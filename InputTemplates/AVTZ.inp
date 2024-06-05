@@ -1,0 +1,18 @@
+jobtype uks rpa
+basis aug-cc-pVTZ
+scf
+ xcfunc PBE
+ thresh density 1.0E-6 
+end
+
+rpa
+ accuracy ludicrous
+ CCD-Corrections JCTC2023
+end
+
+xyz
+{NATOMS_LIST}
+charges {CHARGES_LIST}
+{COORDINATES}
+end
+
