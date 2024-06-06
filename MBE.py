@@ -12,17 +12,6 @@ import qcelemental
 import subprocess
 
 
-def MolAlignInterface(MolA, MolB, TmpDir, MolAlignExec):
-    FileA = os.path.join(TmpDir, "MolA.xyz")
-    FileB = os.path.join(TmpDir, "MolB.xyz")
-    MolA.write(FileA)
-    MolB.write(FileB)
-    result = subprocess.run([MolAlignExec, "-remap", FileA, FileB], capture_output=True, text=True)
-    s = result.stderr.strip()
-    RMSD = float(s)
-    return RMSD
-    
-
 def AlignMolecules(Coords1, ZNums1, Coords2, ZNums2):
     #
     # Molecule alignment code of Borca et al.
@@ -169,9 +158,9 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
     return Monomers
 
 
-def Make(UnitCellFile, SupercellXYZ, Na, Nb, Nc, Cutoffs,
+def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
          RequestedClusterTypes, Ordering, XYZDirs, CSVDirs,
-         TmpDir, AlignmentThresh, MolAlignExec):
+         AlignmentThresh):
 
     StartTime = time.time()
     #
@@ -210,6 +199,7 @@ def Make(UnitCellFile, SupercellXYZ, Na, Nb, Nc, Cutoffs,
     Supercell.translate(-R_COM)
     for M in Molecules:
         M.translate(-R_COM)
+    SupercellXYZ = os.path.join(XYZDirs["supercell"], "supercell.xyz")
     Supercell.write(SupercellXYZ)
     #
     # Sort molecules according to their distances
@@ -294,18 +284,12 @@ def Make(UnitCellFile, SupercellXYZ, Na, Nb, Nc, Cutoffs,
                 # performing expensive search for exact
                 # replicas
                 #
-                Algo = "qcelemental"
                 if len(MatchCandidates) > 0:
                     for k in MatchCandidates:
                         NComparisons[ClusterType] += 1
                         M = Clusters[ClusterType][k]
-                        if Algo == "molalign":
-                            RMSD = MolAlignInterface(Molecule,
-                                                     M["ASEMolecule"],
-                                                     TmpDir, MolAlignExec)
-                        elif Algo == "qcelemental":
-                            RMSD = AlignMolecules(Coords1, ZNums1,
-                                                  M["Coords"], M["ZNums"])
+                        RMSD = AlignMolecules(Coords1, ZNums1,
+                                              M["Coords"], M["ZNums"])
                         if RMSD < AlignmentThresh:
                             M["Replicas"] += 1
                             Unique = False
@@ -321,7 +305,6 @@ def Make(UnitCellFile, SupercellXYZ, Na, Nb, Nc, Cutoffs,
                 if Unique:
                     Cluster = {}
                     Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
-                    Cluster["ASEMolecule"] = Molecule
                     Cluster["Coords"] = Coords1
                     Cluster["ZNums"] = ZNums1
                     if n >= 3:
