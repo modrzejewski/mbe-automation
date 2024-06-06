@@ -10,6 +10,7 @@ import itertools
 import time
 import qcelemental
 import subprocess
+import DirectoryStructure
 
 
 def AlignMolecules(Coords1, ZNums1, Coords2, ZNums2):
@@ -127,6 +128,11 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
     NMolecules, MoleculeIndices = sparse.csgraph.connected_components(ConnectivityMatrix)
     NAtoms = len(MoleculeIndices)
     print(f"Supercell: {Na}×{Nb}×{Nc}, includes {NAtoms} atoms")
+    print("Supercell vectors")
+    for q in range(3):
+        x, y, z = Supercell.cell[q]
+        v = ("a", "b", "c")[q]
+        print(f"{v} = [{x:10.3f}, {y:10.3f}, {z:10.3f}]")
     #
     # Find molecules for which no bond goes through
     # the boundary of the supercell
@@ -173,7 +179,8 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
     print("")
     print("Many-Body Expansion".center(80))
     print("")
-    print(f"Unit cell read from {UnitCellFile}")
+    print(f"Project:   {DirectoryStructure.PROJECT_DIR}")
+    print(f"Unit cell: {UnitCellFile}")
     print("Lattice parameters")
     print(f"a = {La:.4f} Å")
     print(f"b = {Lb:.4f} Å")
@@ -254,6 +261,9 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
         AllClusters = scipy.special.comb(len(Neighbors), n-1)
         ProcessedClusters = 0
         JobsDone = 0
+        print("")
+        print(f"Computing unique {ClusterType}")
+        print(f"Alignment threshold for {ClusterType}: RMSD < {AlignmentThresh:.4f} Å")
         for x in itertools.combinations(Neighbors, n-1):
             if 10*int(np.floor(10*(ProcessedClusters/AllClusters))) > JobsDone:
                 JobsDone = 10*int(np.floor(10*(ProcessedClusters/AllClusters)))
@@ -327,7 +337,6 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
                 
         NClusters[ClusterType] = len(Clusters[ClusterType])
         print(f"100% {ClusterType} completed")
-        print(f"Alignment threshold for {ClusterType}: RMSD < {AlignmentThresh:.4f} Å")
         print(f"{NClusters[ClusterType]} unique {ClusterType} satisfy Max(MinRij) < {Cutoff:.2f} Å")
 
     for ClusterType in RequestedClusterTypes:
@@ -365,4 +374,5 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
         csv.close()
         
     EndTime = time.time()
-    print(f"All geometries extracted in {EndTime-StartTime:.1f} seconds")
+    print("")
+    print(f"All geometries computed in {EndTime-StartTime:.1f} seconds")
