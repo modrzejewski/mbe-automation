@@ -1,14 +1,16 @@
 import os
 import os.path
 import stat
+import math
 
 def Make(QueueDirs, QueueMainScript, SystemTypes, TemplateFile, InpDirs, LogDirs):
     f = open(TemplateFile, "r")
     Template = f.read()
     f.close()
-    MaxBlockSize = 1000
+    MaxBlockSize = 100
     SlurmCommands = ""
     for SystemType in SystemTypes:
+        SlurmCommands += f"#\n#{SystemType.center(80)}\n#\n"
         for BasisType in ("small-basis", "large-basis"):
             InputDir = InpDirs[SystemType][BasisType]
             Files = sorted(os.listdir(InputDir))
@@ -19,9 +21,12 @@ def Make(QueueDirs, QueueMainScript, SystemTypes, TemplateFile, InpDirs, LogDirs
             for b in range(1, NBlocks + 1):
                 i0 = 1 + (b - 1) * MaxBlockSize
                 i1 = min(b * MaxBlockSize, NTasks)
-                FilePath = os.path.join(QueueDirs[SystemType][BasisType], f"{i0}-{i1}.py")
-                D = {"FIRST": str(i0),
-                     "LAST": str(i1),
+                d = math.ceil(math.log(NTasks, 10))
+                system0 = str(i0-1).zfill(d)
+                system1 = str(i1-1).zfill(d)
+                FilePath = os.path.join(QueueDirs[SystemType][BasisType], f"{system0}-{system1}.py")
+                D = {"FIRST": system0,
+                     "LAST": system1,
                      "INP_DIR": InpDirs[SystemType][BasisType],
                      "LOG_DIR": LogDirs[SystemType][BasisType],
                      "NTASKS": NTasks,
@@ -51,3 +56,4 @@ import os
     #    
     mode = os.stat(QueueMainScript).st_mode
     os.chmod(QueueMainScript, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    print(f"Main queue script: {QueueMainScript}")
