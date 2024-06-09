@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#SBATCH --job-name="{FIRST}-{LAST}-{SYSTEM_TYPE}-{BASIS_TYPE}"
+#SBATCH --job-name="{FIRST_SYSTEM}-{LAST_SYSTEM}-{SYSTEM_TYPE}-{BASIS_TYPE}"
 #SBATCH --account OPEN-30-27                                                               
 #SBATCH --partition qcpu  
 #SBATCH --nodes 1      
@@ -9,9 +9,9 @@
 import os
 #
 # Total number of {SYSTEM_TYPE}/{BASIS_TYPE}: {NTASKS}
-# This script is for {SYSTEM_TYPE}/{BASIS_TYPE} {FIRST}-{LAST}
+# This script is for {SYSTEM_TYPE}/{BASIS_TYPE} {FIRST_SYSTEM}-{LAST_SYSTEM}
 #
-ThisJob = {FIRST} + int(os.environ["SLURM_ARRAY_TASK_ID"]) - 1
+ThisJob = {OFFSET} + int(os.environ["SLURM_ARRAY_TASK_ID"]) - 1
 InpDir = "{INP_DIR}"
 LogDir = "{LOG_DIR}"
 AllFiles = sorted(os.listdir(InpDir)) 

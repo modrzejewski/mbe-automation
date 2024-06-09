@@ -25,29 +25,6 @@ def AlignMolecules(Coords1, ZNums1, Coords2, ZNums2):
     return RMSD
 
 
-def ChemicalDescriptor(Molecule):
-    #
-    # Chemical descriptor is taken from Borca et al.
-    # C. H. Borca; B.W. Bakr; L.A. Burns; C.D. Sherrill 
-    # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
-    #
-    NAtoms = len(Molecule)
-    Coords = Molecule.get_positions() * ase.units.Bohr
-    Z = Molecule.get_atomic_numbers()
-    Rij = scipy.spatial.distance.cdist(Coords, Coords)
-    M = np.zeros((NAtoms, NAtoms))
-    for j in range(NAtoms):
-        for i in range(j, NAtoms):
-            if (i == j):
-                M[i, j] = 0.5 * (Z[i])**(2.4)
-            else:
-                M[i, j] = Z[i] * Z[j] / Rij[i, j]
-                                            
-    Eigenvals = scipy.linalg.eigh(M, lower=True, eigvals_only=True, driver="evd")
-    Eigenvals.sort()
-    return Eigenvals
-
-
 def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThresh):
     n = len(Constituents)
     MatchCandidates = []
@@ -286,7 +263,6 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
                 Molecule = Atoms()
                 for i in Constituents:
                     Molecule.extend(Monomers[i])
-                    D1 = ChemicalDescriptor(Molecule)
                 Coords1 = Molecule.get_positions() * ase.units.Bohr
                 ZNums1 = Molecule.get_atomic_numbers()
                 #
@@ -303,15 +279,7 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
                         if RMSD < AlignmentThresh:
                             M["Replicas"] += 1
                             Unique = False
-                            break
-                        
-                        # D2 = M["Descriptor"]
-                        # Delta = np.sum(np.absolute(D1-D2))
-                        # if Delta <  1.0E-6:
-                        #     M["Replicas"] += 1
-                        #     Unique = False
-                        #     break
-                        
+                            break                        
                 if Unique:
                     Cluster = {}
                     Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
@@ -329,7 +297,6 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
                         Cluster["MaxCOMRij"] = COMDist
                         Cluster["SumAvRij"] = AvDist
                     Cluster["Constituents"] = Constituents
-                    Cluster["Descriptor"] = D1
                     Cluster["Replicas"] = 1
                     Clusters[ClusterType].append(Cluster)
                 else:
@@ -353,17 +320,12 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
         csv.write(f"{Col1:>15},{Col2:>15},{Col3:>15},{Col4:>15},{Col5:>15}\n")
         for i in range(NClusters[ClusterType]):
             C = Clusters[ClusterType][Map[i]]
-            Prefix = str(i).zfill(math.ceil(math.log(NMonomers, 10)))
+            Prefix = str(i).zfill(math.ceil(math.log(NClusters[ClusterType], 10)))
             Label = Prefix + "-" + C["Label"]
             Constituents = C["Constituents"]
             Dir = XYZDirs[ClusterType]
             FilePath = os.path.join(f"{Dir}", f"{Label}.xyz")
             WriteClusterXYZ(FilePath, Constituents, Monomers)
-            Col1 = "System"
-            Col2 = "Replicas"
-            Col3 = "SumAvRij"
-            Col4 = "MaxMinRij"
-            Col5 = "MaxCOMRij"
             Col1 = Prefix
             Col2 = str(C["Replicas"])
             R1, R2, R3 = C["SumAvRij"], C["MaxMinRij"], C["MaxCOMRij"]

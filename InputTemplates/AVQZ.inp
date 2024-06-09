@@ -1,13 +1,20 @@
 jobtype uks rpa
 basis aug-cc-pVQZ
 scf
- xcfunc PBE
- thresh density 1.0E-6 
+ xcfunc HF
+ thresh density 1.0E-6
+ Algorithm THC
+ THC_QRThresh 1.0E-3
 end
 
 rpa
- accuracy ludicrous
+ RPA+MBPT3
+ accuracy default
  CCD-Corrections JCTC2023
+ T2AuxOrbitals NO
+ T2AuxNOCutoffThresh 1.0E-8
+ T2CutoffThresh 1.0E-4
+ CholeskyTauThresh 1.0E-5
 end
 
 xyz
