@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+#
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ User's Input ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
                                                 #
@@ -51,7 +51,7 @@ Cutoffs = {"dimers": 20.0,
                                                 # SumAvRij         R(k) = sum(a,b∈k)average(i∈a,j∈b) ||Rij||
                                                 # MaxMinRij        R(k) = max(a,b∈k)min(i∈a,j∈b) ||Rij||
                                                 # MaxCOMRij        R(k) = max(a,b∈k)||Rcom(a)-Rcom(b)||
-#
+                                                #
 Ordering            = "SumAvRij"
 
                                                 # Supercell dimension is Na x Nb x Nc, where Nx indicates
@@ -74,37 +74,56 @@ AlignmentThresh    = 1.0E-3
 
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ End of User's Input ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
 
-import MBE
-import Inputs
-import QueueScripts
-import DirectoryStructure
-import os.path
-import shutil
+def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
+               Ordering, Na, Nb, Nc, InputTemplates, QueueScript,
+               AlignmentThresh):
 
-DirectoryStructure.SetUp(ProjectDirectory)
+    import MBE
+    import Inputs
+    import QueueScripts
+    import DirectoryStructure
+    import os.path
+    import shutil
 
-MBE.Make(UnitCellFile,
-         Na, Nb, Nc,
-         Cutoffs,
-         SystemTypes,
-         Ordering,
-         DirectoryStructure.XYZ_DIRS,
-         DirectoryStructure.CSV_DIRS,
-         AlignmentThresh)
+    DirectoryStructure.SetUp(ProjectDirectory)
 
-Inputs.Make(InputTemplates,
-            SystemTypes,
-            DirectoryStructure.INP_DIRS,
-            DirectoryStructure.XYZ_DIRS)
+    MBE.Make(UnitCellFile,
+             Na, Nb, Nc,
+             Cutoffs,
+             SystemTypes,
+             Ordering,
+             DirectoryStructure.XYZ_DIRS,
+             DirectoryStructure.CSV_DIRS,
+             AlignmentThresh)
 
-QueueScripts.Make(DirectoryStructure.QUEUE_DIRS,
-                  DirectoryStructure.QUEUE_MAIN_SCRIPT,
-                  SystemTypes,
-                  QueueScript,
-                  DirectoryStructure.INP_DIRS,
-                  DirectoryStructure.LOG_DIRS)
+    Inputs.Make(InputTemplates,
+                SystemTypes,
+                DirectoryStructure.INP_DIRS,
+                DirectoryStructure.XYZ_DIRS)
 
-shutil.copy(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis.py"),
-            os.path.join(ProjectDirectory, "DataAnalysis.py"))
-print(f"Data analysis script: {os.path.join(ProjectDirectory, 'DataAnalysis.py')}")
+    QueueScripts.Make(DirectoryStructure.QUEUE_DIRS,
+                      DirectoryStructure.QUEUE_MAIN_SCRIPT,
+                      SystemTypes,
+                      QueueScript,
+                      DirectoryStructure.INP_DIRS,
+                      DirectoryStructure.LOG_DIRS)
+
+    template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis.py"), "r")
+    s = template.read()
+    template.close()
+    DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis.py")
+    f = open(DataAnalysisPath, "w")
+    f.write(s.format(
+        ROOT_DIR=os.path.abspath(DirectoryStructure.ROOT_DIR),
+        PROJECT_DIR=os.path.abspath(ProjectDirectory)))
+    f.close()
+    
+    print(f"Data analysis script: {DataAnalysisPath}")
+
+
+
+NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
+               Ordering, Na, Nb, Nc, InputTemplates, QueueScript,
+               AlignmentThresh)

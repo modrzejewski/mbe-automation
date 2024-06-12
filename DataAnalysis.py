@@ -2,7 +2,7 @@
 
 # ------------------------------------------- User's Input -----------------------------------------
 
-ProjectDirectory            = "./"
+ProjectDirectory            = "{PROJECT_DIR}"
 
                                                    #
                                                    # Available methods:
@@ -16,6 +16,10 @@ Method                      = "RPA+MBPT3"
 SmallBasisXNumber           = 3
 
 # --------------------------------------- End of User's Input --------------------------------------
+
+import sys
+import os
+sys.path.append(os.path.abspath("{ROOT_DIR}"))
 
 import CSV
 
