@@ -15,7 +15,7 @@ import os
 ThisJob = {OFFSET} + int(os.environ["SLURM_ARRAY_TASK_ID"]) - 1
 InpDir = "{INP_DIR}"
 LogDir = "{LOG_DIR}"
-AllFiles = sorted(os.listdir(InpDir)) 
+AllFiles = sorted([x for x in os.listdir(InpDir) if x.endswith(".inp")])
 InpFile = AllFiles[ThisJob-1]
 LogFile = os.path.splitext(InpFile)[0] + ".log"
 InpPath = os.path.join(InpDir, InpFile)

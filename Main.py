@@ -80,6 +80,7 @@ import Inputs
 import QueueScripts
 import DirectoryStructure
 import os.path
+import shutil
 
 DirectoryStructure.SetUp(ProjectDirectory)
 
@@ -103,3 +104,7 @@ QueueScripts.Make(DirectoryStructure.QUEUE_DIRS,
                   QueueScript,
                   DirectoryStructure.INP_DIRS,
                   DirectoryStructure.LOG_DIRS)
+
+shutil.copy(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis.py"),
+            os.path.join(ProjectDirectory, "DataAnalysis.py"))
+print(f"Data analysis script: {os.path.join(ProjectDirectory, 'DataAnalysis.py')}")

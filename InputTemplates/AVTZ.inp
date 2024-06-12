@@ -4,12 +4,12 @@ scf
  xcfunc HF
  thresh density 1.0E-6
  Algorithm THC
- THC_QRThresh 1.0E-3
+ THC_QRThresh 1.0E-4
 end
 
 rpa
- RPA+MBPT3
  accuracy default
+ RPA+MBPT3
  CCD-Corrections JCTC2023
  T2AuxOrbitals NO
  T2AuxNOCutoffThresh 1.0E-8
