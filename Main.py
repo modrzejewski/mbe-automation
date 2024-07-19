@@ -9,12 +9,12 @@
                                                 # The path will be created automatically if does not exist.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/ethane"
+ProjectDirectory    = "./Projects/benzene"
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/ethane/POSCAR"
+UnitCellFile        = "./Systems/benzene/benzene-temperature-138.cif"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers
@@ -58,7 +58,7 @@ Ordering            = "SumAvRij"
                                                 # how many times the unit cell is repeated in each dimension.
                                                 # The supercell needs to be large enough so that the clusters
                                                 # up to the requested cutoff radius can be properly generated.
-Na, Nb, Nc          = 3, 3, 3
+Na, Nb, Nc          = 5, 5, 5
                                       
 InputTemplates = {"small-basis": "./InputTemplates/AVTZ.inp",
                   "large-basis": "./InputTemplates/AVQZ.inp"
