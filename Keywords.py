@@ -137,8 +137,42 @@ MBPT3_TOTAL_ENERGY_SUM = [
     "Ec2g",
     "EcRPA"
 ]
-
-
+#
+# RPA + SOSEX + full set of 3rd order particle-hole corrections
+#
+PHRPA3_ENERGY_COMPONENTS = [
+    "EtotDFT",
+    "EtotHF",
+    "EcSingles",
+    "EcSinglesQuadratic",
+    "EcRPA",
+    "EcSOSEX",
+    "EcPH3",
+    TOTAL_ENERGY
+]
+PHRPA3_REGEX_STRINGS = {
+    "EtotDFT" : "Eint(?:Nadd)?\(DFT\)" + NumberRegex,
+    "EtotHF" : "Eint(?:Nadd)?\(HF\)" + NumberRegex,
+    "EcSingles" : "Eint(?:Nadd)?\(1-RDM linear\)" + NumberRegex,
+    "EcSinglesQuadratic" : "Eint(?:Nadd)?\(1-RDM quadratic\)" + NumberRegex,
+    "EcRPA" : "Eint(?:Nadd)?\(direct ring\)" + NumberRegex,
+    "EcSOSEX" : "Eint(?:Nadd)?\(SOSEX\)" + NumberRegex,
+    "EcPH3" : "Eint(?:Nadd)?\(3rd order ph\)" + NumberRegex,
+    TOTAL_ENERGY : "Eint(?:Nadd)?\(total\)" + NumberRegex
+}
+PHRPA3_EXTRAPOLATED_COMPONENTS = [
+    "EcRPA",
+    "EcSOSEX",
+    "EcPH3"
+    ]
+PHRPA3_TOTAL_ENERGY_SUM = [
+    "EtotHF",
+    "EcSingles",
+    "EcSinglesQuadratic",
+    "EcRPA",
+    "EcSOSEX",
+    "EcPH3"
+]
 #
 # RPA + ALL MBPT3 corrections
 #

@@ -8,10 +8,11 @@ ProjectDirectory            = "{PROJECT_DIR}"
                                                    # Available methods:
                                                    #
                                                    # "rPT2", "RPA+MBPT3", "MBPT3",
-                                                   # "RPA", "RPA+ALL_CORRECTIONS", "MP3"
+                                                   # "RPA", "RPA+ALL_CORRECTIONS", "MP3",
+                                                   # "JCTC2024", "ph-RPA(3)"                                                   
                                                    #
                                                  
-Method                      = "RPA+MBPT3"
+Method                      = "JCTC2024"
 
 SmallBasisXNumber           = 3
 

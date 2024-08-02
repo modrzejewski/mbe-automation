@@ -68,6 +68,11 @@ def WriteCSV(XYZDir, LogDir, CSVDir, Method, X):
         RegexStrings = Keywords.rPT2_REGEX_STRINGS
         ExtrapolatedComponents = Keywords.rPT2_EXTRAPOLATED_COMPONENTS
         TotalEnergySum = Keywords.rPT2_TOTAL_ENERGY_SUM
+    elif Method == "JCTC2024" or Method == "ph-RPA(3)":
+        EnergyComponents = Keywords.PHRPA3_ENERGY_COMPONENTS
+        RegexStrings = Keywords.PHRPA3_REGEX_STRINGS
+        ExtrapolatedComponents = Keywords.PHRPA3_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = Keywords.PHRPA3_TOTAL_ENERGY_SUM
     elif Method == "MBPT3" or Method == "RPA+MBPT3":
         EnergyComponents = Keywords.MBPT3_ENERGY_COMPONENTS
         RegexStrings = Keywords.MBPT3_REGEX_STRINGS

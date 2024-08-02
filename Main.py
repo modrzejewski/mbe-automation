@@ -63,7 +63,12 @@ Na, Nb, Nc          = 5, 5, 5
 InputTemplates = {"small-basis": "./InputTemplates/AVTZ.inp",
                   "large-basis": "./InputTemplates/AVQZ.inp"
                   }
-
+                                                #
+                                                # Script for the queue system specific to your
+                                                # computing cluster. This file should include your
+                                                # computational grant id, max execution time,
+                                                # memory, etc.
+                                                #
 QueueScript        = "./QueueTemplates/Barbora.py"
 
                                                 # Threshold for alignment of molecular clusters.
