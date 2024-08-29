@@ -11,10 +11,14 @@ import time
 import qcelemental
 import subprocess
 import DirectoryStructure
+import shutil
 
 def ChemicalDescriptor(Coords, ZNums):
+    #
+    # Chemical descriptor used by Borca et al.
+    #
     NAtoms = len(Coords)
-    M = np.zeros(NAtoms, NAtoms)
+    M = np.zeros((NAtoms, NAtoms))
     for a in range(NAtoms):
         M[a, a] = 0.5 * ZNums[a]**2.4
     for b in range(NAtoms):
@@ -299,11 +303,12 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
                         NComparisons[ClusterType] += 1
                         M = Clusters[ClusterType][k]
                         if CompareChemicalDescriptors:
+                            Dist = CompareDescriptors(Coords1, ZNums1,
+                                                      M["Coords"], M["ZNums"])
+                        else:
                             Dist = AlignMolecules(Coords1, ZNums1,
                                                   M["Coords"], M["ZNums"])
-                        else:
-                            Dist = CompareDescriptors(Coords1, ZNums1,
-                                                  M["Coords"], M["ZNums"])
+                            
                         if Dist < AlignmentThresh:
                             M["Replicas"] += 1
                             Unique = False
@@ -362,6 +367,11 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
             Col5 = f"{R3:.4f}"
             csv.write(f"{Col1:>15},{Col2:>15},{Col3:>15},{Col4:>15},{Col5:>15}\n")
         csv.close()
+        if len(Methods) > 1:
+            for x in range(1, len(Methods)):
+                source = os.path.join(CSVDirs[Methods[0]][ClusterType], "systems.csv")
+                destination = os.path.join(CSVDirs[Methods[x]][ClusterType], "systems.csv")
+                shutil.copy(source, destination)
         
     EndTime = time.time()
     print("")

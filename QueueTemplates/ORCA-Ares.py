@@ -8,6 +8,18 @@
 #SBATCH --time=01:00:00 
 
 import os
+import shutil
+
+#
+# Number of cores used by ORCA
+#
+os.environ["OMP_NUM_THREADS"] = os.environ["SLURM_CPUS_PER_TASK"]
+os.environ["MKL_NUM_THREADS"] = os.environ["SLURM_CPUS_PER_TASK"]
+#
+# On the ares cluster, it is recommended to use the ORCA environmental
+# variable instead of simply orca command.
+#
+OrcaExecutable = os.environ["ORCA"]
 #
 # Total number of {SYSTEM_TYPE}/{BASIS_TYPE}: {NTASKS}
 # This script is for {SYSTEM_TYPE}/{BASIS_TYPE} {FIRST_SYSTEM}-{LAST_SYSTEM}
@@ -20,5 +32,20 @@ InpFile = AllFiles[ThisJob-1]
 LogFile = os.path.splitext(InpFile)[0] + ".log"
 InpPath = os.path.join(InpDir, InpFile)
 LogPath = os.path.join(LogDir, LogFile)
-OrcaExec = os.environ["ORCA"]
-os.system(f"module load orca; /net/people/plgrid/plgmodrzej/beyond-rpa/bin/run -np 1 -nt 48 '{{InpPath}}' >& '{{LogPath}}'")
+ScratchDir = os.path.join(LogDir, os.path.splitext(InpFile)[0])
+if not path.exists(ScratchDir):
+    os.makedirs(ScratchDirs)
+#
+# Copy input file into the scratch directory.
+#
+source = InpFile
+destination = os.path.join(ScratchDir, "input.inp")
+shutils.copy(source, destination)
+current_dir = os.getcwd()
+os.chdir(ScratchDir)
+os.system(f"module load orca; {{OrcaExecutable}} input.inp >& '{{LogPath}}'")
+os.chdir(current_dir)
+#
+# Remove scratch
+#
+shutils.rmtree(ScratchDir)

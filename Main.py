@@ -78,7 +78,7 @@ Ordering            = "SumAvRij"
                                                 # how many times the unit cell is repeated in each dimension.
                                                 # The supercell needs to be large enough so that the clusters
                                                 # up to the requested cutoff radius can be properly generated.
-Na, Nb, Nc          = 7, 7, 7
+Na, Nb, Nc          = 5, 5, 5
                                                 #
                                                 # Templates for input files for each method defined in Methods.
                                                 # You don't need to define any template file for a method
