@@ -1,6 +1,9 @@
 
 
 NumberRegex = "\s+(?P<number>[+-]*[0-9]+.[0-9]+E[+-]*[0-9]+)"
+MRCC_NumberRegex = "\s+(?P<number>[+-]*[0-9]+.[0-9]+)"
+ORCA_NumberRegex = "\s+(?P<number>[+-]*[0-9]+.[0-9]+)"
+
 TOTAL_ENERGY = "Etot"
 
 RPA_ENERGY_COMPONENTS = [
@@ -319,3 +322,36 @@ MP3_TOTAL_ENERGY_SUM = [
     "Ec2k",
     "Ec2l"
 ]
+
+#
+# LNO-CCSD(T) in MRCC
+#
+LNO_REGEX_STRINGS = {
+    "EtotHF" : "\s*Reference energy \[au\]:" + MRCC_NumberRegex,
+    "Ec"     : "\s*CCSD\(T\) correlation energy + MP2 corrections \[au\]:" + MRCC_NumberRegex,
+    TOTAL_ENERGY : "\s*Total LNO-CCSD\(T\) energy with MP2 corrections \[au\]:" + MRCC_NumberRegex
+}
+LNO_EXTRAPOLATED_COMPONENTS = [
+    "Ec"
+    ]
+LNO_TOTAL_ENERGY_SUM = [
+    "EtotHF",
+    "Ec"
+    ]
+
+#  Reference energy [au]:                                  -158.526831919782
+#  CCSD(T) correlation energy + MP2 corrections [au]:        -0.875517929219
+# Total LNO-CCSD(T) energy with MP2 corrections [au]:     -159.402349849001
+
+
+#
+# DLPNO-CCSD(T) in ORCA
+#
+# Extrapolated SCF energy     E(SCF,3/4)    =     -615.121782182 (-0.004312252)
+# Extrapolated MDCI corr. en. EC(MDCI,3/4)  =       -0.850909470 (-0.034981686)
+# Extrapolated MDCI energy    EMDCI(3/4)    =     -615.972691652 (-0.039293939)
+DLPNO_REGEX_STRINGS = {
+    "EtotHF" : "Extrapolated SCF energy     E\(SCF,3/4\)    =" + ORCA_NumberRegex,
+    "Ec"     : "Extrapolated MDCI corr. en. EC\(MDCI,3/4\)  =" + ORCA_NumberRegex,
+    TOTAL_ENERGY : "Extrapolated MDCI energy    EMDCI\(3/4\)    =" + ORCA_NumberRegex
+}

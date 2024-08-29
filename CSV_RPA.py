@@ -8,7 +8,7 @@ import Keywords
 def Make(ProjectDir, Method, SmallBasisXNumber):
     for SystemType in ("dimers", "trimers", "tetramers"):
         LogDir = os.path.join(ProjectDir, "logs", "RPA", SystemType)
-        CSVDir = os.path.join(ProjectDir, "csv", SystemType)
+        CSVDir = os.path.join(ProjectDir, "csv", "RPA", SystemType)
         XYZDir = os.path.join(ProjectDir, "xyz", SystemType)
         WriteCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber)
 

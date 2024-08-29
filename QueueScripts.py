@@ -24,12 +24,12 @@ def Make(QueueDirs, QueueMainScript, SystemTypes, TemplateFile, InpDirs, LogDirs
                 d = math.ceil(math.log(NTasks, 10))
                 system0 = str(i0-1).zfill(d)
                 system1 = str(i1-1).zfill(d)
-                FilePath = os.path.join(QueueDirs[SystemType][BasisType], f"{system0}-{system1}.py")
+                FilePath = os.path.abspath(os.path.join(QueueDirs[SystemType][BasisType], f"{system0}-{system1}.py"))
                 D = {"FIRST_SYSTEM": system0,
                      "LAST_SYSTEM": system1,
                      "OFFSET": i0,
-                     "INP_DIR": InpDirs[SystemType][BasisType],
-                     "LOG_DIR": LogDirs[SystemType][BasisType],
+                     "INP_DIR": os.path.abspath(InpDirs[SystemType][BasisType]),
+                     "LOG_DIR": os.path.abspath(LogDirs[SystemType][BasisType]),
                      "NTASKS": NTasks,
                      "BASIS_TYPE": BasisType,
                      "SYSTEM_TYPE": SystemType,

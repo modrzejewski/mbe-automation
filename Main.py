@@ -20,7 +20,7 @@ ProjectDirectory    = "./Projects/test"
                                                 # (2) DLPNO-CCSD(T)
                                                 # (3) LNO-CCSD(T)
                                                 #
-Methods = ("RPA", "DLPNO-CCSD(T)", "LNO-CCSD(T)")
+Methods = ("RPA", "LNO-CCSD(T)")
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
@@ -189,18 +189,31 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                                  QueueScriptTemplates[Method],
                                  DirectoryStructure.INP_DIRS[Method],
                                  DirectoryStructure.LOG_DIRS[Method])
+    if "RPA" in Methods:
+        template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis_RPA.py"), "r")
+        s = template.read()
+        template.close()
+        DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis_RPA.py")
+        f = open(DataAnalysisPath, "w")
+        f.write(s.format(
+            ROOT_DIR=os.path.abspath(DirectoryStructure.ROOT_DIR),
+            PROJECT_DIR=os.path.abspath(ProjectDirectory)))
+        f.close()
 
-    template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis_RPA.py"), "r")
-    s = template.read()
-    template.close()
-    DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis_RPA.py")
-    f = open(DataAnalysisPath, "w")
-    f.write(s.format(
-        ROOT_DIR=os.path.abspath(DirectoryStructure.ROOT_DIR),
-        PROJECT_DIR=os.path.abspath(ProjectDirectory)))
-    f.close()
-    
-    print(f"Data analysis script: {DataAnalysisPath}")
+        print(f"RPA data analysis script: {DataAnalysisPath}")
+
+    if "LNO-CCSD(T)" in Methods:
+        template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis_MRCC.py"), "r")
+        s = template.read()
+        template.close()
+        DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis_MRCC.py")
+        f = open(DataAnalysisPath, "w")
+        f.write(s.format(
+            ROOT_DIR=os.path.abspath(DirectoryStructure.ROOT_DIR),
+            PROJECT_DIR=os.path.abspath(ProjectDirectory)))
+        f.close()
+
+        print(f"LNO-CCSD(T) data analysis script: {DataAnalysisPath}")
 
 
 
