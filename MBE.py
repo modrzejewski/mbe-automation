@@ -12,6 +12,27 @@ import qcelemental
 import subprocess
 import DirectoryStructure
 
+def ChemicalDescriptor(Coords, ZNums):
+    NAtoms = len(Coords)
+    M = np.zeros(NAtoms, NAtoms)
+    for a in range(NAtoms):
+        M[a, a] = 0.5 * ZNums[a]**2.4
+    for b in range(NAtoms):
+        for a in range(b+1,NAtoms):
+            dab = np.linalg.norm(Coords[a] - Coords[b])
+            za = ZNums[a]
+            zb = ZNums[b]
+            M[a, b] = za*zb/dab
+    eigvals = np.linalg.eigvalsh(M, UPLO="L")
+    return eigvals
+
+
+def CompareDescriptors(Coords1, ZNums1, Coords2, ZNums2):
+    eigvals1 = ChemicalDescriptor(Coords1, ZNums1)
+    eigvals2 = ChemicalDescriptor(Coords2, ZNums2)
+    d = np.linalg.norm(eigvals1-eigvals2)
+    return d
+
 
 def AlignMolecules(Coords1, ZNums1, Coords2, ZNums2):
     #
@@ -143,7 +164,7 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
 
 def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
          RequestedClusterTypes, Ordering, XYZDirs, CSVDirs,
-         AlignmentThresh):
+         AlignmentThresh, CompareChemicalDescriptors, Methods):
 
     StartTime = time.time()
     #
@@ -240,7 +261,10 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
         JobsDone = 0
         print("")
         print(f"Computing unique {ClusterType}")
-        print(f"Alignment threshold for {ClusterType}: RMSD < {AlignmentThresh:.4f} Å")
+        if CompareChemicalDescriptors:
+            print(f"Computing symmetry factors for {ClusterType} using chemical descriptors with threshold < {AlignmentThresh:.4f} Å")
+        else:
+            print(f"Computing symmetry factors for {ClusterType} using the alignment subroutine with RMSD < {AlignmentThresh:.4f} Å")
         for x in itertools.combinations(Neighbors, n-1):
             if 10*int(np.floor(10*(ProcessedClusters/AllClusters))) > JobsDone:
                 JobsDone = 10*int(np.floor(10*(ProcessedClusters/AllClusters)))
@@ -274,9 +298,13 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
                     for k in MatchCandidates:
                         NComparisons[ClusterType] += 1
                         M = Clusters[ClusterType][k]
-                        RMSD = AlignMolecules(Coords1, ZNums1,
-                                              M["Coords"], M["ZNums"])
-                        if RMSD < AlignmentThresh:
+                        if CompareChemicalDescriptors:
+                            Dist = AlignMolecules(Coords1, ZNums1,
+                                                  M["Coords"], M["ZNums"])
+                        else:
+                            Dist = CompareDescriptors(Coords1, ZNums1,
+                                                  M["Coords"], M["ZNums"])
+                        if Dist < AlignmentThresh:
                             M["Replicas"] += 1
                             Unique = False
                             break                        
@@ -311,7 +339,7 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
         for c in range(NClusters[ClusterType]):
             SortingKey[c] = Clusters[ClusterType][c][Ordering]
         Map = np.argsort(SortingKey)
-        csv = open(os.path.join(CSVDirs[ClusterType], "systems.csv"), "w")
+        csv = open(os.path.join(CSVDirs[Methods[0]][ClusterType], "systems.csv"), "w")
         Col1 = "System"
         Col2 = "Weight"
         Col3 = "SumAvRij"

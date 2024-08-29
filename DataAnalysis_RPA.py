@@ -22,6 +22,6 @@ import sys
 import os
 sys.path.append(os.path.abspath("{ROOT_DIR}"))
 
-import CSV
+import CSV_RPA
 
-CSV.Make(ProjectDirectory, Method, SmallBasisXNumber)
+CSV_RPA.Make(ProjectDirectory, Method, SmallBasisXNumber)

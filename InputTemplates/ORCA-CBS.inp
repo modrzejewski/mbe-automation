@@ -1,0 +1,14 @@
+! DLPNO-CCSD(T) AutoAux Extrapolate(3/4,aug-cc) VeryTightSCF PModel
+
+%maxcore 8000
+
+%mdci
+TCutPairs 1.0E-5
+TCutPNO   1.0E-7
+TCutMKN   1.0E-4
+end
+
+* xyz 0 1
+{COORDINATES}
+*
+

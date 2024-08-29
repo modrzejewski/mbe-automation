@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #SBATCH --job-name="{FIRST_SYSTEM}-{LAST_SYSTEM}-{SYSTEM_TYPE}-{BASIS_TYPE}"
-#SBATCH -A plgrpa2023-cpu
+#SBATCH -A plgrpa2025-cpu
 #SBATCH -p plgrid 
 #SBATCH --nodes 1      
 #SBATCH --ntasks-per-node=1

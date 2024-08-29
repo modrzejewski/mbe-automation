@@ -1,0 +1,17 @@
+jobtype uks rpa
+basis aug-cc-pVTZ
+scf
+ xcfunc HF
+end
+
+rpa
+ accuracy default
+ CCD-Corrections JCTC2024
+end
+
+xyz
+{NATOMS_LIST}
+charges {CHARGES_LIST}
+{COORDINATES}
+end
+

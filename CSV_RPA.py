@@ -6,9 +6,8 @@ import argparse
 import Keywords
 
 def Make(ProjectDir, Method, SmallBasisXNumber):
-
     for SystemType in ("dimers", "trimers", "tetramers"):
-        LogDir = os.path.join(ProjectDir, "logs", SystemType)
+        LogDir = os.path.join(ProjectDir, "logs", "RPA", SystemType)
         CSVDir = os.path.join(ProjectDir, "csv", SystemType)
         XYZDir = os.path.join(ProjectDir, "xyz", SystemType)
         WriteCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber)
@@ -97,9 +96,9 @@ def WriteCSV(XYZDir, LogDir, CSVDir, Method, X):
     if len(XYZFiles) == 0:
         return
 
-    csv_small = open(os.path.join(CSVDir, "small-basis.csv"), "w")
-    csv_large = open(os.path.join(CSVDir, "large-basis.csv"), "w")
-    csv_cbs =   open(os.path.join(CSVDir, "cbs.csv"), "w")
+    csv_small = open(os.path.join(CSVDir, "rpa-small-basis.csv"), "w")
+    csv_large = open(os.path.join(CSVDir, "rpa-large-basis.csv"), "w")
+    csv_cbs =   open(os.path.join(CSVDir, "rpa-cbs.csv"), "w")
 
     SystemColWidth = 30
     ColWidth = 25

@@ -1,12 +1,11 @@
 #
-# Coded by Marcin Modrzejewski (Charles Univ, September 2018)
+# Marcin Modrzejewski (University of Warsaw, 2024)
 #
 import os
 from os import path
 import subprocess
 import numpy as np
 import sys
-import argparse
 import re
 import XYZ
 

@@ -1,0 +1,12 @@
+basis=aug-cc-pVTZ
+calc=LNO-CCSD(T)
+Lcorthr=vTight
+mem=16000MB
+
+geom=xyz
+{NATOMS}
+
+{COORDINATES}
+
+ghost={GHOSTS}
+
