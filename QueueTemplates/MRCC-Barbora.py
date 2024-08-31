@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 #SBATCH --job-name="{FIRST_SYSTEM}-{LAST_SYSTEM}-{SYSTEM_TYPE}-{BASIS_TYPE}"
-#SBATCH -A plgrpa2025-cpu
-#SBATCH -p plgrid 
+#SBATCH --account OPEN-30-27                                                               
+#SBATCH --partition qcpu_free
 #SBATCH --nodes 1      
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=48
-#SBATCH --time=01:00:00 
+#SBATCH --ntasks-per-node=36
+#SBATCH --time=15:00:00 
 
 import os
 import shutil
@@ -19,8 +18,8 @@ SUBSYSTEM_LABELS = {{
 #
 # Number of cores used by MRCC
 #
-os.environ["OMP_NUM_THREADS"] = "48"
-os.environ["MKL_NUM_THREADS"] = "48"
+os.environ["OMP_NUM_THREADS"] = "36"
+os.environ["MKL_NUM_THREADS"] = "36"
 #
 # Total number of {SYSTEM_TYPE}/{BASIS_TYPE}: {NTASKS}
 # This script is for {SYSTEM_TYPE}/{BASIS_TYPE} {FIRST_SYSTEM}-{LAST_SYSTEM}
@@ -45,7 +44,7 @@ for Subsystem in SUBSYSTEM_LABELS["{SYSTEM_TYPE}"]:
     shutil.copy(source, destination)
     current_dir = os.getcwd()
     os.chdir(ScratchDir)
-    os.system(f"module load mrcc; dmrcc >& '{{LogPath}}'")
+    os.system(f"module load intel/2021b; export PATH=$PATH:/home/marcin/mrcc; dmrcc >& '{{LogPath}}'")
     os.chdir(current_dir)
     #
     # Remove scratch

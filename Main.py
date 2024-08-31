@@ -59,8 +59,8 @@ SystemTypes         = ("dimers", "trimers")
                                                 #
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
-Cutoffs = {"dimers": 15.0,
-           "trimers": 10.0,      
+Cutoffs = {"dimers": 30.0,
+           "trimers": 15.0,      
            "tetramers": 10.0
            }
                                                 #
@@ -72,13 +72,13 @@ Cutoffs = {"dimers": 15.0,
                                                 # MaxMinRij        R(k) = max(a,b∈k)min(i∈a,j∈b) ||Rij||
                                                 # MaxCOMRij        R(k) = max(a,b∈k)||Rcom(a)-Rcom(b)||
                                                 #
-Ordering            = "SumAvRij"
+Ordering            = "MaxMinRij"
 
                                                 # Supercell dimension is Na x Nb x Nc, where Nx indicates
                                                 # how many times the unit cell is repeated in each dimension.
                                                 # The supercell needs to be large enough so that the clusters
                                                 # up to the requested cutoff radius can be properly generated.
-Na, Nb, Nc          = 5, 5, 5
+Na, Nb, Nc          = 9, 9, 9
                                                 #
                                                 # Templates for input files for each method defined in Methods.
                                                 # You don't need to define any template file for a method
@@ -115,8 +115,8 @@ ExistingXYZDirs = {
                                                 # memory, etc.
                                                 #
 QueueScriptTemplates = {
-    "RPA":           "./QueueTemplates/RPA-Ares.py",
-    "LNO-CCSD(T)":   "./QueueTemplates/MRCC-Ares.py",
+    "RPA":           "./QueueTemplates/RPA-Barbora.py",
+    "LNO-CCSD(T)":   "./QueueTemplates/MRCC-Barbora.py",
     "DLPNO-CCSD(T)": "./QueueTemplates/ORCA-Ares.py"
     }
                                                 #
@@ -188,7 +188,8 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                                  SystemTypes,
                                  QueueScriptTemplates[Method],
                                  DirectoryStructure.INP_DIRS[Method],
-                                 DirectoryStructure.LOG_DIRS[Method])
+                                 DirectoryStructure.LOG_DIRS[Method],
+                                 Method)
     if "RPA" in Methods:
         template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis_RPA.py"), "r")
         s = template.read()

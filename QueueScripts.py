@@ -2,8 +2,9 @@ import os
 import os.path
 import stat
 import math
+import DirectoryStructure
 
-def Make(QueueDirs, QueueMainScript, SystemTypes, TemplateFile, InpDirs, LogDirs):
+def Make(QueueDirs, QueueMainScript, SystemTypes, TemplateFile, InpDirs, LogDirs, Method):
     f = open(TemplateFile, "r")
     Template = f.read()
     f.close()
@@ -13,7 +14,10 @@ def Make(QueueDirs, QueueMainScript, SystemTypes, TemplateFile, InpDirs, LogDirs
         SlurmCommands += f"#\n#{SystemType.center(80)}\n#\n"
         for BasisType in ("small-basis", "large-basis"):
             InputDir = InpDirs[SystemType][BasisType]
-            Files = sorted(os.listdir(InputDir))
+            if Method != "LNO-CCSD(T)":
+                Files = sorted(os.listdir(InputDir))
+            else:
+                Files = sorted(os.listdir(os.path.join(InputDir, DirectoryStructure.SUBSYSTEM_LABELS[SystemType][0])))
             NTasks = len(Files)
             NBlocks = NTasks // MaxBlockSize
             if NTasks % MaxBlockSize > 0:
@@ -39,7 +43,7 @@ def Make(QueueDirs, QueueMainScript, SystemTypes, TemplateFile, InpDirs, LogDirs
                 f = open(FilePath, "w")
                 f.write(s)
                 f.close()
-                SlurmCommands += f'os.system("sbatch --array=1-{i1-i0+1} {FilePath}")\n'
+                SlurmCommands += f"""os.system("sbatch --array=1-{i1-i0+1} '{FilePath}'")\n"""
     #
     # Make QueueMainScript: a master script which runs all
     # queue jobs. The user can control the number of computed systems
