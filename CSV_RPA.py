@@ -5,12 +5,12 @@ import os.path
 import argparse
 import Keywords
 
-def Make(ProjectDir, Method, SmallBasisXNumber):
+def Make(ProjectDir, Method, SmallBasisXNumber, CompletedJobs=("small-basis", "large-basis")):
     for SystemType in ("dimers", "trimers", "tetramers"):
         LogDir = os.path.join(ProjectDir, "logs", "RPA", SystemType)
         CSVDir = os.path.join(ProjectDir, "csv", "RPA", SystemType)
         XYZDir = os.path.join(ProjectDir, "xyz", SystemType)
-        WriteCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber)
+        WriteCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, CompletedJobs)
 
 
 def extrapolate_energies(E_S, E_L, X, EnergyComponents, ExtrapolatedComponents, TotalEnergySum):
@@ -55,7 +55,7 @@ def read_rpa_log(log_path, EnergyComponents, RegexStrings):
     return Energies
 
 
-def WriteCSV(XYZDir, LogDir, CSVDir, Method, X):
+def WriteCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
     
     if Method == "RPA":
         EnergyComponents = Keywords.RPA_ENERGY_COMPONENTS
@@ -96,53 +96,59 @@ def WriteCSV(XYZDir, LogDir, CSVDir, Method, X):
     if len(XYZFiles) == 0:
         return
 
-    csv_small = open(os.path.join(CSVDir, "rpa-small-basis.csv"), "w")
-    csv_large = open(os.path.join(CSVDir, "rpa-large-basis.csv"), "w")
-    csv_cbs =   open(os.path.join(CSVDir, "rpa-cbs.csv"), "w")
+    Small = "small-basis" in CompletedJobs
+    Large = "large-basis" in CompletedJobs
+    CBS = "small-basis" in CompletedJobs and "large-basis" in CompletedJobs
+
+    if Small:
+        csv_small = open(os.path.join(CSVDir, "rpa-small-basis.csv"), "w")
+    if Large:
+        csv_large = open(os.path.join(CSVDir, "rpa-large-basis.csv"), "w")
+    if CBS:
+        csv_cbs =   open(os.path.join(CSVDir, "rpa-cbs.csv"), "w")
 
     SystemColWidth = 30
     ColWidth = 25
     NComponents = len(EnergyComponents)
     NCols = 1 + len(EnergyComponents)
     header = f"{{:>{SystemColWidth}}}," + ",".join([f"{{:>{ColWidth}}}"] * (NCols-1)) + "\n"
-    
-    csv_small.write(header.format(*["System"]+EnergyComponents))
-    csv_large.write(header.format(*["System"]+EnergyComponents))
-    csv_cbs.write(header.format(*["System"]+EnergyComponents))
+
+    if Small:
+        csv_small.write(header.format(*["System"]+EnergyComponents))
+    if Large:
+        csv_large.write(header.format(*["System"]+EnergyComponents))
+    if CBS:
+        csv_cbs.write(header.format(*["System"]+EnergyComponents))
     
     dataline = f"{{:>{SystemColWidth}s}}," + ",".join([f"{{:>{ColWidth}.8f}}"] * (NCols-1)) + "\n"
     
-    SumEint_S = np.zeros(NComponents)
-    SumEint_L = np.zeros(NComponents)
-    SumEint_CBS = np.zeros(NComponents)
-    n = 0
     for x in XYZFiles:
         s = os.path.splitext(x)[0]
         LogFileS = os.path.join(SmallBasisLogsDir, s) + ".log"
         LogFileL = os.path.join(LargeBasisLogsDir, s) + ".log"
-        if not (os.path.exists(LogFileS) and os.path.exists(LogFileL)):
-            continue
-        Eint_S = read_rpa_log(LogFileS, EnergyComponents, RegexStrings)
-        Eint_L = read_rpa_log(LogFileL, EnergyComponents, RegexStrings)
-        n += 1
-        if not (Eint_S is None or Eint_L is None):
-            Eint_CBS = extrapolate_energies(Eint_S, Eint_L, X, EnergyComponents, ExtrapolatedComponents, TotalEnergySum)
+        if Small:
+            Eint_S = read_rpa_log(LogFileS, EnergyComponents, RegexStrings)
             data_s = np.zeros(NComponents)
-            data_l = np.zeros(NComponents)
-            data_cbs = np.zeros(NComponents)
             for i in range(NComponents):
                 data_s[i] = Eint_S[EnergyComponents[i]]
-                data_l[i] = Eint_L[EnergyComponents[i]]
-                data_cbs[i] = Eint_CBS[EnergyComponents[i]]
-            SumEint_S += np.array(data_s)
-            SumEint_L += np.array(data_l)
-            SumEint_CBS += np.array(data_cbs)
-
             csv_small.write(dataline.format(s, *data_s))
+        if Large:
+            Eint_L = read_rpa_log(LogFileL, EnergyComponents, RegexStrings)
+            data_l = np.zeros(NComponents)
+            for i in range(NComponents):
+                data_l[i] = Eint_L[EnergyComponents[i]]
             csv_large.write(dataline.format(s, *data_l))
+        if CBS:
+            Eint_CBS = extrapolate_energies(Eint_S, Eint_L, X, EnergyComponents, ExtrapolatedComponents, TotalEnergySum)
+            data_cbs = np.zeros(NComponents)
+            for i in range(NComponents):
+                data_cbs[i] = Eint_CBS[EnergyComponents[i]]
             csv_cbs.write(dataline.format(s, *data_cbs))
-                
-    csv_small.close()
-    csv_large.close()
-    csv_cbs.close()
+
+    if Small:
+        csv_small.close()
+    if Large:
+        csv_large.close()
+    if CBS:
+        csv_cbs.close()
     print(f"CSV spreadsheets written to {CSVDir}")

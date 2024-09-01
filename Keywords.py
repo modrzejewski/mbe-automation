@@ -326,9 +326,15 @@ MP3_TOTAL_ENERGY_SUM = [
 #
 # LNO-CCSD(T) in MRCC
 #
+LNO_ENERGY_COMPONENTS = [
+    "EtotHF",
+    "Ec",
+    TOTAL_ENERGY
+    ]
+
 LNO_REGEX_STRINGS = {
     "EtotHF" : "\s*Reference energy \[au\]:" + MRCC_NumberRegex,
-    "Ec"     : "\s*CCSD\(T\) correlation energy + MP2 corrections \[au\]:" + MRCC_NumberRegex,
+    "Ec"     : "\s*CCSD\(T\) correlation energy \+ MP2 corrections \[au\]:" + MRCC_NumberRegex,
     TOTAL_ENERGY : "\s*Total LNO-CCSD\(T\) energy with MP2 corrections \[au\]:" + MRCC_NumberRegex
 }
 LNO_EXTRAPOLATED_COMPONENTS = [

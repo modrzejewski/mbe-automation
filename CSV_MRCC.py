@@ -4,6 +4,7 @@ import os
 import os.path
 import argparse
 import Keywords
+import DirectoryStructure
 
 ToKcal = 627.5094688043
 
@@ -12,7 +13,7 @@ def Make(ProjectDir, Method, SmallBasisXNumber):
         LogDir = os.path.join(ProjectDir, "logs", "LNO-CCSD(T)", SystemType)
         CSVDir = os.path.join(ProjectDir, "csv", "LNO-CCSD(T)", SystemType)
         XYZDir = os.path.join(ProjectDir, "xyz", SystemType)
-        WriteCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, SystemType)
+        WriteCSV(XYZDir, LogDir, CSVDir, SmallBasisXNumber, SystemType)
 
 
 def extrapolate_energies(E_S, E_L, X, EnergyComponents, ExtrapolatedComponents, TotalEnergySum):
@@ -58,8 +59,10 @@ def read_mrcc_log(log_path, EnergyComponents, RegexStrings):
 
 
 def DimerEnergy(Eabs):
-    Eint = Eabs["AB"] - Eabs["A"] - Eabs["B"]
-    Eint = Eint * ToKcal
+    Eint = {}
+    for x in Keywords.LNO_ENERGY_COMPONENTS:
+        Eint[x] = Eabs["AB"][x] - Eabs["A"][x] - Eabs["B"][x]
+        Eint[x] = Eint[x] * ToKcal
     return Eint
 
 
@@ -74,7 +77,7 @@ def TrimerNaddEnergy(E):
 
 
 def TetramerNaddEnergy(E):
-    Eabcd = E[_TOTAL) - E[_MONO_A) - E[_MONO_B) - E[_MONO_C) - E[_MONO_D)
+    Eabcd = E["ABCD"] - E["A"] - E["B"] - E["C"] - E["D"]
 
     Eabc = E["ABC"] - E["A"] - E["B"] - E["C"]
     Eabd = E["ABD"] - E["A"] - E["B"] - E["D"]
@@ -136,7 +139,7 @@ def WriteCSV(XYZDir, LogDir, CSVDir, X, SystemType):
         s = os.path.splitext(x)[0]
         E_S = {}
         E_L = {}
-        for Subsystem in SUBSYSTEM_LABELS[SystemType]:
+        for Subsystem in DirectoryStructure.SUBSYSTEM_LABELS[SystemType]:
             LogFileS = os.path.join(SmallBasisLogsDir, Subsystem, s) + ".log"
             LogFileL = os.path.join(LargeBasisLogsDir, Subsystem, s) + ".log"
             if not (os.path.exists(LogFileS) and os.path.exists(LogFileL)):
