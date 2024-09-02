@@ -122,6 +122,18 @@ def IntermolecularDistance(MolA, MolB):
     return MinRij, AvRij
 
 
+def Rmax(Supercell):
+    LatticeVectors = Supercell.get_cell()
+    Volume = Supercell.cell.volume
+    R = np.zeros(3)
+    for i in range(3):
+        axb = np.cross(LatticeVectors[(i + 1) % 3, :], LatticeVectors[(i + 2) % 3, :])
+        h = Volume / np.linalg.norm(axb) / 2
+        R[i] = h
+        
+    return R
+
+
 def GenerateMonomers(UnitCell, Na, Nb, Nc):
     Supercell = ase.build.make_supercell(UnitCell, np.diag(np.array([Na, Nb, Nc])))
     BondCutoffs = neighborlist.natural_cutoffs(Supercell)
@@ -135,6 +147,9 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
         x, y, z = Supercell.cell[q]
         v = ("a", "b", "c")[q]
         print(f"{v} = [{x:10.3f}, {y:10.3f}, {z:10.3f}]")
+        
+    R = Rmax(Supercell)
+    print(f"Max radius (Ra, Rb, Rc) = ({R[0]:.1f}, {R[1]:.1f}, {R[2]:.1f}) Å")
     #
     # Find molecules for which no bond goes through
     # the boundary of the supercell
@@ -144,7 +159,7 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
         ConstituentAtoms = np.where(MoleculeIndices == m)[0]
         #
         # If any bond goes through the boundary of the supercell,
-        # this will be evident from nonzero the Offsets array
+        # this will be evident from nonzero vector Offsets,
         # which contains the lattice vector multipliers
         #
         WholeMolecule = True
