@@ -16,6 +16,7 @@ import shutil
 def ChemicalDescriptor(Coords, ZNums):
     #
     # Chemical descriptor used by Borca et al.
+    # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
     #
     NAtoms = len(Coords)
     M = np.zeros((NAtoms, NAtoms))
@@ -149,7 +150,7 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
         print(f"{v} = [{x:10.3f}, {y:10.3f}, {z:10.3f}]")
         
     R = Rmax(Supercell)
-    print(f"Max radius (Ra, Rb, Rc) = ({R[0]:.1f}, {R[1]:.1f}, {R[2]:.1f}) Å")
+    print(f"Max radius [Ra, Rb, Rc] = [{R[0]:.1f}, {R[1]:.1f}, {R[2]:.1f}] Å")
     #
     # Find molecules for which no bond goes through
     # the boundary of the supercell
