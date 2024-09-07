@@ -98,7 +98,7 @@ InputTemplates = {
                                                 #     unit cell data. ExistingXYZDirs won't be
                                                 #     referenced.
                                                 #
-UseExistingXYZ = False
+UseExistingXYZ = True
                                                 #
                                                 # Directories with existing xyz files. You don't need to define
                                                 # ExistingXYZDirs if you are generating new clusters from the given
@@ -155,6 +155,7 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
     import Inputs_MRCC
     import QueueScripts
     import DirectoryStructure
+    import os
     import os.path
     import shutil
 
@@ -174,6 +175,11 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
         print("Coordinates will be read from existing xyz directories:")
         for s in SystemTypes:
             print(ExistingXYZDirs[s])
+            for filename in os.listdir(ExistingXYZDirs[s]):
+                if filename.endswith(".xyz"):
+                    source_file = os.path.join(ExistingXYZDirs[s], filename)
+                    dest_file = os.path.join(DirectoryStructure.XYZ_DIRS[s], filename)
+                    shutil.copyfile(source_file, dest_file)
 
     InputSubroutines = {"RPA": Inputs_RPA.Make, "DLPNO-CCSD(T)": Inputs_ORCA.Make, "LNO-CCSD(T)": Inputs_MRCC.Make}
     QueueSubroutines = {"RPA": QueueScripts.Make, "DLPNO-CCSD(T)": QueueScripts.Make, "LNO-CCSD(T)": QueueScripts.Make}
