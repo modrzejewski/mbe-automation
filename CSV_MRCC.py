@@ -67,38 +67,44 @@ def DimerEnergy(Eabs):
 
 
 def TrimerNaddEnergy(E):
-    Eabc = E["ABC"] - E["A"] - E["B"] - E["C"]
-    Eab = E["AB"] - E["A"] - E["B"]
-    Ebc = E["BC"] - E["B"] - E["C"]
-    Eac = E["AC"] - E["A"] - E["C"]
-    EintNadd = Eabc - Eab - Ebc - Eac
-    EintNadd = EintNadd * ToKcal
+    EintNadd = {}
+    for x in Keywords.LNO_ENERGY_COMPONENTS:
+        Eabc = E["ABC"][x] - E["A"][x] - E["B"][x] - E["C"][x]
+        Eab = E["AB"][x] - E["A"][x] - E["B"][x]
+        Ebc = E["BC"][x] - E["B"][x] - E["C"][x]
+        Eac = E["AC"][x] - E["A"][x] - E["C"][x]
+        EintNadd[x] = Eabc - Eab - Ebc - Eac
+        EintNadd[x] = EintNadd[x] * ToKcal
     return EintNadd
 
 
 def TetramerNaddEnergy(E):
-    Eabcd = E["ABCD"] - E["A"] - E["B"] - E["C"] - E["D"]
+    EintNadd = {}
 
-    Eabc = E["ABC"] - E["A"] - E["B"] - E["C"]
-    Eabd = E["ABD"] - E["A"] - E["B"] - E["D"]
-    Eacd = E["ACD"] - E["A"] - E["C"] - E["D"]
-    Ebcd = E["BCD"] - E["B"] - E["C"] - E["D"]
+    for x in Keywords.LNO_ENERGY_COMPONENTS:
+        Eabcd = E["ABCD"][x] - E["A"][x] - E["B"][x] - E["C"][x] - E["D"][x]
+
+        Eabc = E["ABC"][x] - E["A"][x] - E["B"][x] - E["C"][x]
+        Eabd = E["ABD"][x] - E["A"][x] - E["B"][x] - E["D"][x]
+        Eacd = E["ACD"][x] - E["A"][x] - E["C"][x] - E["D"][x]
+        Ebcd = E["BCD"][x] - E["B"][x] - E["C"][x] - E["D"][x]
     
-    Eab = E["AB"] - E["A"] - E["B"]
-    Ebc = E["BC"] - E["B"] - E["C"]
-    Eac = E["AC"] - E["A"] - E["C"]
-    Ead = E["AD"] - E["A"] - E["D"]
-    Ebd = E["BD"] - E["B"] - E["D"]
-    Ecd = E["CD"] - E["C"] - E["D"]
+        Eab = E["AB"][x] - E["A"][x] - E["B"][x]
+        Ebc = E["BC"][x] - E["B"][x] - E["C"][x]
+        Eac = E["AC"][x] - E["A"][x] - E["C"][x]
+        Ead = E["AD"][x] - E["A"][x] - E["D"][x]
+        Ebd = E["BD"][x] - E["B"][x] - E["D"][x]
+        Ecd = E["CD"][x] - E["C"][x] - E["D"][x]
 
-    EabcNadd = Eabc - Eab - Ebc - Eac
-    EabdNadd = Eabd - Eab - Ead - Ebd
-    EacdNadd = Eacd - Eac - Ead - Ecd
-    EbcdNadd = Ebcd - Ebc - Ebd - Ecd
+        EabcNadd = Eabc - Eab - Ebc - Eac
+        EabdNadd = Eabd - Eab - Ead - Ebd
+        EacdNadd = Eacd - Eac - Ead - Ecd
+        EbcdNadd = Ebcd - Ebc - Ebd - Ecd
 
-    EintNadd = (Eabcd - Eab - Ebc - Eac - Ead - Ebd - Ecd 
-                - EabcNadd - EabdNadd - EacdNadd - EbcdNadd)
-    EintNadd = EintNadd * ToKcal
+        EintNadd[x] = (Eabcd - Eab - Ebc - Eac - Ead - Ebd - Ecd 
+                    - EabcNadd - EabdNadd - EacdNadd - EbcdNadd)
+        EintNadd[x] = EintNadd[x] * ToKcal
+        
     return EintNadd
     
 
