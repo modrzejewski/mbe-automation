@@ -9,7 +9,7 @@
                                                 # A new path will be created automatically if it does not exist.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/test"
+ProjectDirectory    = "./Projects/test-ethane-alignment"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -25,7 +25,7 @@ Methods = ("RPA", "LNO-CCSD(T)")
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/benzene/benzene-temperature-138.cif"
+UnitCellFile        = "./Systems/ethane/POSCAR"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
@@ -98,7 +98,7 @@ InputTemplates = {
                                                 #     unit cell data. ExistingXYZDirs won't be
                                                 #     referenced.
                                                 #
-UseExistingXYZ = True
+UseExistingXYZ = False
                                                 #
                                                 # Directories with existing xyz files. You don't need to define
                                                 # ExistingXYZDirs if you are generating new clusters from the given
@@ -119,26 +119,8 @@ QueueScriptTemplates = {
     "LNO-CCSD(T)":   "./QueueTemplates/MRCC-Barbora.py",
     "DLPNO-CCSD(T)": "./QueueTemplates/ORCA-Ares.py"
     }
-                                                #
-                                                # Symmetry numbers
-                                                #
-                                                # Choose one of cluster comparison algorithm:
-                                                #
-                                                # (1) Alignment of atoms belonging to the molecular clusters.
-                                                # This is a slow algorithm. Clusters are considered symmetry-equivalent
-                                                # if the RMSD
-                                                # of aligned atomic positions is below
-                                                # AlignmentThresh (Angstroms)
-                                                # This algorithm is enabled by CompareChemicalDescriptors=False
-                                                # (2) Comparison of chemical descriptors (used in several
-                                                # works of Barca et al.)
-                                                # Enable this algorithm by CompareChemicalDescriptors=True                                                                             #
-                                                # Tested values of AlighmentThresh:
-                                                # 1.0E-3 (Angs) for the alighment algorithm
-                                                # 1.0E-8 for the chemical descriptor algorithm
-                                                #
-AlignmentThresh    = 1.0E-8
-CompareChemicalDescriptors = True
+
+CompareChemicalDescriptors = False
 
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ End of User's Input ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~~~
@@ -146,7 +128,7 @@ CompareChemicalDescriptors = True
 
 def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                Ordering, Na, Nb, Nc, InputTemplates, QueueScriptTemplates,
-               AlignmentThresh, Methods, CompareChemicalDescriptors, UseExistingXYZ,
+               Methods, CompareChemicalDescriptors, UseExistingXYZ,
                ExistingXYZDirs=None):
 
     import MBE
@@ -169,7 +151,6 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                  Ordering,
                  DirectoryStructure.XYZ_DIRS,
                  DirectoryStructure.CSV_DIRS,
-                 AlignmentThresh, 
                  CompareChemicalDescriptors, Methods)
     else:
         print("Coordinates will be read from existing xyz directories:")
@@ -226,5 +207,5 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
 
 NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
            Ordering, Na, Nb, Nc, InputTemplates, QueueScriptTemplates,
-           AlignmentThresh, Methods, CompareChemicalDescriptors, UseExistingXYZ,
+           Methods, CompareChemicalDescriptors, UseExistingXYZ,
            ExistingXYZDirs)
