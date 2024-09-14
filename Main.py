@@ -120,15 +120,13 @@ QueueScriptTemplates = {
     "DLPNO-CCSD(T)": "./QueueTemplates/ORCA-Ares.py"
     }
 
-CompareChemicalDescriptors = False
-
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ End of User's Input ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~~~
 #
 
 def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                Ordering, Na, Nb, Nc, InputTemplates, QueueScriptTemplates,
-               Methods, CompareChemicalDescriptors, UseExistingXYZ,
+               Methods, UseExistingXYZ,
                ExistingXYZDirs=None):
 
     import MBE
@@ -151,7 +149,7 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                  Ordering,
                  DirectoryStructure.XYZ_DIRS,
                  DirectoryStructure.CSV_DIRS,
-                 CompareChemicalDescriptors, Methods)
+                 Methods)
     else:
         print("Coordinates will be read from existing xyz directories:")
         for s in SystemTypes:
@@ -207,5 +205,4 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
 
 NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
            Ordering, Na, Nb, Nc, InputTemplates, QueueScriptTemplates,
-           Methods, CompareChemicalDescriptors, UseExistingXYZ,
-           ExistingXYZDirs)
+           Methods, UseExistingXYZ, ExistingXYZDirs)

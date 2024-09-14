@@ -13,32 +13,6 @@ import subprocess
 import DirectoryStructure
 import shutil
 
-def ChemicalDescriptor(Coords, ZNums):
-    #
-    # Chemical descriptor used by Borca et al.
-    # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
-    #
-    NAtoms = len(Coords)
-    M = np.zeros((NAtoms, NAtoms))
-    for a in range(NAtoms):
-        M[a, a] = 0.5 * ZNums[a]**2.4
-    for b in range(NAtoms):
-        for a in range(b+1,NAtoms):
-            dab = np.linalg.norm(Coords[a] - Coords[b])
-            za = ZNums[a]
-            zb = ZNums[b]
-            M[a, b] = za*zb/dab
-    eigvals = np.linalg.eigvalsh(M, UPLO="L")
-    return eigvals
-
-
-def CompareDescriptors(Coords1, ZNums1, Coords2, ZNums2):
-    eigvals1 = ChemicalDescriptor(Coords1, ZNums1)
-    eigvals2 = ChemicalDescriptor(Coords2, ZNums2)
-    d = np.linalg.norm(eigvals1-eigvals2)
-    return d
-
-
 def AlignMolecules(A, B):
     #
     # Subroutine ase.geometry.distance is used by Hoja, List, and Boese in their
@@ -187,7 +161,7 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
 
 def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
          RequestedClusterTypes, Ordering, XYZDirs, CSVDirs,
-         CompareChemicalDescriptors, Methods):
+         Methods):
 
     #
     # Threshold for symmetry equivalence of clusters
@@ -294,10 +268,8 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
         JobsDone = 0
         print("")
         print(f"Computing unique {ClusterType}")
-        if CompareChemicalDescriptors:
-            print(f"Computing symmetry factors for {ClusterType} using chemical descriptors with threshold < {AlignmentThresh:.4f} Å")
-        else:
-            print(f"Computing symmetry factors for {ClusterType} using the alignment subroutine with RMSD < {AlignmentThresh:.4f} Å")
+        print(f"Computing symmetry factors for {ClusterType}")
+        print(f"Threshold for symmetry equivalent clusters: RMSD < {AlignmentThresh:.4f} Å")
         for x in itertools.combinations(Neighbors, n-1):
             if 10*int(np.floor(10*(ProcessedClusters/AllClusters))) > JobsDone:
                 JobsDone = 10*int(np.floor(10*(ProcessedClusters/AllClusters)))
@@ -320,8 +292,6 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
                 Molecule = Atoms()
                 for i in Constituents:
                     Molecule.extend(Monomers[i])
-                Coords1 = Molecule.get_positions() * ase.units.Bohr
-                ZNums1 = Molecule.get_atomic_numbers()
                 #
                 # Only if sorted distances match, we are
                 # performing expensive search for exact
@@ -332,32 +302,25 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
                         NComparisons[ClusterType] += 1
                         M = Clusters[ClusterType][k]
                         Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
-                        if CompareChemicalDescriptors:
-                            Dist = CompareDescriptors(Coords1, ZNums1,
-                                                      M["Coords"], M["ZNums"])
-                        else:
-                            Dist = AlignMolecules(Molecule, Molecule2)
-                            if Dist > AlignmentThresh and AlignMirrorImages:
-                                #
-                                # Test the mirror image of Molecule2. After enabling
-                                # mirror images, the symmetry weights
-                                # from the MBE code (CrystaLattE) of Borca et al.
-                                # are correctly replicated:
-                                #
-                                # C. H. Borca; B.W. Bakr; L.A. Burns; C.D. Sherrill 
-                                # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
-                                #
-                                # Added after reading the source code of CrystaLattE.
-                                #
-                                Coords2 = Molecule2.get_positions()
-                                Coords2[:, 1] *= -1
-                                Molecule2.set_positions(Coords2)
-                                Dist2 = AlignMolecules(Molecule, Molecule2)
-                                Dist = min(Dist, Dist2)
+                        Dist = AlignMolecules(Molecule, Molecule2)
+                        if Dist > AlignmentThresh and AlignMirrorImages:
+                            #
+                            # Test the mirror image of Molecule2. After enabling
+                            # mirror images, the symmetry weights
+                            # from the MBE code (CrystaLattE) of Borca et al.
+                            # are correctly replicated:
+                            #
+                            # C. H. Borca; B.W. Bakr; L.A. Burns; C.D. Sherrill 
+                            # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
+                            #
+                            # Added after reading the source code of CrystaLattE.
+                            #
+                            Coords2 = Molecule2.get_positions()
+                            Coords2[:, 1] *= -1
+                            Molecule2.set_positions(Coords2)
+                            Dist2 = AlignMolecules(Molecule, Molecule2)
+                            Dist = min(Dist, Dist2)
                                 
-                            # Dist = AlignMolecules(Coords1, ZNums1,
-                            #                       M["Coords"], M["ZNums"])
-                            
                         if Dist < AlignmentThresh:
                             M["Replicas"] += 1
                             Unique = False
@@ -366,8 +329,6 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
                     Cluster = {}
                     Cluster["Atoms"] = Molecule
                     Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
-                    Cluster["Coords"] = Coords1
-                    Cluster["ZNums"] = ZNums1
                     if n >= 3:
                         Cluster["MinRij"] = MinDist
                         Cluster["AvRij"] = AvDist
