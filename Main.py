@@ -9,7 +9,7 @@
                                                 # A new path will be created automatically if it does not exist.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/test-ethane-alignment"
+ProjectDirectory    = "./Projects/test"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -25,7 +25,7 @@ Methods = ("RPA", "LNO-CCSD(T)")
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/ethane/POSCAR"
+UnitCellFile        = "./Systems/benzene/benzene-temperature-138.cif"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
@@ -74,11 +74,6 @@ Cutoffs = {"dimers": 30.0,
                                                 #
 Ordering            = "MaxMinRij"
 
-                                                # Supercell dimension is Na x Nb x Nc, where Nx indicates
-                                                # how many times the unit cell is repeated in each dimension.
-                                                # The supercell needs to be large enough so that the clusters
-                                                # up to the requested cutoff radius can be properly generated.
-Na, Nb, Nc          = 9, 9, 9
                                                 #
                                                 # Templates for input files for each method defined in Methods.
                                                 # You don't need to define any template file for a method
@@ -125,7 +120,7 @@ QueueScriptTemplates = {
 #
 
 def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
-               Ordering, Na, Nb, Nc, InputTemplates, QueueScriptTemplates,
+               Ordering, InputTemplates, QueueScriptTemplates,
                Methods, UseExistingXYZ,
                ExistingXYZDirs=None):
 
@@ -143,7 +138,6 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
 
     if not UseExistingXYZ:
         MBE.Make(UnitCellFile,
-                 Na, Nb, Nc,
                  Cutoffs,
                  SystemTypes,
                  Ordering,
@@ -204,5 +198,5 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
 
 
 NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
-           Ordering, Na, Nb, Nc, InputTemplates, QueueScriptTemplates,
+           Ordering, InputTemplates, QueueScriptTemplates,
            Methods, UseExistingXYZ, ExistingXYZDirs)

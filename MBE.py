@@ -112,6 +112,40 @@ def Rmax(Supercell):
     return R
 
 
+def GetSupercellDimensions(UnitCell, SupercellRadius):
+    #
+    #     Determine the size of the supercell according to
+    #     the SupercellRadius parameter
+    #
+    #     SupercellRadius = a positive number R
+    #     The supercell dimension Na x Nb x Nc is automatically determined
+    #     such that Na, Nb, Nc are the minimum values such that the following
+    #     is satisfied
+    #
+    #     Dq >= Hq + 2 * R
+    #
+    #     where
+    #            Dq is the height of the supercell in the qth direction
+    #            Hq is the height of the unit cell in the qth direction
+    #
+    #     In other words, R is the thickness of the layer of cells
+    #     added to the central unit cell in order to build the supercell.
+    #
+    LatticeVectors = UnitCell.get_cell()
+    Volume = UnitCell.cell.volume
+    N = [0, 0, 0]
+    for i in range(3):
+        axb = np.cross(LatticeVectors[(i + 1) % 3, :], LatticeVectors[(i + 2) % 3, :])
+        #
+        # Volume of a parallelepiped = ||a x b|| ||c|| |Cos(gamma)|
+        # Here, h is the height in the a x b direction
+        #
+        h = Volume / np.linalg.norm(axb)
+        N[i] = 2 * math.ceil(SupercellRadius / h) + 1
+        
+    return N[0], N[1], N[2]
+
+
 def GenerateMonomers(UnitCell, Na, Nb, Nc):
     Supercell = ase.build.make_supercell(UnitCell, np.diag(np.array([Na, Nb, Nc])))
     BondCutoffs = neighborlist.natural_cutoffs(Supercell)
@@ -159,9 +193,8 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
     return Monomers
 
 
-def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
-         RequestedClusterTypes, Ordering, XYZDirs, CSVDirs,
-         Methods):
+def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, Ordering,
+         XYZDirs, CSVDirs, Methods):
 
     #
     # Threshold for symmetry equivalence of clusters
@@ -194,6 +227,12 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
     print(f"β = {beta:.3f}°")
     print(f"γ = {gamma:.3f}°")
     print(f"V = {volume:.4f} Å³")
+
+    SupercellRadius = 0
+    for ClusterType in RequestedClusterTypes:
+        if Cutoffs[ClusterType] > SupercellRadius:
+            SupercellRadius = Cutoffs[ClusterType]
+    Na, Nb, Nc = GetSupercellDimensions(UnitCell, SupercellRadius)
     #
     # List of molecules for which all atoms are
     # contained within the supercell and no covalent
@@ -242,13 +281,39 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
     #
     AvRij = np.zeros((NMonomers, NMonomers))
     MinRij = np.zeros((NMonomers, NMonomers))
-    for j in range(NMonomers):
-        for i in range(j, NMonomers):
-            a, b = IntermolecularDistance(Monomers[i], Monomers[j])
-            MinRij[i, j] = a
-            MinRij[j, i] = a
-            AvRij[i, j] = b
-            AvRij[j, i] = b
+    #
+    # Assemble a list of molecules inside the sphere of
+    # radius R=(dimer cutoff radius)
+    #
+    Reference = 0
+    MonomersWithinCutoff = {"dimers":[], "trimers":[], "tetramers":[]}
+    for i in range(NMonomers):
+        a, b = IntermolecularDistance(Monomers[i], Monomers[Reference])
+        MinRij[i, Reference] = a
+        MinRij[Reference, i] = a
+        AvRij[i, Reference] = b
+        AvRij[Reference, i] = b
+    
+    for ClusterType in RequestedClusterTypes:
+        Cutoff = Cutoffs[ClusterType]
+        MonomersWithinCutoff[ClusterType] = [x for x in range(NMonomers) if (x != Reference and MinRij[Reference, x] < Cutoff)]    
+        print(f"{len(MonomersWithinCutoff[ClusterType])} monomers within the cutoff radius for {ClusterType}")
+    
+    ClusterType = None
+    LargestCutoff = 0
+    for x in ("trimers", "tetramers"):
+        if x in RequestedClusterTypes:
+            if Cutoffs[x] > LargestCutoff:
+                ClusterType = x
+
+    if ClusterType:
+        for j in MonomersWithinCutoff[ClusterType]:
+            for i in MonomersWithinCutoff[ClusterType]:
+                a, b = IntermolecularDistance(Monomers[i], Monomers[j])
+                MinRij[i, j] = a
+                MinRij[j, i] = a
+                AvRij[i, j] = b
+                AvRij[j, i] = b
     #
     # Generate unique clusters
     #
@@ -261,16 +326,15 @@ def Make(UnitCellFile, Na, Nb, Nc, Cutoffs,
         Cutoff = Cutoffs[ClusterType]
         n = ClusterSize[ClusterType]
         Reference = 0
-        Neighbors = [x for x in range(NMonomers) if (x != Reference and MinRij[Reference, x] < Cutoff)]
         NDistances = scipy.special.comb(n, 2, exact=True)
-        AllClusters = scipy.special.comb(len(Neighbors), n-1)
+        AllClusters = scipy.special.comb(len(MonomersWithinCutoff[ClusterType]), n-1)
         ProcessedClusters = 0
         JobsDone = 0
         print("")
         print(f"Computing unique {ClusterType}")
         print(f"Computing symmetry factors for {ClusterType}")
         print(f"Threshold for symmetry equivalent clusters: RMSD < {AlignmentThresh:.4f} Å")
-        for x in itertools.combinations(Neighbors, n-1):
+        for x in itertools.combinations(MonomersWithinCutoff[ClusterType], n-1):
             if 10*int(np.floor(10*(ProcessedClusters/AllClusters))) > JobsDone:
                 JobsDone = 10*int(np.floor(10*(ProcessedClusters/AllClusters)))
                 print(f"{JobsDone:3d}% {ClusterType} completed")
