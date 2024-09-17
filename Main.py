@@ -25,7 +25,7 @@ Methods = ("RPA", "LNO-CCSD(T)")
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/benzene/benzene-temperature-138.cif"
+UnitCellFile        = "./Systems/orthorombic-acetylene/POSCAR"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
@@ -59,7 +59,7 @@ SystemTypes         = ("dimers", "trimers")
                                                 #
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
-Cutoffs = {"dimers": 30.0,
+Cutoffs = {"dimers": 25.0,
            "trimers": 15.0,      
            "tetramers": 10.0
            }
@@ -179,7 +179,8 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
             ROOT_DIR=os.path.abspath(DirectoryStructure.ROOT_DIR),
             PROJECT_DIR=os.path.abspath(ProjectDirectory)))
         f.close()
-
+        mode = os.stat(QueueMainScript).st_mode
+        os.chmod(DataAnalysisPath, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         print(f"RPA data analysis script: {DataAnalysisPath}")
 
     if "LNO-CCSD(T)" in Methods:
@@ -192,7 +193,8 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
             ROOT_DIR=os.path.abspath(DirectoryStructure.ROOT_DIR),
             PROJECT_DIR=os.path.abspath(ProjectDirectory)))
         f.close()
-
+        mode = os.stat(QueueMainScript).st_mode
+        os.chmod(DataAnalysisPath, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         print(f"LNO-CCSD(T) data analysis script: {DataAnalysisPath}")
 
 

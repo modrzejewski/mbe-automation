@@ -343,7 +343,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, Ordering,
             if n >= 3:
                 for i, j in itertools.combinations(x, 2):
                     Rij = MinRij[i, j]
-                    if Rij > Cutoff:
+                    if Rij >= Cutoff:
                         WithinRadius = False
                         break
             if WithinRadius:
