@@ -1,10 +1,7 @@
-#!/usr/bin/env python3
-#
-# Coded by Marcin Modrzejewski (Charles Univ, Prague 2018)
-#
-#
+import sys
 import os
 from os import path
+import shutil
 
 SUBSYSTEM_LABELS = {
     "dimers":    ["AB", "A", "B"],
@@ -17,71 +14,81 @@ def SetUp(ProjectDir, Methods):
     global XYZ_DIRS, QUEUE_DIRS, QUEUE_MAIN_SCRIPT
     
     ROOT_DIR = path.dirname(path.realpath(__file__))
-    PROJECT_DIR = path.join(ProjectDir)
+    PROJECT_DIR = path.join(ProjectDir)    
     INP_DIRS, LOG_DIRS, CSV_DIRS, XYZ_DIRS, QUEUE_DIRS = {}, {}, {}, {}, {}
+    #
+    # If the project directory already exists, move the existing contents
+    # to a backup location
+    #
+    if os.path.exists(PROJECT_DIR):
+        print(f"Project directory already exists")
+        MaxCounter = 1000
+        Success = False
+        for i in range(MaxCounter):
+            BackupPath = PROJECT_DIR + f"_{i}"
+            if not os.path.exists(BackupPath):
+                try:
+                    shutil.move(src=PROJECT_DIR, dst=BackupPath)
+                    Success = True
+                    break
+                except Exception as e:
+                    print(f"{e}")
+                    sys.exit()
+        if Success:
+            print(f"Moved existing contents to {BackupPath}")
+        else:
+            print(f"Clean up your directory manually before proceeding with a new project")
+            sys.exit()
+    
+    os.makedirs(PROJECT_DIR)
+
+    for SystemType in ("monomers-supercell", "monomers-relaxed", "dimers", "trimers", "tetramers", "supercell"):
+        XYZ_DIRS[SystemType] = path.join(PROJECT_DIR, "xyz", SystemType)
+        os.makedirs(XYZ_DIRS[SystemType], exist_ok=True)
+    
     for Method in Methods:
         INP_DIRS[Method], LOG_DIRS[Method], QUEUE_DIRS[Method], CSV_DIRS[Method] = {}, {}, {}, {}
-    for SystemType in ("supercell", "monomers", "dimers", "trimers", "tetramers"):
-        for Method in Methods:
+        for SystemType in ("monomers-supercell", "monomers-relaxed", "dimers", "trimers", "tetramers"):
             INP_DIRS[Method][SystemType] = {}
             LOG_DIRS[Method][SystemType] = {}
             QUEUE_DIRS[Method][SystemType] = {}
-            CSV_DIRS[Method][SystemType] = path.join(PROJECT_DIR, "csv", Method, SystemType)
-            if not path.exists(CSV_DIRS[Method][SystemType]):
-                os.makedirs(CSV_DIRS[Method][SystemType])
-        XYZ_DIRS[SystemType] = path.join(PROJECT_DIR, "xyz", SystemType)    
-        if not path.exists(XYZ_DIRS[SystemType]):
-            os.makedirs(XYZ_DIRS[SystemType])
-        for BasisType in ("small-basis", "large-basis", "no-extrapolation"):
-            for Method in Methods:
+            if Method != "DLPNO-CCSD(T)":
+                BasisTypes = ["small-basis", "large-basis"]
+            else:
+                #
+                # DLPNO-CC calculations in Orca employ Orca's internal algorithm for basis set extrapolation.
+                # As a result, a single-point result is already a CBS estimate and no separate small basis
+                # and larger basis calculations are needed.
+                #
+                BasisTypes = ["orca-extrapolation"]
+            for BasisType in BasisTypes:
+                QUEUE_DIRS[Method][SystemType][BasisType] = path.join(PROJECT_DIR, "queue", Method, SystemType, BasisType)
+                os.makedirs(QUEUE_DIRS[Method][SystemType][BasisType], exist_ok=True)
                 INP_DIRS[Method][SystemType][BasisType] = path.join(PROJECT_DIR, "inputs", Method, SystemType, BasisType)
+                os.makedirs(INP_DIRS[Method][SystemType][BasisType], exist_ok=True)
                 LOG_DIRS[Method][SystemType][BasisType] = path.join(PROJECT_DIR, "logs", Method, SystemType, BasisType)
-                if not path.exists(INP_DIRS[Method][SystemType][BasisType]):
-                    os.makedirs(INP_DIRS[Method][SystemType][BasisType])
-                if not path.exists(LOG_DIRS[Method][SystemType][BasisType]):
-                    os.makedirs(LOG_DIRS[Method][SystemType][BasisType])
-                if Method == "LNO-CCSD(T)":
-                    if BasisType in ("small-basis", "large-basis") and SystemType in SUBSYSTEM_LABELS:
+                os.makedirs(LOG_DIRS[Method][SystemType][BasisType], exist_ok=True)
+                #
+                # For the methods where we can't use a single input file for the cluster
+                # and all of its subsystems, we need to create separate subdirectories
+                # for each single point energy calculation
+                #
+                if Method in ["LNO-CCSD(T)"]:
+                    if SystemType not in ["monomers-supercell", "monomers-relaxed"]:
                         for Subsystem in SUBSYSTEM_LABELS[SystemType]:
                             subsystem_inp = path.join(INP_DIRS[Method][SystemType][BasisType], Subsystem)
                             subsystem_log = path.join(LOG_DIRS[Method][SystemType][BasisType], Subsystem)
-                            if not path.exists(subsystem_inp):
-                                os.makedirs(subsystem_inp)                                
-                            if not path.exists(subsystem_log):
-                                os.makedirs(subsystem_log)
-                QUEUE_DIRS[Method][SystemType][BasisType] = path.join(PROJECT_DIR, "queue", Method, SystemType, BasisType)
-                if not path.exists(QUEUE_DIRS[Method][SystemType][BasisType]):
-                    os.makedirs(QUEUE_DIRS[Method][SystemType][BasisType])
+                            os.makedirs(subsystem_inp, exist_ok=True)                                
+                            os.makedirs(subsystem_log, exist_ok=True)
+                            
+        for SystemType in ["monomers", "dimers", "trimers", "tetramers"]:
+            CSV_DIRS[Method][SystemType] = path.join(PROJECT_DIR, "csv", Method, SystemType)
+            os.makedirs(CSV_DIRS[Method][SystemType], exist_ok=True)
 
     QUEUE_MAIN_SCRIPT = {}
     for Method in Methods:
-        QUEUE_MAIN_SCRIPT[Method] = path.join(PROJECT_DIR, "queue", f"{Method}-RunTaskArray.py")
-    CleanAllDirs(Methods)
-
-
-def CleanDir(directory, extension):
-    if os.path.exists(directory):
-        ext = extension.upper()
-        for f in sorted(os.listdir(directory)):
-            if f.upper().endswith(ext):
-                full_path = path.join(directory, f)
-                os.remove(full_path)
-
-def CleanAllDirs(Methods):
-    for SystemType in ("supercell", "monomers", "dimers", "trimers", "tetramers"):
-        CleanDir(XYZ_DIRS[SystemType], ".xyz")
-    for Method in Methods:
-        for SystemType in ("supercell", "monomers", "dimers", "trimers", "tetramers"):
-            CleanDir(CSV_DIRS[Method][SystemType], ".csv")
-            for BasisType in ("small-basis", "large-basis", "no-extrapolation"):
-                CleanDir(INP_DIRS[Method][SystemType][BasisType], ".inp")
-                CleanDir(INP_DIRS[Method][SystemType][BasisType], ".conf")
-                CleanDir(LOG_DIRS[Method][SystemType][BasisType], ".log")            
-                CleanDir(QUEUE_DIRS[Method][SystemType][BasisType], ".py")
-            
-        if path.exists(QUEUE_MAIN_SCRIPT[Method]):
-            os.remove(QUEUE_MAIN_SCRIPT[Method])
-
+        QUEUE_MAIN_SCRIPT[Method] = path.join(PROJECT_DIR, f"RunTaskArray_{Method}.py")
         
+    return
 
 

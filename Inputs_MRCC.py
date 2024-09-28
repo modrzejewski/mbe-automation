@@ -112,17 +112,26 @@ def write_dimer_inputs(job_directory, input_template, dimer_idx, dimer_coords, d
     return
 
 
+def write_monomer_input(job_directory, input_template, coords, label):
+    InputContents = generate_input(input_template, coords)
+    InputPath = path.join(job_directory, f"{label}.inp")
+    f = open(InputPath, "w+")
+    f.write(InputContents)
+    f.close()        
+    return
+
+
 def write_mrcc_input_files(FileContents, SubsystemLabels, molecule_label, job_directory):
-    for x in range(len(FileContents)):
+    for x in range(len(FileContents)):        
         inp_path = path.join(job_directory, SubsystemLabels[x], f"{molecule_label}.inp")
         f = open(inp_path, "w+")
         f.write(FileContents[x])
         f.close()
         
 
-def Make(InputTemplates, SystemTypes, InputDirs, XYZDirs):
+def Make(InputTemplates, ClusterTypes, MonomerRelaxation, InputDirs, XYZDirs):
     Write = {"dimers":write_dimer_inputs, "trimers":write_trimer_inputs, "tetramers":write_tetramer_inputs}
-    for ClusterType in SystemTypes:
+    for ClusterType in ClusterTypes:
         xyz_files, molecule_idx, molecule_coords, labels = XYZ.LoadXYZDir(XYZDirs[ClusterType])
         for f in xyz_files:
            Write[ClusterType](InputDirs[ClusterType]["small-basis"],
@@ -131,3 +140,15 @@ def Make(InputTemplates, SystemTypes, InputDirs, XYZDirs):
            Write[ClusterType](InputDirs[ClusterType]["large-basis"],
                               InputTemplates["large-basis"],
                               molecule_idx[f], molecule_coords[f], labels[f])
+           
+    if MonomerRelaxation:
+        MonomerCoords, Labels = XYZ.LoadMonomerXYZDir(XYZDirs["monomers-supercell"], XYZDirs["monomers-relaxed"])
+        for Label in Labels:
+            for MonomerType in ["monomers-supercell", "monomers-relaxed"]:
+                for BasisType in ["small-basis", "large-basis"]:
+                    write_monomer_input(
+                        InputDirs[MonomerType][BasisType],
+                        InputTemplates[BasisType],
+                        MonomerCoords[MonomerType][Label], Label)
+                    
+    return

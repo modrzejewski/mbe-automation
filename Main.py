@@ -4,9 +4,10 @@
 #
                                                 #
                                                 # This is the job directory, i.e., the path to the directory
-                                                # where all system-specific files (inp, log, py, ...) will
-                                                # be kept. You can include multiple levels of subdirectories.
+                                                # where all system-specific files (inp, log, py, ...) are kept.
                                                 # A new path will be created automatically if it does not exist.
+                                                # If the path already exists, e.g., it's your previous project,
+                                                # all existing files will be moved to a backup location.
                                                 #
                                                 
 ProjectDirectory    = "./Projects/test"
@@ -17,15 +18,14 @@ ProjectDirectory    = "./Projects/test"
                                                 # Available methods:
                                                 #
                                                 # (1) RPA
-                                                # (2) DLPNO-CCSD(T)
-                                                # (3) LNO-CCSD(T)
+                                                # (2) LNO-CCSD(T)
                                                 #
 Methods = ("RPA", "LNO-CCSD(T)")
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/orthorombic-acetylene/POSCAR"
+UnitCellFile        = "./Systems/X23/05_anthracene/solid.xyz"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
@@ -33,13 +33,25 @@ UnitCellFile        = "./Systems/orthorombic-acetylene/POSCAR"
                                                 # (a) SystemTypes = ("dimers", "trimers")
                                                 # (b) SystemTypes = ("dimers", )
                                                 # (c) SystemTypes = ("dimers", "trimers", "tetramers")
+                                                # (d) SystemTypes = ("monomers", "dimers", "trimers")
                                                 # 
-                                                # where in case b only dimers are to be generated (note
+                                                # In (b), only dimers will be generated (note
                                                 # the trailing comma).
-                                                # 
+                                                # In (d), monomer relaxation energy will
+                                                # be computed. In this case, providing RelaxedMonomerXYZ
+                                                # is required.
+                                                #                                    
+                                                
+SystemTypes         = ("monomers", "dimers", "trimers")
+
+                                                #
+                                                # Geometry of an isolated relaxed monomer.
+                                                # The value of RelaxedMonomerXYZ is referenced only
+                                                # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-SystemTypes         = ("dimers", "trimers") 
+RelaxedMonomerXYZ   = "./Systems/X23/05_anthracene/molecule.xyz"
+
                                                 #
                                                 # Distance cutoffs
                                                 #
@@ -59,8 +71,8 @@ SystemTypes         = ("dimers", "trimers")
                                                 #
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
-Cutoffs = {"dimers": 25.0,
-           "trimers": 15.0,      
+Cutoffs = {"dimers": 20.0,
+           "trimers": 10.0,      
            "tetramers": 10.0
            }
                                                 #
@@ -122,7 +134,7 @@ QueueScriptTemplates = {
 def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                Ordering, InputTemplates, QueueScriptTemplates,
                Methods, UseExistingXYZ,
-               ExistingXYZDirs=None):
+               ExistingXYZDirs=None, RelaxedMonomerXYZ=None):
 
     import MBE
     import Inputs_RPA
@@ -132,14 +144,23 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
     import DirectoryStructure
     import os
     import os.path
+    import stat
     import shutil
+
+    ClusterTypes = []
+    for SystemType in SystemTypes:
+        if SystemType != "monomers":
+            ClusterTypes.append(SystemType)
+    MonomerRelaxation = "monomers" in SystemTypes
 
     DirectoryStructure.SetUp(ProjectDirectory, Methods)
 
     if not UseExistingXYZ:
         MBE.Make(UnitCellFile,
                  Cutoffs,
-                 SystemTypes,
+                 ClusterTypes,
+                 MonomerRelaxation,
+                 RelaxedMonomerXYZ,
                  Ordering,
                  DirectoryStructure.XYZ_DIRS,
                  DirectoryStructure.CSV_DIRS,
@@ -159,12 +180,14 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
     
     for Method in Methods:
         InputSubroutines[Method](InputTemplates[Method],
-                                 SystemTypes,
+                                 ClusterTypes,
+                                 MonomerRelaxation,
                                  DirectoryStructure.INP_DIRS[Method],
                                  DirectoryStructure.XYZ_DIRS if not UseExistingXYZ else ExistingXYZDirs)
         QueueSubroutines[Method](DirectoryStructure.QUEUE_DIRS[Method],
                                  DirectoryStructure.QUEUE_MAIN_SCRIPT[Method],
-                                 SystemTypes,
+                                 ClusterTypes,
+                                 MonomerRelaxation,
                                  QueueScriptTemplates[Method],
                                  DirectoryStructure.INP_DIRS[Method],
                                  DirectoryStructure.LOG_DIRS[Method],
@@ -179,21 +202,21 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
             ROOT_DIR=os.path.abspath(DirectoryStructure.ROOT_DIR),
             PROJECT_DIR=os.path.abspath(ProjectDirectory)))
         f.close()
-        mode = os.stat(QueueMainScript).st_mode
+        mode = os.stat(DataAnalysisPath).st_mode
         os.chmod(DataAnalysisPath, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         print(f"RPA data analysis script: {DataAnalysisPath}")
 
     if "LNO-CCSD(T)" in Methods:
-        template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis_MRCC.py"), "r")
+        template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis_LNO-CCSD(T).py"), "r")
         s = template.read()
         template.close()
-        DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis_MRCC.py")
+        DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis_LNO-CCSD(T).py")
         f = open(DataAnalysisPath, "w")
         f.write(s.format(
             ROOT_DIR=os.path.abspath(DirectoryStructure.ROOT_DIR),
             PROJECT_DIR=os.path.abspath(ProjectDirectory)))
         f.close()
-        mode = os.stat(QueueMainScript).st_mode
+        mode = os.stat(DataAnalysisPath).st_mode
         os.chmod(DataAnalysisPath, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         print(f"LNO-CCSD(T) data analysis script: {DataAnalysisPath}")
 
@@ -201,4 +224,5 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
 
 NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
            Ordering, InputTemplates, QueueScriptTemplates,
-           Methods, UseExistingXYZ, ExistingXYZDirs)
+           Methods, UseExistingXYZ, ExistingXYZDirs, 
+           RelaxedMonomerXYZ)

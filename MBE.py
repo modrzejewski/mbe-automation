@@ -57,9 +57,7 @@ def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThr
         COMDist.sort()
         for k in range(len(Clusters)):
             M = Clusters[k]
-            if (np.max(np.abs(AvDist-M["AvRij"])) < AlignmentThresh and
-                np.max(np.abs(MinDist-M["MinRij"])) < AlignmentThresh and
-                np.max(np.abs(COMDist-M["COMRij"])) < AlignmentThresh):
+            if np.max(np.abs(MinDist-M["MinRij"])) < AlignmentThresh:
                 MatchCandidates.append(k)
 
     return MatchCandidates, MinDist, AvDist, COMDist
@@ -67,12 +65,16 @@ def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThr
 
 def ClusterLabel(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
-    prefixes = {1:"monomer", 2:"dimer", 3:"trimer", 4:"tetramer", 5:"pentamer"}
+    prefixes = {1:"monomer", 2:"dimer", 3:"trimer", 4:"tetramer"}
     Label = prefixes[len(Constituents)] + "-" + "-".join([str(i).zfill(d) for i in Constituents])
     return Label
 
 
 def WriteClusterXYZ(FilePath, Constituents, Monomers):
+    #
+    # Write an xyz file with a comment line (i.e., the second line in the file)
+    # which specifies the number of atoms in each monomer.
+    #
     ClusterSize = len(Constituents)
     N = [len(Monomers[i]) for i in Constituents]
     if ClusterSize == 1:
@@ -100,39 +102,37 @@ def IntermolecularDistance(MolA, MolB):
     return MinRij, AvRij
 
 
-def Rmax(Supercell):
-    LatticeVectors = Supercell.get_cell()
-    Volume = Supercell.cell.volume
-    R = np.zeros(3)
-    for i in range(3):
-        axb = np.cross(LatticeVectors[(i + 1) % 3, :], LatticeVectors[(i + 2) % 3, :])
-        h = Volume / np.linalg.norm(axb) / 2
-        R[i] = h
-        
-    return R
-
-
 def GetSupercellDimensions(UnitCell, SupercellRadius):
     #
     #     Determine the size of the supercell according to
-    #     the SupercellRadius parameter
+    #     the SupercellRadius parameter.
     #
-    #     SupercellRadius = a positive number R
+    #     SupercellRadius is the maximum intermolecular distance, R,
+    #     measured between a molecule in the central unit cell and
+    #     any molecule belonging to the supercell.
+    #
     #     The supercell dimension Na x Nb x Nc is automatically determined
     #     such that Na, Nb, Nc are the minimum values such that the following
     #     is satisfied
     #
-    #     Dq >= Hq + 2 * R
+    #     Dq > Hq + 2 * R
     #
     #     where
     #            Dq is the height of the supercell in the qth direction
     #            Hq is the height of the unit cell in the qth direction
+    #             R is the maximum intermolecular distance 
     #
     #     In other words, R is the thickness of the layer of cells
     #     added to the central unit cell in order to build the supercell.
     #
     LatticeVectors = UnitCell.get_cell()
     Volume = UnitCell.cell.volume
+    #
+    # Extra layer of cells to prevent the worst-case scenario: the outermost molecule
+    # is within the cutoff radius R (defined as the minimum interatomic distance),
+    # but the covalent bonds go through the boundary of the cell.
+    #
+    Delta = 1
     N = [0, 0, 0]
     for i in range(3):
         axb = np.cross(LatticeVectors[(i + 1) % 3, :], LatticeVectors[(i + 2) % 3, :])
@@ -141,7 +141,7 @@ def GetSupercellDimensions(UnitCell, SupercellRadius):
         # Here, h is the height in the a x b direction
         #
         h = Volume / np.linalg.norm(axb)
-        N[i] = 2 * math.ceil(SupercellRadius / h) + 1
+        N[i] = 2 * (math.ceil(SupercellRadius / h)+Delta) + 1
         
     return N[0], N[1], N[2]
 
@@ -159,9 +159,6 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
         x, y, z = Supercell.cell[q]
         v = ("a", "b", "c")[q]
         print(f"{v} = [{x:10.3f}, {y:10.3f}, {z:10.3f}]")
-        
-    R = Rmax(Supercell)
-    print(f"Max radius [Ra, Rb, Rc] = [{R[0]:.1f}, {R[1]:.1f}, {R[2]:.1f}] Å")
     #
     # Find molecules for which no bond goes through
     # the boundary of the supercell
@@ -193,16 +190,23 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
     return Monomers
 
 
-def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, Ordering,
-         XYZDirs, CSVDirs, Methods):
+def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
+         RelaxedMonomerXYZ, Ordering, XYZDirs, CSVDirs, Methods):
 
     #
     # Threshold for symmetry equivalence of clusters
-    # (RMSD of atomic positions, in Angstroms)
+    # (RMSD of atomic positions, in Angstroms). This
+    # threshold should be on the order of the uncertainty
+    # in geometry optimization. 1.0E-4 Angstroms seems
+    # right and gave correct symmetry weights in all
+    # tests on ethane, ethylene, acetylene, and benzene.
     #
     AlignmentThresh = 1.0E-4
     #
-    # Add mirror images to the symmetry equivalence test
+    # Add mirror images to the symmetry equivalence
+    # test. This setting doubles the time spent
+    # for structure comparisons but finds additional
+    # clusters with the same energy.
     #
     AlignMirrorImages = True
     
@@ -215,7 +219,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, Ordering,
     alpha, beta, gamma = UnitCell.cell.angles()
     volume = UnitCell.cell.volume
     print("")
-    print("Many-Body Expansion".center(80))
+    print("Many-body expansion")
     print("")
     print(f"Project:   {DirectoryStructure.PROJECT_DIR}")
     print(f"Unit cell: {UnitCellFile}")
@@ -227,7 +231,15 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, Ordering,
     print(f"β = {beta:.3f}°")
     print(f"γ = {gamma:.3f}°")
     print(f"V = {volume:.4f} Å³")
-
+    #
+    # Determine the supercell size consistent
+    # with the requested cutoff radii for clusters.
+    # Note that a supercell which is too small results
+    # in some of the symmetry-equivalent clusters being
+    # outside of the supercell parallelepiped. This in
+    # turn yields incorrect symmetry weights at distances
+    # approaching the cutoff radius.
+    #
     SupercellRadius = 0
     for ClusterType in RequestedClusterTypes:
         if Cutoffs[ClusterType] > SupercellRadius:
@@ -270,12 +282,33 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, Ordering,
         MonomerCOM[M, :] = COM[MonomerMap[M], :]
     COMRij = scipy.spatial.distance.cdist(MonomerCOM, MonomerCOM)
     #
-    # Write monomer xyz files
     #
-    for M in range(NMonomers):
-        Label = ClusterLabel([M], NMonomers)
-        FilePath = os.path.join(XYZDirs["monomers"], f"{Label}.xyz")
-        WriteClusterXYZ(FilePath, [M], Monomers)
+    # Write the xyz's of monomers in the supercell
+    #
+    Reference = 0
+    Label = ClusterLabel([Reference], NMonomers)
+    FilePath = os.path.join(XYZDirs["monomers-supercell"], f"{Label}.xyz")
+    WriteClusterXYZ(FilePath, [Reference], Monomers)
+    #
+    # Write the xyz's of the relaxed monomers if the relaxation term is requested.
+    #
+    RelaxedMonomers = []
+    if MonomerRelaxation:
+        Reference = 0
+        #
+        # Use-specified geometry with relaxed
+        # isolated monomer coordinates
+        #
+        Monomer = ase.io.read(RelaxedMonomerXYZ)
+        RelaxedMonomers.append(Monomer)
+        #
+        # Name of the xyz file with a relaxed geometry is the same
+        # as the corresponding monomer in the supercell.
+        #
+        Label = ClusterLabel([Reference], NMonomers)
+        FilePath = os.path.join(XYZDirs["monomers-relaxed"], f"{Label}.xyz")
+        WriteClusterXYZ(FilePath, [Reference], RelaxedMonomers)
+        
     #
     # Distances between monomers
     #
@@ -319,7 +352,8 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, Ordering,
     #
     ClusterSize = {"monomers":1, "dimers":2, "trimers":3, "tetramers":4}
     NReplicas = {"dimers":0, "trimers":0, "tetramers":0}
-    NComparisons = {"dimers":0, "trimers":0, "tetramers":0}
+    NAlignments = {"dimers":0, "trimers":0, "tetramers":0}
+    NExpensiveChecks = {"dimers":0, "trimers":0, "tetramers":0}
     NClusters = {"dimers":0, "trimers":0, "tetramers":0}
     Clusters = {"dimers":[], "trimers":[], "tetramers":[]}
     for ClusterType in RequestedClusterTypes:        
@@ -363,7 +397,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, Ordering,
                 #
                 if len(MatchCandidates) > 0:
                     for k in MatchCandidates:
-                        NComparisons[ClusterType] += 1
+                        NExpensiveChecks[ClusterType] += 1
                         M = Clusters[ClusterType][k]
                         Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
                         Dist = AlignMolecules(Molecule, Molecule2)
@@ -386,9 +420,11 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, Ordering,
                             Dist = min(Dist, Dist2)
                                 
                         if Dist < AlignmentThresh:
+                            NAlignments[ClusterType] += 1
                             M["Replicas"] += 1
                             Unique = False
-                            break                        
+                            break    
+                        
                 if Unique:
                     Cluster = {}
                     Cluster["Atoms"] = Molecule

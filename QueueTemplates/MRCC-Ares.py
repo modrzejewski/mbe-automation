@@ -11,6 +11,8 @@ import os
 import shutil
 
 SUBSYSTEM_LABELS = {{
+    "monomers-relaxed": [""],
+    "monomers-supercell": [""],
     "dimers":    ["AB", "A", "B"],
     "trimers":   ["ABC", "A", "B", "C", "AB", "BC", "AC"],
     "tetramers": ["ABCD", "A", "B", "C", "AB", "BC", "AC", "D", "AD", "BC", "CD", "ABC", "ABD", "ACD", "BCD"]
