@@ -9,18 +9,19 @@ import sys
 ToKcal = 627.5094688043
 
 def Make(ProjectDir, Method, SmallBasisXNumber, CompletedJobs=("small-basis", "large-basis")):
-    for SystemType in ("dimers", "trimers", "tetramers"):
-        LogDir = os.path.join(ProjectDir, "logs", "RPA", SystemType)
-        CSVDir = os.path.join(ProjectDir, "csv", "RPA", SystemType)
-        XYZDir = os.path.join(ProjectDir, "xyz", SystemType)
-        WriteCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, CompletedJobs)
-
     CSVDir = os.path.join(ProjectDir, "csv", "RPA", "monomers")
     LogDir, XYZDir = {}, {}
     for SystemType in ["monomers-relaxed", "monomers-supercell"]:
         LogDir[SystemType] = os.path.join(ProjectDir, "logs", "RPA", SystemType)
         XYZDir[SystemType] = os.path.join(ProjectDir, "xyz", SystemType)        
     WriteMonomerCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, CompletedJobs)
+    
+    for SystemType in ("dimers", "trimers", "tetramers"):
+        LogDir = os.path.join(ProjectDir, "logs", "RPA", SystemType)
+        CSVDir = os.path.join(ProjectDir, "csv", "RPA", SystemType)
+        XYZDir = os.path.join(ProjectDir, "xyz", SystemType)
+        WriteCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, CompletedJobs)
+
     return
 
 
@@ -105,7 +106,7 @@ def MethodDependentParams(Method):
 
 
 def WriteCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
-    EnergyComponents, RegexStrings, ExtrapolatedComponents, TotalEnergySum = MethoDependentParams(Method)
+    EnergyComponents, RegexStrings, ExtrapolatedComponents, TotalEnergySum = MethodDependentParams(Method)
     SmallBasisLogsDir = os.path.join(LogDir, "small-basis")
     LargeBasisLogsDir = os.path.join(LogDir, "large-basis")
 
@@ -213,7 +214,7 @@ def WriteMonomerCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
     
     dataline = f"{{:>{SystemColWidth}s}}," + ",".join([f"{{:>{ColWidth}.8f}}"] * (NCols-1)) + "\n"
     
-    for x in XYZFiles:
+    for x in XYZFiles["monomers-relaxed"]:
         Label = os.path.splitext(x)[0]
         E_S, E_L, E_CBS = {}, {}, {}
         for System in ["monomers-relaxed", "monomers-supercell"]:
@@ -224,7 +225,7 @@ def WriteMonomerCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
             if Large:
                 E_L[System] = read_rpa_log(LogFileL, EnergyComponents, RegexStrings)
             if CBS:
-                E_CBS[System] = extrapolate_energies(E_S[System], E_L[System], X, EnergyComponents, &
+                E_CBS[System] = extrapolate_energies(E_S[System], E_L[System], X, EnergyComponents, 
                                                      ExtrapolatedComponents, TotalEnergySum)
 
         data_s = np.zeros(NComponents)
@@ -232,20 +233,20 @@ def WriteMonomerCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
         data_cbs = np.zeros(NComponents)
         if Small:
             for i in range(NComponents):
-                data_s[i] = (E_S["monomer-supercell"][EnergyComponents[i]]
-                             - E_S["monomer-relaxed"][EnergyComponents[i]]) * ToKcal
+                data_s[i] = (E_S["monomers-supercell"][EnergyComponents[i]]
+                             - E_S["monomers-relaxed"][EnergyComponents[i]]) * ToKcal
             csv_small.write(dataline.format(Label, *data_s))
             
         if Large:
             for i in range(NComponents):
-                data_l[i] = (E_L["monomer-supercell"][EnergyComponents[i]]
-                             - E_L["monomer-relaxed"][EnergyComponents[i]]) * ToKcal
+                data_l[i] = (E_L["monomers-supercell"][EnergyComponents[i]]
+                             - E_L["monomers-relaxed"][EnergyComponents[i]]) * ToKcal
             csv_large.write(dataline.format(Label, *data_l))
 
         if CBS:
             for i in range(NComponents):
-                data_cbs[i] = (E_CBS["monomer-supercell"][EnergyComponents[i]]
-                               - E_CBS["monomer-relaxed"][EnergyComponents[i]]) * ToKcal
+                data_cbs[i] = (E_CBS["monomers-supercell"][EnergyComponents[i]]
+                               - E_CBS["monomers-relaxed"][EnergyComponents[i]]) * ToKcal
             csv_cbs.write(dataline.format(Label, *data_cbs))
                 
     if Small:
