@@ -23,6 +23,13 @@ SUBSYSTEM_LABELS = {{
 os.environ["OMP_NUM_THREADS"] = "48"
 os.environ["MKL_NUM_THREADS"] = "48"
 #
+# MPI setup
+#
+if "I_MPI_PMI_LIBRARY" in os.environ:
+    del os.environ["I_MPI_PMI_LIBRARY"]
+os.environ["I_MPI_HYDRA_BOOTSTRAP"] = "ssh"
+os.environ["I_MPI_OFI_PROVIDER"] = "tcp"
+#
 # Total number of {SYSTEM_TYPE}/{BASIS_TYPE}: {NTASKS}
 # This script is for {SYSTEM_TYPE}/{BASIS_TYPE} {FIRST_SYSTEM}-{LAST_SYSTEM}
 #

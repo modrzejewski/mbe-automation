@@ -21,4 +21,9 @@ LogFile = os.path.splitext(InpFile)[0] + ".log"
 InpPath = os.path.join(InpDir, InpFile)
 LogPath = os.path.join(LogDir, LogFile)
 
+if "I_MPI_PMI_LIBRARY" in os.environ:
+    del os.environ["I_MPI_PMI_LIBRARY"]
+os.environ["I_MPI_HYDRA_BOOTSTRAP"] = "ssh"
+os.environ["I_MPI_OFI_PROVIDER"] = "tcp"
+
 os.system(f"module load python/3.10.7; module load ifort; module load impi; module load mkl; ~/beyond-rpa/bin/run -np 1 -nt 48 '{{InpPath}}' >& '{{LogPath}}'")
