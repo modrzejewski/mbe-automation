@@ -21,4 +21,4 @@ LogFile = os.path.splitext(InpFile)[0] + ".log"
 InpPath = os.path.join(InpDir, InpFile)
 LogPath = os.path.join(LogDir, LogFile)
 
-os.system(f"module load python/3.10.7; module load ifort; module load impi; ~/beyond-rpa/bin/run -np 1 -nt 48 '{{InpPath}}' >& '{{LogPath}}'")
+os.system(f"module load python/3.10.7; module load ifort; module load impi; module load mkl; ~/beyond-rpa/bin/run -np 1 -nt 48 '{{InpPath}}' >& '{{LogPath}}'")

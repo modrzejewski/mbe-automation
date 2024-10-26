@@ -46,7 +46,7 @@ for Subsystem in SUBSYSTEM_LABELS["{SYSTEM_TYPE}"]:
     shutil.copy(source, destination)
     current_dir = os.getcwd()
     os.chdir(ScratchDir)
-    os.system(f"module load python/3.10.7; module load ifort; module load impi; export PATH=$PATH:~/mrcc; dmrcc >& '{{LogPath}}'")
+    os.system(f"module load python/3.10.7; module load ifort; module load impi; module load mkl; export PATH=$PATH:~/mrcc; dmrcc >& '{{LogPath}}'")
     os.chdir(current_dir)
     #
     # Remove scratch
