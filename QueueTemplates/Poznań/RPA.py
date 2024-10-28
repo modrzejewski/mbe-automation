@@ -26,4 +26,11 @@ if "I_MPI_PMI_LIBRARY" in os.environ:
 os.environ["I_MPI_HYDRA_BOOTSTRAP"] = "ssh"
 os.environ["I_MPI_OFI_PROVIDER"] = "tcp"
 
+# In case of MPI-related bugs, set the following parameters
+# to get debugging data:
+#
+# export I_MPI_DEBUG=5
+# export I_MPI_HYDRA_DEBUG=1
+# export I_MPI_OFI_PROVIDER_DUMP=1
+
 os.system(f"module load python/3.10.7; module load ifort; module load impi; module load mkl; ~/beyond-rpa/bin/run -np 1 -nt 48 '{{InpPath}}' >& '{{LogPath}}'")
