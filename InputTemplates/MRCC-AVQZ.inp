@@ -1,7 +1,10 @@
 basis=aug-cc-pVQZ
 calc=LNO-CCSD(T)
 Lcorthr=vTight
-mem=16000MB
+mem=128000MB
+ptthreads=1
+ccsdthreads=1
+mpitasks=1
 
 geom=xyz
 {NATOMS}

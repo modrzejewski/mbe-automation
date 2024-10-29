@@ -4,7 +4,8 @@
 #SBATCH -p altair 
 #SBATCH --nodes 1      
 #SBATCH --ntasks-per-node=48
-#SBATCH --time=15:00:00 
+#SBATCH --time=15:00:00
+#SBATCH --mem=180gb
 
 import os
 import shutil

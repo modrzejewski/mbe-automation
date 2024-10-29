@@ -1,4 +1,4 @@
-basis=aug-cc-pVTZ
+basis=aug-cc-pVDZ
 calc=LNO-CCSD(T)
 Lcorthr=vTight
 mem=128000MB
