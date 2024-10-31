@@ -8,19 +8,22 @@ import sys
 
 ToKcal = 627.5094688043
 
-def Make(ProjectDir, Method, SmallBasisXNumber, CompletedJobs=("small-basis", "large-basis")):
+def Make(ProjectDir, Method, SmallBasisXNumber, CompletedJobs=["small-basis", "large-basis"],
+         RequestedSystemTypes=["monomers", "dimers", "trimers", "tetramers"]):
     CSVDir = os.path.join(ProjectDir, "csv", "RPA", "monomers")
     LogDir, XYZDir = {}, {}
-    for SystemType in ["monomers-relaxed", "monomers-supercell"]:
-        LogDir[SystemType] = os.path.join(ProjectDir, "logs", "RPA", SystemType)
-        XYZDir[SystemType] = os.path.join(ProjectDir, "xyz", SystemType)        
-    WriteMonomerCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, CompletedJobs)
+    if "monomers" in RequestedSystemTypes:
+        for SystemType in ["monomers-relaxed", "monomers-supercell"]:
+            LogDir[SystemType] = os.path.join(ProjectDir, "logs", "RPA", SystemType)
+            XYZDir[SystemType] = os.path.join(ProjectDir, "xyz", SystemType)        
+        WriteMonomerCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, CompletedJobs)
     
     for SystemType in ("dimers", "trimers", "tetramers"):
-        LogDir = os.path.join(ProjectDir, "logs", "RPA", SystemType)
-        CSVDir = os.path.join(ProjectDir, "csv", "RPA", SystemType)
-        XYZDir = os.path.join(ProjectDir, "xyz", SystemType)
-        WriteCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, CompletedJobs)
+        if SystemType in RequestedSystemTypes:
+            LogDir = os.path.join(ProjectDir, "logs", "RPA", SystemType)
+            CSVDir = os.path.join(ProjectDir, "csv", "RPA", SystemType)
+            XYZDir = os.path.join(ProjectDir, "xyz", SystemType)
+            WriteCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, CompletedJobs)
 
     return
 
