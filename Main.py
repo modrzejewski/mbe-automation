@@ -72,7 +72,7 @@ RelaxedMonomerXYZ   = "./Systems/X23/09_cytosine/molecule.xyz"
                                                 #
 Cutoffs = {"dimers": 20.0,
            "trimers": 10.0,      
-           "tetramers": 10.0
+           "tetramers": 8.0
            }
                                                 #
                                                 # Ordering of dimers, trimers, tetramers.

@@ -331,6 +331,19 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
         Cutoff = Cutoffs[ClusterType]
         MonomersWithinCutoff[ClusterType] = [x for x in range(NMonomers) if (x != Reference and MinRij[Reference, x] < Cutoff)]    
         print(f"{len(MonomersWithinCutoff[ClusterType])} monomers within the cutoff radius for {ClusterType}")
+
+    #
+    # Write xyz's to visualize all the monomers within the cutoff radius
+    # for dimers, trimers, and tetramers.
+    #
+    for ClusterType in ["dimers", "trimers", "tetramers"]:
+        if ClusterType in RequestedClusterTypes:
+            Sphere = Atoms(Monomers[Reference])
+            for M in MonomersWithinCutoff[ClusterType]:
+                Sphere.extend(Monomers[M])
+            SphereXYZ = os.path.join(XYZDirs["supercell"], f"{ClusterType}-sphere.xyz")
+            Sphere.write(SphereXYZ)
+            print(f"Coordination sphere for {ClusterType}: {SphereXYZ}")
     
     ClusterType = None
     LargestCutoff = 0
@@ -365,8 +378,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
         ProcessedClusters = 0
         JobsDone = 0
         print("")
-        print(f"Computing unique {ClusterType}")
-        print(f"Computing symmetry factors for {ClusterType}")
+        print(f"Computing unique {ClusterType} with MaxMinRij < {Cutoffs[ClusterType]} Å")
         print(f"Threshold for symmetry equivalent clusters: RMSD < {AlignmentThresh:.4f} Å")
         for x in itertools.combinations(MonomersWithinCutoff[ClusterType], n-1):
             if 10*int(np.floor(10*(ProcessedClusters/AllClusters))) > JobsDone:
