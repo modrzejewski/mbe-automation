@@ -380,10 +380,13 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
         print("")
         print(f"Computing unique {ClusterType} with MaxMinRij < {Cutoffs[ClusterType]} Å")
         print(f"Threshold for symmetry equivalent clusters: RMSD < {AlignmentThresh:.4f} Å")
+        BlockStartTime = time.time()
         for x in itertools.combinations(MonomersWithinCutoff[ClusterType], n-1):
             if 10*int(np.floor(10*(ProcessedClusters/AllClusters))) > JobsDone:
                 JobsDone = 10*int(np.floor(10*(ProcessedClusters/AllClusters)))
-                print(f"{JobsDone:3d}% {ClusterType} completed")
+                BlockEndTime = time.time()
+                print(f"{JobsDone:3d}% {ClusterType} completed ({BlockEndTime-BlockStartTime:.1E} seconds)")
+                BlockStartTime = BlockEndTime
             ProcessedClusters += 1
             WithinRadius = True
             if n >= 3:
@@ -459,7 +462,8 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                     NReplicas[ClusterType] += 1
                 
         NClusters[ClusterType] = len(Clusters[ClusterType])
-        print(f"100% {ClusterType} completed")
+        BlockEndTime = time.time()
+        print(f"100% {ClusterType} completed ({BlockEndTime-BlockStartTime:.1E} seconds)")
         print(f"{NClusters[ClusterType]} unique {ClusterType} satisfy Max(MinRij) < {Cutoff:.2f} Å")
 
     for ClusterType in RequestedClusterTypes:
