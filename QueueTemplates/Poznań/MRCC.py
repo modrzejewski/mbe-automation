@@ -2,9 +2,10 @@
 #SBATCH --job-name="{FIRST_SYSTEM}-{LAST_SYSTEM}-{SYSTEM_TYPE}-{BASIS_TYPE}"
 #SBATCH -A pl0415-01                                                               
 #SBATCH -p altair 
-#SBATCH --nodes 1      
-#SBATCH --ntasks-per-node=48
-#SBATCH --time=15:00:00
+#SBATCH --nodes 1
+#SBATCH --cpus-per-task=48      
+#SBATCH --ntasks-per-node=1
+#SBATCH --time=72:00:00
 #SBATCH --mem=180gb
 
 import os

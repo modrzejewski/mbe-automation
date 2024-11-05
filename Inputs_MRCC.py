@@ -46,7 +46,7 @@ def generate_input(input_template, coords, GhostAtoms=None):
 
 
 def write_tetramer_inputs(job_directory, input_template, tetramer_idx, tetramer_coords, tetramer_label):
-    coords_ab = tetramer_coords[0] + tetramer_coords[1] + tetramer_coords[2] + tetramer_coords[3]
+    coords = tetramer_coords[0] + tetramer_coords[1] + tetramer_coords[2] + tetramer_coords[3]
     na = tetramer_idx[0][1] - tetramer_idx[0][0] + 1
     nb = tetramer_idx[1][1] - tetramer_idx[1][0] + 1
     nc = tetramer_idx[2][1] - tetramer_idx[2][0] + 1

@@ -25,24 +25,23 @@ Methods = ("RPA", "LNO-CCSD(T)")
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/X23/05_anthracene/solid.xyz"
+UnitCellFile        = "./Systems/X23/09_cytosine/solid.xyz"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
                                                 #
-                                                # (a) SystemTypes = ("dimers", "trimers")
-                                                # (b) SystemTypes = ("dimers", )
-                                                # (c) SystemTypes = ("dimers", "trimers", "tetramers")
-                                                # (d) SystemTypes = ("monomers", "dimers", "trimers")
+                                                # (a) SystemTypes = ["dimers", "trimers"]
+                                                # (b) SystemTypes = ["dimers"]
+                                                # (c) SystemTypes = ["dimers", "trimers", "tetramers"]
+                                                # (d) SystemTypes = ["monomers", "dimers", "trimers"]
                                                 # 
-                                                # In (b), only dimers will be generated (note
-                                                # the trailing comma).
+                                                # In (b), only dimers will be generated.
                                                 # In (d), monomer relaxation energy will
                                                 # be computed. In this case, providing RelaxedMonomerXYZ
                                                 # is required.
                                                 #                                    
                                                 
-SystemTypes         = ("monomers", "dimers", "trimers")
+SystemTypes         = ["tetramers"]
 
                                                 #
                                                 # Geometry of an isolated relaxed monomer.
@@ -50,7 +49,7 @@ SystemTypes         = ("monomers", "dimers", "trimers")
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/05_anthracene/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/09_cytosine/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
@@ -122,8 +121,8 @@ ExistingXYZDirs = {
                                                 # memory, etc.
                                                 #
 QueueScriptTemplates = {
-    "RPA":           "./QueueTemplates/RPA-Barbora.py",
-    "LNO-CCSD(T)":   "./QueueTemplates/MRCC-Barbora.py",
+    "RPA":           "./QueueTemplates/Poznań/RPA.py",
+    "LNO-CCSD(T)":   "./QueueTemplates/Poznań/MRCC.py",
     "DLPNO-CCSD(T)": "./QueueTemplates/ORCA-Ares.py"
     }
 
