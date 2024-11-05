@@ -9,6 +9,8 @@
 #SBATCH --mem=180gb
 
 import os
+import os.path
+import sys
 #
 # Total number of {SYSTEM_TYPE}/{BASIS_TYPE}: {NTASKS}
 # This script is for {SYSTEM_TYPE}/{BASIS_TYPE} {FIRST_SYSTEM}-{LAST_SYSTEM}
@@ -21,6 +23,8 @@ InpFile = AllFiles[ThisJob-1]
 LogFile = os.path.splitext(InpFile)[0] + ".log"
 InpPath = os.path.join(InpDir, InpFile)
 LogPath = os.path.join(LogDir, LogFile)
+if os.path.exists(LogPath):
+    sys.exit(0)
 
 if "I_MPI_PMI_LIBRARY" in os.environ:
     del os.environ["I_MPI_PMI_LIBRARY"]

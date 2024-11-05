@@ -7,6 +7,8 @@
 #SBATCH --time=01:00:00 
 
 import os
+import os.path
+import sys
 #
 # Total number of {SYSTEM_TYPE}/{BASIS_TYPE}: {NTASKS}
 # This script is for {SYSTEM_TYPE}/{BASIS_TYPE} {FIRST_SYSTEM}-{LAST_SYSTEM}
@@ -19,5 +21,19 @@ InpFile = AllFiles[ThisJob-1]
 LogFile = os.path.splitext(InpFile)[0] + ".log"
 InpPath = os.path.join(InpDir, InpFile)
 LogPath = os.path.join(LogDir, LogFile)
+if os.path.exists(LogPath):
+    sys.exit(0)
+
+if "I_MPI_PMI_LIBRARY" in os.environ:
+    del os.environ["I_MPI_PMI_LIBRARY"]
+os.environ["I_MPI_HYDRA_BOOTSTRAP"] = "ssh"
+os.environ["I_MPI_OFI_PROVIDER"] = "tcp"
+
+# In case of MPI-related bugs, set the following parameters
+# to get debugging data:
+#
+# export I_MPI_DEBUG=5
+# export I_MPI_HYDRA_DEBUG=1
+# export I_MPI_OFI_PROVIDER_DUMP=1
 
 os.system(f"module load intel/2021b; /home/marcin/Krysia/beyond-rpa/bin/run -np 1 -nt 36 '{{InpPath}}' >& '{{LogPath}}'")

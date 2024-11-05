@@ -1,9 +1,9 @@
 basis=aug-cc-pVDZ
 calc=LNO-CCSD(T)
 Lcorthr=vTight
-mem=128000MB
-ptthreads=1
-ccsdthreads=1
+mem=32GB
+ptthreads=4
+ccsdthreads=4
 mpitasks=1
 
 geom=xyz
