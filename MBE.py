@@ -30,7 +30,14 @@ def AlignMolecules(A, B):
     RMSD = np.sqrt(FrobNorm**2 / len(A))
     return RMSD
 
-def compare_descriptors_Coulomb_Matrix(descriptor1, descriptor2):
+def compare_descriptors_Coulomb_Matrix(molecule1, molecule2):
+    # The definition of the CoulumbMatrix.
+    # Conains the maximal number of atoms in molecule and Defines the method for handling permutational invariance
+    cm = CoulombMatrix(n_atoms_max=len(molecule1),  permutation='eigenspectrum') 
+    # Create the descriptors for bouth molecules
+    descriptor1 = cm.create(molecule1)
+    descriptor2 = cm.create(molecule2)
+    # Comper the descriptors
     if len(descriptor1) != len(descriptor2):
         raise ValueError("Descriptors must have the same length.")
         
