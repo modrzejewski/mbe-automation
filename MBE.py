@@ -12,6 +12,9 @@ import time
 import subprocess
 import DirectoryStructure
 import shutil
+import dscribe
+from dscribe.descriptors import CoulombMatrix
+
 
 def AlignMolecules(A, B):
     #
@@ -26,6 +29,21 @@ def AlignMolecules(A, B):
     FrobNorm = ase.geometry.distance(A, B)
     RMSD = np.sqrt(FrobNorm**2 / len(A))
     return RMSD
+
+def compare_descriptors_Coulomb_Matrix(descriptor1, descriptor2):
+    if len(descriptor1) != len(descriptor2):
+        raise ValueError("Descriptors must have the same length.")
+        
+    differences = np.abs(descriptor1 - descriptor2)
+    #the difinition of cut-off
+    delta_Rij = 10**(-4)
+    lambda_min = np.minimum(descriptor1, descriptor1)
+    cut_off = abs(lambda_min)*delta_Rij
+    if np.all(differences < cut_off):
+        return 0
+    else:
+        return 1
+
 
 
 def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThresh):
