@@ -30,7 +30,7 @@ def AlignMolecules(A, B):
     RMSD = np.sqrt(FrobNorm**2 / len(A))
     return RMSD
 
-def compare_descriptors_Coulomb_Matrix(molecule1, molecule2):
+def CompareDescriptorsCoulombMatrix(molecule1, molecule2):
     # The definition of the CoulumbMatrix.
     # Conains the maximal number of atoms in molecule and Defines the method for handling permutational invariance
     cm = CoulombMatrix(n_atoms_max=len(molecule1),  permutation='eigenspectrum') 
@@ -51,7 +51,7 @@ def compare_descriptors_Coulomb_Matrix(molecule1, molecule2):
     else:
         return 1
 
-def compare_descriptors_MBTR(molecule1, molecule2):
+def CompareDescriptorsMBTR(molecule1, molecule2):
     # The definition of the MBTR descriptors with itd parameters.
     mbtr2 = MBTR( 
         species=trimer1.get_chemical_symbols(),
