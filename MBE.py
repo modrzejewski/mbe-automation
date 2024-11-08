@@ -51,7 +51,45 @@ def compare_descriptors_Coulomb_Matrix(molecule1, molecule2):
     else:
         return 1
 
-
+def compare_descriptors_MBTR(molecule1, molecule2):
+    # The definition of the MBTR descriptors with itd parameters.
+    mbtr2 = MBTR( 
+        species=trimer1.get_chemical_symbols(),
+        geometry={"function":  "inverse_distance"},
+        grid={"min": 0, "max": 1, "n": 200, "sigma": 0.02},
+        weighting={"function": "exp", "scale": 1.0, "threshold": 1e-3} ,
+        periodic=False,
+        normalization="l2",
+    )
+    mbtr3 = MBTR( 
+        species=trimer1.get_chemical_symbols(),
+        geometry={"function": "cosine"},
+        grid={"min": 0, "max": 1, "n": 200, "sigma": 0.2},
+        weighting={"function": "unity"} ,
+        periodic=False,
+        normalization="l2",
+    )            
+    # Create the descriptors for bouth molecules
+    descriptor12 = mbtr2.create(molecule1)
+    descriptor22 = mbtr2.create(molecule2)
+    descriptor13 = mbtr3.create(molecule1)
+    descriptor23 = mbtr3.create(molecule2)
+    # Comper the descriptors
+    if len(descriptor12) != len(descriptor22):
+        raise ValueError("Descriptors must have the same length.")
+    if len(descriptor13) != len(descriptor23):
+        raise ValueError("Descriptors must have the same length.")
+    
+    distance2 = euclidean(descriptor12, descriptor22)
+    distance3 = euclidean(descriptor13, descriptor23)
+    cut_off = 10**(-8)
+    if (distance2 < cut_off):
+        if (distance3 < cut_off):
+            return 0
+        else:
+            return 1
+    else:
+        return 1
 
 def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThresh):
     n = len(Constituents)
