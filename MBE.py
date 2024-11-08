@@ -91,6 +91,32 @@ def CompareDescriptorsMBTR(molecule1, molecule2):
     else:
         return 1
 
+def CoulombMatrixDescriptor(molecule):
+    cm = CoulombMatrix(n_atoms_max=len(molecule),  permutation='eigenspectrum') 
+    descriptor = cm.create(molecule1)
+    return descriptor
+
+def MBTRDescriptor(molecule):
+    mbtr2 = MBTR( 
+        species=trimer1.get_chemical_symbols(),
+        geometry={"function":  "inverse_distance"},
+        grid={"min": 0, "max": 1, "n": 200, "sigma": 0.02},
+        weighting={"function": "exp", "scale": 1.0, "threshold": 1e-3} ,
+        periodic=False,
+        normalization="l2",
+    )
+    mbtr3 = MBTR( 
+        species=trimer1.get_chemical_symbols(),
+        geometry={"function": "cosine"},
+        grid={"min": 0, "max": 1, "n": 200, "sigma": 0.2},
+        weighting={"function": "exp", "scale": 1.0, "threshold": 1e-3} ,
+        periodic=False,
+        normalization="l2",
+    )     
+    descriptor2 = mbtr2.create(molecule)
+    descriptor3 = mbtr3.create(molecule)
+    return descriptor2
+
 def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThresh):
     n = len(Constituents)
     MatchCandidates = []
