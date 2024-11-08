@@ -1,6 +1,7 @@
 basis=aug-cc-pVTZ
 calc=LNO-CCSD(T)
 Lcorthr=vTight
+dfbasis_cor=aug-cc-pVQZ-RI
 mem=32GB
 ptthreads=4
 ccsdthreads=4

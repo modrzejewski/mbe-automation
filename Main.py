@@ -25,7 +25,7 @@ Methods = ("RPA", "LNO-CCSD(T)")
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/X23/09_cytosine/solid.xyz"
+UnitCellFile        = "./Systems/benzene/benzene-temperature-138.cif"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
@@ -72,7 +72,7 @@ RelaxedMonomerXYZ   = "./Systems/X23/09_cytosine/molecule.xyz"
                                                 #
 Cutoffs = {"dimers": 20.0,
            "trimers": 10.0,      
-           "tetramers": 8.0
+           "tetramers": 10.0
            }
                                                 #
                                                 # Ordering of dimers, trimers, tetramers.
