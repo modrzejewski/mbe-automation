@@ -460,12 +460,20 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                 # performing expensive search for exact
                 # replicas
                 #
+                
+                CMDescriptor = CoulombMatrixDescriptor(Molecule) 
+                MBTRDescriptor = MBTRDescriptor(Molecule) 
+                
                 if len(MatchCandidates) > 0:
                     for k in MatchCandidates:
                         NExpensiveChecks[ClusterType] += 1
                         M = Clusters[ClusterType][k]
                         Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
+                        CMDescriptor2 = Clusters[ClusterType][k]["CoulumbMartix"].copy()
+                        MBTRDescriptor2 = Clusters[ClusterType][k]["MBTR"].copy()
                         Dist = AlignMolecules(Molecule, Molecule2)
+                        DistCM = CompareDescriptorsCoulombMatrix(CMDescriptor, CMDescriptor2)
+                        DistMBTR = CompareDescriptorsMBTR(MBTRDescriptor, MBTRDescriptor2)
                         if Dist > AlignmentThresh and AlignMirrorImages:
                             #
                             # Test the mirror image of Molecule2. After enabling
@@ -494,6 +502,8 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                     Cluster = {}
                     Cluster["Atoms"] = Molecule
                     Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
+                    Cluster["CoulumbMartix"] = CoulumbDescriptor
+                    Cluster["MBTR"] = MBTRDescriptor
                     if n >= 3:
                         Cluster["MinRij"] = MinDist
                         Cluster["AvRij"] = AvDist
