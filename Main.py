@@ -25,7 +25,7 @@ Methods = ("RPA", "LNO-CCSD(T)")
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/benzene/benzene-temperature-138.cif"
+UnitCellFile        = "./Systems/Sherrill-JCP2023/14_oxalic_acid_alpha.cif"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
@@ -41,7 +41,7 @@ UnitCellFile        = "./Systems/benzene/benzene-temperature-138.cif"
                                                 # is required.
                                                 #                                    
                                                 
-SystemTypes         = ["tetramers"]
+SystemTypes         = ["dimers"]
 
                                                 #
                                                 # Geometry of an isolated relaxed monomer.
@@ -70,7 +70,7 @@ RelaxedMonomerXYZ   = "./Systems/X23/09_cytosine/molecule.xyz"
                                                 #
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
-Cutoffs = {"dimers": 20.0,
+Cutoffs = {"dimers": 30.0,
            "trimers": 10.0,      
            "tetramers": 10.0
            }

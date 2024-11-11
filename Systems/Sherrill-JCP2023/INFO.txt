@@ -1,0 +1,3 @@
+This supplementary material for 
+"Benchmarking Two-Body Contributions to Crystal Lattice Energies and a Range-Dependent Assessment of Approximate Methods" by Sargent, et al.
+
