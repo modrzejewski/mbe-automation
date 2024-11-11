@@ -483,6 +483,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                                 #
                                 Coords2 = Molecule2.get_positions()
                                 Coords2[:, 1] *= -1
+                                Molecule2.set_positions(Coords2)
                                 DistMBTR2 = CompareDescriptorsMBTR(MBTRDescriptor, MBTRDescriptor(Molecule2.set_positions(Coords2)))
                                 DistMBTR = min(DistMBTR, DistMBTR2)
                                 
