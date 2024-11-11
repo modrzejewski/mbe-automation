@@ -241,7 +241,7 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
 
 
 def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
-         RelaxedMonomerXYZ, Ordering, XYZDirs, CSVDirs, Methods):
+         RelaxedMonomerXYZ, Ordering, XYZDirs, CSVDirs, Methods, Descriptor):
 
     #
     # Threshold for symmetry equivalence of clusters
@@ -460,9 +460,65 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                 # performing expensive search for exact
                 # replicas
                 #
+                if Descriptor:
+                    MBTRDescriptor = MBTRDescriptor(Molecule) 
+                    if len(MatchCandidates) > 0:
+                        for k in MatchCandidates:
+                            NExpensiveChecks[ClusterType] += 1
+                            M = Clusters[ClusterType][k]
+                            Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
+                            MBTRDescriptor2 = Clusters[ClusterType][k]["MBTR"].copy()
+                            DistMBTR = CompareDescriptorsMBTR(MBTRDescriptor, MBTRDescriptor2)
+                            if DistMBTR > AlignmentThresh and AlignMirrorImages:
+                                #
+                                # Test the mirror image of Molecule2. After enabling
+                                # mirror images, the symmetry weights
+                                # from the MBE code (CrystaLattE) of Borca et al.
+                                # are correctly replicated:
+                                #
+                                # C. H. Borca; B.W. Bakr; L.A. Burns; C.D. Sherrill 
+                                # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
+                                #
+                                # Added after reading the source code of CrystaLattE.
+                                #
+                                Coords2 = Molecule2.get_positions()
+                                Coords2[:, 1] *= -1
+                                DistMBTR2 = CompareDescriptorsMBTR(MBTRDescriptor, MBTRDescriptor(Molecule2.set_positions(Coords2)))
+                                DistMBTR = min(DistMBTR, DistMBTR2)
+                                
+                            if DistMBTR < AlignmentThresh:
+                                NAlignments[ClusterType] += 1
+                                M["Replicas"] += 1
+                                Unique = False
+                                break    
+                        
+                    if Unique:
+                        Cluster = {}
+                        Cluster["Atoms"] = Molecule
+                        Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
+
+                        Cluster["MBTR"] = MBTRDescriptor
+                        if n >= 3:
+                            Cluster["MinRij"] = MinDist
+                            Cluster["AvRij"] = AvDist
+                            Cluster["COMRij"] = COMDist
+                            Cluster["MaxMinRij"] = np.max(MinDist)
+                            Cluster["MaxCOMRij"] = np.max(COMDist)
+                            Cluster["SumAvRij"] = np.sum(AvDist)
+                        else:
+                            Cluster["MaxMinRij"] = MinDist
+                            Cluster["MaxCOMRij"] = COMDist
+                            Cluster["SumAvRij"] = AvDist
+                        Cluster["Constituents"] = Constituents
+                        Cluster["Replicas"] = 1
+                        Clusters[ClusterType].append(Cluster)
+                    else:
+                        NReplicas[ClusterType] += 1
                 
-                CMDescriptor = CoulombMatrixDescriptor(Molecule) 
-                MBTRDescriptor = MBTRDescriptor(Molecule) 
+            NClusters[ClusterType] = len(Clusters[ClusterType])
+            BlockEndTime = time.time()
+            print(f"100% {ClusterType} completed ({BlockEndTime-BlockStartTime:.1E} seconds)")
+            print(f"{NClusters[ClusterType]} unique {ClusterType} satisfy Max(MinRij) < {Cutoff:.2f} Å")
                 
                 if len(MatchCandidates) > 0:
                     for k in MatchCandidates:
