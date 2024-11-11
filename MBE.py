@@ -496,7 +496,6 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                         Cluster = {}
                         Cluster["Atoms"] = Molecule
                         Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
-
                         Cluster["MBTR"] = MBTRDescriptor
                         if n >= 3:
                             Cluster["MinRij"] = MinDist
@@ -514,69 +513,58 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                         Clusters[ClusterType].append(Cluster)
                     else:
                         NReplicas[ClusterType] += 1
-                
-            NClusters[ClusterType] = len(Clusters[ClusterType])
-            BlockEndTime = time.time()
-            print(f"100% {ClusterType} completed ({BlockEndTime-BlockStartTime:.1E} seconds)")
-            print(f"{NClusters[ClusterType]} unique {ClusterType} satisfy Max(MinRij) < {Cutoff:.2f} Å")
-                
-                if len(MatchCandidates) > 0:
-                    for k in MatchCandidates:
-                        NExpensiveChecks[ClusterType] += 1
-                        M = Clusters[ClusterType][k]
-                        Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
-                        CMDescriptor2 = Clusters[ClusterType][k]["CoulumbMartix"].copy()
-                        MBTRDescriptor2 = Clusters[ClusterType][k]["MBTR"].copy()
-                        Dist = AlignMolecules(Molecule, Molecule2)
-                        DistCM = CompareDescriptorsCoulombMatrix(CMDescriptor, CMDescriptor2)
-                        DistMBTR = CompareDescriptorsMBTR(MBTRDescriptor, MBTRDescriptor2)
-                        if Dist > AlignmentThresh and AlignMirrorImages:
-                            #
-                            # Test the mirror image of Molecule2. After enabling
-                            # mirror images, the symmetry weights
-                            # from the MBE code (CrystaLattE) of Borca et al.
-                            # are correctly replicated:
-                            #
-                            # C. H. Borca; B.W. Bakr; L.A. Burns; C.D. Sherrill 
-                            # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
-                            #
-                            # Added after reading the source code of CrystaLattE.
-                            #
-                            Coords2 = Molecule2.get_positions()
-                            Coords2[:, 1] *= -1
-                            Molecule2.set_positions(Coords2)
-                            Dist2 = AlignMolecules(Molecule, Molecule2)
-                            Dist = min(Dist, Dist2)
-                                
-                        if Dist < AlignmentThresh:
-                            NAlignments[ClusterType] += 1
-                            M["Replicas"] += 1
-                            Unique = False
-                            break    
-                        
-                if Unique:
-                    Cluster = {}
-                    Cluster["Atoms"] = Molecule
-                    Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
-                    Cluster["CoulumbMartix"] = CoulumbDescriptor
-                    Cluster["MBTR"] = MBTRDescriptor
-                    if n >= 3:
-                        Cluster["MinRij"] = MinDist
-                        Cluster["AvRij"] = AvDist
-                        Cluster["COMRij"] = COMDist
-                        Cluster["MaxMinRij"] = np.max(MinDist)
-                        Cluster["MaxCOMRij"] = np.max(COMDist)
-                        Cluster["SumAvRij"] = np.sum(AvDist)
-                    else:
-                        Cluster["MaxMinRij"] = MinDist
-                        Cluster["MaxCOMRij"] = COMDist
-                        Cluster["SumAvRij"] = AvDist
-                    Cluster["Constituents"] = Constituents
-                    Cluster["Replicas"] = 1
-                    Clusters[ClusterType].append(Cluster)
                 else:
-                    NReplicas[ClusterType] += 1
-                
+                    if len(MatchCandidates) > 0:
+                        for k in MatchCandidates:
+                            NExpensiveChecks[ClusterType] += 1
+                            M = Clusters[ClusterType][k]
+                            Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
+                            Dist = AlignMolecules(Molecule, Molecule2)
+                            if Dist > AlignmentThresh and AlignMirrorImages:
+                                #
+                                # Test the mirror image of Molecule2. After enabling
+                                # mirror images, the symmetry weights
+                                # from the MBE code (CrystaLattE) of Borca et al.
+                                # are correctly replicated:
+                                #
+                                # C. H. Borca; B.W. Bakr; L.A. Burns; C.D. Sherrill 
+                                # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
+                                #
+                                # Added after reading the source code of CrystaLattE.
+                                #
+                                Coords2 = Molecule2.get_positions()
+                                Coords2[:, 1] *= -1
+                                Molecule2.set_positions(Coords2)
+                                Dist2 = AlignMolecules(Molecule, Molecule2)
+                                Dist = min(Dist, Dist2)
+                                
+                            if Dist < AlignmentThresh:
+                                NAlignments[ClusterType] += 1
+                                M["Replicas"] += 1
+                                Unique = False
+                                break    
+                            
+                    if Unique:
+                        Cluster = {}
+                        Cluster["Atoms"] = Molecule
+                        Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
+                        if n >= 3:
+                            Cluster["MinRij"] = MinDist
+                            Cluster["AvRij"] = AvDist
+                            Cluster["COMRij"] = COMDist
+                            Cluster["MaxMinRij"] = np.max(MinDist)
+                            Cluster["MaxCOMRij"] = np.max(COMDist)
+                            Cluster["SumAvRij"] = np.sum(AvDist)
+                        else:
+                            Cluster["MaxMinRij"] = MinDist
+                            Cluster["MaxCOMRij"] = COMDist
+                            Cluster["SumAvRij"] = AvDist
+                        Cluster["Constituents"] = Constituents
+                        Cluster["Replicas"] = 1
+                        Clusters[ClusterType].append(Cluster)
+                    else:
+                        NReplicas[ClusterType] += 1
+                    
         NClusters[ClusterType] = len(Clusters[ClusterType])
         BlockEndTime = time.time()
         print(f"100% {ClusterType} completed ({BlockEndTime-BlockStartTime:.1E} seconds)")
