@@ -30,92 +30,53 @@ def AlignMolecules(A, B):
     RMSD = np.sqrt(FrobNorm**2 / len(A))
     return RMSD
 
-def CompareDescriptorsCoulombMatrix(molecule1, molecule2):
-    # The definition of the CoulumbMatrix.
-    # Conains the maximal number of atoms in molecule and Defines the method for handling permutational invariance
-    cm = CoulombMatrix(n_atoms_max=len(molecule1),  permutation='eigenspectrum') 
-    # Create the descriptors for bouth molecules
-    descriptor1 = cm.create(molecule1)
-    descriptor2 = cm.create(molecule2)
-    # Comper the descriptors
-    if len(descriptor1) != len(descriptor2):
-        raise ValueError("Descriptors must have the same length.")
-        
-    differences = np.abs(descriptor1 - descriptor2)
-    #the difinition of cut-off
-    delta_Rij = 10**(-4)
-    lambda_min = np.minimum(descriptor1, descriptor1)
-    cut_off = abs(lambda_min)*delta_Rij
-    if np.all(differences < cut_off):
-        return 0
-    else:
-        return 1
-
-def CompareDescriptorsMBTR(molecule1, molecule2):
-    # The definition of the MBTR descriptors with itd parameters.
-    mbtr2 = MBTR( 
-        species=trimer1.get_chemical_symbols(),
-        geometry={"function":  "inverse_distance"},
-        grid={"min": 0, "max": 1, "n": 200, "sigma": 0.02},
-        weighting={"function": "exp", "scale": 1.0, "threshold": 1e-3} ,
-        periodic=False,
-        normalization="l2",
-    )
-    mbtr3 = MBTR( 
-        species=trimer1.get_chemical_symbols(),
-        geometry={"function": "cosine"},
-        grid={"min": 0, "max": 1, "n": 200, "sigma": 0.2},
-        weighting={"function": "unity"} ,
-        periodic=False,
-        normalization="l2",
-    )            
-    # Create the descriptors for bouth molecules
-    descriptor12 = mbtr2.create(molecule1)
-    descriptor22 = mbtr2.create(molecule2)
-    descriptor13 = mbtr3.create(molecule1)
-    descriptor23 = mbtr3.create(molecule2)
-    # Comper the descriptors
-    if len(descriptor12) != len(descriptor22):
-        raise ValueError("Descriptors must have the same length.")
-    if len(descriptor13) != len(descriptor23):
-        raise ValueError("Descriptors must have the same length.")
-    
-    distance2 = euclidean(descriptor12, descriptor22)
-    distance3 = euclidean(descriptor13, descriptor23)
-    cut_off = 10**(-8)
-    if (distance2 < cut_off):
-        if (distance3 < cut_off):
-            return 0
-        else:
-            return 1
-    else:
-        return 1
-
 def CoulombMatrixDescriptor(molecule):
     cm = CoulombMatrix(n_atoms_max=len(molecule),  permutation='eigenspectrum') 
     descriptor = cm.create(molecule1)
     return descriptor
 
+def CompareDescriptorsCoulombMatrix(descriptor1, descriptor2):
+    # Comper the descriptors
+    if len(descriptor1) != len(descriptor2):
+        raise ValueError("Descriptors must have the same length.")
+    differences = np.abs(descriptor1 - descriptor2)
+    return differences
+
+
 def MBTRDescriptor(molecule):
     mbtr2 = MBTR( 
-        species=trimer1.get_chemical_symbols(),
+        species=list(set(trimer.get_chemical_symbols())),
         geometry={"function":  "inverse_distance"},
-        grid={"min": 0, "max": 1, "n": 200, "sigma": 0.02},
-        weighting={"function": "exp", "scale": 1.0, "threshold": 1e-3} ,
+        grid={"min": 0, "max": 1.0, "n": 200, "sigma": 0.02},
+        weighting={"function": "unity"},#"exp", "scale": 1.0, "threshold": 1e-3},
         periodic=False,
-        normalization="l2",
+        normalization="n_atoms",
     )
     mbtr3 = MBTR( 
-        species=trimer1.get_chemical_symbols(),
+        species=list(set(trimer.get_chemical_symbols())),
         geometry={"function": "cosine"},
-        grid={"min": 0, "max": 1, "n": 200, "sigma": 0.2},
-        weighting={"function": "exp", "scale": 1.0, "threshold": 1e-3} ,
+        grid={"min": -1.0, "max": 1.0, "n": 200, "sigma": 0.02},
+        weighting={"function": "unity"},
         periodic=False,
-        normalization="l2",
-    )     
-    descriptor2 = mbtr2.create(molecule)
-    descriptor3 = mbtr3.create(molecule)
-    return descriptor2
+        normalization="n_atoms",
+    )
+    descriptor = [mbtr2.create(molecule), mbtr3.create(molecule)]
+    return descriptor
+
+
+def CompareDescriptorsMBTR(descriptor1, descriptor2):      
+    # Comper the descriptors
+    if len(descriptor1[0]) != len(descriptor2[0]):
+        raise ValueError("Descriptors must have the same length.")
+    if len(descriptor1[1]) != len(descriptor2[1]):
+        raise ValueError("Descriptors must have the same length.")
+    
+    distance2 = euclidean(descriptor1[0], descriptor2[0])
+    distance3 = euclidean(descriptor1[1], descriptor2[2])
+    return np.sqrt(distance2**2 + distance3**2)
+
+
+
 
 def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThresh):
     n = len(Constituents)
