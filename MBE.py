@@ -74,7 +74,7 @@ def CompareDescriptorsMBTR(descriptor1, descriptor2):
         raise ValueError("Descriptors must have the same length.")
     
     distance2 = euclidean(descriptor1[0], descriptor2[0])
-    distance3 = euclidean(descriptor1[1], descriptor2[2])
+    distance3 = euclidean(descriptor1[1], descriptor2[1])
     return np.sqrt(distance2**2 + distance3**2)
 
 
