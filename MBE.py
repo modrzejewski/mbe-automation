@@ -485,7 +485,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                         Cluster = {}
                         Cluster["Atoms"] = Molecule
                         Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
-                        Cluster["MBTR"] = MBTRDescriptor
+                        Cluster["MBTR"] = MBTR
                         if n >= 3:
                             Cluster["MinRij"] = MinDist
                             Cluster["AvRij"] = AvDist
