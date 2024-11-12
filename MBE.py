@@ -473,6 +473,10 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                             DistMBTR = CompareDescriptorsMBTR(MBTRDescriptor, MBTRDescriptor2)
                             
                             if DistMBTR < AlignmentThresh:
+                                #
+                                # The MBTR descriptor is the same for  
+                                # mirror images of a molecule.
+                                #
                                 NAlignments[ClusterType] += 1
                                 M["Replicas"] += 1
                                 Unique = False
