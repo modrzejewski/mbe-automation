@@ -47,7 +47,7 @@ def CompareDescriptorsCoulombMatrix(descriptor1, descriptor2):
 
 def MBTRDescriptor(molecule):
     mbtr2 = MBTR( 
-        species=list(set(trimer.get_chemical_symbols())),
+        species=list(set(molecule.get_chemical_symbols())),
         geometry={"function":  "inverse_distance"},
         grid={"min": 0, "max": 1.0, "n": 200, "sigma": 0.02},
         weighting={"function": "unity"},#"exp", "scale": 1.0, "threshold": 1e-3},
@@ -55,7 +55,7 @@ def MBTRDescriptor(molecule):
         normalization="n_atoms",
     )
     mbtr3 = MBTR( 
-        species=list(set(trimer.get_chemical_symbols())),
+        species=list(set(molecule.get_chemical_symbols())),
         geometry={"function": "cosine"},
         grid={"min": -1.0, "max": 1.0, "n": 200, "sigma": 0.02},
         weighting={"function": "unity"},
@@ -463,14 +463,14 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                 # replicas
                 #
                 if Descriptor:
-                    MBTRDescriptor = MBTRDescriptor(Molecule) 
+                    MBTR = MBTRDescriptor(Molecule) 
                     if len(MatchCandidates) > 0:
                         for k in MatchCandidates:
                             NExpensiveChecks[ClusterType] += 1
                             M = Clusters[ClusterType][k]
                             Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
-                            MBTRDescriptor2 = Clusters[ClusterType][k]["MBTR"].copy()
-                            DistMBTR = CompareDescriptorsMBTR(MBTRDescriptor, MBTRDescriptor2)
+                            MBTR2 = Clusters[ClusterType][k]["MBTR"].copy()
+                            DistMBTR = CompareDescriptorsMBTR(MBTR, MBTR2)
                             
                             if DistMBTR < AlignmentThresh:
                                 #
