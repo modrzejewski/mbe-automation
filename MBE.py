@@ -14,6 +14,8 @@ import DirectoryStructure
 import shutil
 import dscribe
 from dscribe.descriptors import CoulombMatrix
+from dscribe.descriptors import MBTR
+from scipy.spatial.distance import euclidean
 
 
 def AlignMolecules(A, B):
@@ -469,30 +471,12 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                             Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
                             MBTRDescriptor2 = Clusters[ClusterType][k]["MBTR"].copy()
                             DistMBTR = CompareDescriptorsMBTR(MBTRDescriptor, MBTRDescriptor2)
-                            if DistMBTR > AlignmentThresh and AlignMirrorImages:
-                                #
-                                # Test the mirror image of Molecule2. After enabling
-                                # mirror images, the symmetry weights
-                                # from the MBE code (CrystaLattE) of Borca et al.
-                                # are correctly replicated:
-                                #
-                                # C. H. Borca; B.W. Bakr; L.A. Burns; C.D. Sherrill 
-                                # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
-                                #
-                                # Added after reading the source code of CrystaLattE.
-                                #
-                                Coords2 = Molecule2.get_positions()
-                                Coords2[:, 1] *= -1
-                                Molecule2.set_positions(Coords2)
-                                DistMBTR2 = CompareDescriptorsMBTR(MBTRDescriptor, MBTRDescriptor(Molecule2.set_positions(Coords2)))
-                                DistMBTR = min(DistMBTR, DistMBTR2)
-                                
+                            
                             if DistMBTR < AlignmentThresh:
                                 NAlignments[ClusterType] += 1
                                 M["Replicas"] += 1
                                 Unique = False
                                 break    
-                        
                     if Unique:
                         Cluster = {}
                         Cluster["Atoms"] = Molecule
