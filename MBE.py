@@ -18,6 +18,7 @@ from dscribe.descriptors import MBTR
 from scipy.spatial.distance import euclidean
 
 
+
 def AlignMolecules(A, B):
     #
     # Subroutine ase.geometry.distance is used by Hoja, List, and Boese in their
@@ -65,8 +66,20 @@ def MBTRDescriptor(molecule):
     descriptor = [mbtr2.create(molecule), mbtr3.create(molecule)]
     return descriptor
 
+def MBTR2Descriptor(molecule):
+    mbtr2 = MBTR( 
+        species=list(set(molecule.get_chemical_symbols())),
+        geometry={"function":  "inverse_distance"},
+        grid={"min": 0, "max": 1.0, "n": 200, "sigma": 0.02},
+        weighting={"function": "unity"},#"exp", "scale": 1.0, "threshold": 1e-3},
+        periodic=False,
+        normalization="n_atoms",
+    )
+    descriptor = mbtr2.create(molecule)
+    return descriptor
 
-def CompareDescriptorsMBTR(descriptor1, descriptor2):      
+
+def CompareMBTR(descriptor1, descriptor2):      
     # Comper the descriptors
     if len(descriptor1[0]) != len(descriptor2[0]):
         raise ValueError("Descriptors must have the same length.")
@@ -78,6 +91,31 @@ def CompareDescriptorsMBTR(descriptor1, descriptor2):
     return np.sqrt(distance2**2 + distance3**2)
 
 
+def CompareMBTR2only(descriptor1, descriptor2):      
+    # Comper the descriptors
+    if len(descriptor1) != len(descriptor2):
+        raise ValueError("Descriptors must have the same length.")
+    distance = euclidean(descriptor1, descriptor2)
+    return distance
+
+def CompareMBTRdifference(descriptor1, descriptor2):      
+    # Comper the descriptors
+    if len(descriptor1[0]) != len(descriptor2[0]):
+        raise ValueError("Descriptors must have the same length.")
+    if len(descriptor1[1]) != len(descriptor2[1]):
+        raise ValueError("Descriptors must have the same length.")
+    
+    distance2 = descriptor1[0] - descriptor2[0]
+    distance3 = descriptor1[1] - descriptor2[1]
+    return np.sqrt(np.dot(distance2,distance2) + np.dot(distance3,distance3))
+
+def CompareMBTRdifference2only(descriptor1, descriptor2):      
+    # Comper the descriptors
+    if len(descriptor1) != len(descriptor2):
+        raise ValueError("Descriptors must have the same length.")
+    
+    distance = descriptor1 - descriptor2
+    return np.sqrt(np.dot(distance2,distance2))
 
 
 def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThresh):
