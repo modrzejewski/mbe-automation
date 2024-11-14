@@ -508,7 +508,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                             M = Clusters[ClusterType][k]
                             Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
                             MBTR2 = Clusters[ClusterType][k]["MBTR"].copy()
-                            DistMBTR = CompareDescriptorsMBTR(MBTR, MBTR2)
+                            DistMBTR = CompareMBTR(MBTR, MBTR2)
                             
                             if DistMBTR < AlignmentThresh:
                                 #
