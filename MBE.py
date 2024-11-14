@@ -78,6 +78,22 @@ def MBTR2Descriptor(molecule):
     descriptor = mbtr2.create(molecule)
     return descriptor
 
+def SOAPDescriptor(molecule, MaxCOMDist):
+    n_max =np.max(molecule.get_atomic_numbers())
+    l_max = 
+    soap = SOAP(
+        species=list(set(molecule.get_chemical_symbols())),
+        periodic=False,
+        r_cut=MaxCOMDist,
+        n_max=n_max,
+        l_max=l_max,
+    )    
+
+
+    
+    descriptor = mbtr2.create(molecule)
+    return descriptor
+
 
 def CompareMBTR(descriptor1, descriptor2):      
     # Comper the descriptors
