@@ -426,6 +426,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
         MinRij[Reference, i] = a
         AvRij[i, Reference] = b
         AvRij[Reference, i] = b
+
     
     for ClusterType in RequestedClusterTypes:
         Cutoff = Cutoffs[ClusterType]
