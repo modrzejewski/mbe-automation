@@ -15,6 +15,7 @@ import shutil
 import dscribe
 from dscribe.descriptors import CoulombMatrix
 from dscribe.descriptors import MBTR
+from dscribe.descriptors import SOAP
 from scipy.spatial.distance import euclidean
 
 
@@ -78,20 +79,15 @@ def MBTR2Descriptor(molecule):
     descriptor = mbtr2.create(molecule)
     return descriptor
 
-def SOAPDescriptor(molecule, MaxCOMDist):
-    n_max =np.max(molecule.get_atomic_numbers())
-    l_max = 
+def SOAPDescriptor(molecule, AvDist):
     soap = SOAP(
         species=list(set(molecule.get_chemical_symbols())),
         periodic=False,
-        r_cut=MaxCOMDist,
-        n_max=n_max,
-        l_max=l_max,
-    )    
-
-
-    
-    descriptor = mbtr2.create(molecule)
+        r_cut=AvDist,
+        n_max=4, #zmiana n_max i l_max sprawia, że wypluwa się dłuższy wektor i poprawia dokładność
+        l_max=3,
+    )     
+    descriptor = soap.create(molecule)
     return descriptor
 
 
