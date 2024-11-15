@@ -17,6 +17,7 @@ from dscribe.descriptors import CoulombMatrix
 from dscribe.descriptors import MBTR
 from dscribe.descriptors import SOAP
 from scipy.spatial.distance import euclidean
+from dscribe.kernels import REMatchKernel
 
 
 
@@ -79,18 +80,6 @@ def MBTR2Descriptor(molecule):
     descriptor = mbtr2.create(molecule)
     return descriptor
 
-def SOAPDescriptor(molecule, AvDist):
-    soap = SOAP(
-        species=list(set(molecule.get_chemical_symbols())),
-        periodic=False,
-        r_cut=AvDist,
-        n_max=4, #zmiana n_max i l_max sprawia, że wypluwa się dłuższy wektor i poprawia dokładność
-        l_max=3,
-    )     
-    descriptor = soap.create(molecule)
-    return descriptor
-
-
 def CompareMBTR(descriptor1, descriptor2):      
     # Comper the descriptors
     if len(descriptor1[0]) != len(descriptor2[0]):
@@ -128,6 +117,15 @@ def CompareMBTRdifference2only(descriptor1, descriptor2):
     
     distance = descriptor1 - descriptor2
     return np.sqrt(np.dot(distance2,distance2))
+
+def CompereSOAP(descriptor1, descriptor2): #TBC
+    # Calculates the similarity with the REMatch kernel and a linear metric. The
+    # result will be a full similarity matrix.
+    re = REMatchKernel(metric="linear", alpha=1, threshold=1e-6)    
+    re_kernel = re.create([a_features, b_features])
+
+    return re_kernel
+
 
 
 def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThresh):
