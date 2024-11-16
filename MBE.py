@@ -18,6 +18,8 @@ from dscribe.descriptors import MBTR
 from dscribe.descriptors import SOAP
 from scipy.spatial.distance import euclidean
 from dscribe.kernels import REMatchKernel
+from dscribe.kernels import AverageKernel
+from dscribe.kernels.localsimilaritykernel import LocalSimilarityKernel
 
 
 
@@ -118,13 +120,25 @@ def CompareMBTRdifference2only(descriptor1, descriptor2):
     distance = descriptor1 - descriptor2
     return np.sqrt(np.dot(distance2,distance2))
 
-def CompereSOAP(descriptor1, descriptor2): #TBC
-    # Calculates the similarity with the REMatch kernel and a linear metric. The
-    # result will be a full similarity matrix.
-    re = REMatchKernel(metric="linear", alpha=1, threshold=1e-6)    
-    re_kernel = re.create([a_features, b_features])
+def SOAPdescriptor(molecule, MaxDist):
+    soap = SOAP(
+        species=list(set(molecule.get_chemical_symbols())),
+        periodic=False,
+        r_cut=MaxDist,
+        n_max=10,
+        l_max=10,
+    )
+    descriptor = soap.create(molecule)
+    descriptor = normalize(descriptor)
+    return descriptor
 
-    return re_kernel
+
+def CompereSOAP(descriptor1, descriptor2): #TBC
+    re = AverageKernel(metric="rbf", gamma=1)
+    re_kernel = re.create([descriptor1, descriptor2])
+    sym = re.get_global_similarity(re_kernel)
+    dist = 1 - sym
+    return dist
 
 
 
