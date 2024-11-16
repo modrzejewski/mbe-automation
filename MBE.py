@@ -133,13 +133,19 @@ def SOAPdescriptor(molecule, MaxDist):
     return descriptor
 
 
-def CompereSOAP(descriptor1, descriptor2): #TBC
+def CompereSOAP_AvK(descriptor1, descriptor2): #TBC
     re = AverageKernel(metric="rbf", gamma=1)
     re_kernel = re.create([descriptor1, descriptor2])
     sym = re.get_global_similarity(re_kernel)
     dist = 1 - sym
     return dist
 
+def CompereSOAP_REMK(descriptor1, descriptor2): #TBC
+    re = REMatchKernel(metric="linear", alpha=0.01, threshold=1e-8)
+    re_kernel = re.create([descriptor1, descriptor2])
+    sym = re.get_global_similarity(re_kernel) 
+    dist = 1 - sym
+    return dist
 
 
 def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThresh):
