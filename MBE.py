@@ -148,13 +148,14 @@ def CompereSOAP_REMK(descriptor1, descriptor2): #TBC
     return dist
 
 
-def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThresh):
+def CompareDistances(Constituents, Clusters, MinRij, MaxRij AvRij, COMRij, AlignmentThresh):
     n = len(Constituents)
     MatchCandidates = []
     if n == 2:
         i = Constituents[0]
         j = Constituents[1]
         MinDist = MinRij[i, j]
+        MaxDist = MaxRij[i, j]
         AvDist = AvRij[i, j]
         COMDist = COMRij[i, j]
         for k in range(len(Clusters)):
@@ -164,11 +165,13 @@ def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThr
     else:
         NDistances = scipy.special.comb(n, 2, exact=True)
         MinDist = np.zeros(NDistances)
+        MaxDist = np.zeros(NDistances)
         AvDist = np.zeros(NDistances)
         COMDist = np.zeros(NDistances)
         t = 0
         for i, j in itertools.combinations(Constituents, 2):
             MinDist[t] = MinRij[i, j]
+            MaxDist[t] = MaxRij[i, j]
             AvDist[t] = AvRij[i, j]
             COMDist[t] = COMRij[i, j]
             t += 1
@@ -180,7 +183,7 @@ def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThr
             if np.max(np.abs(MinDist-M["MinRij"])) < AlignmentThresh:
                 MatchCandidates.append(k)
 
-    return MatchCandidates, MinDist, AvDist, COMDist
+    return MatchCandidates, MinDist, AvDist, COMDist, MaxDist
                     
 
 def ClusterLabel(Constituents, NMonomers):
@@ -218,8 +221,9 @@ def IntermolecularDistance(MolA, MolB):
     posB = MolB.get_positions()
     Rij = scipy.spatial.distance.cdist(posA, posB)
     MinRij = np.min(Rij)
+    MaxRij = np.max(Rij)
     AvRij = np.mean(Rij)
-    return MinRij, AvRij
+    return MinRij, AvRij, MaxRij
 
 
 def GetSupercellDimensions(UnitCell, SupercellRadius):
@@ -434,6 +438,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
     #
     AvRij = np.zeros((NMonomers, NMonomers))
     MinRij = np.zeros((NMonomers, NMonomers))
+    MaxRij = np.zeros((NMonomers, NMonomers))
     #
     # Assemble a list of molecules inside the sphere of
     # radius R=(dimer cutoff radius)
@@ -441,11 +446,13 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
     Reference = 0
     MonomersWithinCutoff = {"dimers":[], "trimers":[], "tetramers":[]}
     for i in range(NMonomers):
-        a, b = IntermolecularDistance(Monomers[i], Monomers[Reference])
+        a, b, c = IntermolecularDistance(Monomers[i], Monomers[Reference])
         MinRij[i, Reference] = a
         MinRij[Reference, i] = a
         AvRij[i, Reference] = b
         AvRij[Reference, i] = b
+        MaxRij[i, Reference] = c
+        MaxRij[Reference, i] = c
 
     
     for ClusterType in RequestedClusterTypes:
@@ -476,11 +483,13 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
     if ClusterType:
         for j in MonomersWithinCutoff[ClusterType]:
             for i in MonomersWithinCutoff[ClusterType]:
-                a, b = IntermolecularDistance(Monomers[i], Monomers[j])
+                a, b, c = IntermolecularDistance(Monomers[i], Monomers[j])
                 MinRij[i, j] = a
                 MinRij[j, i] = a
                 AvRij[i, j] = b
                 AvRij[j, i] = b
+                MaxRij[i, j] = c
+                MaxRij[j, i] = c
     #
     # Generate unique clusters
     #
@@ -518,9 +527,9 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                         break
             if WithinRadius:
                 Constituents = (Reference,) + x
-                MatchCandidates, MinDist, AvDist, COMDist = CompareDistances(Constituents,
+                MatchCandidates, MinDist, AvDist, COMDist, MaxDist = CompareDistances(Constituents,
                                                                             Clusters[ClusterType],
-                                                                            MinRij, AvRij, COMRij,
+                                                                            MinRij, MaxRij, AvRij, COMRij,
                                                                             AlignmentThresh)
                 Unique = True
                 Molecule = Atoms()
