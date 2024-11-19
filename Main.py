@@ -25,7 +25,7 @@ Methods = ("RPA", "LNO-CCSD(T)")
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/Sherrill-JCP2023/14_oxalic_acid_alpha.cif"
+UnitCellFile        = "./Systems/Sherrill-JCP2023/13_naphthalene/POSCAR"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
