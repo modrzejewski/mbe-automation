@@ -326,21 +326,21 @@ MP3_TOTAL_ENERGY_SUM = [
 #
 # LNO-CCSD(T) in MRCC
 #
-LNO_ENERGY_COMPONENTS = [
+LNO_CCSD_T_ENERGY_COMPONENTS = [
     "EtotHF",
     "Ec",
     TOTAL_ENERGY
     ]
 
-LNO_REGEX_STRINGS = {
+LNO_CCSD_T_REGEX_STRINGS = {
     "EtotHF" : r"\s*Reference energy \[au\]:" + MRCC_NumberRegex,
     "Ec"     : r"\s*CCSD\(T\) correlation energy \+ MP2 corrections \[au\]:" + MRCC_NumberRegex,
     TOTAL_ENERGY : r"\s*Total LNO-CCSD\(T\) energy with MP2 corrections \[au\]:" + MRCC_NumberRegex
 }
-LNO_EXTRAPOLATED_COMPONENTS = [
+LNO_CCSD_T_EXTRAPOLATED_COMPONENTS = [
     "Ec"
     ]
-LNO_TOTAL_ENERGY_SUM = [
+LNO_CCSD_T_TOTAL_ENERGY_SUM = [
     "EtotHF",
     "Ec"
     ]
@@ -348,6 +348,33 @@ LNO_TOTAL_ENERGY_SUM = [
 #  Reference energy [au]:                                  -158.526831919782
 #  CCSD(T) correlation energy + MP2 corrections [au]:        -0.875517929219
 # Total LNO-CCSD(T) energy with MP2 corrections [au]:     -159.402349849001
+
+
+#
+# LNO-CCSD in MRCC
+#
+LNO_CCSD_ENERGY_COMPONENTS = [
+    "EtotHF",
+    "Ec",
+    TOTAL_ENERGY
+    ]
+
+LNO_CCSD_REGEX_STRINGS = {
+    "EtotHF" : r"\s*Reference energy \[au\]:" + MRCC_NumberRegex,
+    "Ec"     : r"\s*CCSD correlation energy \+ MP2 corrections \[au\]:" + MRCC_NumberRegex,
+    TOTAL_ENERGY : r"\s*Total LNO-CCSD energy with MP2 corrections \[au\]:" + MRCC_NumberRegex
+}
+LNO_CCSD_EXTRAPOLATED_COMPONENTS = [
+    "Ec"
+    ]
+LNO_CCSD_TOTAL_ENERGY_SUM = [
+    "EtotHF",
+    "Ec"
+    ]
+# CCSD correlation energy [au]:                             -3.800350980277
+# Total CCSD energy [au]:                                -1133.342778615845
+# CCSD correlation energy + MP2 corrections [au]:           -3.801662854117
+# Total LNO-CCSD energy with MP2 corrections [au]:       -1133.344090489685
 
 
 #

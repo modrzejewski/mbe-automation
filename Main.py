@@ -10,7 +10,7 @@
                                                 # all existing files will be moved to a backup location.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/test"
+ProjectDirectory    = "./Projects/Khanh_succinic_acid"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -25,7 +25,7 @@ Methods = ("RPA", "LNO-CCSD(T)")
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/Sherrill-JCP2023/13_naphthalene/POSCAR"
+UnitCellFile        = "./Systems/X23/23_succinic_acid/solid.xyz"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
@@ -41,7 +41,7 @@ UnitCellFile        = "./Systems/Sherrill-JCP2023/13_naphthalene/POSCAR"
                                                 # is required.
                                                 #                                    
                                                 
-SystemTypes         = ["dimers"]
+SystemTypes         = ["trimers"]
 
                                                 #
                                                 # Geometry of an isolated relaxed monomer.
@@ -71,7 +71,7 @@ RelaxedMonomerXYZ   = "./Systems/X23/09_cytosine/molecule.xyz"
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
 Cutoffs = {"dimers": 30.0,
-           "trimers": 10.0,      
+           "trimers": 4.0,      
            "tetramers": 10.0
            }
                                                 #

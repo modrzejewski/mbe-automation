@@ -7,12 +7,11 @@ ProjectDirectory            = "{PROJECT_DIR}"
                                                    #
                                                    # Available methods:
                                                    #
-                                                   # "rPT2", "RPA+MBPT3", "MBPT3",
-                                                   # "RPA", "RPA+ALL_CORRECTIONS", "MP3",
-                                                   # "JCTC2024", "ph-RPA(3)"                                                   
+                                                   # LNO-CCSD(T)
+                                                   # LNO-CCSD
                                                    #
                                                  
-Method                      = "JCTC2024"
+Method                      = "LNO-CCSD(T)"
 
 SmallBasisXNumber           = 3
 

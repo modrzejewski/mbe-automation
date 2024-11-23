@@ -10,6 +10,7 @@ ToKcal = 627.5094688043
 
 def Make(ProjectDir, Method, SmallBasisXNumber, CompletedJobs=["small-basis", "large-basis"],
          RequestedSystemTypes=["monomers", "dimers", "trimers", "tetramers"]):
+    
     CSVDir = os.path.join(ProjectDir, "csv", "RPA", "monomers")
     LogDir, XYZDir = {}, {}
     if "monomers" in RequestedSystemTypes:
@@ -70,7 +71,7 @@ def read_rpa_log(log_path, EnergyComponents, RegexStrings):
     return Energies
 
 
-def MethodDependentParams(Method):
+def MethodDependentKeywords(Method):
     if Method == "RPA":
         EnergyComponents = Keywords.RPA_ENERGY_COMPONENTS
         RegexStrings = Keywords.RPA_REGEX_STRINGS
@@ -109,7 +110,7 @@ def MethodDependentParams(Method):
 
 
 def WriteCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
-    EnergyComponents, RegexStrings, ExtrapolatedComponents, TotalEnergySum = MethodDependentParams(Method)
+    EnergyComponents, RegexStrings, ExtrapolatedComponents, TotalEnergySum = MethodDependentKeywords(Method)
     SmallBasisLogsDir = os.path.join(LogDir, "small-basis")
     LargeBasisLogsDir = os.path.join(LogDir, "large-basis")
 
@@ -177,7 +178,7 @@ def WriteCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
 
 
 def WriteMonomerCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
-    EnergyComponents, RegexStrings, ExtrapolatedComponents, TotalEnergySum = MethodDependentParams(Method)
+    EnergyComponents, RegexStrings, ExtrapolatedComponents, TotalEnergySum = MethodDependentKeywords(Method)
     SmallBasisLogsDir, LargeBasisLogsDir, XYZFiles = {}, {}, {}
     for System in ["monomers-relaxed", "monomers-supercell"]:
         SmallBasisLogsDir[System] = os.path.join(LogDir[System], "small-basis")

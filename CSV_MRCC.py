@@ -9,19 +9,23 @@ import sys
 
 ToKcal = 627.5094688043
 
-def Make(ProjectDir, Method, SmallBasisXNumber):
+def Make(ProjectDir, Method, SmallBasisXNumber, CompletedJobs=["small-basis", "large-basis"],
+         RequestedSystemTypes=["monomers", "dimers", "trimers", "tetramers"]):
+    
     CSVDir = os.path.join(ProjectDir, "csv", "LNO-CCSD(T)", "monomers")
     LogDir, XYZDir = {}, {}
-    for SystemType in ["monomers-relaxed", "monomers-supercell"]:
-        LogDir[SystemType] = os.path.join(ProjectDir, "logs", "LNO-CCSD(T)", SystemType)
-        XYZDir[SystemType] = os.path.join(ProjectDir, "xyz", SystemType)        
-    WriteMonomerCSV(XYZDir, LogDir, CSVDir, SmallBasisXNumber)
+    if "monomers" in RequestedSystemTypes:
+        for SystemType in ["monomers-relaxed", "monomers-supercell"]:
+            LogDir[SystemType] = os.path.join(ProjectDir, "logs", "LNO-CCSD(T)", SystemType)
+            XYZDir[SystemType] = os.path.join(ProjectDir, "xyz", SystemType)        
+        WriteMonomerCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, CompletedJobs)
     
     for SystemType in ("dimers", "trimers", "tetramers"):
-        LogDir = os.path.join(ProjectDir, "logs", "LNO-CCSD(T)", SystemType)
-        CSVDir = os.path.join(ProjectDir, "csv", "LNO-CCSD(T)", SystemType)
-        XYZDir = os.path.join(ProjectDir, "xyz", SystemType)
-        WriteCSV(XYZDir, LogDir, CSVDir, SmallBasisXNumber, SystemType)
+        if SystemType in RequestedSystemTypes:
+            LogDir = os.path.join(ProjectDir, "logs", "LNO-CCSD(T)", SystemType)
+            CSVDir = os.path.join(ProjectDir, "csv", "LNO-CCSD(T)", SystemType)
+            XYZDir = os.path.join(ProjectDir, "xyz", SystemType)
+            WriteCSV(XYZDir, LogDir, CSVDir, Method, SmallBasisXNumber, SystemType, CompletedJobs)
 
     return
 
@@ -68,17 +72,17 @@ def read_mrcc_log(log_path, EnergyComponents, RegexStrings):
     return Energies
 
 
-def DimerEnergy(Eabs):
+def DimerEnergy(Eabs, EnergyComponents):
     Eint = {}
-    for x in Keywords.LNO_ENERGY_COMPONENTS:
+    for x in EnergyComponents:
         Eint[x] = Eabs["AB"][x] - Eabs["A"][x] - Eabs["B"][x]
         Eint[x] = Eint[x] * ToKcal
     return Eint
 
 
-def TrimerNaddEnergy(E):
+def TrimerNaddEnergy(E, EnergyComponents):
     EintNadd = {}
-    for x in Keywords.LNO_ENERGY_COMPONENTS:
+    for x in EnergyComponents:
         Eabc = E["ABC"][x] - E["A"][x] - E["B"][x] - E["C"][x]
         Eab = E["AB"][x] - E["A"][x] - E["B"][x]
         Ebc = E["BC"][x] - E["B"][x] - E["C"][x]
@@ -88,10 +92,10 @@ def TrimerNaddEnergy(E):
     return EintNadd
 
 
-def TetramerNaddEnergy(E):
+def TetramerNaddEnergy(E, EnergyComponents):
     EintNadd = {}
 
-    for x in Keywords.LNO_ENERGY_COMPONENTS:
+    for x in EnergyComponents:
         Eabcd = E["ABCD"][x] - E["A"][x] - E["B"][x] - E["C"][x] - E["D"][x]
 
         Eabc = E["ABC"][x] - E["A"][x] - E["B"][x] - E["C"][x]
@@ -116,15 +120,28 @@ def TetramerNaddEnergy(E):
         EintNadd[x] = EintNadd[x] * ToKcal
         
     return EintNadd
-    
 
-def WriteCSV(XYZDir, LogDir, CSVDir, X, SystemType):
-    
-    EnergyComponents = Keywords.LNO_ENERGY_COMPONENTS
-    RegexStrings = Keywords.LNO_REGEX_STRINGS
-    ExtrapolatedComponents = Keywords.LNO_EXTRAPOLATED_COMPONENTS
-    TotalEnergySum = Keywords.LNO_TOTAL_ENERGY_SUM
 
+def MethodDependentKeywords(Method):
+    if Method == "LNO-CCSD(T)":
+        EnergyComponents = Keywords.LNO_CCSD_T_ENERGY_COMPONENTS
+        RegexStrings = Keywords.LNO_CCSD_T_REGEX_STRINGS
+        ExtrapolatedComponents = Keywords.LNO_CCSD_T_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = Keywords.LNO_CCSD_T_TOTAL_ENERGY_SUM
+    elif Method == "LNO-CCSD":
+        EnergyComponents = Keywords.LNO_CCSD_ENERGY_COMPONENTS
+        RegexStrings = Keywords.LNO_CCSD_REGEX_STRINGS
+        ExtrapolatedComponents = Keywords.LNO_CCSD_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = Keywords.LNO_CCSD_TOTAL_ENERGY_SUM
+    else:
+        print("Invalid method name in CSV_MRCC")
+        sys.exit()
+
+    return EnergyComponents, RegexStrings, ExtrapolatedComponents, TotalEnergySum
+        
+
+def WriteCSV(XYZDir, LogDir, CSVDir, Method, X, SystemType, CompletedJobs):
+    EnergyComponents, RegexStrings, ExtrapolatedComponents, TotalEnergySum = MethodDependentKeywords(Method)
     EintSubroutines = {"dimers": DimerEnergy, "trimers": TrimerNaddEnergy, "tetramers": TetramerNaddEnergy}
 
     SmallBasisLogsDir = os.path.join(LogDir, "small-basis")
@@ -135,19 +152,29 @@ def WriteCSV(XYZDir, LogDir, CSVDir, X, SystemType):
     if len(XYZFiles) == 0:
         return
 
-    csv_small = open(os.path.join(CSVDir, "lno-ccsd(t)-small-basis.csv"), "w")
-    csv_large = open(os.path.join(CSVDir, "lno-ccsd(t)-large-basis.csv"), "w")
-    csv_cbs =   open(os.path.join(CSVDir, "lno-ccsd(t)-cbs.csv"), "w")
+    Small = "small-basis" in CompletedJobs
+    Large = "large-basis" in CompletedJobs
+    CBS = "small-basis" in CompletedJobs and "large-basis" in CompletedJobs
+
+    if Small:
+        csv_small = open(os.path.join(CSVDir, "lno-ccsd(t)-small-basis.csv"), "w")
+    if Large:
+        csv_large = open(os.path.join(CSVDir, "lno-ccsd(t)-large-basis.csv"), "w")
+    if CBS:
+        csv_cbs =   open(os.path.join(CSVDir, "lno-ccsd(t)-cbs.csv"), "w")
 
     SystemColWidth = 30
     ColWidth = 25
     NComponents = len(EnergyComponents)
     NCols = 1 + len(EnergyComponents)
     header = f"{{:>{SystemColWidth}}}," + ",".join([f"{{:>{ColWidth}}}"] * (NCols-1)) + "\n"
-    
-    csv_small.write(header.format(*["System"]+EnergyComponents))
-    csv_large.write(header.format(*["System"]+EnergyComponents))
-    csv_cbs.write(header.format(*["System"]+EnergyComponents))
+
+    if Small:
+        csv_small.write(header.format(*["System"]+EnergyComponents))
+    if Large:
+        csv_large.write(header.format(*["System"]+EnergyComponents))
+    if CBS:
+        csv_cbs.write(header.format(*["System"]+EnergyComponents))
     
     dataline = f"{{:>{SystemColWidth}s}}," + ",".join([f"{{:>{ColWidth}.8f}}"] * (NCols-1)) + "\n"
     
@@ -158,40 +185,47 @@ def WriteCSV(XYZDir, LogDir, CSVDir, X, SystemType):
         for Subsystem in DirectoryStructure.SUBSYSTEM_LABELS[SystemType]:
             LogFileS = os.path.join(SmallBasisLogsDir, Subsystem, s) + ".log"
             LogFileL = os.path.join(LargeBasisLogsDir, Subsystem, s) + ".log"
-            if not (os.path.exists(LogFileS) and os.path.exists(LogFileL)):
-                continue
-            E_S[Subsystem] = read_mrcc_log(LogFileS, EnergyComponents, RegexStrings)
-            E_L[Subsystem] = read_mrcc_log(LogFileL, EnergyComponents, RegexStrings)
-        Eint_S = EintSubroutines[SystemType](E_S)
-        Eint_L = EintSubroutines[SystemType](E_L)
-        Eint_CBS = extrapolate_energies(Eint_S, Eint_L, X, EnergyComponents,
-                                        ExtrapolatedComponents, TotalEnergySum)
+            if Small:
+                E_S[Subsystem] = read_mrcc_log(LogFileS, EnergyComponents, RegexStrings)
+            if Large:
+                E_L[Subsystem] = read_mrcc_log(LogFileL, EnergyComponents, RegexStrings)
+        if Small:
+            Eint_S = EintSubroutines[SystemType](E_S, EnergyComponents)
+        if Large:
+            Eint_L = EintSubroutines[SystemType](E_L, EnergyComponents)
+        if CBS:
+            Eint_CBS = extrapolate_energies(Eint_S, Eint_L, X, EnergyComponents,
+                                            ExtrapolatedComponents, TotalEnergySum)
         data_s = np.zeros(NComponents)
         data_l = np.zeros(NComponents)
         data_cbs = np.zeros(NComponents)
         for i in range(NComponents):
-            data_s[i] = Eint_S[EnergyComponents[i]]
-            data_l[i] = Eint_L[EnergyComponents[i]]
-            data_cbs[i] = Eint_CBS[EnergyComponents[i]]
+            if Small:
+                data_s[i] = Eint_S[EnergyComponents[i]]
+            if Large:
+                data_l[i] = Eint_L[EnergyComponents[i]]
+            if CBS:
+                data_cbs[i] = Eint_CBS[EnergyComponents[i]]
 
-        csv_small.write(dataline.format(s, *data_s))
-        csv_large.write(dataline.format(s, *data_l))
-        csv_cbs.write(dataline.format(s, *data_cbs))
-                
-    csv_small.close()
-    csv_large.close()
-    csv_cbs.close()
+        if Small:
+            csv_small.write(dataline.format(s, *data_s))
+        if Large:
+            csv_large.write(dataline.format(s, *data_l))
+        if CBS:
+            csv_cbs.write(dataline.format(s, *data_cbs))
+
+    if Small:
+        csv_small.close()
+    if Large:
+        csv_large.close()
+    if CBS:
+        csv_cbs.close()
     print(f"CSV spreadsheets written to {CSVDir}")
 
 
 
-def WriteMonomerCSV(XYZDir, LogDir, CSVDir, X):
-
-    EnergyComponents = Keywords.LNO_ENERGY_COMPONENTS
-    RegexStrings = Keywords.LNO_REGEX_STRINGS
-    ExtrapolatedComponents = Keywords.LNO_EXTRAPOLATED_COMPONENTS
-    TotalEnergySum = Keywords.LNO_TOTAL_ENERGY_SUM
-    
+def WriteMonomerCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
+    EnergyComponents, RegexStrings, ExtrapolatedComponents, TotalEnergySum = MethodDependentKeywords(Method)
     SmallBasisLogsDir, LargeBasisLogsDir, XYZFiles = {}, {}, {}
     for System in ["monomers-relaxed", "monomers-supercell"]:
         SmallBasisLogsDir[System] = os.path.join(LogDir[System], "small-basis")
@@ -204,10 +238,17 @@ def WriteMonomerCSV(XYZDir, LogDir, CSVDir, X):
     if XYZFiles["monomers-relaxed"] != XYZFiles["monomers-supercell"]:
         print("Unequal number of relaxed and supercell monomer coordinates")
         sys.exit(1)
-        
-    csv_small = open(os.path.join(CSVDir, "lno-ccsd(t)-small-basis.csv"), "w")
-    csv_large = open(os.path.join(CSVDir, "lno-ccsd(t)-large-basis.csv"), "w")
-    csv_cbs =   open(os.path.join(CSVDir, "lno-ccsd(t)-cbs.csv"), "w")
+
+    Small = "small-basis" in CompletedJobs
+    Large = "large-basis" in CompletedJobs
+    CBS = "small-basis" in CompletedJobs and "large-basis" in CompletedJobs
+
+    if Small:
+        csv_small = open(os.path.join(CSVDir, "lno-ccsd(t)-small-basis.csv"), "w")
+    if Large:
+        csv_large = open(os.path.join(CSVDir, "lno-ccsd(t)-large-basis.csv"), "w")
+    if CBS:
+        csv_cbs =   open(os.path.join(CSVDir, "lno-ccsd(t)-cbs.csv"), "w")
 
     SystemColWidth = 30
     ColWidth = 25
@@ -215,9 +256,12 @@ def WriteMonomerCSV(XYZDir, LogDir, CSVDir, X):
     NCols = 1 + len(EnergyComponents)
     header = f"{{:>{SystemColWidth}}}," + ",".join([f"{{:>{ColWidth}}}"] * (NCols-1)) + "\n"
 
-    csv_small.write(header.format(*["System"]+EnergyComponents))
-    csv_large.write(header.format(*["System"]+EnergyComponents))
-    csv_cbs.write(header.format(*["System"]+EnergyComponents))
+    if Small:
+        csv_small.write(header.format(*["System"]+EnergyComponents))
+    if Large:
+        csv_large.write(header.format(*["System"]+EnergyComponents))
+    if CBS:
+        csv_cbs.write(header.format(*["System"]+EnergyComponents))
     
     dataline = f"{{:>{SystemColWidth}s}}," + ",".join([f"{{:>{ColWidth}.8f}}"] * (NCols-1)) + "\n"
     
@@ -227,33 +271,42 @@ def WriteMonomerCSV(XYZDir, LogDir, CSVDir, X):
         for System in ["monomers-relaxed", "monomers-supercell"]:
             LogFileS = os.path.join(SmallBasisLogsDir[System], Label) + ".log"
             LogFileL = os.path.join(LargeBasisLogsDir[System], Label) + ".log"
-            E_S[System] = read_mrcc_log(LogFileS, EnergyComponents, RegexStrings)
-            E_L[System] = read_mrcc_log(LogFileL, EnergyComponents, RegexStrings)
-            E_CBS[System] = extrapolate_energies(E_S[System], E_L[System], X, EnergyComponents, 
-                                                 ExtrapolatedComponents, TotalEnergySum)
+            if Small:
+                E_S[System] = read_mrcc_log(LogFileS, EnergyComponents, RegexStrings)
+            if Large:
+                E_L[System] = read_mrcc_log(LogFileL, EnergyComponents, RegexStrings)
+            if CBS:
+                E_CBS[System] = extrapolate_energies(E_S[System], E_L[System], X, EnergyComponents, 
+                                                     ExtrapolatedComponents, TotalEnergySum)
 
         data_s = np.zeros(NComponents)
         data_l = np.zeros(NComponents)
         data_cbs = np.zeros(NComponents)
-        
-        for i in range(NComponents):
-            data_s[i] = (E_S["monomers-supercell"][EnergyComponents[i]]
-                         - E_S["monomers-relaxed"][EnergyComponents[i]]) * ToKcal
-        csv_small.write(dataline.format(Label, *data_s))
-            
-        for i in range(NComponents):
-            data_l[i] = (E_L["monomers-supercell"][EnergyComponents[i]]
-                         - E_L["monomers-relaxed"][EnergyComponents[i]]) * ToKcal
-        csv_large.write(dataline.format(Label, *data_l))
 
-        for i in range(NComponents):
-            data_cbs[i] = (E_CBS["monomers-supercell"][EnergyComponents[i]]
-                           - E_CBS["monomers-relaxed"][EnergyComponents[i]]) * ToKcal
-        csv_cbs.write(dataline.format(Label, *data_cbs))
-                
-    csv_small.close()
-    csv_large.close()
-    csv_cbs.close()
+        if Small:
+            for i in range(NComponents):
+                data_s[i] = (E_S["monomers-supercell"][EnergyComponents[i]]
+                             - E_S["monomers-relaxed"][EnergyComponents[i]]) * ToKcal
+            csv_small.write(dataline.format(Label, *data_s))
+
+        if Large:
+            for i in range(NComponents):
+                data_l[i] = (E_L["monomers-supercell"][EnergyComponents[i]]
+                             - E_L["monomers-relaxed"][EnergyComponents[i]]) * ToKcal
+            csv_large.write(dataline.format(Label, *data_l))
+
+        if CBS:
+            for i in range(NComponents):
+                data_cbs[i] = (E_CBS["monomers-supercell"][EnergyComponents[i]]
+                               - E_CBS["monomers-relaxed"][EnergyComponents[i]]) * ToKcal
+            csv_cbs.write(dataline.format(Label, *data_cbs))
+
+    if Small:
+        csv_small.close()
+    if Large:
+        csv_large.close()
+    if CBS:
+        csv_cbs.close()
         
     print(f"CSV spreadsheets written to {CSVDir}")
     return
