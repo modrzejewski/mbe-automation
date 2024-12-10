@@ -136,10 +136,10 @@ def WriteCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
     #
     if Small:
         ErrorsOutput = os.path.join(CSVDir, "rpa-small-basis-errors.txt")
-        NumericalErrors(output_file=ErrorsOutput, log_files_dir=SmallBasisLogsDir)
+        ErrorAnalysis_RPA.NumericalErrors(output_file=ErrorsOutput, log_files_dir=SmallBasisLogsDir)
     if Large:
         ErrorsOutput = os.path.join(CSVDir, "rpa-large-basis-errors.txt")
-        NumericalErrors(output_file=ErrorsOutput, log_files_dir=LargeBasisLogsDir)
+        ErrorAnalysis_RPA.NumericalErrors(output_file=ErrorsOutput, log_files_dir=LargeBasisLogsDir)
 
     SystemColWidth = 30
     ColWidth = 25

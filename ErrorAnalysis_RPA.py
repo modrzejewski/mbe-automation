@@ -4,6 +4,14 @@ import os
 import re
 import sys
 
+def write_results(f, results):
+    for category, top_errors in results.items():
+        f.write(f"Category: {category}\n")
+        f.write("Top 10 Errors:\n")       
+        for error, file_name in top_errors:
+            f.write(f"  {error:.4E} (File: {file_name})\n")
+            
+
 def NumericalErrors(output_file="", log_files_dir="."):
     # Regex pattern to match specific lines starting with desired categories
     pattern = re.compile(r"^\s*(2\s+natural orbitals|3\s+eigendecomposition of T2|4\s+pair-natural orbitals)\s+[-+]?[0-9]\.[0-9]+E[+-][0-9]+\s+([-+]?[0-9]\.[0-9]+E[+-][0-9]+)")
@@ -32,7 +40,7 @@ def NumericalErrors(output_file="", log_files_dir="."):
     results = {}
     for category, errors in errors_by_category.items():
         top_10_errors = sorted(errors, key=lambda x: abs(x[0]), reverse=True)[:10]
-        results[category] = top_10_errors
+        results[category] = top_10_errors    
 
     if NMatches > 0:
         if output_file != "":
@@ -41,9 +49,3 @@ def NumericalErrors(output_file="", log_files_dir="."):
         else:
             write_results(sys.stdout, results)
 
-    def write_results(f, results):
-        for category, top_errors in results.items():
-            f.write(f"Category: {category}\n")
-            f.write("Top 10 Errors:\n")       
-            for error, file_name in top_errors:
-                f.write(f"  {error:.4E} (File: {file_name})\n") 
