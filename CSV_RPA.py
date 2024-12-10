@@ -5,6 +5,7 @@ import os.path
 import argparse
 import Keywords
 import sys
+import ErrorAnalysis_RPA
 
 ToKcal = 627.5094688043
 
@@ -129,6 +130,16 @@ def WriteCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
         csv_large = open(os.path.join(CSVDir, "rpa-large-basis.csv"), "w")
     if CBS:
         csv_cbs =   open(os.path.join(CSVDir, "rpa-cbs.csv"), "w")
+
+    #
+    # Estimates for numerical errors
+    #
+    if Small:
+        ErrorsOutput = os.path.join(CSVDir, "rpa-small-basis-errors.txt")
+        NumericalErrors(output_file=ErrorsOutput, log_files_dir=SmallBasisLogsDir)
+    if Large:
+        ErrorsOutput = os.path.join(CSVDir, "rpa-large-basis-errors.txt")
+        NumericalErrors(output_file=ErrorsOutput, log_files_dir=LargeBasisLogsDir)
 
     SystemColWidth = 30
     ColWidth = 25

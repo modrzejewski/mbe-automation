@@ -10,7 +10,7 @@
                                                 # all existing files will be moved to a backup location.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/Khanh_succinic_acid"
+ProjectDirectory    = "./Projects/berkelbach"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -25,7 +25,7 @@ Methods = ("RPA", "LNO-CCSD(T)")
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/X23/23_succinic_acid/solid.xyz"
+UnitCellFile        = "./Systems/Berkelbach-JPCL2023/15_oxalic_acid_beta/solid.cif"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
@@ -41,7 +41,7 @@ UnitCellFile        = "./Systems/X23/23_succinic_acid/solid.xyz"
                                                 # is required.
                                                 #                                    
                                                 
-SystemTypes         = ["trimers"]
+SystemTypes         = ["dimers"]
 
                                                 #
                                                 # Geometry of an isolated relaxed monomer.

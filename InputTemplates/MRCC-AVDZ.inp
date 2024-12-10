@@ -1,10 +1,11 @@
 basis=aug-cc-pVDZ
 calc=LNO-CCSD(T)
-Lcorthr=vTight
+Lcorthr=vvTight
 dfbasis_cor=aug-cc-pVTZ-RI
-mem=32GB
-ptthreads=4
-ccsdthreads=4
+dfbasis_scf=aug-cc-pVTZ-RI
+mem=80GB
+ptthreads=2
+ccsdthreads=2
 mpitasks=1
 
 geom=xyz
