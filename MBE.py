@@ -2,6 +2,7 @@ import numpy as np
 import ase.geometry
 import ase.io
 import ase.build
+import ase.spacegroup.symmetrize
 from ase import Atoms, neighborlist
 import scipy
 from scipy import sparse
@@ -190,6 +191,24 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
     return Monomers
 
 
+def UnitCellSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-3):
+    print("Unit cell symmetry")
+    print(f"{'Threshold':<20}{'Hermann-Mauguin symbol':<30}{'Spacegroup number':<20}")
+    for precision in [1.0E-6, 1.0E-5, 1.0E-4, 1.0E-3, 1.0E-2]:
+        spgdata = ase.spacegroup.symmetrize.check_symmetry(UnitCell, symprec=precision)
+        SymmetryIndex = spgdata["number"]
+        HMSymbol = spgdata["international"]
+        print(f"{precision:<20.6f}{HMSymbol:<30}{SymmetryIndex:<20}")
+        
+    SymmetrizedUnitCell = UnitCell.copy()
+    ase.spacegroup.symmetrize.refine_symmetry(SymmetrizedUnitCell, symprec=SymmetrizationThresh)
+    print(f"Symmetry refinement threshold for symmetrized unit cell: {SymmetrizationThresh}")
+    print(f"Unit cell coordinates are stored in {XYZDirs['unitcell']}")
+    UnitCellXYZ = os.path.join(XYZDirs["unitcell"], "unit_cell.xyz")
+    SymmUnitCellXYZ = os.path.join(XYZDirs["unitcell"], "symmetrized_unit_cell.xyz")
+    UnitCell.write(UnitCellXYZ)
+    SymmetrizedUnitCell.write(SymmUnitCellXYZ)
+    
 def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
          RelaxedMonomerXYZ, Ordering, XYZDirs, CSVDirs, Methods):
 
@@ -231,6 +250,10 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
     print(f"β = {beta:.3f}°")
     print(f"γ = {gamma:.3f}°")
     print(f"V = {volume:.4f} Å³")
+    #
+    # Check symmetry of the unit cell
+    #
+    UnitCellSymmetry(UnitCell, XYZDirs)
     #
     # Determine the supercell size consistent
     # with the requested cutoff radii for clusters.

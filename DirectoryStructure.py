@@ -42,7 +42,7 @@ def SetUp(ProjectDir, Methods):
     
     os.makedirs(PROJECT_DIR)
 
-    for SystemType in ("monomers-supercell", "monomers-relaxed", "dimers", "trimers", "tetramers", "supercell"):
+    for SystemType in ("monomers-supercell", "monomers-relaxed", "dimers", "trimers", "tetramers", "supercell", "unitcell"):
         XYZ_DIRS[SystemType] = path.join(PROJECT_DIR, "xyz", SystemType)
         os.makedirs(XYZ_DIRS[SystemType], exist_ok=True)
     

@@ -10,7 +10,7 @@
                                                 # all existing files will be moved to a backup location.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/berkelbach"
+ProjectDirectory    = "./Projects/test"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -25,7 +25,7 @@ Methods = ("RPA", "LNO-CCSD(T)")
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/Berkelbach-JPCL2023/15_oxalic_acid_beta/solid.cif"
+UnitCellFile        = "./Systems/X23/14_oxalic_acid_alpha/solid.xyz"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
@@ -49,7 +49,7 @@ SystemTypes         = ["dimers"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/09_cytosine/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/14_oxalic_acid_alpha/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
@@ -71,7 +71,7 @@ RelaxedMonomerXYZ   = "./Systems/X23/09_cytosine/molecule.xyz"
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
 Cutoffs = {"dimers": 30.0,
-           "trimers": 4.0,      
+           "trimers": 15.0,      
            "tetramers": 10.0
            }
                                                 #
