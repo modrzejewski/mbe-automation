@@ -10,11 +10,11 @@ SUBSYSTEM_LABELS = {
     }
 
 def SetUp(ProjectDir, Methods):
-    global ROOT_DIR, PROJECT_DIR, INP_DIRS, LOG_DIRS, CSV_DIRS
+    global ROOT_DIR, PROJECT_DIR, INP_DIRS, LOG_DIRS, CSV_DIRS, PBC_DIRS
     global XYZ_DIRS, QUEUE_DIRS, QUEUE_MAIN_SCRIPT
     
     ROOT_DIR = path.dirname(path.realpath(__file__))
-    PROJECT_DIR = path.join(ProjectDir)    
+    PROJECT_DIR = path.join(ProjectDir)        
     INP_DIRS, LOG_DIRS, CSV_DIRS, XYZ_DIRS, QUEUE_DIRS = {}, {}, {}, {}, {}
     #
     # If the project directory already exists, move the existing contents
@@ -42,6 +42,11 @@ def SetUp(ProjectDir, Methods):
     
     os.makedirs(PROJECT_DIR)
 
+    PBC_DIRS = {}
+    for PBCProgram in ["vasp", "pyscf", "crystal"]:
+        PBC_DIRS[PBCProgram] = path.join(PROJECT_DIR, "pbc", PBCProgram)
+        os.makedirs(PBC_DIRS[PBCProgram], exist_ok=True)
+    
     for SystemType in ("monomers-supercell", "monomers-relaxed", "dimers", "trimers", "tetramers", "supercell", "unitcell"):
         XYZ_DIRS[SystemType] = path.join(PROJECT_DIR, "xyz", SystemType)
         os.makedirs(XYZ_DIRS[SystemType], exist_ok=True)

@@ -3,6 +3,7 @@ import ase.geometry
 import ase.io
 import ase.build
 import ase.spacegroup.symmetrize
+import ase.spacegroup.utils
 from ase import Atoms, neighborlist
 import scipy
 from scipy import sparse
@@ -207,7 +208,28 @@ def UnitCellSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-3):
     UnitCellXYZ = os.path.join(XYZDirs["unitcell"], "unit_cell.xyz")
     SymmUnitCellXYZ = os.path.join(XYZDirs["unitcell"], "symmetrized_unit_cell.xyz")
     UnitCell.write(UnitCellXYZ)
-    SymmetrizedUnitCell.write(SymmUnitCellXYZ)
+    SymmetrizedUnitCell.write(SymmUnitCellXYZ)    
+    PBCInput_Crystal(SymmetrizedUnitCell)
+
+    
+def PBCInput_Crystal(UnitCell):
+    spgdata = ase.spacegroup.symmetrize.check_symmetry(UnitCell)
+    SymmetryIndex = spgdata["number"]
+    AtomTypes = UnitCell.get_atomic_numbers()
+    ScaledCoords = UnitCell.get_scaled_positions()
+    IrreducibleAtoms = ase.spacegroup.utils._get_reduced_indices(UnitCell)
+    s = ""
+    for i in IrreducibleAtoms:
+        AtomType = AtomTypes[i]
+        x, y, z = ScaledCoords[i]
+        s += f"{AtomType} {x:20.8f} {y:20.8f} {z:20.8f}\n"
+    InputFile = os.path.join(DirectoryStructure.PBC_DIRS["crystal"], "solid.inp")
+    f = open(InputFile, "w")
+    f.write(s)
+    f.close()
+    print(f"Crystal input written to {InputFile}")
+    
+    
     
 def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
          RelaxedMonomerXYZ, Ordering, XYZDirs, CSVDirs, Methods):
