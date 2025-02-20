@@ -10,7 +10,7 @@
                                                 # all existing files will be moved to a backup location.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/test"
+ProjectDirectory    = "./Projects/test-jakub-berkelbach-5angs"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -20,12 +20,12 @@ ProjectDirectory    = "./Projects/test"
                                                 # (1) RPA
                                                 # (2) LNO-CCSD(T)
                                                 #
-Methods = ("RPA", "LNO-CCSD(T)")
+Methods = ["RPA", "LNO-CCSD(T)"]
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/X23/14_oxalic_acid_alpha/solid.xyz"
+UnitCellFile        = "./Systems/Berkelbach-JPCL2023/04_ammonia/POSCAR"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,
@@ -49,7 +49,7 @@ SystemTypes         = ["dimers"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/14_oxalic_acid_alpha/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/04_ammonia/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
@@ -70,7 +70,7 @@ RelaxedMonomerXYZ   = "./Systems/X23/14_oxalic_acid_alpha/molecule.xyz"
                                                 #
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
-Cutoffs = {"dimers": 30.0,
+Cutoffs = {"dimers": 5.0,
            "trimers": 15.0,      
            "tetramers": 10.0
            }
