@@ -10,7 +10,7 @@
                                                 # all existing files will be moved to a backup location.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/test-jakub-berkelbach-5angs"
+ProjectDirectory    = "./Projects/test"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -25,7 +25,7 @@ Methods = ["RPA", "LNO-CCSD(T)"]
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/Berkelbach-JPCL2023/04_ammonia/POSCAR"
+UnitCellFile        = "./Systems/X23/19_trioxane/solid.xyz"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers. For example,

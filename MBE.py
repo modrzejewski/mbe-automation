@@ -192,10 +192,10 @@ def GenerateMonomers(UnitCell, Na, Nb, Nc):
     return Monomers
 
 
-def UnitCellSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-3):
+def UnitCellSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-2):
     print("Unit cell symmetry")
     print(f"{'Threshold':<20}{'Hermann-Mauguin symbol':<30}{'Spacegroup number':<20}")
-    for precision in [1.0E-6, 1.0E-5, 1.0E-4, 1.0E-3, 1.0E-2]:
+    for precision in [1.0E-6, 1.0E-5, 1.0E-4, 1.0E-3, 1.0E-2, 1.0E-1]:
         spgdata = ase.spacegroup.symmetrize.check_symmetry(UnitCell, symprec=precision)
         SymmetryIndex = spgdata["number"]
         HMSymbol = spgdata["international"]

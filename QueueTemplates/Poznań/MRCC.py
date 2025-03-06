@@ -11,6 +11,7 @@
 import os
 import os.path
 import shutil
+import subprocess
 
 SUBSYSTEM_LABELS = {{
     "monomers-relaxed": [""],
@@ -63,7 +64,14 @@ for Subsystem in SUBSYSTEM_LABELS["{SYSTEM_TYPE}"]:
     shutil.copy(source, destination)
     current_dir = os.getcwd()
     os.chdir(ScratchDir)
-    os.system(f"module load python/3.10.7; module load ifort; module load impi; module load mkl; export PATH=$PATH:~/mrcc; dmrcc >& '{{LogPath}}'")
+    #    os.system(f"module load python/3.10.7; module load ifort; module load impi; module load mkl; export PATH=$PATH:~/mrcc; dmrcc >& '{{LogPath}}'")
+    cmd = "module load python; module load ifort; module load impi; module load mkl; export PATH=$PATH:~/mrcc; dmrcc"
+    with open(LogPath, "w") as log_file:
+        process = subprocess.Popen(cmd, shell=True, stdout=log_file,
+                                   stderr=subprocess.STDOUT, bufsize=1,
+                                   universal_newlines=True)
+        process.communicate()
+    
     os.chdir(current_dir)
     #
     # Remove scratch

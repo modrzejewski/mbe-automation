@@ -11,6 +11,7 @@
 import os
 import os.path
 import sys
+import subprocess
 #
 # Total number of {SYSTEM_TYPE}/{BASIS_TYPE}: {NTASKS}
 # This script is for {SYSTEM_TYPE}/{BASIS_TYPE} {FIRST_SYSTEM}-{LAST_SYSTEM}
@@ -38,4 +39,18 @@ os.environ["I_MPI_OFI_PROVIDER"] = "tcp"
 # export I_MPI_HYDRA_DEBUG=1
 # export I_MPI_OFI_PROVIDER_DUMP=1
 
-os.system(f"module load python/3.10.7; module load ifort; module load impi; module load mkl; ~/beyond-rpa/bin/run -np 1 -nt 48 '{{InpPath}}' >& '{{LogPath}}'")
+# os.system(f"module load python/3.10.7; module load ifort; module load impi; module load mkl; ~/beyond-rpa/bin/run -np 1 -nt 48 '{{InpPath}}' >& '{{LogPath}}'")
+
+
+cmd = f"module load python; module load ifort; module load impi; module load mkl; ~/beyond-rpa/bin/run -np 1 -nt 48 '{{InpPath}}'"
+with open(LogPath, "w") as log_file:
+    process = subprocess.Popen(cmd, shell=True, stdout=log_file,
+                               stderr=subprocess.STDOUT, bufsize=1,
+                               universal_newlines=True)
+    process.communicate()
+
+
+    
+
+
+
