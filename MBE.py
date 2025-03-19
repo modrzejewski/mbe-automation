@@ -14,6 +14,16 @@ import time
 import subprocess
 import DirectoryStructure
 import shutil
+import dscribe
+from dscribe.descriptors import CoulombMatrix
+from dscribe.descriptors import MBTR
+from dscribe.descriptors import SOAP
+from scipy.spatial.distance import euclidean
+from dscribe.kernels import REMatchKernel
+from dscribe.kernels import AverageKernel
+from dscribe.kernels.localsimilaritykernel import LocalSimilarityKernel
+
+
 
 def AlignMolecules(A, B):
     #
@@ -29,14 +39,125 @@ def AlignMolecules(A, B):
     RMSD = np.sqrt(FrobNorm**2 / len(A))
     return RMSD
 
+def CoulombMatrixDescriptor(molecule):
+    cm = CoulombMatrix(n_atoms_max=len(molecule),  permutation='eigenspectrum') 
+    descriptor = cm.create(molecule1)
+    return descriptor
 
-def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThresh):
+def CompareDescriptorsCoulombMatrix(descriptor1, descriptor2):
+    # Comper the descriptors
+    if len(descriptor1) != len(descriptor2):
+        raise ValueError("Descriptors must have the same length.")
+    differences = np.abs(descriptor1 - descriptor2)
+    return differences
+
+
+def MBTRDescriptor(molecule):
+    mbtr2 = MBTR( 
+        species=list(set(molecule.get_chemical_symbols())),
+        geometry={"function":  "inverse_distance"},
+        grid={"min": 0, "max": 1.0, "n": 200, "sigma": 0.02},
+        weighting={"function": "unity"},#"exp", "scale": 1.0, "threshold": 1e-3},
+        periodic=False,
+        normalization="n_atoms",
+    )
+    mbtr3 = MBTR( 
+        species=list(set(molecule.get_chemical_symbols())),
+        geometry={"function": "cosine"},
+        grid={"min": -1.0, "max": 1.0, "n": 200, "sigma": 0.02},
+        weighting={"function": "unity"},
+        periodic=False,
+        normalization="n_atoms",
+    )
+    descriptor = [mbtr2.create(molecule), mbtr3.create(molecule)]
+    return descriptor
+
+def MBTR2Descriptor(molecule):
+    mbtr2 = MBTR( 
+        species=list(set(molecule.get_chemical_symbols())),
+        geometry={"function":  "inverse_distance"},
+        grid={"min": 0, "max": 1.0, "n": 200, "sigma": 0.02},
+        weighting={"function": "unity"},#"exp", "scale": 1.0, "threshold": 1e-3},
+        periodic=False,
+        normalization="n_atoms",
+    )
+    descriptor = mbtr2.create(molecule)
+    return descriptor
+
+def CompareMBTR(descriptor1, descriptor2):      
+    # Comper the descriptors
+    if len(descriptor1[0]) != len(descriptor2[0]):
+        raise ValueError("Descriptors must have the same length.")
+    if len(descriptor1[1]) != len(descriptor2[1]):
+        raise ValueError("Descriptors must have the same length.")
+    
+    distance2 = euclidean(descriptor1[0], descriptor2[0])
+    distance3 = euclidean(descriptor1[1], descriptor2[1])
+    return np.sqrt(distance2**2 + distance3**2)
+
+
+def CompareMBTR2only(descriptor1, descriptor2):      
+    # Comper the descriptors
+    if len(descriptor1) != len(descriptor2):
+        raise ValueError("Descriptors must have the same length.")
+    distance = euclidean(descriptor1, descriptor2)
+    return distance
+
+def CompareMBTRdifference(descriptor1, descriptor2):      
+    # Comper the descriptors
+    if len(descriptor1[0]) != len(descriptor2[0]):
+        raise ValueError("Descriptors must have the same length.")
+    if len(descriptor1[1]) != len(descriptor2[1]):
+        raise ValueError("Descriptors must have the same length.")
+    
+    distance2 = descriptor1[0] - descriptor2[0]
+    distance3 = descriptor1[1] - descriptor2[1]
+    return np.sqrt(np.dot(distance2,distance2) + np.dot(distance3,distance3))
+
+def CompareMBTRdifference2only(descriptor1, descriptor2):      
+    # Comper the descriptors
+    if len(descriptor1) != len(descriptor2):
+        raise ValueError("Descriptors must have the same length.")
+    
+    distance = descriptor1 - descriptor2
+    return np.sqrt(np.dot(distance2,distance2))
+
+def SOAPdescriptor(molecule, MaxDist):
+    soap = SOAP(
+        species=list(set(molecule.get_chemical_symbols())),
+        periodic=False,
+        r_cut=MaxDist,
+        n_max=10,
+        l_max=10,
+    )
+    descriptor = soap.create(molecule)
+    descriptor = normalize(descriptor)
+    return descriptor
+
+
+def CompereSOAP_AvK(descriptor1, descriptor2): #TBC
+    re = AverageKernel(metric="rbf", gamma=1)
+    re_kernel = re.create([descriptor1, descriptor2])
+    sym = re.get_global_similarity(re_kernel)
+    dist = 1 - sym
+    return dist
+
+def CompereSOAP_REMK(descriptor1, descriptor2): #TBC
+    re = REMatchKernel(metric="linear", alpha=0.01, threshold=1e-8)
+    re_kernel = re.create([descriptor1, descriptor2])
+    sym = re.get_global_similarity(re_kernel) 
+    dist = 1 - sym
+    return dist
+
+
+def CompareDistances(Constituents, Clusters, MinRij, MaxRij AvRij, COMRij, AlignmentThresh):
     n = len(Constituents)
     MatchCandidates = []
     if n == 2:
         i = Constituents[0]
         j = Constituents[1]
         MinDist = MinRij[i, j]
+        MaxDist = MaxRij[i, j]
         AvDist = AvRij[i, j]
         COMDist = COMRij[i, j]
         for k in range(len(Clusters)):
@@ -46,11 +167,13 @@ def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThr
     else:
         NDistances = scipy.special.comb(n, 2, exact=True)
         MinDist = np.zeros(NDistances)
+        MaxDist = np.zeros(NDistances)
         AvDist = np.zeros(NDistances)
         COMDist = np.zeros(NDistances)
         t = 0
         for i, j in itertools.combinations(Constituents, 2):
             MinDist[t] = MinRij[i, j]
+            MaxDist[t] = MaxRij[i, j]
             AvDist[t] = AvRij[i, j]
             COMDist[t] = COMRij[i, j]
             t += 1
@@ -62,7 +185,7 @@ def CompareDistances(Constituents, Clusters, MinRij, AvRij, COMRij, AlignmentThr
             if np.max(np.abs(MinDist-M["MinRij"])) < AlignmentThresh:
                 MatchCandidates.append(k)
 
-    return MatchCandidates, MinDist, AvDist, COMDist
+    return MatchCandidates, MinDist, AvDist, COMDist, MaxDist
                     
 
 def ClusterLabel(Constituents, NMonomers):
@@ -100,8 +223,9 @@ def IntermolecularDistance(MolA, MolB):
     posB = MolB.get_positions()
     Rij = scipy.spatial.distance.cdist(posA, posB)
     MinRij = np.min(Rij)
+    MaxRij = np.max(Rij)
     AvRij = np.mean(Rij)
-    return MinRij, AvRij
+    return MinRij, AvRij, MaxRij
 
 
 def GetSupercellDimensions(UnitCell, SupercellRadius):
@@ -232,7 +356,7 @@ def PBCInput_Crystal(UnitCell):
     
     
 def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
-         RelaxedMonomerXYZ, Ordering, XYZDirs, CSVDirs, Methods):
+         RelaxedMonomerXYZ, Ordering, XYZDirs, CSVDirs, Methods, Descriptor):
 
     #
     # Threshold for symmetry equivalence of clusters
@@ -359,6 +483,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
     #
     AvRij = np.zeros((NMonomers, NMonomers))
     MinRij = np.zeros((NMonomers, NMonomers))
+    MaxRij = np.zeros((NMonomers, NMonomers))
     #
     # Assemble a list of molecules inside the sphere of
     # radius R=(dimer cutoff radius)
@@ -366,11 +491,14 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
     Reference = 0
     MonomersWithinCutoff = {"dimers":[], "trimers":[], "tetramers":[]}
     for i in range(NMonomers):
-        a, b = IntermolecularDistance(Monomers[i], Monomers[Reference])
+        a, b, c = IntermolecularDistance(Monomers[i], Monomers[Reference])
         MinRij[i, Reference] = a
         MinRij[Reference, i] = a
         AvRij[i, Reference] = b
         AvRij[Reference, i] = b
+        MaxRij[i, Reference] = c
+        MaxRij[Reference, i] = c
+
     
     for ClusterType in RequestedClusterTypes:
         Cutoff = Cutoffs[ClusterType]
@@ -400,11 +528,13 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
     if ClusterType:
         for j in MonomersWithinCutoff[ClusterType]:
             for i in MonomersWithinCutoff[ClusterType]:
-                a, b = IntermolecularDistance(Monomers[i], Monomers[j])
+                a, b, c = IntermolecularDistance(Monomers[i], Monomers[j])
                 MinRij[i, j] = a
                 MinRij[j, i] = a
                 AvRij[i, j] = b
                 AvRij[j, i] = b
+                MaxRij[i, j] = c
+                MaxRij[j, i] = c
     #
     # Generate unique clusters
     #
@@ -442,9 +572,9 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                         break
             if WithinRadius:
                 Constituents = (Reference,) + x
-                MatchCandidates, MinDist, AvDist, COMDist = CompareDistances(Constituents,
+                MatchCandidates, MinDist, AvDist, COMDist, MaxDist = CompareDistances(Constituents,
                                                                             Clusters[ClusterType],
-                                                                            MinRij, AvRij, COMRij,
+                                                                            MinRij, MaxRij, AvRij, COMRij,
                                                                             AlignmentThresh)
                 Unique = True
                 Molecule = Atoms()
@@ -455,57 +585,98 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
                 # performing expensive search for exact
                 # replicas
                 #
-                if len(MatchCandidates) > 0:
-                    for k in MatchCandidates:
-                        NExpensiveChecks[ClusterType] += 1
-                        M = Clusters[ClusterType][k]
-                        Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
-                        Dist = AlignMolecules(Molecule, Molecule2)
-                        if Dist > AlignmentThresh and AlignMirrorImages:
-                            #
-                            # Test the mirror image of Molecule2. After enabling
-                            # mirror images, the symmetry weights
-                            # from the MBE code (CrystaLattE) of Borca et al.
-                            # are correctly replicated:
-                            #
-                            # C. H. Borca; B.W. Bakr; L.A. Burns; C.D. Sherrill 
-                            # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
-                            #
-                            # Added after reading the source code of CrystaLattE.
-                            #
-                            Coords2 = Molecule2.get_positions()
-                            Coords2[:, 1] *= -1
-                            Molecule2.set_positions(Coords2)
-                            Dist2 = AlignMolecules(Molecule, Molecule2)
-                            Dist = min(Dist, Dist2)
-                                
-                        if Dist < AlignmentThresh:
-                            NAlignments[ClusterType] += 1
-                            M["Replicas"] += 1
-                            Unique = False
-                            break    
-                        
-                if Unique:
-                    Cluster = {}
-                    Cluster["Atoms"] = Molecule
-                    Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
-                    if n >= 3:
-                        Cluster["MinRij"] = MinDist
-                        Cluster["AvRij"] = AvDist
-                        Cluster["COMRij"] = COMDist
-                        Cluster["MaxMinRij"] = np.max(MinDist)
-                        Cluster["MaxCOMRij"] = np.max(COMDist)
-                        Cluster["SumAvRij"] = np.sum(AvDist)
+                if Descriptor:
+                    MBTR = MBTRDescriptor(Molecule) 
+                    if len(MatchCandidates) > 0:
+                        for k in MatchCandidates:
+                            NExpensiveChecks[ClusterType] += 1
+                            M = Clusters[ClusterType][k]
+                            Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
+                            MBTR2 = Clusters[ClusterType][k]["MBTR"].copy()
+                            DistMBTR = CompareMBTR(MBTR, MBTR2)
+                            
+                            if DistMBTR < AlignmentThresh:
+                                #
+                                # The MBTR descriptor is the same for  
+                                # mirror images of a molecule.
+                                #
+                                NAlignments[ClusterType] += 1
+                                M["Replicas"] += 1
+                                Unique = False
+                                break    
+                    if Unique:
+                        Cluster = {}
+                        Cluster["Atoms"] = Molecule
+                        Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
+                        Cluster["MBTR"] = MBTR
+                        if n >= 3:
+                            Cluster["MinRij"] = MinDist
+                            Cluster["AvRij"] = AvDist
+                            Cluster["COMRij"] = COMDist
+                            Cluster["MaxMinRij"] = np.max(MinDist)
+                            Cluster["MaxCOMRij"] = np.max(COMDist)
+                            Cluster["SumAvRij"] = np.sum(AvDist)
+                        else:
+                            Cluster["MaxMinRij"] = MinDist
+                            Cluster["MaxCOMRij"] = COMDist
+                            Cluster["SumAvRij"] = AvDist
+                        Cluster["Constituents"] = Constituents
+                        Cluster["Replicas"] = 1
+                        Clusters[ClusterType].append(Cluster)
                     else:
-                        Cluster["MaxMinRij"] = MinDist
-                        Cluster["MaxCOMRij"] = COMDist
-                        Cluster["SumAvRij"] = AvDist
-                    Cluster["Constituents"] = Constituents
-                    Cluster["Replicas"] = 1
-                    Clusters[ClusterType].append(Cluster)
+                        NReplicas[ClusterType] += 1
                 else:
-                    NReplicas[ClusterType] += 1
-                
+                    if len(MatchCandidates) > 0:
+                        for k in MatchCandidates:
+                            NExpensiveChecks[ClusterType] += 1
+                            M = Clusters[ClusterType][k]
+                            Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
+                            Dist = AlignMolecules(Molecule, Molecule2)
+                            if Dist > AlignmentThresh and AlignMirrorImages:
+                                #
+                                # Test the mirror image of Molecule2. After enabling
+                                # mirror images, the symmetry weights
+                                # from the MBE code (CrystaLattE) of Borca et al.
+                                # are correctly replicated:
+                                #
+                                # C. H. Borca; B.W. Bakr; L.A. Burns; C.D. Sherrill 
+                                # J. Chem. Phys. 151, 144103 (2019); doi: 10.1063/1.5120520
+                                #
+                                # Added after reading the source code of CrystaLattE.
+                                #
+                                Coords2 = Molecule2.get_positions()
+                                Coords2[:, 1] *= -1
+                                Molecule2.set_positions(Coords2)
+                                Dist2 = AlignMolecules(Molecule, Molecule2)
+                                Dist = min(Dist, Dist2)
+                                
+                            if Dist < AlignmentThresh:
+                                NAlignments[ClusterType] += 1
+                                M["Replicas"] += 1
+                                Unique = False
+                                break    
+                            
+                    if Unique:
+                        Cluster = {}
+                        Cluster["Atoms"] = Molecule
+                        Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
+                        if n >= 3:
+                            Cluster["MinRij"] = MinDist
+                            Cluster["AvRij"] = AvDist
+                            Cluster["COMRij"] = COMDist
+                            Cluster["MaxMinRij"] = np.max(MinDist)
+                            Cluster["MaxCOMRij"] = np.max(COMDist)
+                            Cluster["SumAvRij"] = np.sum(AvDist)
+                        else:
+                            Cluster["MaxMinRij"] = MinDist
+                            Cluster["MaxCOMRij"] = COMDist
+                            Cluster["SumAvRij"] = AvDist
+                        Cluster["Constituents"] = Constituents
+                        Cluster["Replicas"] = 1
+                        Clusters[ClusterType].append(Cluster)
+                    else:
+                        NReplicas[ClusterType] += 1
+                    
         NClusters[ClusterType] = len(Clusters[ClusterType])
         BlockEndTime = time.time()
         print(f"100% {ClusterType} completed ({BlockEndTime-BlockStartTime:.1E} seconds)")
