@@ -15,6 +15,7 @@ import subprocess
 import DirectoryStructure
 import shutil
 import ClusterComparison
+import PBC
 import sys
 
 
@@ -229,7 +230,7 @@ def PBCInput_Crystal(UnitCell):
     
     
     
-def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
+def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmbedding,
          RelaxedMonomerXYZ, Ordering, ProjectDir, XYZDirs, CSVDirs, Methods,
          SymmetrizeUnitCell, ClusterComparisonAlgorithm):
     #
@@ -259,7 +260,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
     print("")
     print("Many-body expansion")
     print("")
-    print(f"Project:   {DirectoryStructure.PROJECT_DIR}")
+    print(f"Project:   {ProjectDir}")
     print(f"Unit cell: {UnitCellFile}")
     #
     # Unit cell
@@ -389,6 +390,23 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
             SphereXYZ = os.path.join(XYZDirs["supercell"], f"{ClusterType}-sphere.xyz")
             Sphere.write(SphereXYZ)
             print(f"Coordination sphere for {ClusterType}: {SphereXYZ}")
+    #
+    # Ghost atoms for the BSSE correction in PBC calculations.
+    # (This does not affect the BSSE correction in MBE calculations.)
+    #
+    if PBCEmbedding:
+        if Cutoffs["ghosts"] < Cutoffs["dimers"]:
+            print(f"Searching for ghost atoms within {Cutoffs['ghosts']} Å from the reference molecule")
+            Ghosts = PBC.GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs)
+            print(f"Found {len(Ghosts)} ghost atoms")
+            Label = ClusterLabel([Reference], NMonomers)
+            FilePath = os.path.join(XYZDirs["monomers-supercell"], f"{Label}+ghosts.xyz")
+            Reference_Plus_Ghosts = Monomers[Reference] + Ghosts
+            Reference_Plus_Ghosts.write(FilePath)
+            print(f"Reference monomer+ghosts: {FilePath}")
+        else:
+            print(f"Cutoff for ghosts ({Cutoffs['ghosts']} Å) must be smaller than cutoff for dimers ({Cutoffs['dimers']} Å)")
+            sys.exit(1)
     
     ClusterType = None
     LargestCutoff = 0
@@ -571,6 +589,6 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation,
     EndTime = time.time()
     print("")    
     print(f"All geometries computed in {EndTime-StartTime:.1f} seconds")
-    print(f"Summary of cluster generation written to {ClusterGenLogFile}")
+    print(f"Summary written to {ClusterGenLogFile}")
     sys.stdout.file.close()
     sys.stdout = sys.stdout.stdout

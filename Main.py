@@ -10,7 +10,7 @@
                                                 # all existing files will be moved to a backup location.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/test-mbtr"
+ProjectDirectory    = "./Projects/test-rmsd"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -28,20 +28,25 @@ Methods = ["RPA", "LNO-CCSD(T)"]
 UnitCellFile        = "./Systems/X23/19_trioxane/solid.xyz"
 
                                                 # Types of calculated systems. Allowed values:
-                                                # monomers, dimers, trimers, tetramers. For example,
+                                                # monomers, dimers, trimers, tetramers, bulk.
+                                                #
+                                                # Examples:
                                                 #
                                                 # (a) SystemTypes = ["dimers", "trimers"]
                                                 # (b) SystemTypes = ["dimers"]
                                                 # (c) SystemTypes = ["dimers", "trimers", "tetramers"]
                                                 # (d) SystemTypes = ["monomers", "dimers", "trimers"]
+                                                # (e) SystemTypes = ["monomers", "dimers", "trimers", "bulk"]
                                                 # 
                                                 # In (b), only dimers will be generated.
                                                 # In (d), monomer relaxation energy will
                                                 # be computed. In this case, providing RelaxedMonomerXYZ
                                                 # is required.
-                                                #                                    
+                                                # In (e), in addition to MBE, inputs will be generated
+                                                # for a PBC embedding calculation.
+                                                #
                                                 
-SystemTypes         = ["dimers"]
+SystemTypes         = ["dimers", "bulk"]
 
                                                 #
                                                 # Geometry of an isolated relaxed monomer.
@@ -68,11 +73,19 @@ RelaxedMonomerXYZ   = "./Systems/X23/19_trioxane/molecule.xyz"
                                                 #         j         atom belonging to molecule b
                                                 #         Rij       distance between atoms i and j
                                                 #
+                                                # The ghosts cutoff is the the maximum atom-ghost
+                                                # distance used to compute the dummy atoms for
+                                                # the basis set counterpoise correction
+                                                # in PBC calculations. The cutoff for ghosts in
+                                                # PBC calculations does not affect the BSSE correction
+                                                # in MBE.
+                                                #
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
 Cutoffs = {"dimers": 30.0,
            "trimers": 15.0,      
-           "tetramers": 10.0
+           "tetramers": 10.0,
+           "ghosts": 4
            }
                                                 #
                                                 # Ordering of dimers, trimers, tetramers.
@@ -179,9 +192,10 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
 
     ClusterTypes = []
     for SystemType in SystemTypes:
-        if SystemType != "monomers":
+        if SystemType != "monomers" and SystemType != "bulk":
             ClusterTypes.append(SystemType)
     MonomerRelaxation = "monomers" in SystemTypes
+    PBCEmbedding = "bulk" in SystemTypes
 
     DirectoryStructure.SetUp(ProjectDirectory, Methods)
 
@@ -190,6 +204,7 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                  Cutoffs,
                  ClusterTypes,
                  MonomerRelaxation,
+                 PBCEmbedding,
                  RelaxedMonomerXYZ,
                  Ordering,
                  DirectoryStructure.PROJECT_DIR,
