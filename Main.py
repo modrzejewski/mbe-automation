@@ -10,7 +10,7 @@
                                                 # all existing files will be moved to a backup location.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/test"
+ProjectDirectory    = "./Projects/test-mbtr"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -49,7 +49,7 @@ SystemTypes         = ["dimers"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/04_ammonia/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/19_trioxane/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
@@ -70,7 +70,7 @@ RelaxedMonomerXYZ   = "./Systems/X23/04_ammonia/molecule.xyz"
                                                 #
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
-Cutoffs = {"dimers": 5.0,
+Cutoffs = {"dimers": 30.0,
            "trimers": 15.0,      
            "tetramers": 10.0
            }
@@ -125,6 +125,34 @@ QueueScriptTemplates = {
     "LNO-CCSD(T)":   "./QueueTemplates/Poznań/MRCC.py",
     "DLPNO-CCSD(T)": "./QueueTemplates/ORCA-Ares.py"
     }
+                                                #
+                                                # Use the spglib package to symmetrize the input
+                                                # unit cell. Enabling this option will increase
+                                                # the symmetry weights if the input structure is
+                                                # distorted by geometry optimization.
+                                                #
+                                                # Space groups at different tolerance thresholds
+                                                # are printed out on the screen so that the user
+                                                # has the full information on how this option
+                                                # changes the input structure.
+                                                #           
+SymmetrizeUnitCell  = True
+                                                #
+                                                # Algorithm used for comparing clusters of molecules
+                                                # to test if they are symmetry-equivalent. The symmetry
+                                                # weights found by different algorithms may differ if 
+                                                # the crystal is slightly distorted due to geometry
+                                                # optimization.
+                                                #
+                                                # RMSD      Uses rotations and inversion to compute the RMSD
+                                                #           of the optimal overlap between atomic positions.
+                                                #
+                                                # MBTR      Compares vectors of two-body and three-body
+                                                #           MBTR descriptors computed with the dscribe
+                                                #           package.
+                                                #
+
+ClusterComparisonAlgorithm = "RMSD"
 
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ End of User's Input ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~~~
@@ -133,7 +161,10 @@ QueueScriptTemplates = {
 def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                Ordering, InputTemplates, QueueScriptTemplates,
                Methods, UseExistingXYZ,
-               ExistingXYZDirs=None, RelaxedMonomerXYZ=None):
+               ExistingXYZDirs=None,
+               RelaxedMonomerXYZ=None,
+               SymmetrizeUnitCell=True,
+               ClusterComparisonAlgorithm="RMSD"):
 
     import MBE
     import Inputs_RPA
@@ -161,9 +192,12 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                  MonomerRelaxation,
                  RelaxedMonomerXYZ,
                  Ordering,
+                 DirectoryStructure.PROJECT_DIR,
                  DirectoryStructure.XYZ_DIRS,
                  DirectoryStructure.CSV_DIRS,
-                 Methods)
+                 Methods,
+                 SymmetrizeUnitCell,
+                 ClusterComparisonAlgorithm)
     else:
         print("Coordinates will be read from existing xyz directories:")
         for s in SystemTypes:
@@ -221,7 +255,16 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
 
 
 
-NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
-           Ordering, InputTemplates, QueueScriptTemplates,
-           Methods, UseExistingXYZ, ExistingXYZDirs, 
-           RelaxedMonomerXYZ)
+NewProject(ProjectDirectory,
+           UnitCellFile,
+           SystemTypes,
+           Cutoffs,
+           Ordering,
+           InputTemplates,
+           QueueScriptTemplates,
+           Methods,
+           UseExistingXYZ,
+           ExistingXYZDirs, 
+           RelaxedMonomerXYZ,
+           SymmetrizeUnitCell,
+           ClusterComparisonAlgorithm)
