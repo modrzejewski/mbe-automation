@@ -350,7 +350,6 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
         Label = ClusterLabel([Reference], NMonomers)
         FilePath = os.path.join(XYZDirs["monomers-relaxed"], f"{Label}.xyz")
         WriteClusterXYZ(FilePath, [Reference], RelaxedMonomers)
-        
     #
     # Distances between monomers
     #

@@ -1,6 +1,12 @@
 from ase import Atoms
+import ase.io
 import scipy
 import numpy as np
+import os.path
+import os
+import shutil
+import sys
+
 
 
 def GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs):
@@ -22,4 +28,28 @@ def GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs):
             Ghosts.extend(selected_atoms)
             
     return Ghosts
+
+
+def KPointGrid(UnitCell, Radius):
+    a1, a2, a3 = UnitCell.get_cell().lengths()
+    nk = [
+        max(1, int(np.ceil(  Radius/a1   ))),
+        max(1, int(np.ceil(  Radius/a2   ))),
+        max(1, int(np.ceil(  Radius/a3   )))
+        ]
+    return nk
+    
+
+def KPointGrid_Reciprocal(UnitCell, KPointsSpacing):
+    b1 = UnitCell.get_cell().reciprocal().lengths()[0] * 2 * np.pi
+    b2 = UnitCell.get_cell().reciprocal().lengths()[1] * 2 * np.pi
+    b3 = UnitCell.get_cell().reciprocal().lengths()[2] * 2 * np.pi
+    nk = [
+        max(1, int(np.ceil(b1/KPointsSpacing))),
+        max(1, int(np.ceil(b2/KPointsSpacing))),
+        max(1, int(np.ceil(b3/KPointsSpacing)))
+    ]
+    return nk
+
+
 
