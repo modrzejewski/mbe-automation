@@ -10,7 +10,7 @@
                                                 # all existing files will be moved to a backup location.
                                                 #
                                                 
-ProjectDirectory    = "./Projects/test-mbtr"
+ProjectDirectory    = "./Projects/test"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -19,29 +19,35 @@ ProjectDirectory    = "./Projects/test-mbtr"
                                                 #
                                                 # (1) RPA
                                                 # (2) LNO-CCSD(T)
+                                                # (3) HF(PBC)
                                                 #
-Methods = ["RPA", "LNO-CCSD(T)"]
+Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)"]
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/X23/19_trioxane/solid.xyz"
+UnitCellFile        = "./Systems/X23/20_uracil/solid.xyz"
 
                                                 # Types of calculated systems. Allowed values:
-                                                # monomers, dimers, trimers, tetramers. For example,
+                                                # monomers, dimers, trimers, tetramers, bulk.
+                                                #
+                                                # Examples:
                                                 #
                                                 # (a) SystemTypes = ["dimers", "trimers"]
                                                 # (b) SystemTypes = ["dimers"]
                                                 # (c) SystemTypes = ["dimers", "trimers", "tetramers"]
                                                 # (d) SystemTypes = ["monomers", "dimers", "trimers"]
+                                                # (e) SystemTypes = ["monomers", "dimers", "trimers", "bulk"]
                                                 # 
                                                 # In (b), only dimers will be generated.
                                                 # In (d), monomer relaxation energy will
                                                 # be computed. In this case, providing RelaxedMonomerXYZ
                                                 # is required.
-                                                #                                    
+                                                # In (e), in addition to MBE, inputs will be generated
+                                                # for a PBC embedding calculation.
+                                                #
                                                 
-SystemTypes         = ["dimers"]
+SystemTypes         = ["monomers", "dimers", "bulk"]
 
                                                 #
                                                 # Geometry of an isolated relaxed monomer.
@@ -49,7 +55,7 @@ SystemTypes         = ["dimers"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/19_trioxane/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/20_uracil/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
@@ -68,11 +74,19 @@ RelaxedMonomerXYZ   = "./Systems/X23/19_trioxane/molecule.xyz"
                                                 #         j         atom belonging to molecule b
                                                 #         Rij       distance between atoms i and j
                                                 #
+                                                # The ghosts cutoff is the the maximum atom-ghost
+                                                # distance used to compute the dummy atoms for
+                                                # the basis set counterpoise correction
+                                                # in PBC calculations. The cutoff for ghosts in
+                                                # PBC calculations does not affect the BSSE correction
+                                                # in MBE.
+                                                #
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
 Cutoffs = {"dimers": 30.0,
            "trimers": 15.0,      
-           "tetramers": 10.0
+           "tetramers": 10.0,
+           "ghosts": 6.0
            }
                                                 #
                                                 # Ordering of dimers, trimers, tetramers.
@@ -91,9 +105,18 @@ Ordering            = "MaxMinRij"
                                                 # which is not defined in Methods.
                                                 #
 InputTemplates = {
-    "RPA": {"small-basis": "./InputTemplates/RPA-AVTZ.inp", "large-basis": "./InputTemplates/RPA-AVQZ.inp"},
-    "DLPNO-CCSD(T)" : "./InputTemplates/ORCA-CBS.inp",
-    "LNO-CCSD(T)" : {"small-basis": "./InputTemplates/MRCC-AVTZ.inp", "large-basis": "./InputTemplates/MRCC-AVQZ.inp"}
+    "RPA": {
+        "small-basis": "./InputTemplates/RPA-AVTZ.inp",
+        "large-basis": "./InputTemplates/RPA-AVQZ.inp"
+    },
+    "LNO-CCSD(T)" : {
+        "small-basis": "./InputTemplates/MRCC-AVTZ.inp",
+        "large-basis": "./InputTemplates/MRCC-AVQZ.inp"
+    },
+    "HF(PBC)" : {
+        "solid": "./InputTemplates/HF(PBC)/pyscf/solid.py",
+        "molecule": "./InputTemplates/HF(PBC)/pyscf/molecule.py"
+    }
     }
                                                 #
                                                 # Set UseExistingXYZ to                                                
@@ -123,7 +146,7 @@ ExistingXYZDirs = {
 QueueScriptTemplates = {
     "RPA":           "./QueueTemplates/Poznań/RPA.py",
     "LNO-CCSD(T)":   "./QueueTemplates/Poznań/MRCC.py",
-    "DLPNO-CCSD(T)": "./QueueTemplates/ORCA-Ares.py"
+    "HF(PBC)":       "./QueueTemplates/Poznań/PYSCF.py"
     }
                                                 #
                                                 # Use the spglib package to symmetrize the input
@@ -170,6 +193,7 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
     import Inputs_RPA
     import Inputs_ORCA
     import Inputs_MRCC
+    import Inputs_PYSCF
     import QueueScripts
     import DirectoryStructure
     import os
@@ -177,25 +201,35 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
     import stat
     import shutil
 
+    MethodsMBE = []
+    MethodsPBC = []
+    for m in Methods:
+        if m.endswith("(PBC)"):
+            MethodsPBC.append(m.removesuffix("(PBC)"))
+        else:
+            MethodsMBE.append(m)
+
     ClusterTypes = []
     for SystemType in SystemTypes:
-        if SystemType != "monomers":
+        if SystemType != "monomers" and SystemType != "bulk":
             ClusterTypes.append(SystemType)
     MonomerRelaxation = "monomers" in SystemTypes
+    PBCEmbedding = "bulk" in SystemTypes
 
-    DirectoryStructure.SetUp(ProjectDirectory, Methods)
+    DirectoryStructure.SetUp(ProjectDirectory, MethodsMBE, MethodsPBC)
 
     if not UseExistingXYZ:
         MBE.Make(UnitCellFile,
                  Cutoffs,
                  ClusterTypes,
                  MonomerRelaxation,
+                 PBCEmbedding,
                  RelaxedMonomerXYZ,
                  Ordering,
                  DirectoryStructure.PROJECT_DIR,
                  DirectoryStructure.XYZ_DIRS,
                  DirectoryStructure.CSV_DIRS,
-                 Methods,
+                 MethodsMBE,
                  SymmetrizeUnitCell,
                  ClusterComparisonAlgorithm)
     else:
@@ -208,10 +242,10 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                     dest_file = os.path.join(DirectoryStructure.XYZ_DIRS[s], filename)
                     shutil.copyfile(source_file, dest_file)
 
-    InputSubroutines = {"RPA": Inputs_RPA.Make, "DLPNO-CCSD(T)": Inputs_ORCA.Make, "LNO-CCSD(T)": Inputs_MRCC.Make}
-    QueueSubroutines = {"RPA": QueueScripts.Make, "DLPNO-CCSD(T)": QueueScripts.Make, "LNO-CCSD(T)": QueueScripts.Make}
+    InputSubroutines = {"RPA": Inputs_RPA.Make, "LNO-CCSD(T)": Inputs_MRCC.Make}
+    QueueSubroutines = {"RPA": QueueScripts.Make, "LNO-CCSD(T)": QueueScripts.Make}
     
-    for Method in Methods:
+    for Method in MethodsMBE:
         InputSubroutines[Method](InputTemplates[Method],
                                  ClusterTypes,
                                  MonomerRelaxation,
@@ -225,7 +259,15 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                                  DirectoryStructure.INP_DIRS[Method],
                                  DirectoryStructure.LOG_DIRS[Method],
                                  Method)
-    if "RPA" in Methods:
+
+    if PBCEmbedding and "HF" in MethodsPBC:
+        Inputs_PYSCF.Make(DirectoryStructure.INP_DIRS,
+                          DirectoryStructure.XYZ_DIRS,
+                          InputTemplates["HF(PBC)"],
+                          QueueScriptTemplates["HF(PBC)"],
+                          SymmetrizeUnitCell)          
+                              
+    if "RPA" in MethodsMBE:
         template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis_RPA.py"), "r")
         s = template.read()
         template.close()
@@ -239,7 +281,7 @@ def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
         os.chmod(DataAnalysisPath, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         print(f"RPA data analysis script: {DataAnalysisPath}")
 
-    if "LNO-CCSD(T)" in Methods:
+    if "LNO-CCSD(T)" in MethodsMBE:
         template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis_LNO-CCSD(T).py"), "r")
         s = template.read()
         template.close()

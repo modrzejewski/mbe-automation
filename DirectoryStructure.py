@@ -9,8 +9,8 @@ SUBSYSTEM_LABELS = {
     "tetramers": ["ABCD", "A", "B", "C", "AB", "BC", "AC", "D", "AD", "BC", "CD", "ABC", "ABD", "ACD", "BCD"]
     }
 
-def SetUp(ProjectDir, Methods):
-    global ROOT_DIR, PROJECT_DIR, INP_DIRS, LOG_DIRS, CSV_DIRS, PBC_DIRS
+def SetUp(ProjectDir, MethodsMBE, MethodsPBC):
+    global ROOT_DIR, PROJECT_DIR, INP_DIRS, LOG_DIRS, CSV_DIRS
     global XYZ_DIRS, QUEUE_DIRS, QUEUE_MAIN_SCRIPT
     
     ROOT_DIR = path.dirname(path.realpath(__file__))
@@ -41,17 +41,12 @@ def SetUp(ProjectDir, Methods):
             sys.exit()
     
     os.makedirs(PROJECT_DIR)
-
-    PBC_DIRS = {}
-    for PBCProgram in ["vasp", "pyscf", "crystal"]:
-        PBC_DIRS[PBCProgram] = path.join(PROJECT_DIR, "pbc", PBCProgram)
-        os.makedirs(PBC_DIRS[PBCProgram], exist_ok=True)
     
     for SystemType in ("monomers-supercell", "monomers-relaxed", "dimers", "trimers", "tetramers", "supercell", "unitcell"):
         XYZ_DIRS[SystemType] = path.join(PROJECT_DIR, "xyz", SystemType)
         os.makedirs(XYZ_DIRS[SystemType], exist_ok=True)
-    
-    for Method in Methods:
+
+    for Method in MethodsMBE:
         INP_DIRS[Method], LOG_DIRS[Method], QUEUE_DIRS[Method], CSV_DIRS[Method] = {}, {}, {}, {}
         for SystemType in ("monomers-supercell", "monomers-relaxed", "dimers", "trimers", "tetramers"):
             INP_DIRS[Method][SystemType] = {}
@@ -90,8 +85,14 @@ def SetUp(ProjectDir, Methods):
             CSV_DIRS[Method][SystemType] = path.join(PROJECT_DIR, "csv", Method, SystemType)
             os.makedirs(CSV_DIRS[Method][SystemType], exist_ok=True)
 
+    for Method in MethodsPBC:
+        INP_DIRS[Method+"(PBC)"] = path.join(PROJECT_DIR, "PBC", Method)
+        LOG_DIRS[Method+"(PBC)"] = path.join(PROJECT_DIR, "PBC", Method)
+        QUEUE_DIRS[Method+"(PBC)"] = path.join(PROJECT_DIR, "PBC", Method)
+        os.makedirs(INP_DIRS[Method+"(PBC)"], exist_ok=True)
+            
     QUEUE_MAIN_SCRIPT = {}
-    for Method in Methods:
+    for Method in MethodsMBE:
         QUEUE_MAIN_SCRIPT[Method] = path.join(PROJECT_DIR, f"RunTaskArray_{Method}.py")
         
     return
