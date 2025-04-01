@@ -26,7 +26,7 @@ Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)"]
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/X23/20_uracil/solid.xyz"
+UnitCellFile        = "./Systems/X23/09_anthracene/solid.xyz"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers, bulk.
@@ -55,7 +55,7 @@ SystemTypes         = ["monomers", "dimers", "bulk"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/20_uracil/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/09_anthracene/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs

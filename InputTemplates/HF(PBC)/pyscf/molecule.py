@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import ase
 import pyscf
 from ase.io import read
@@ -47,7 +45,7 @@ Ghosts = MoleculeWithGhosts[NAtoms:]
 
 s1 = "\n".join(
     f"{{symbol}} {{pos[0]:.8f}} {{pos[1]:.8f}} {{pos[2]:.8f}}"
-    for symbol, pos in zip(Molecule.get_chemical_symbols(), Molecule.get_positions())
+    for symbol, pos in zip(Molecule.get_chemical_symbols(), Molecule.get_positions()))
 )
 if NGhosts > 0:
     s2 = "\n".join(
@@ -90,11 +88,11 @@ M3.build()
 
 Jobs = ["crystal geometry with ghosts", "crystal geometry without ghosts", "relaxed geometry"]    
 M = [M2, M2, M3]
-for k, Mk in M:
-    print(f"Molecule: {{Jobs[k]}}"
-    print(f'Atomic orbitals: {{mol.nao}}')
-    print(f'Occupied orbitals: {{mol.nelectron//2}}')
-    mean_field = scf.RHF(mol).density_fit()
+for k, Mk in enumerate(M):
+    print(f"Molecule: {{Jobs[k]}}")
+    print(f'Atomic orbitals: {{Mk.nao}}')
+    print(f'Occupied orbitals: {{Mk.nelectron//2}}')
+    mean_field = scf.RHF(Mk).density_fit()
     #
     # Elimination of linear dependencies by Cholesky orthogonalization
     #
