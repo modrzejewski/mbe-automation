@@ -86,7 +86,7 @@ RelaxedMonomerXYZ   = "./Systems/X23/09_anthracene/molecule.xyz"
 Cutoffs = {"dimers": 30.0,
            "trimers": 15.0,      
            "tetramers": 10.0,
-           "ghosts": 6.0
+           "ghosts": 4.0
            }
                                                 #
                                                 # Ordering of dimers, trimers, tetramers.

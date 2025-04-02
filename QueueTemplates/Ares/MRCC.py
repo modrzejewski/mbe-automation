@@ -36,6 +36,13 @@ for Subsystem in SUBSYSTEM_LABELS["{SYSTEM_TYPE}"]:
     LogFile = os.path.splitext(InpFile)[0] + ".log"
     InpPath = os.path.join(InpDir, InpFile)
     LogPath = os.path.join(LogDir, LogFile)
+    #
+    # Skip to the next system if the log file already exits. Thanks to this feature,
+    # individual job restarts can be done simply by deleting the invalid log files
+    # and restarting the whole job batch.
+    #
+    if os.path.exists(LogPath):
+        continue
     ScratchDir = os.path.join(LogDir, os.path.splitext(InpFile)[0])
     if not os.path.exists(ScratchDir):
         os.makedirs(ScratchDir)

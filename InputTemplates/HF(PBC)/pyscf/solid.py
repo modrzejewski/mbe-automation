@@ -8,6 +8,7 @@ import ase.build
 from ase import Atoms
 import scipy
 from scipy import sparse
+import os
 import os.path
 import time
 from pyscf import scf
@@ -29,11 +30,16 @@ MaxMemory = 170 * 10**3 # memory in megabytes
 Verbosity = 4
 AlwaysCheckLinDeps = True
 LinDepThresh = 1.0E-6
+ConsiderSymmetry = True # reduce the number of k grid points by considering space group symmetry
+ScratchDir = "./scratch_solid"
 
 print("PBC Hartree-Fock calculation with PySCF")
 print(f"Coordinates: {{XYZFile}}")
 print(f"Basis set: {{BasisSet}}")
 print(f"Number of k-points: ({{KPointGrid[0]}},{{KPointGrid[1]}},{{KPointGrid[2]}}")
+
+os.makedirs(ScratchDir, exist_ok=True)
+os.environ["PYSCF_TMPDIR"] = os.path.realpath(ScratchDir)
 
 system  = read(XYZFile)
 cell_ase = system.get_cell()
@@ -53,12 +59,15 @@ cell.build(
     basis = BasisSet,
     a = system.get_cell(),
     max_memory=MaxMemory,
-    verbose = Verbosity)
+    verbose = Verbosity,
+    space_group_symmetry = ConsiderSymmetry # automatically detect the space group symmetry
+)
 
 print(f"AOs per cell: {{cell.nao:5d}}")
 print(f"Occupied orbitals per cell: {{cell.nelectron//2:5d}}")
 
-kpts = cell.make_kpts(KPointGrid)
+kpts = cell.make_kpts(KPointGrid, space_group_symmetry=ConsiderSymmetry,
+                      time_reversal_symmetry=ConsiderSymmetry)
 #
 # Enable range-separation algorithm for Coulomb integral evaluation.
 # According to the pySCF manual, this variant has the smallest

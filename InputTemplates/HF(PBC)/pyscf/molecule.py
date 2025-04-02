@@ -22,6 +22,7 @@ MaxMemory = 170 * 10**3 # memory in megabytes
 Verbosity = 4
 AlwaysCheckLinDeps = True
 LinDepThresh = 1.0E-6
+ScratchDir = "./scratch_molecule"
 
 print("Finite system Hartree-Fock calculation")
 print("(1) Molecule (crystal geometry, with ghosts)")
@@ -31,6 +32,9 @@ print(f"Coordinates 1, 2: {{XYZ_MoleculeWithGhosts}}")
 print(f"Coordinated 3: {{XYZ_RelaxedMolecule}}")
 print(f"Basis set: {{BasisSet}}")
 print(f"Atoms: {{NAtoms}}")
+
+os.makedirs(ScratchDir, exist_ok=True)
+os.environ["PYSCF_TMPDIR"] = os.path.realpath(ScratchDir)
 
 MoleculeWithGhosts  = read(XYZ_MoleculeWithGhosts)
 RelaxedMolecule = read(XYZ_RelaxedMolecule)
@@ -45,7 +49,7 @@ Ghosts = MoleculeWithGhosts[NAtoms:]
 
 s1 = "\n".join(
     f"{{symbol}} {{pos[0]:.8f}} {{pos[1]:.8f}} {{pos[2]:.8f}}"
-    for symbol, pos in zip(Molecule.get_chemical_symbols(), Molecule.get_positions()))
+    for symbol, pos in zip(Molecule.get_chemical_symbols(), Molecule.get_positions())
 )
 if NGhosts > 0:
     s2 = "\n".join(
@@ -58,6 +62,7 @@ else:
 s3 = "\n".join(
     f"{{symbol}} {{pos[0]:.8f}} {{pos[1]:.8f}} {{pos[2]:.8f}}"
     for symbol, pos in zip(RelaxedMolecule.get_chemical_symbols(), RelaxedMolecule.get_positions())
+)
     
 M1 = gto.M(
     unit="angstrom",
