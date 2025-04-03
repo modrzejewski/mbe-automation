@@ -25,21 +25,25 @@ BasisSet = "{BASIS_SET}"
 # Nk * LatticeVectorLength > {KPOINT_RADIUS:.0f} A
 #
 KPointGrid = [{NX},{NY},{NZ}] 
-XYZFile = "./solid.xyz"
+XYZFile = "solid.xyz"
+NAtoms = {NATOMS} # Number of atoms of the reference molecule
 MaxMemory = 170 * 10**3 # memory in megabytes
 Verbosity = 4
 AlwaysCheckLinDeps = True
 LinDepThresh = 1.0E-6
-ConsiderSymmetry = True # reduce the number of k grid points by considering space group symmetry
-ScratchDir = "./scratch_solid"
+ScratchDir = "scratch_solid"
+
+XYZFile = os.path.join(os.path.abspath(__file__), XYZFile)
+ScratchDir = os.path.join(os.path.abspath(__file__), ScratchDir)
 
 print("PBC Hartree-Fock calculation with PySCF")
 print(f"Coordinates: {{XYZFile}}")
 print(f"Basis set: {{BasisSet}}")
-print(f"Number of k-points: ({{KPointGrid[0]}},{{KPointGrid[1]}},{{KPointGrid[2]}}")
+print(f"K-points: ({{KPointGrid[0]}},{{KPointGrid[1]}},{{KPointGrid[2]}}")
 
 os.makedirs(ScratchDir, exist_ok=True)
-os.environ["PYSCF_TMPDIR"] = os.path.realpath(ScratchDir)
+os.environ["PYSCF_TMPDIR"] = ScratchDir
+os.environ["TMPDIR"] = ScratchDir
 
 system  = read(XYZFile)
 cell_ase = system.get_cell()
@@ -47,6 +51,11 @@ if cell_ase.handedness == -1:
     print("The input lattice vectors (row by row) should form a right-handed coordinate system.")
     print("Otherwise some integrals may be computed incorrectly in PySCF.")
     sys.exit(1)
+if len(system) % NAtoms != 0:
+    print("Invalid number of atoms in the unit cell: cannot determine the number of molecules")
+    sys.exit(1)
+NMoleculesPerCell = len(system) / NAtoms
+print(f"Molecules in the unit cell: {NMoleculesPerCell}")
     
 geometry_string = "\n".join(
     f"{{symbol}} {{pos[0]:.8f}} {{pos[1]:.8f}} {{pos[2]:.8f}}"
@@ -59,15 +68,13 @@ cell.build(
     basis = BasisSet,
     a = system.get_cell(),
     max_memory=MaxMemory,
-    verbose = Verbosity,
-    space_group_symmetry = ConsiderSymmetry # automatically detect the space group symmetry
+    verbose = Verbosity
 )
 
 print(f"AOs per cell: {{cell.nao:5d}}")
 print(f"Occupied orbitals per cell: {{cell.nelectron//2:5d}}")
 
-kpts = cell.make_kpts(KPointGrid, space_group_symmetry=ConsiderSymmetry,
-                      time_reversal_symmetry=ConsiderSymmetry)
+kpts = cell.make_kpts(KPointGrid)
 #
 # Enable range-separation algorithm for Coulomb integral evaluation.
 # According to the pySCF manual, this variant has the smallest
@@ -75,10 +82,16 @@ kpts = cell.make_kpts(KPointGrid, space_group_symmetry=ConsiderSymmetry,
 #
 mean_field = scf.KRHF(cell, kpts=kpts, exxdiv="ewald").jk_method("RS")
 #
-# Elimination of linear dependencies by Cholesky orthogonalization
+# Elimination of linear dependencies
 #
-mean_field = mol_scf.addons.remove_linear_dep_(mean_field,
-                                               threshold=LinDepThresh,
-                                               cholesky_threshold=1.0E-8,
-                                               force_pivoted_cholesky=AlwaysCheckLinDeps)
-mean_field.run()
+# mean_field = mol_scf.addons.remove_linear_dep_(mean_field,
+#                                                threshold=LinDepThresh,
+#                                                cholesky_threshold=1.0E-8,
+#                                                force_pivoted_cholesky=AlwaysCheckLinDeps)
+if AlwaysCheckLinDeps:
+    mean_field._eigh = _eigh_with_canonical_orth(LinDepThresh)
+mean_field.chkfile = os.path.join(ScratchDir, "solid.chk")
+CellEnergy = mean_field.run()
+CellEnergyPerMolecule = CellEnergy / NMoleculesPerCell
+print(f"Calculations completed")
+print(f"Cell energy per molecule (a.u.): {{CellEnergyPerMolecule:.8f}}")

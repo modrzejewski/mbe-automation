@@ -9,8 +9,7 @@
                                                 # If the path already exists, e.g., it's your previous project,
                                                 # all existing files will be moved to a backup location.
                                                 #
-                                                
-ProjectDirectory    = "./Projects/test"
+ProjectDirectory    = "./Projects/pbc-test"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -26,7 +25,7 @@ Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)"]
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 
-UnitCellFile        = "./Systems/X23/09_anthracene/solid.xyz"
+UnitCellFile        = "./Systems/X23/05_anthracene/solid.xyz"
 
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers, bulk.
@@ -55,7 +54,7 @@ SystemTypes         = ["monomers", "dimers", "bulk"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/09_anthracene/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/05_anthracene/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs

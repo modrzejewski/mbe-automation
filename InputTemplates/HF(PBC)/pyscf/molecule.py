@@ -16,13 +16,17 @@ import sys
 
 BasisSet = "{BASIS_SET}"
 NAtoms = {NATOMS} # Number of atoms of the reference molecule
-XYZ_MoleculeWithGhosts = "./molecule_supercell.xyz"
-XYZ_RelaxedMolecule = "./molecule_relaxed.xyz"
+XYZ_MoleculeWithGhosts = "molecule_supercell.xyz"
+XYZ_RelaxedMolecule = "molecule_relaxed.xyz"
 MaxMemory = 170 * 10**3 # memory in megabytes
 Verbosity = 4
 AlwaysCheckLinDeps = True
 LinDepThresh = 1.0E-6
-ScratchDir = "./scratch_molecule"
+ScratchDir = "scratch_molecule"
+
+XYZ_MoleculeWithGhosts = os.path.join(os.path.abspath(__file__), XYZ_MoleculeWithGhosts)
+XYZ_RelaxedMolecule = os.path.join(os.path.abspath(__file__), XYZ_RelaxedMolecule)
+ScratchDir = os.path.join(os.path.abspath(__file__), ScratchDir)
 
 print("Finite system Hartree-Fock calculation")
 print("(1) Molecule (crystal geometry, with ghosts)")
@@ -35,6 +39,7 @@ print(f"Atoms: {{NAtoms}}")
 
 os.makedirs(ScratchDir, exist_ok=True)
 os.environ["PYSCF_TMPDIR"] = os.path.realpath(ScratchDir)
+os.environ["TMPDIR"] = ScratchDir
 
 MoleculeWithGhosts  = read(XYZ_MoleculeWithGhosts)
 RelaxedMolecule = read(XYZ_RelaxedMolecule)
@@ -91,21 +96,31 @@ M3 = gto.M(
 )
 M3.build()
 
-Jobs = ["crystal geometry with ghosts", "crystal geometry without ghosts", "relaxed geometry"]    
+Jobs = ["crystal geometry with ghosts",
+        "crystal geometry without ghosts",
+        "relaxed geometry"]    
 M = [M2, M2, M3]
+Energies = {}
 for k, Mk in enumerate(M):
     print(f"Molecule: {{Jobs[k]}}")
     print(f'Atomic orbitals: {{Mk.nao}}')
     print(f'Occupied orbitals: {{Mk.nelectron//2}}')
     mean_field = scf.RHF(Mk).density_fit()
     #
-    # Elimination of linear dependencies by Cholesky orthogonalization
+    # Elimination of linear dependencies
     #
-    mean_field = mol_scf.addons.remove_linear_dep_(mean_field,
-                                                   threshold=LinDepThresh,
-                                                   cholesky_threshold=1.0E-8,
-                                                   force_pivoted_cholesky=AlwaysCheckLinDeps)
-    mean_field.run()
+    # mean_field = mol_scf.addons.remove_linear_dep_(mean_field,
+    #                                                threshold=LinDepThresh,
+    #                                                cholesky_threshold=1.0E-8,
+    #                                                force_pivoted_cholesky=AlwaysCheckLinDeps)
+    if AlwaysCheckLinDeps:
+        mean_field._eigh = _eigh_with_canonical_orth(LinDepThresh)
+    mean_field.chkfile = os.path.join(ScratchDir, f"molecule_{{k}}.chk")
+    Energies[Jobs[k]] = mean_field.run()
+    
 
+print(f"Calculations completed")
+for J in Jobs:
+    print(f"Energy of single molecule ({{J}}; a.u.): {{Energies[J]:.8f}}")
 
 
