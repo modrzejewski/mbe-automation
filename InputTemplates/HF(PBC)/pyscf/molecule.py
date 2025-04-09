@@ -24,9 +24,10 @@ AlwaysCheckLinDeps = True
 LinDepThresh = 1.0E-6
 ScratchDir = "scratch_molecule"
 
-XYZ_MoleculeWithGhosts = os.path.join(os.path.abspath(__file__), XYZ_MoleculeWithGhosts)
-XYZ_RelaxedMolecule = os.path.join(os.path.abspath(__file__), XYZ_RelaxedMolecule)
-ScratchDir = os.path.join(os.path.abspath(__file__), ScratchDir)
+WorkDir = os.path.abspath(os.path.dirname(__file__))
+XYZ_MoleculeWithGhosts = os.path.join(WorkDir, XYZ_MoleculeWithGhosts)
+XYZ_RelaxedMolecule = os.path.join(WorkDir, XYZ_RelaxedMolecule)
+ScratchDir = os.path.join(WorkDir, ScratchDir)
 
 print("Finite system Hartree-Fock calculation")
 print("(1) Molecule (crystal geometry, with ghosts)")
@@ -100,7 +101,7 @@ Jobs = ["crystal geometry with ghosts",
         "crystal geometry without ghosts",
         "relaxed geometry"]    
 M = [M2, M2, M3]
-Energies = {}
+Energies = {{}}
 for k, Mk in enumerate(M):
     print(f"Molecule: {{Jobs[k]}}")
     print(f'Atomic orbitals: {{Mk.nao}}')

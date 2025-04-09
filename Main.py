@@ -20,13 +20,17 @@ ProjectDirectory    = "./Projects/pbc-test"
                                                 # (2) LNO-CCSD(T)
                                                 # (3) HF(PBC)
                                                 #
+                                                
 Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)"]
+
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
+                                                #
                                                 
 UnitCellFile        = "./Systems/X23/05_anthracene/solid.xyz"
 
+                                                #
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers, bulk.
                                                 #

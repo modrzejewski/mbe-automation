@@ -36,23 +36,12 @@ def Make(InpDirs, XYZDirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
         UnitCellFile = b
     print(f"Unit cell for HF(PBC) calculations: {UnitCellFile}")
     UnitCell = ase.io.read(UnitCellFile)
-
-    KGrids = []
-    KRadii = []
-    for R in [10.0, 15.0, 18.0, 20.0, 22.0, 25.0, 30.0]:
-        Nk = PBC.KPointGrid(UnitCell, R)
-        if Nk in KGrids:
-            continue
-        else:
-            KGrids.append(Nk)
-            KRadii.append(R)
-            
+    Grids = PBC.KPointGrids(UnitCell, EvenNumbers=False)    
     Ref = 0
     for basis in BasisSets:
-        for k, Nk in enumerate(KGrids):
+        for Radius, Nk in Grids:
             NAtoms = len(ase.io.read(os.path.join(XYZDirs["monomers-relaxed"], RelaxedMonomers[Ref])))
             nx, ny, nz = Nk
-            Radius = KRadii[k]
             PBCJobDir = os.path.join(InpDirs[Method], f"{Radius:.0f}-{nx}-{ny}-{nz}", basis)
             os.makedirs(PBCJobDir, exist_ok=True)
             shutil.copy(
@@ -107,5 +96,4 @@ def Make(InpDirs, XYZDirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
             with open(os.path.join(PBCJobDir, "submit_molecule.py"), "w") as f:
                 f.write(MolQueue)
 
-            print(f"HF(PBC) scripts: {PBCJobDir}")
 

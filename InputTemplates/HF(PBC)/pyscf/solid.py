@@ -33,8 +33,9 @@ AlwaysCheckLinDeps = True
 LinDepThresh = 1.0E-6
 ScratchDir = "scratch_solid"
 
-XYZFile = os.path.join(os.path.abspath(__file__), XYZFile)
-ScratchDir = os.path.join(os.path.abspath(__file__), ScratchDir)
+WorkDir = os.path.abspath(os.path.dirname(__file__))
+XYZFile = os.path.join(WorkDir, XYZFile)
+ScratchDir = os.path.join(WorkDir, ScratchDir)
 
 print("PBC Hartree-Fock calculation with PySCF")
 print(f"Coordinates: {{XYZFile}}")
@@ -55,7 +56,7 @@ if len(system) % NAtoms != 0:
     print("Invalid number of atoms in the unit cell: cannot determine the number of molecules")
     sys.exit(1)
 NMoleculesPerCell = len(system) / NAtoms
-print(f"Molecules in the unit cell: {NMoleculesPerCell}")
+print(f"Molecules in the unit cell: {{NMoleculesPerCell}}")
     
 geometry_string = "\n".join(
     f"{{symbol}} {{pos[0]:.8f}} {{pos[1]:.8f}} {{pos[2]:.8f}}"

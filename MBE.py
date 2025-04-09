@@ -17,6 +17,8 @@ import shutil
 import ClusterComparison
 import PBC
 import sys
+import pymatgen.core
+import pymatgen.io.ase
 
 
 class ReplicatedOutput:
@@ -265,7 +267,11 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     #
     # Unit cell
     #
-    UnitCell = ase.io.read(UnitCellFile)
+    if UnitCellFile.lower().endswith(".cif"):
+        structure = pymatgen.core.Structure.from_file(UnitCellFile)
+        UnitCell = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
+    else:
+        UnitCell = ase.io.read(UnitCellFile)
     SymmetrizedUnitCell, SymmetryChanged = DetermineSpaceGroupSymmetry(UnitCell, XYZDirs)
     if SymmetrizeUnitCell and SymmetryChanged:
         print("Molecular clusters will be generated using symmetrized unit cell")
