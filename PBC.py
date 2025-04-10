@@ -26,7 +26,10 @@ def IrreducibleScaledKPoints(UnitCell, BZ_KPoints):
         verbose = 0,
         space_group_symmetry=True
     )
-    K = pyscf.pbc.lib.kpts.make_kpts(cell, kpts=BZ_KPoints, space_group_symmetry=True)
+    K = pyscf.pbc.lib.kpts.make_kpts(cell,
+                                     kpts=BZ_KPoints,
+                                     space_group_symmetry=True,
+                                     time_reversal_symmetry=True)
     return K.kpts_scaled_ibz
 
 
@@ -129,7 +132,7 @@ def RminSupercell(UnitCell, Radius, EvenNumbers=False):
                          ' Try running with a larger maxperdim.')
 
 
-def KPointGrids(UnitCell, EvenNumbers=False):
+def AutomaticKPointGrids(UnitCell, EvenNumbers=False):
     Grids = []
     print("")
     print("Constructing Brillouin zone grids by supercell->BZ mapping")
@@ -149,7 +152,9 @@ def KPointGrids(UnitCell, EvenNumbers=False):
         else:
             Grids.append((R, Nk))
 
+    KPoints_SmallestIBZ = []
     for R, Nk in Grids:
+        Nx, Ny, Nz = Nk
         KPoints_Gamma = ScaledKPoints(Nk, GammaCentered=True)
         KPoints_MP = ScaledKPoints(Nk, GammaCentered=False)
         IBZ_KPoints_Gamma = IrreducibleScaledKPoints(UnitCell, KPoints_Gamma)
@@ -157,8 +162,13 @@ def KPointGrids(UnitCell, EvenNumbers=False):
         NPointsBZ = len(KPoints_Gamma)
         NPointsIBZ_Gamma = len(IBZ_KPoints_Gamma)
         NPointsIBZ_MP = len(IBZ_KPoints_MP)
-        size = f"{Nk[0]}×{Nk[1]}×{Nk[2]}"
+        size = f"{Nx}×{Ny}×{Nz}"
         print(f"{R:10.0f}{size:>20}{NPointsBZ:20d}{NPointsIBZ_Gamma:25d}{NPointsIBZ_MP:25d}")
+        if NPointsIBZ_Gamma <= NPointsIBZ_MP:
+            KPoints_SmallestIBZ.append( (R, "Γ-centered", Nx, Ny, Nz, KPoints_Gamma) )
+        else:
+            KPoints_SmallestIBZ.append( (R, "Monkhorst-Pack", Nx, Ny, Nz, KPoints_MP) )
+            
     print("")
 
-    return Grids
+    return KPoints_SmallestIBZ

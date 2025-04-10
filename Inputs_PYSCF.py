@@ -4,6 +4,7 @@ import shutil
 import ase.io
 import sys
 import os
+import numpy as np
 
 
 def FindMonomerXYZ(directory):
@@ -36,14 +37,15 @@ def Make(InpDirs, XYZDirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
         UnitCellFile = b
     print(f"Unit cell for HF(PBC) calculations: {UnitCellFile}")
     UnitCell = ase.io.read(UnitCellFile)
-    Grids = PBC.KPointGrids(UnitCell, EvenNumbers=False)    
+    Grids = PBC.AutomaticKPointGrids(UnitCell)
+
     Ref = 0
     for basis in BasisSets:
-        for Radius, Nk in Grids:
+        for Radius, GridType, Nx, Ny, Nz, ScaledKPoints in Grids:
             NAtoms = len(ase.io.read(os.path.join(XYZDirs["monomers-relaxed"], RelaxedMonomers[Ref])))
-            nx, ny, nz = Nk
-            PBCJobDir = os.path.join(InpDirs[Method], f"{Radius:.0f}-{nx}-{ny}-{nz}", basis)
+            PBCJobDir = os.path.join(InpDirs[Method], f"{Radius:.0f}-{Nx}-{Ny}-{Nz}", basis)
             os.makedirs(PBCJobDir, exist_ok=True)
+            np.savetxt(os.path.join(PBCJobDir, "kpoints.txt"), ScaledKPoints)
             shutil.copy(
                 os.path.join(XYZDirs["monomers-relaxed"], RelaxedMonomers[Ref]),
                 os.path.join(PBCJobDir, "molecule_relaxed.xyz")
@@ -58,12 +60,15 @@ def Make(InpDirs, XYZDirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
             )
             PBCJobParams = {
                 "BASIS_SET": basis,
-                "NX": nx, "NY": ny, "NZ": nz,
+                "KPOINT_RADIUS": Radius,
+                "KPOINT_GRID_TYPE": GridType,
+                "KPOINT_NX": Nx,
+                "KPOINT_NY": Ny,
+                "KPOINT_NZ": Nz,
                 "NATOMS": NAtoms,
                 "TITLE" : "HF(PBC)/solid",
                 "INP_SCRIPT" : "solid.py",
-                "LOG_FILE" : "solid.log",
-                "KPOINT_RADIUS": Radius
+                "LOG_FILE" : "solid.log"
             }
             f = open(InputTemplates["solid"], "r")
             s = f.read()
