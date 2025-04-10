@@ -8,9 +8,8 @@ import ase.build
 from ase import Atoms
 import os.path
 import time
-from pyscf import scf
 import pyscf.lib
-from pyscf import scf, gto
+from pyscf import gto
 from pyscf import scf as mol_scf
 import sys
 
@@ -106,16 +105,12 @@ for k, Mk in enumerate(M):
     print(f"Molecule: {{Jobs[k]}}")
     print(f'Atomic orbitals: {{Mk.nao}}')
     print(f'Occupied orbitals: {{Mk.nelectron//2}}')
-    mean_field = scf.RHF(Mk).density_fit()
+    mean_field = mol_scf.RHF(Mk).density_fit()
     #
     # Elimination of linear dependencies
     #
-    # mean_field = mol_scf.addons.remove_linear_dep_(mean_field,
-    #                                                threshold=LinDepThresh,
-    #                                                cholesky_threshold=1.0E-8,
-    #                                                force_pivoted_cholesky=AlwaysCheckLinDeps)
     if AlwaysCheckLinDeps:
-        mean_field._eigh = _eigh_with_canonical_orth(LinDepThresh)
+        mean_field._eigh = mol_scf.addons._eigh_with_canonical_orth(LinDepThresh)
     mean_field.chkfile = os.path.join(ScratchDir, f"molecule_{{k}}.chk")
     SCFResults[Jobs[k]] = mean_field.kernel()
 
@@ -123,6 +118,6 @@ print(f"Calculations completed")
 print(f"Energies (a.u.):")
 for J in Jobs:
     Energy = SCFResults[J]
-    print(f"{{J}}: {{Energy}}")
+    print(f"{{J:35}} {{Energy}}")
 
 

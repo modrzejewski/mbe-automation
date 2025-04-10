@@ -11,9 +11,9 @@ from scipy import sparse
 import os
 import os.path
 import time
-from pyscf import scf
 import pyscf.lib
-from pyscf.pbc import gto, scf
+from pyscf.pbc import gto
+from pyscf.pbc import scf as pbc_scf
 from pyscf import scf as mol_scf
 import sys
 
@@ -79,18 +79,16 @@ kpts = cell.make_kpts(KPointGrid)
 # According to the pySCF manual, this variant has the smallest
 # memory requirements for large systems.
 #
-mean_field = scf.KRHF(cell, kpts=kpts, exxdiv="ewald").jk_method("RS")
+mean_field = pbc_scf.KRHF(cell, kpts=kpts, exxdiv="ewald").jk_method("RS")
 #
 # Elimination of linear dependencies
 #
-# mean_field = mol_scf.addons.remove_linear_dep_(mean_field,
-#                                                threshold=LinDepThresh,
-#                                                cholesky_threshold=1.0E-8,
-#                                                force_pivoted_cholesky=AlwaysCheckLinDeps)
 if AlwaysCheckLinDeps:
     mean_field._eigh = mol_scf.addons._eigh_with_canonical_orth(LinDepThresh)
 mean_field.chkfile = os.path.join(ScratchDir, "solid.chk")
 CellEnergy = mean_field.kernel()
 CellEnergyPerMolecule = CellEnergy / NMoleculesPerCell
 print(f"Calculations completed")
-print(f"Cell energy per molecule (a.u.): {{CellEnergyPerMolecule:.8f}}")
+print(f"Energies (a.u.):")
+J = "crystal lattice energy per molecule"
+print(f"{{J}} {{CellEnergyPerMolecule:.8f}}")
