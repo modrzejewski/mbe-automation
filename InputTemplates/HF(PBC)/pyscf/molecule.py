@@ -101,7 +101,7 @@ Jobs = ["crystal geometry with ghosts",
         "crystal geometry without ghosts",
         "relaxed geometry"]    
 M = [M2, M2, M3]
-Energies = {{}}
+SCFResults = {{}}
 for k, Mk in enumerate(M):
     print(f"Molecule: {{Jobs[k]}}")
     print(f'Atomic orbitals: {{Mk.nao}}')
@@ -117,11 +117,12 @@ for k, Mk in enumerate(M):
     if AlwaysCheckLinDeps:
         mean_field._eigh = _eigh_with_canonical_orth(LinDepThresh)
     mean_field.chkfile = os.path.join(ScratchDir, f"molecule_{{k}}.chk")
-    Energies[Jobs[k]] = mean_field.run()
-    
+    SCFResults[Jobs[k]] = mean_field.kernel()
 
 print(f"Calculations completed")
+print(f"Energies (a.u.):")
 for J in Jobs:
-    print(f"Energy of single molecule ({{J}}; a.u.): {{Energies[J]:.8f}}")
+    Energy = SCFResults[J]
+    print(f"{{J}}: {{Energy}}")
 
 

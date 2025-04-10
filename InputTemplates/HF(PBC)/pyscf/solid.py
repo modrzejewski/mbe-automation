@@ -13,8 +13,6 @@ import os.path
 import time
 from pyscf import scf
 import pyscf.lib
-from pyscf.pbc import gto
-from pyscf import scf
 from pyscf.pbc import gto, scf
 from pyscf import scf as mol_scf
 import sys
@@ -90,9 +88,9 @@ mean_field = scf.KRHF(cell, kpts=kpts, exxdiv="ewald").jk_method("RS")
 #                                                cholesky_threshold=1.0E-8,
 #                                                force_pivoted_cholesky=AlwaysCheckLinDeps)
 if AlwaysCheckLinDeps:
-    mean_field._eigh = _eigh_with_canonical_orth(LinDepThresh)
+    mean_field._eigh = mol_scf.addons._eigh_with_canonical_orth(LinDepThresh)
 mean_field.chkfile = os.path.join(ScratchDir, "solid.chk")
-CellEnergy = mean_field.run()
+CellEnergy = mean_field.kernel()
 CellEnergyPerMolecule = CellEnergy / NMoleculesPerCell
 print(f"Calculations completed")
 print(f"Cell energy per molecule (a.u.): {{CellEnergyPerMolecule:.8f}}")
