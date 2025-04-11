@@ -164,10 +164,7 @@ def AutomaticKPointGrids(UnitCell, EvenNumbers=False):
         NPointsIBZ_MP = len(IBZ_KPoints_MP)
         size = f"{Nx}×{Ny}×{Nz}"
         print(f"{R:10.0f}{size:>20}{NPointsBZ:20d}{NPointsIBZ_Gamma:25d}{NPointsIBZ_MP:25d}")
-        if NPointsIBZ_Gamma <= NPointsIBZ_MP:
-            KPoints_SmallestIBZ.append( (R, "Γ-centered", Nx, Ny, Nz, KPoints_Gamma) )
-        else:
-            KPoints_SmallestIBZ.append( (R, "Monkhorst-Pack", Nx, Ny, Nz, KPoints_MP) )
+        KPoints_SmallestIBZ.append( (R, "Γ-centered", Nx, Ny, Nz, KPoints_Gamma) )
             
     print("")
 

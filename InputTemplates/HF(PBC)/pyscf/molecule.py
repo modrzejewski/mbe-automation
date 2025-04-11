@@ -118,6 +118,6 @@ print(f"Calculations completed")
 print(f"Energies (a.u.):")
 for J in Jobs:
     Energy = SCFResults[J]
-    print(f"{{J:35}} {{Energy}}")
+    print(f"{{J:35}} {{Energy:.8f}}")
 
 

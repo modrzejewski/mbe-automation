@@ -69,24 +69,19 @@ cell.build(
     basis = BasisSet,
     a = system.get_cell(),
     max_memory=MaxMemory,
-    verbose = Verbosity,
-    space_group_symmetry=UseSymmetry
+    verbose = Verbosity
 )
 
 print(f"AOs per cell: {{cell.nao:5d}}")
 print(f"Occupied orbitals per cell: {{cell.nelectron//2:5d}}")
 
 ExplicitKPointGrid = np.loadtxt(os.path.join(WorkDir, KPointsFile))
-kpts = pyscf.pbc.lib.kpts.make_kpts(cell,
-                                    kpts=ExplicitKPointGrid,
-                                    space_group_symmetry=UseSymmetry,
-                                    time_reversal_symmetry=UseSymmetry)
 #
 # Enable range-separation algorithm for Coulomb integral evaluation.
 # According to the pySCF manual, this variant has the smallest
 # memory requirements for large systems.
 #
-mean_field = pbc_scf.KRHF(cell, kpts=kpts, exxdiv="ewald").jk_method("RS")
+mean_field = pbc_scf.KRHF(cell, kpts=ExplicitKPointGrid, exxdiv="ewald").jk_method("RS")
 #
 # Elimination of linear dependencies
 #
