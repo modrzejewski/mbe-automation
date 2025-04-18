@@ -7,7 +7,7 @@ import subprocess
 import numpy as np
 import sys
 import re
-import XYZ
+from .. import xyz
 
 
 def generate_input(input_template, coords, GhostAtoms=set([])):
@@ -104,7 +104,7 @@ def write_dimer_inputs(job_directory, input_template, dimer_idx, dimer_coords, d
 def Make(InputTemplate, SystemTypes, InputDirs, XYZDirs):
     Write = {"dimers":write_dimer_inputs, "trimers":write_trimer_inputs, "tetramers":write_tetramer_inputs}
     for ClusterType in SystemTypes:
-        xyz_files, molecule_idx, molecule_coords, labels = XYZ.LoadXYZDir(XYZDirs[ClusterType])
+        xyz_files, molecule_idx, molecule_coords, labels = xyz.LoadXYZDir(XYZDirs[ClusterType])
         for f in xyz_files:
            Write[ClusterType](InputDirs[ClusterType]["no-extrapolation"],
                               InputTemplate,

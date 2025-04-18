@@ -3,9 +3,9 @@ import numpy as np
 import os
 import os.path
 import argparse
-import Keywords
+from . import keywords
 import sys
-import ErrorAnalysis_RPA
+import mbe_automation.validation.rpa
 
 ToKcal = 627.5094688043
 
@@ -50,9 +50,9 @@ def extrapolate_energies(E_S, E_L, X, EnergyComponents, ExtrapolatedComponents, 
         else:
             E_CBS[z] = E_L[z]
 
-    E_CBS[Keywords.TOTAL_ENERGY] = 0.0
+    E_CBS[keywords.TOTAL_ENERGY] = 0.0
     for z in TotalEnergySum:
-        E_CBS[Keywords.TOTAL_ENERGY] += E_CBS[z]
+        E_CBS[keywords.TOTAL_ENERGY] += E_CBS[z]
     
     return E_CBS
 
@@ -74,35 +74,35 @@ def read_rpa_log(log_path, EnergyComponents, RegexStrings):
 
 def MethodDependentKeywords(Method):
     if Method == "RPA":
-        EnergyComponents = Keywords.RPA_ENERGY_COMPONENTS
-        RegexStrings = Keywords.RPA_REGEX_STRINGS
-        ExtrapolatedComponents = Keywords.RPA_EXTRAPOLATED_COMPONENTS
-        TotalEnergySum = Keywords.RPA_TOTAL_ENERGY_SUM
+        EnergyComponents = keywords.RPA_ENERGY_COMPONENTS
+        RegexStrings = keywords.RPA_REGEX_STRINGS
+        ExtrapolatedComponents = keywords.RPA_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = keywords.RPA_TOTAL_ENERGY_SUM
     elif Method == "rPT2":
-        EnergyComponents = Keywords.rPT2_ENERGY_COMPONENTS
-        RegexStrings = Keywords.rPT2_REGEX_STRINGS
-        ExtrapolatedComponents = Keywords.rPT2_EXTRAPOLATED_COMPONENTS
-        TotalEnergySum = Keywords.rPT2_TOTAL_ENERGY_SUM
+        EnergyComponents = keywords.rPT2_ENERGY_COMPONENTS
+        RegexStrings = keywords.rPT2_REGEX_STRINGS
+        ExtrapolatedComponents = keywords.rPT2_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = keywords.rPT2_TOTAL_ENERGY_SUM
     elif Method == "JCTC2024" or Method == "ph-RPA(3)":
-        EnergyComponents = Keywords.PHRPA3_ENERGY_COMPONENTS
-        RegexStrings = Keywords.PHRPA3_REGEX_STRINGS
-        ExtrapolatedComponents = Keywords.PHRPA3_EXTRAPOLATED_COMPONENTS
-        TotalEnergySum = Keywords.PHRPA3_TOTAL_ENERGY_SUM
+        EnergyComponents = keywords.PHRPA3_ENERGY_COMPONENTS
+        RegexStrings = keywords.PHRPA3_REGEX_STRINGS
+        ExtrapolatedComponents = keywords.PHRPA3_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = keywords.PHRPA3_TOTAL_ENERGY_SUM
     elif Method == "MBPT3" or Method == "RPA+MBPT3":
-        EnergyComponents = Keywords.MBPT3_ENERGY_COMPONENTS
-        RegexStrings = Keywords.MBPT3_REGEX_STRINGS
-        ExtrapolatedComponents = Keywords.MBPT3_EXTRAPOLATED_COMPONENTS
-        TotalEnergySum = Keywords.MBPT3_TOTAL_ENERGY_SUM
+        EnergyComponents = keywords.MBPT3_ENERGY_COMPONENTS
+        RegexStrings = keywords.MBPT3_REGEX_STRINGS
+        ExtrapolatedComponents = keywords.MBPT3_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = keywords.MBPT3_TOTAL_ENERGY_SUM
     elif Method == "RPA+ALL_CORRECTIONS":
-        EnergyComponents = Keywords.FULL_MBPT3_ENERGY_COMPONENTS
-        RegexStrings = Keywords.FULL_MBPT3_REGEX_STRINGS
-        ExtrapolatedComponents = Keywords.FULL_MBPT3_EXTRAPOLATED_COMPONENTS
-        TotalEnergySum = Keywords.FULL_MBPT3_TOTAL_ENERGY_SUM    
+        EnergyComponents = keywords.FULL_MBPT3_ENERGY_COMPONENTS
+        RegexStrings = keywords.FULL_MBPT3_REGEX_STRINGS
+        ExtrapolatedComponents = keywords.FULL_MBPT3_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = keywords.FULL_MBPT3_TOTAL_ENERGY_SUM    
     elif Method == "MP3":
-        EnergyComponents = Keywords.MP3_ENERGY_COMPONENTS
-        RegexStrings = Keywords.MP3_REGEX_STRINGS
-        ExtrapolatedComponents = Keywords.MP3_EXTRAPOLATED_COMPONENTS
-        TotalEnergySum = Keywords.MP3_TOTAL_ENERGY_SUM
+        EnergyComponents = keywords.MP3_ENERGY_COMPONENTS
+        RegexStrings = keywords.MP3_REGEX_STRINGS
+        ExtrapolatedComponents = keywords.MP3_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = keywords.MP3_TOTAL_ENERGY_SUM
     else:
         print("Invalid method name in CSV_RPA")
         sys.exit()
@@ -136,10 +136,10 @@ def WriteCSV(XYZDir, LogDir, CSVDir, Method, X, CompletedJobs):
     #
     if Small:
         ErrorsOutput = os.path.join(CSVDir, "rpa-small-basis-errors.txt")
-        ErrorAnalysis_RPA.NumericalErrors(output_file=ErrorsOutput, log_files_dir=SmallBasisLogsDir)
+        mbe_automation.validation.rpa.NumericalErrors(output_file=ErrorsOutput, log_files_dir=SmallBasisLogsDir)
     if Large:
         ErrorsOutput = os.path.join(CSVDir, "rpa-large-basis-errors.txt")
-        ErrorAnalysis_RPA.NumericalErrors(output_file=ErrorsOutput, log_files_dir=LargeBasisLogsDir)
+        mbe_automation.validation.rpa.NumericalErrors(output_file=ErrorsOutput, log_files_dir=LargeBasisLogsDir)
 
     SystemColWidth = 30
     ColWidth = 25

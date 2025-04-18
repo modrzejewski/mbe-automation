@@ -7,8 +7,8 @@ import subprocess
 import numpy as np
 import sys
 import re
-import XYZ
-import DirectoryStructure
+from .. import xyz
+from .. import directory_structure
 
 
 def ghosts_formatted_string(ghosts_list):
@@ -71,7 +71,7 @@ def write_tetramer_inputs(job_directory, input_template, tetramer_idx, tetramer_
     ACD = generate_input(input_template, coords, ghosts_formatted_string([AtomsB]))
     BCD = generate_input(input_template, coords, ghosts_formatted_string([AtomsA]))
     FileContents = [ABCD, A, B, C, AB, BC, AC, D, AD, BC, CD, ABC, ABD, ACD, BCD]
-    write_mrcc_input_files(FileContents, DirectoryStructure.SUBSYSTEM_LABELS["tetramers"],
+    write_mrcc_input_files(FileContents, directory_structure.SUBSYSTEM_LABELS["tetramers"],
                            tetramer_label, job_directory)    
     return
 
@@ -92,7 +92,7 @@ def write_trimer_inputs(job_directory, input_template, trimer_idx, trimer_coords
     BC = generate_input(input_template, coords, ghosts_formatted_string([AtomsA]))
     AC = generate_input(input_template, coords, ghosts_formatted_string([AtomsB]))
     FileContents = [ABC, A, B, C, AB, BC, AC]
-    write_mrcc_input_files(FileContents, DirectoryStructure.SUBSYSTEM_LABELS["trimers"],
+    write_mrcc_input_files(FileContents, directory_structure.SUBSYSTEM_LABELS["trimers"],
                            trimer_label, job_directory)    
     return
 
@@ -107,7 +107,7 @@ def write_dimer_inputs(job_directory, input_template, dimer_idx, dimer_coords, d
     A = generate_input(input_template, coords, ghosts_formatted_string([AtomsB]))
     B = generate_input(input_template, coords, ghosts_formatted_string([AtomsA]))
     FileContents = [AB, A, B]
-    write_mrcc_input_files(FileContents, DirectoryStructure.SUBSYSTEM_LABELS["dimers"],
+    write_mrcc_input_files(FileContents, directory_structure.SUBSYSTEM_LABELS["dimers"],
                            dimer_label, job_directory)
     return
 
@@ -132,7 +132,7 @@ def write_mrcc_input_files(FileContents, SubsystemLabels, molecule_label, job_di
 def Make(InputTemplates, ClusterTypes, MonomerRelaxation, InputDirs, XYZDirs):
     Write = {"dimers":write_dimer_inputs, "trimers":write_trimer_inputs, "tetramers":write_tetramer_inputs}
     for ClusterType in ClusterTypes:
-        xyz_files, molecule_idx, molecule_coords, labels = XYZ.LoadXYZDir(XYZDirs[ClusterType])
+        xyz_files, molecule_idx, molecule_coords, labels = xyz.LoadXYZDir(XYZDirs[ClusterType])
         for f in xyz_files:
            Write[ClusterType](InputDirs[ClusterType]["small-basis"],
                               InputTemplates["small-basis"],
@@ -142,7 +142,7 @@ def Make(InputTemplates, ClusterTypes, MonomerRelaxation, InputDirs, XYZDirs):
                               molecule_idx[f], molecule_coords[f], labels[f])
            
     if MonomerRelaxation:
-        MonomerCoords, Labels = XYZ.LoadMonomerXYZDir(XYZDirs["monomers-supercell"], XYZDirs["monomers-relaxed"])
+        MonomerCoords, Labels = xyz.LoadMonomerXYZDir(XYZDirs["monomers-supercell"], XYZDirs["monomers-relaxed"])
         for Label in Labels:
             for MonomerType in ["monomers-supercell", "monomers-relaxed"]:
                 for BasisType in ["small-basis", "large-basis"]:

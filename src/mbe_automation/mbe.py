@@ -12,10 +12,9 @@ import math
 import itertools
 import time
 import subprocess
-import DirectoryStructure
 import shutil
-import ClusterComparison
-import PBC
+from . import cluster_comparison
+from . import pbc
 import sys
 import pymatgen.core
 import pymatgen.io.ase
@@ -213,25 +212,6 @@ def DetermineSpaceGroupSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-2
     return SymmetrizedUnitCell, SymmetryChanged
 
     
-def PBCInput_Crystal(UnitCell):
-    spgdata = ase.spacegroup.symmetrize.check_symmetry(UnitCell)
-    SymmetryIndex = spgdata.number
-    AtomTypes = UnitCell.get_atomic_numbers()
-    ScaledCoords = UnitCell.get_scaled_positions()
-    IrreducibleAtoms = ase.spacegroup.utils._get_reduced_indices(UnitCell)
-    s = ""
-    for i in IrreducibleAtoms:
-        AtomType = AtomTypes[i]
-        x, y, z = ScaledCoords[i]
-        s += f"{AtomType} {x:20.8f} {y:20.8f} {z:20.8f}\n"
-    InputFile = os.path.join(DirectoryStructure.PBC_DIRS["crystal"], "solid.inp")
-    f = open(InputFile, "w")
-    f.write(s)
-    f.close()
-    print(f"Crystal input written to {InputFile}")
-    
-    
-    
 def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmbedding,
          RelaxedMonomerXYZ, Ordering, ProjectDir, XYZDirs, CSVDirs, Methods,
          SymmetrizeUnitCell, ClusterComparisonAlgorithm):
@@ -402,7 +382,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     if PBCEmbedding:
         if Cutoffs["ghosts"] < Cutoffs["dimers"]:
             print(f"Searching for ghost atoms within {Cutoffs['ghosts']} Å from the reference molecule")
-            Ghosts = PBC.GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs)
+            Ghosts = pbc.GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs)
             print(f"Found {len(Ghosts)} ghost atoms")
             Label = ClusterLabel([Reference], NMonomers)
             FilePath = os.path.join(XYZDirs["monomers-supercell"], f"{Label}+ghosts.xyz")
@@ -475,10 +455,10 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
                 # match candidates.
                 #
                 MatchCandidates, MinDist, AvDist, COMDist, MaxDist = \
-                    ClusterComparison.CompareDistances(Constituents,
-                                                       Clusters[ClusterType],
-                                                       MinRij, MaxRij, AvRij, COMRij,
-                                                       AlignmentThresh)
+                    cluster_comparison.CompareDistances(Constituents,
+                                                        Clusters[ClusterType],
+                                                        MinRij, MaxRij, AvRij, COMRij,
+                                                        AlignmentThresh)
                 #
                 # If the length of MatchCandidates is greater than zero,
                 # then we have some reasonable match candidates.
@@ -491,7 +471,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
                 for i in Constituents:
                     Molecule.extend(Monomers[i])
                 if ClusterComparisonAlgorithm == "MBTR":
-                    MBTR = ClusterComparison.MBTRDescriptor(Molecule)
+                    MBTR = cluster_comparison.MBTRDescriptor(Molecule)
                     
                 if len(MatchCandidates) > 0:
                     for k in MatchCandidates:
@@ -500,7 +480,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
                         
                         if ClusterComparisonAlgorithm == "RMSD":
                             Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
-                            Dist = ClusterComparison.AlignMolecules_RMSD(Molecule, Molecule2)
+                            Dist = cluster_comparison.AlignMolecules_RMSD(Molecule, Molecule2)
                             if Dist > AlignmentThresh and AlignMirrorImages:
                                 #
                                 # Test the mirror image of Molecule2. After enabling
@@ -516,12 +496,12 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
                                 Coords2 = Molecule2.get_positions()
                                 Coords2[:, 1] *= -1
                                 Molecule2.set_positions(Coords2)
-                                Dist2 = ClusterComparison.AlignMolecules_RMSD(Molecule, Molecule2)
+                                Dist2 = cluster_comparison.AlignMolecules_RMSD(Molecule, Molecule2)
                                 Dist = min(Dist, Dist2)
                             
                         elif ClusterComparisonAlgorithm == "MBTR":
                             MBTR2 = Clusters[ClusterType][k]["MBTR"].copy()
-                            Dist = ClusterComparison.AlignMolecules_MBTR(MBTR, MBTR2)
+                            Dist = cluster_comparison.AlignMolecules_MBTR(MBTR, MBTR2)
 
                         if Dist < AlignmentThresh:
                             NAlignments[ClusterType] += 1

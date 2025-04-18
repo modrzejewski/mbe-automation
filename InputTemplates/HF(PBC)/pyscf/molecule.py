@@ -99,7 +99,7 @@ M3.build()
 Jobs = ["crystal geometry with ghosts",
         "crystal geometry without ghosts",
         "relaxed geometry"]    
-M = [M2, M2, M3]
+M = [M1, M2, M3]
 SCFResults = {{}}
 for k, Mk in enumerate(M):
     print(f"Molecule: {{Jobs[k]}}")

@@ -3,8 +3,8 @@ import numpy as np
 import os
 import os.path
 import argparse
-import Keywords
-import DirectoryStructure
+from . import keywords
+from . import directory_structure
 import sys
 
 ToKcal = 627.5094688043
@@ -50,9 +50,9 @@ def extrapolate_energies(E_S, E_L, X, EnergyComponents, ExtrapolatedComponents, 
         else:
             E_CBS[z] = E_L[z]
 
-    E_CBS[Keywords.TOTAL_ENERGY] = 0.0
+    E_CBS[keywords.TOTAL_ENERGY] = 0.0
     for z in TotalEnergySum:
-        E_CBS[Keywords.TOTAL_ENERGY] += E_CBS[z]
+        E_CBS[keywords.TOTAL_ENERGY] += E_CBS[z]
     
     return E_CBS
 
@@ -124,15 +124,15 @@ def TetramerNaddEnergy(E, EnergyComponents):
 
 def MethodDependentKeywords(Method):
     if Method == "LNO-CCSD(T)":
-        EnergyComponents = Keywords.LNO_CCSD_T_ENERGY_COMPONENTS
-        RegexStrings = Keywords.LNO_CCSD_T_REGEX_STRINGS
-        ExtrapolatedComponents = Keywords.LNO_CCSD_T_EXTRAPOLATED_COMPONENTS
-        TotalEnergySum = Keywords.LNO_CCSD_T_TOTAL_ENERGY_SUM
+        EnergyComponents = keywords.LNO_CCSD_T_ENERGY_COMPONENTS
+        RegexStrings = keywords.LNO_CCSD_T_REGEX_STRINGS
+        ExtrapolatedComponents = keywords.LNO_CCSD_T_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = keywords.LNO_CCSD_T_TOTAL_ENERGY_SUM
     elif Method == "LNO-CCSD":
-        EnergyComponents = Keywords.LNO_CCSD_ENERGY_COMPONENTS
-        RegexStrings = Keywords.LNO_CCSD_REGEX_STRINGS
-        ExtrapolatedComponents = Keywords.LNO_CCSD_EXTRAPOLATED_COMPONENTS
-        TotalEnergySum = Keywords.LNO_CCSD_TOTAL_ENERGY_SUM
+        EnergyComponents = keywords.LNO_CCSD_ENERGY_COMPONENTS
+        RegexStrings = keywords.LNO_CCSD_REGEX_STRINGS
+        ExtrapolatedComponents = keywords.LNO_CCSD_EXTRAPOLATED_COMPONENTS
+        TotalEnergySum = keywords.LNO_CCSD_TOTAL_ENERGY_SUM
     else:
         print("Invalid method name in CSV_MRCC")
         sys.exit()
@@ -182,7 +182,7 @@ def WriteCSV(XYZDir, LogDir, CSVDir, Method, X, SystemType, CompletedJobs):
         s = os.path.splitext(x)[0]
         E_S = {}
         E_L = {}
-        for Subsystem in DirectoryStructure.SUBSYSTEM_LABELS[SystemType]:
+        for Subsystem in directory_structure.SUBSYSTEM_LABELS[SystemType]:
             LogFileS = os.path.join(SmallBasisLogsDir, Subsystem, s) + ".log"
             LogFileL = os.path.join(LargeBasisLogsDir, Subsystem, s) + ".log"
             if Small:

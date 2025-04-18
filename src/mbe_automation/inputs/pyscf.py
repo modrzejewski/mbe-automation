@@ -1,4 +1,4 @@
-import PBC
+from .. import pbc
 import os.path
 import shutil
 import ase.io
@@ -37,7 +37,7 @@ def Make(InpDirs, XYZDirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
         UnitCellFile = b
     print(f"Unit cell for HF(PBC) calculations: {UnitCellFile}")
     UnitCell = ase.io.read(UnitCellFile)
-    Grids = PBC.AutomaticKPointGrids(UnitCell)
+    Grids = pbc.AutomaticKPointGrids(UnitCell)
 
     Ref = 0
     for basis in BasisSets:

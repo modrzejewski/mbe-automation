@@ -7,7 +7,7 @@ import subprocess
 import numpy as np
 import sys
 import re
-import XYZ
+from .. import xyz
 
 
 def generate_input(input_template, coords, natoms, charges):
@@ -77,7 +77,7 @@ def Make(InputTemplates, ClusterTypes, MonomerRelaxation, InputDirs, XYZDirs):
     Write = {"dimers":write_dimer_input, "trimers":write_trimer_input, "tetramers":write_tetramer_input}
     
     for ClusterType in ClusterTypes:
-        xyz_files, molecule_idx, molecule_coords, labels = XYZ.LoadXYZDir(XYZDirs[ClusterType])
+        xyz_files, molecule_idx, molecule_coords, labels = xyz.LoadXYZDir(XYZDirs[ClusterType])
         for f in xyz_files:
            Write[ClusterType](InputDirs[ClusterType]["small-basis"],
                               InputTemplates["small-basis"],
@@ -87,7 +87,7 @@ def Make(InputTemplates, ClusterTypes, MonomerRelaxation, InputDirs, XYZDirs):
                               molecule_idx[f], molecule_coords[f], labels[f])
     
     if MonomerRelaxation:
-        MonomerCoords, Labels = XYZ.LoadMonomerXYZDir(XYZDirs["monomers-supercell"], XYZDirs["monomers-relaxed"])
+        MonomerCoords, Labels = xyz.LoadMonomerXYZDir(XYZDirs["monomers-supercell"], XYZDirs["monomers-relaxed"])
         for Label in Labels:
             for MonomerType in ["monomers-supercell", "monomers-relaxed"]:
                 for BasisType in ["small-basis", "large-basis"]:

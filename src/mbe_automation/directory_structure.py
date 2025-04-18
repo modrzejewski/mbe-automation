@@ -13,8 +13,8 @@ def SetUp(ProjectDir, MethodsMBE, MethodsPBC):
     global ROOT_DIR, PROJECT_DIR, INP_DIRS, LOG_DIRS, CSV_DIRS
     global XYZ_DIRS, QUEUE_DIRS, QUEUE_MAIN_SCRIPT
     
-    ROOT_DIR = path.dirname(path.realpath(__file__))
-    PROJECT_DIR = path.join(ProjectDir)        
+    ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    PROJECT_DIR = path.realpath(ProjectDir)
     INP_DIRS, LOG_DIRS, CSV_DIRS, XYZ_DIRS, QUEUE_DIRS = {}, {}, {}, {}, {}
     #
     # If the project directory already exists, move the existing contents

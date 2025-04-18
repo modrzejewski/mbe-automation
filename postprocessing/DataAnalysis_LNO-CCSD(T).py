@@ -2,7 +2,7 @@
 
 # ------------------------------------------- User's Input -----------------------------------------
 
-ProjectDirectory            = "{PROJECT_DIR}"
+ProjectDirectory            = "./"
 
                                                    #
                                                    # Available methods:
@@ -17,10 +17,6 @@ SmallBasisXNumber           = 3
 
 # --------------------------------------- End of User's Input --------------------------------------
 
-import sys
-import os
-sys.path.append(os.path.abspath("{ROOT_DIR}"))
+import mbe_automation.outputs.mrcc
 
-import CSV_MRCC
-
-CSV_MRCC.Make(ProjectDirectory, Method, SmallBasisXNumber)
+mbe_automation.outputs.mrcc.Make(ProjectDirectory, Method, SmallBasisXNumber)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import mbe_automation.project
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ User's Input ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
@@ -184,132 +185,17 @@ ClusterComparisonAlgorithm = "RMSD"
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ End of User's Input ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~~~
 #
 
-def NewProject(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
-               Ordering, InputTemplates, QueueScriptTemplates,
-               Methods, UseExistingXYZ,
-               ExistingXYZDirs=None,
-               RelaxedMonomerXYZ=None,
-               SymmetrizeUnitCell=True,
-               ClusterComparisonAlgorithm="RMSD"):
 
-    import MBE
-    import Inputs_RPA
-    import Inputs_ORCA
-    import Inputs_MRCC
-    import Inputs_PYSCF
-    import QueueScripts
-    import DirectoryStructure
-    import os
-    import os.path
-    import stat
-    import shutil
-
-    MethodsMBE = []
-    MethodsPBC = []
-    for m in Methods:
-        if m.endswith("(PBC)"):
-            MethodsPBC.append(m.removesuffix("(PBC)"))
-        else:
-            MethodsMBE.append(m)
-
-    ClusterTypes = []
-    for SystemType in SystemTypes:
-        if SystemType != "monomers" and SystemType != "bulk":
-            ClusterTypes.append(SystemType)
-    MonomerRelaxation = "monomers" in SystemTypes
-    PBCEmbedding = "bulk" in SystemTypes
-
-    DirectoryStructure.SetUp(ProjectDirectory, MethodsMBE, MethodsPBC)
-
-    if not UseExistingXYZ:
-        MBE.Make(UnitCellFile,
-                 Cutoffs,
-                 ClusterTypes,
-                 MonomerRelaxation,
-                 PBCEmbedding,
-                 RelaxedMonomerXYZ,
-                 Ordering,
-                 DirectoryStructure.PROJECT_DIR,
-                 DirectoryStructure.XYZ_DIRS,
-                 DirectoryStructure.CSV_DIRS,
-                 MethodsMBE,
-                 SymmetrizeUnitCell,
-                 ClusterComparisonAlgorithm)
-    else:
-        print("Coordinates will be read from existing xyz directories:")
-        for s in SystemTypes:
-            print(ExistingXYZDirs[s])
-            for filename in os.listdir(ExistingXYZDirs[s]):
-                if filename.endswith(".xyz"):
-                    source_file = os.path.join(ExistingXYZDirs[s], filename)
-                    dest_file = os.path.join(DirectoryStructure.XYZ_DIRS[s], filename)
-                    shutil.copyfile(source_file, dest_file)
-
-    InputSubroutines = {"RPA": Inputs_RPA.Make, "LNO-CCSD(T)": Inputs_MRCC.Make}
-    QueueSubroutines = {"RPA": QueueScripts.Make, "LNO-CCSD(T)": QueueScripts.Make}
-    
-    for Method in MethodsMBE:
-        InputSubroutines[Method](InputTemplates[Method],
-                                 ClusterTypes,
-                                 MonomerRelaxation,
-                                 DirectoryStructure.INP_DIRS[Method],
-                                 DirectoryStructure.XYZ_DIRS if not UseExistingXYZ else ExistingXYZDirs)
-        QueueSubroutines[Method](DirectoryStructure.QUEUE_DIRS[Method],
-                                 DirectoryStructure.QUEUE_MAIN_SCRIPT[Method],
-                                 ClusterTypes,
-                                 MonomerRelaxation,
-                                 QueueScriptTemplates[Method],
-                                 DirectoryStructure.INP_DIRS[Method],
-                                 DirectoryStructure.LOG_DIRS[Method],
-                                 Method)
-
-    if PBCEmbedding and "HF" in MethodsPBC:
-        Inputs_PYSCF.Make(DirectoryStructure.INP_DIRS,
-                          DirectoryStructure.XYZ_DIRS,
-                          InputTemplates["HF(PBC)"],
-                          QueueScriptTemplates["HF(PBC)"],
-                          SymmetrizeUnitCell)          
-                              
-    if "RPA" in MethodsMBE:
-        template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis_RPA.py"), "r")
-        s = template.read()
-        template.close()
-        DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis_RPA.py")
-        f = open(DataAnalysisPath, "w")
-        f.write(s.format(
-            ROOT_DIR=os.path.abspath(DirectoryStructure.ROOT_DIR),
-            PROJECT_DIR=os.path.abspath(ProjectDirectory)))
-        f.close()
-        mode = os.stat(DataAnalysisPath).st_mode
-        os.chmod(DataAnalysisPath, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-        print(f"RPA data analysis script: {DataAnalysisPath}")
-
-    if "LNO-CCSD(T)" in MethodsMBE:
-        template = open(os.path.join(DirectoryStructure.ROOT_DIR, "DataAnalysis_LNO-CCSD(T).py"), "r")
-        s = template.read()
-        template.close()
-        DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis_LNO-CCSD(T).py")
-        f = open(DataAnalysisPath, "w")
-        f.write(s.format(
-            ROOT_DIR=os.path.abspath(DirectoryStructure.ROOT_DIR),
-            PROJECT_DIR=os.path.abspath(ProjectDirectory)))
-        f.close()
-        mode = os.stat(DataAnalysisPath).st_mode
-        os.chmod(DataAnalysisPath, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-        print(f"LNO-CCSD(T) data analysis script: {DataAnalysisPath}")
-
-
-
-NewProject(ProjectDirectory,
-           UnitCellFile,
-           SystemTypes,
-           Cutoffs,
-           Ordering,
-           InputTemplates,
-           QueueScriptTemplates,
-           Methods,
-           UseExistingXYZ,
-           ExistingXYZDirs, 
-           RelaxedMonomerXYZ,
-           SymmetrizeUnitCell,
-           ClusterComparisonAlgorithm)
+mbe_automation.project.prepare_inputs(ProjectDirectory,
+                                      UnitCellFile,
+                                      SystemTypes,
+                                      Cutoffs,
+                                      Ordering,
+                                      InputTemplates,
+                                      QueueScriptTemplates,
+                                      Methods,
+                                      UseExistingXYZ,
+                                      ExistingXYZDirs, 
+                                      RelaxedMonomerXYZ,
+                                      SymmetrizeUnitCell,
+                                      ClusterComparisonAlgorithm)

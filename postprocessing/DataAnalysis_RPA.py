@@ -2,7 +2,7 @@
 
 # ------------------------------------------- User's Input -----------------------------------------
 
-ProjectDirectory            = "{PROJECT_DIR}"
+ProjectDirectory            = "./"
 
                                                    #
                                                    # Available methods:
@@ -18,10 +18,6 @@ SmallBasisXNumber           = 3
 
 # --------------------------------------- End of User's Input --------------------------------------
 
-import sys
-import os
-sys.path.append(os.path.abspath("{ROOT_DIR}"))
+import mbe_automation.outputs.rpa
 
-import CSV_RPA
-
-CSV_RPA.Make(ProjectDirectory, Method, SmallBasisXNumber)
+mbe_automation.csv.rpa.Make(ProjectDirectory, Method, SmallBasisXNumber)

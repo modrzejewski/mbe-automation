@@ -2,7 +2,7 @@ import os
 import os.path
 import stat
 import math
-import DirectoryStructure
+from . import directory_structure
 
 def Make(QueueDirs, QueueMainScript, ClusterTypes, MonomerRelaxation,
          TemplateFile, InpDirs, LogDirs, Method):
@@ -43,7 +43,7 @@ def Make(QueueDirs, QueueMainScript, ClusterTypes, MonomerRelaxation,
             if Method != "LNO-CCSD(T)":
                 Files = sorted(os.listdir(InputDir))
             else:
-                Files = sorted(os.listdir(os.path.join(InputDir, DirectoryStructure.SUBSYSTEM_LABELS[SystemType][0])))
+                Files = sorted(os.listdir(os.path.join(InputDir, directory_structure.SUBSYSTEM_LABELS[SystemType][0])))
             NTasks = len(Files)
             NBlocks = NTasks // MaxBlockSize
             if NTasks % MaxBlockSize > 0:
