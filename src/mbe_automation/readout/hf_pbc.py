@@ -65,8 +65,6 @@ def lattice_energy(jobdir):
     
     molecule_energies = extract_molecule_energies(os.path.join(jobdir, "molecule.log"))
     solid_energy = extract_solid_energy(os.path.join(jobdir, "solid.log"))
-    print(molecule_energies)
-    print(solid_energy)
     if len(molecule_energies) == 3 and len(solid_energy) == 1:
         LatticeEnergy_au = (solid_energy["crystal lattice energy per molecule"]
                             - molecule_energies["crystal geometry with ghosts"]

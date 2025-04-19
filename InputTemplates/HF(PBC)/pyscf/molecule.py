@@ -21,7 +21,7 @@ MaxMemory = 170 * 10**3 # memory in megabytes
 Verbosity = 4
 AlwaysCheckLinDeps = True
 LinDepThresh = 1.0E-6
-ScratchDir = "scratch_molecule"
+ScratchDir = "scratch"
 
 WorkDir = os.path.abspath(os.path.dirname(__file__))
 XYZ_MoleculeWithGhosts = os.path.join(WorkDir, XYZ_MoleculeWithGhosts)

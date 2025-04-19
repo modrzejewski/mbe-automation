@@ -1,4 +1,4 @@
-from . import mbe
+import mbe_automation.mbe
 import mbe_automation.inputs.rpa
 import mbe_automation.inputs.orca
 import mbe_automation.inputs.mrcc
@@ -37,19 +37,19 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
     directory_structure.SetUp(ProjectDirectory, MethodsMBE, MethodsPBC)
 
     if not UseExistingXYZ:
-        mbe.Make(UnitCellFile,
-                 Cutoffs,
-                 ClusterTypes,
-                 MonomerRelaxation,
-                 PBCEmbedding,
-                 RelaxedMonomerXYZ,
-                 Ordering,
-                 directory_structure.PROJECT_DIR,
-                 directory_structure.XYZ_DIRS,
-                 directory_structure.CSV_DIRS,
-                 MethodsMBE,
-                 SymmetrizeUnitCell,
-                 ClusterComparisonAlgorithm)
+        mbe_automation.mbe.Make(UnitCellFile,
+                                Cutoffs,
+                                ClusterTypes,
+                                MonomerRelaxation,
+                                PBCEmbedding,
+                                RelaxedMonomerXYZ,
+                                Ordering,
+                                directory_structure.PROJECT_DIR,
+                                directory_structure.XYZ_DIRS,
+                                directory_structure.CSV_DIRS,
+                                MethodsMBE,
+                                SymmetrizeUnitCell,
+                                ClusterComparisonAlgorithm)
     else:
         print("Coordinates will be read from existing xyz directories:")
         for s in SystemTypes:

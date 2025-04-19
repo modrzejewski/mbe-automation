@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import mbe_automation.project
+import mbe_automation.single_point
 #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ User's Input ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
@@ -186,16 +186,16 @@ ClusterComparisonAlgorithm = "RMSD"
 #
 
 
-mbe_automation.project.prepare_inputs(ProjectDirectory,
-                                      UnitCellFile,
-                                      SystemTypes,
-                                      Cutoffs,
-                                      Ordering,
-                                      InputTemplates,
-                                      QueueScriptTemplates,
-                                      Methods,
-                                      UseExistingXYZ,
-                                      ExistingXYZDirs, 
-                                      RelaxedMonomerXYZ,
-                                      SymmetrizeUnitCell,
-                                      ClusterComparisonAlgorithm)
+mbe_automation.single_point.prepare_inputs(ProjectDirectory,
+                                           UnitCellFile,
+                                           SystemTypes,
+                                           Cutoffs,
+                                           Ordering,
+                                           InputTemplates,
+                                           QueueScriptTemplates,
+                                           Methods,
+                                           UseExistingXYZ,
+                                           ExistingXYZDirs, 
+                                           RelaxedMonomerXYZ,
+                                           SymmetrizeUnitCell,
+                                           ClusterComparisonAlgorithm)

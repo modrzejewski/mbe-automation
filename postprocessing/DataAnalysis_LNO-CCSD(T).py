@@ -17,6 +17,6 @@ SmallBasisXNumber           = 3
 
 # --------------------------------------- End of User's Input --------------------------------------
 
-import mbe_automation.outputs.mrcc
+import mbe_automation.readout.mrcc
 
-mbe_automation.outputs.mrcc.Make(ProjectDirectory, Method, SmallBasisXNumber)
+mbe_automation.readout.mrcc.Make(ProjectDirectory, Method, SmallBasisXNumber)

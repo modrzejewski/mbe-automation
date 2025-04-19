@@ -1,4 +1,4 @@
-from .. import pbc
+import mbe_automation.kpoints
 import os.path
 import shutil
 import ase.io
@@ -37,15 +37,15 @@ def Make(InpDirs, XYZDirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
         UnitCellFile = b
     print(f"Unit cell for HF(PBC) calculations: {UnitCellFile}")
     UnitCell = ase.io.read(UnitCellFile)
-    Grids = pbc.AutomaticKPointGrids(UnitCell)
-
+    GridSequence = mbe_automation.kpoints.Automatic(UnitCell)    
     Ref = 0
     for basis in BasisSets:
-        for Radius, GridType, Nx, Ny, Nz, ScaledKPoints in Grids:
+        for Grid in GridSequence:
+            Radius = Grid["supercell radius"]
+            Nx, Ny, Nz = Grid["supercell dimensions"]
             NAtoms = len(ase.io.read(os.path.join(XYZDirs["monomers-relaxed"], RelaxedMonomers[Ref])))
             PBCJobDir = os.path.join(InpDirs[Method], f"{Radius:.0f}-{Nx}-{Ny}-{Nz}", basis)
             os.makedirs(PBCJobDir, exist_ok=True)
-            np.savetxt(os.path.join(PBCJobDir, "kpoints.txt"), ScaledKPoints)
             shutil.copy(
                 os.path.join(XYZDirs["monomers-relaxed"], RelaxedMonomers[Ref]),
                 os.path.join(PBCJobDir, "molecule_relaxed.xyz")
@@ -61,7 +61,7 @@ def Make(InpDirs, XYZDirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
             PBCJobParams = {
                 "BASIS_SET": basis,
                 "KPOINT_RADIUS": Radius,
-                "KPOINT_GRID_TYPE": GridType,
+                "KPOINT_GAMMA_CENTERED": "True",
                 "KPOINT_NX": Nx,
                 "KPOINT_NY": Ny,
                 "KPOINT_NZ": Nz,

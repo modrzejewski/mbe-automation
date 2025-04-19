@@ -18,6 +18,6 @@ SmallBasisXNumber           = 3
 
 # --------------------------------------- End of User's Input --------------------------------------
 
-import mbe_automation.outputs.rpa
+import mbe_automation.readout.rpa
 
-mbe_automation.csv.rpa.Make(ProjectDirectory, Method, SmallBasisXNumber)
+mbe_automation.readout.rpa.Make(ProjectDirectory, Method, SmallBasisXNumber)

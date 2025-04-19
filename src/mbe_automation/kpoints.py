@@ -13,7 +13,7 @@ import pyscf.pbc
 import pymatgen.core
 
 
-def IrreducibleScaledKPoints(UnitCell, BZ_KPoints):
+def IrreducibleScaledKPoints(UnitCell, BZ_scaled_kpoints):
     geometry_string = "\n".join(
         f"{symbol} {pos[0]:.8f} {pos[1]:.8f} {pos[2]:.8f}"
     for symbol, pos in zip(UnitCell.get_chemical_symbols(), UnitCell.get_positions())
@@ -26,31 +26,12 @@ def IrreducibleScaledKPoints(UnitCell, BZ_KPoints):
         verbose = 0,
         space_group_symmetry=True
     )
+    BZ_abs_kpoints = cell.get_abs_kpts(BZ_scaled_kpoints)
     K = pyscf.pbc.lib.kpts.make_kpts(cell,
-                                     kpts=BZ_KPoints,
+                                     kpts=BZ_abs_kpoints,
                                      space_group_symmetry=True,
                                      time_reversal_symmetry=True)
     return K.kpts_scaled_ibz
-
-
-def GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs):
-    if Cutoffs["ghosts"] >= Cutoffs["dimers"]:
-        print(f"Cutoff for ghosts ({Cutoffs['ghosts']} Å) must be smaller than cutoff for dimers ({Cutoffs['dimers']} Å)")
-        sys.exit(1)
-
-    Ghosts = Atoms()
-    Rmax = Cutoffs["ghosts"]
-    posA = Monomers[Reference].get_positions()
-    for M in MonomersWithinCutoff["dimers"]:
-        MonomerB = Monomers[M]
-        if MinRij[Reference, M] < Rmax:
-            posB = MonomerB.get_positions()
-            Rij = scipy.spatial.distance.cdist(posA, posB)
-            columns_below_cutoff = np.where(np.any(Rij < Rmax, axis=0))[0]
-            selected_atoms = MonomerB[columns_below_cutoff]
-            Ghosts.extend(selected_atoms)
-            
-    return Ghosts
 
 
 def ScaledKPoints(Nk, GammaCentered=True):
@@ -132,8 +113,14 @@ def RminSupercell(UnitCell, Radius, EvenNumbers=False):
                          ' Try running with a larger maxperdim.')
 
 
-def AutomaticKPointGrids(UnitCell, EvenNumbers=False):
-    Grids = []
+def Automatic(UnitCell, EvenNumbers=False):
+    """
+    Generate a sequence of supercells and k-point
+    grids corresponding to increasing point-image
+    distance in the supercell. 
+    """
+    
+    Supercells = []
     print("")
     print("Constructing Brillouin zone grids by supercell->BZ mapping")
     print("m₁×m₂×m₃ supercell lattices with minimum point-image distance R > Rmin")
@@ -143,17 +130,17 @@ def AutomaticKPointGrids(UnitCell, EvenNumbers=False):
     print(f"{'Rmin [Å]':>10}{'m₁×m₂×m₃':>20}{'BZ':>20}{'IBZ(Γ-centered)':>25}{'IBZ(Monkhorst-Pack)':>25}")
     for R in [10.0, 15.0, 18.0, 20.0, 22.0, 25.0, 30.0]:
         Nk = RminSupercell(UnitCell, R, EvenNumbers)
-        if len(Grids) > 1:
-            RPrev, NkPrev = Grids[-1]
+        if len(Supercells) > 1:
+            RPrev, NkPrev = Supercells[-1]
             if (NkPrev == Nk).all():
-                Grids[-1] = (R, Nk)
+                Supercells[-1] = (R, Nk)
             else:
-                Grids.append((R, Nk))
+                Supercells.append((R, Nk))
         else:
-            Grids.append((R, Nk))
+            Supercells.append((R, Nk))
 
-    KPoints_SmallestIBZ = []
-    for R, Nk in Grids:
+    GridSequence = []
+    for R, Nk in Supercells:
         Nx, Ny, Nz = Nk
         KPoints_Gamma = ScaledKPoints(Nk, GammaCentered=True)
         KPoints_MP = ScaledKPoints(Nk, GammaCentered=False)
@@ -164,8 +151,14 @@ def AutomaticKPointGrids(UnitCell, EvenNumbers=False):
         NPointsIBZ_MP = len(IBZ_KPoints_MP)
         size = f"{Nx}×{Ny}×{Nz}"
         print(f"{R:10.0f}{size:>20}{NPointsBZ:20d}{NPointsIBZ_Gamma:25d}{NPointsIBZ_MP:25d}")
-        KPoints_SmallestIBZ.append( (R, "Γ-centered", Nx, Ny, Nz, KPoints_Gamma) )
-            
+        ThisGrid = {}
+        ThisGrid["supercell radius"] = R
+        ThisGrid["supercell dimensions"] = Nk
+        ThisGrid["Gamma-centered IBZ"] = NPointsIBZ_Gamma
+        ThisGrid["MP IBZ"] = NPointsIBZ_MP
+        ThisGrid["Gamma-centered k-points"] = KPoints_Gamma
+        ThisGrid["MP k-points"] = KPoints_MP
+        GridSequence.append(ThisGrid)            
     print("")
-
-    return KPoints_SmallestIBZ
+    
+    return GridSequence
