@@ -22,7 +22,7 @@ ProjectDirectory    = "./Projects/pbc-test"
                                                 # (3) HF(PBC)
                                                 #
                                                 
-Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)"]
+Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)", "MACE(PBC)"]
 
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
@@ -110,17 +110,20 @@ Ordering            = "MaxMinRij"
                                                 #
 InputTemplates = {
     "RPA": {
-        "small-basis": "./InputTemplates/RPA-AVTZ.inp",
-        "large-basis": "./InputTemplates/RPA-AVQZ.inp"
+        "small-basis": "./templates/inputs/RPA-AVTZ.inp",
+        "large-basis": "./templates/inputs/RPA-AVQZ.inp"
     },
     "LNO-CCSD(T)" : {
-        "small-basis": "./InputTemplates/MRCC-AVTZ.inp",
-        "large-basis": "./InputTemplates/MRCC-AVQZ.inp"
+        "small-basis": "./templates/inputs/MRCC-AVTZ.inp",
+        "large-basis": "./templates/inputs/MRCC-AVQZ.inp"
     },
     "HF(PBC)" : {
-        "solid": "./InputTemplates/HF(PBC)/pyscf/solid.py",
-        "molecule": "./InputTemplates/HF(PBC)/pyscf/molecule.py"
-    }
+        "solid": "./templates/inputs/HF(PBC)/pyscf/solid.py",
+        "molecule": "./templates/inputs/HF(PBC)/pyscf/molecule.py"
+    },
+    "MACE(PBC)": {
+        "solid": "./templates/inputs/MACE(PBC)/solid.py"
+        }
     }
                                                 #
                                                 # Set UseExistingXYZ to                                                
@@ -148,9 +151,10 @@ ExistingXYZDirs = {
                                                 # memory, etc.
                                                 #
 QueueScriptTemplates = {
-    "RPA":           "./QueueTemplates/Poznań/RPA.py",
-    "LNO-CCSD(T)":   "./QueueTemplates/Poznań/MRCC.py",
-    "HF(PBC)":       "./QueueTemplates/Poznań/PYSCF.py"
+    "RPA":           "./templates/queue-scripts/Poznań/RPA.py",
+    "LNO-CCSD(T)":   "./templates/queue-scripts/Poznań/MRCC.py",
+    "HF(PBC)":       "./templates/queue-scripts/Poznań/PYSCF.py",
+    "MACE(PBC)":     "./templates/queue-scripts/Poznań/MACE.py"
     }
                                                 #
                                                 # Use the spglib package to symmetrize the input

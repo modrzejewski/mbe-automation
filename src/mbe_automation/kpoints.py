@@ -128,9 +128,9 @@ def Automatic(UnitCell, EvenNumbers=False):
     print("IBZ: symmetry-reduced Brillouin zone")
     print("")
     print(f"{'Rmin [Å]':>10}{'m₁×m₂×m₃':>20}{'BZ':>20}{'IBZ(Γ-centered)':>25}{'IBZ(Monkhorst-Pack)':>25}")
-    for R in [10.0, 15.0, 18.0, 20.0, 22.0, 25.0, 30.0]:
+    for R in np.arange(10, 31):
         Nk = RminSupercell(UnitCell, R, EvenNumbers)
-        if len(Supercells) > 1:
+        if len(Supercells) >= 1:
             RPrev, NkPrev = Supercells[-1]
             if (NkPrev == Nk).all():
                 Supercells[-1] = (R, Nk)

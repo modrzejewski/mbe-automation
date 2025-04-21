@@ -3,9 +3,9 @@ import numpy as np
 import os
 import os.path
 import argparse
-from . import keywords
 import sys
 import mbe_automation.validation.rpa
+import mbe_automation.readout.keywords as keywords
 
 ToKcal = 627.5094688043
 

@@ -3,13 +3,29 @@ import mbe_automation.inputs.rpa
 import mbe_automation.inputs.orca
 import mbe_automation.inputs.mrcc
 import mbe_automation.inputs.pyscf
+import mbe_automation.inputs.mace
 from . import queue_scripts
 from . import directory_structure
 import os
 import os.path
 import stat
 import shutil
+import sys
 
+class ReplicatedOutput:
+    def __init__(self, filename):
+        self.file = open(filename, 'w')
+        self.stdout = sys.stdout  # Original stdout
+
+    def write(self, message):
+        self.stdout.write(message)  # Print to screen
+        self.file.write(message)    # Write to file
+        self.file.flush()
+
+    def flush(self):
+        self.stdout.flush()
+        self.file.flush()
+        
 
 def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                    Ordering, InputTemplates, QueueScriptTemplates,
@@ -18,7 +34,7 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                    RelaxedMonomerXYZ=None,
                    SymmetrizeUnitCell=True,
                    ClusterComparisonAlgorithm="RMSD"):
-
+    
     MethodsMBE = []
     MethodsPBC = []
     for m in Methods:
@@ -35,6 +51,12 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
     PBCEmbedding = "bulk" in SystemTypes
 
     directory_structure.SetUp(ProjectDirectory, MethodsMBE, MethodsPBC)
+    #
+    # Copy stdout to the project's log file. Output will be
+    # both displayed on screen and written to the log file.
+    #
+    SummaryFile = os.path.join(directory_structure.PROJECT_DIR, "input_preparation.txt")
+    sys.stdout = ReplicatedOutput(SummaryFile)
 
     if not UseExistingXYZ:
         mbe_automation.mbe.Make(UnitCellFile,
@@ -78,20 +100,27 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                                  QueueScriptTemplates[Method],
                                  directory_structure.INP_DIRS[Method],
                                  directory_structure.LOG_DIRS[Method],
-                                 Method)
+                                 Method) 
 
-    if PBCEmbedding and "HF" in MethodsPBC:
-        mbe_automation.inputs.pyscf.Make(directory_structure.INP_DIRS,
-                                         directory_structure.XYZ_DIRS,
-                                         InputTemplates["HF(PBC)"],
-                                         QueueScriptTemplates["HF(PBC)"],
-                                         SymmetrizeUnitCell)
-        
-        DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis_HF(PBC)")
+    if PBCEmbedding:
+        if "HF" in MethodsPBC:
+            mbe_automation.inputs.pyscf.Make(directory_structure.INP_DIRS,
+                                             directory_structure.XYZ_DIRS,
+                                             InputTemplates["HF(PBC)"],
+                                             QueueScriptTemplates["HF(PBC)"],
+                                             SymmetrizeUnitCell)
+        if "MACE" in MethodsPBC:
+            mbe_automation.inputs.mace.Make(directory_structure.INP_DIRS,
+                                            directory_structure.XYZ_DIRS,
+                                            InputTemplates["MACE(PBC)"],
+                                            QueueScriptTemplates["MACE(PBC)"],
+                                            SymmetrizeUnitCell)
+            
+        DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis_HF(PBC).py")
         shutil.copyfile(
             os.path.join(directory_structure.ROOT_DIR, "postprocessing", "DataAnalysis_HF(PBC).py"),
             DataAnalysisPath
-            )
+        )
         mode = os.stat(DataAnalysisPath).st_mode
         os.chmod(DataAnalysisPath, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         print(f"HF(PBC) data analysis script: {DataAnalysisPath}")
@@ -117,3 +146,6 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
         print(f"LNO-CCSD(T) data analysis script: {DataAnalysisPath}")
 
         
+    print(f"Summary: {SummaryFile}")
+    sys.stdout.file.close()
+    sys.stdout = sys.stdout.stdout

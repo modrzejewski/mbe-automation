@@ -1,4 +1,5 @@
 import mbe_automation.kpoints
+import mbe_automation.directory_structure
 import os.path
 import shutil
 import ase.io
@@ -7,27 +8,12 @@ import os
 import numpy as np
 
 
-def FindMonomerXYZ(directory):
-    WithGhosts = []
-    WithoutGhosts = []
-    for f in sorted(os.listdir(directory)):
-        name, extension = os.path.splitext(f)
-        if extension == ".xyz":
-            if name.startswith("monomer-"):
-                if name.endswith("+ghosts"):
-                    WithGhosts.append(f)
-                else:
-                    WithoutGhosts.append(f)
-
-    return WithoutGhosts, WithGhosts
-
-
 def Make(InpDirs, XYZDirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
     Method = "HF(PBC)"
     BasisSets = ["cc-pVDZ", "cc-pVTZ", "cc-pVQZ", "aug-cc-pVDZ", "aug-cc-pVTZ", "aug-cc-pVQZ"]
         
-    WithoutGhosts, WithGhosts = FindMonomerXYZ(XYZDirs["monomers-supercell"])
-    RelaxedMonomers, _ = FindMonomerXYZ(XYZDirs["monomers-relaxed"])
+    WithoutGhosts, WithGhosts = mbe_automation.directory_structure.FindMonomerXYZ(XYZDirs["monomers-supercell"])
+    RelaxedMonomers, _ = mbe_automation.directory_structure.FindMonomerXYZ(XYZDirs["monomers-relaxed"])
 
     a = os.path.join(XYZDirs["unitcell"], "symmetrized_unit_cell.xyz")
     b = os.path.join(XYZDirs["unitcell"], "input_unit_cell.xyz")

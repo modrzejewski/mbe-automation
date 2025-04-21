@@ -3,8 +3,8 @@ import numpy as np
 import os
 import os.path
 import argparse
-from . import keywords
-from . import directory_structure
+import mbe_automation.readout.keywords as keywords
+import mbe_automation.directory_structure as directory_structure
 import sys
 
 ToKcal = 627.5094688043

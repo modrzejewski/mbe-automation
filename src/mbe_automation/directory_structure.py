@@ -98,3 +98,17 @@ def SetUp(ProjectDir, MethodsMBE, MethodsPBC):
     return
 
 
+def FindMonomerXYZ(directory):
+    WithGhosts = []
+    WithoutGhosts = []
+    for f in sorted(os.listdir(directory)):
+        name, extension = os.path.splitext(f)
+        if extension == ".xyz":
+            if name.startswith("monomer-"):
+                if name.endswith("+ghosts"):
+                    WithGhosts.append(f)
+                else:
+                    WithoutGhosts.append(f)
+
+    return WithoutGhosts, WithGhosts
+

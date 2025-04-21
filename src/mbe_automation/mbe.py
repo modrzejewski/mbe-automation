@@ -13,26 +13,10 @@ import itertools
 import time
 import subprocess
 import shutil
-from . import cluster_comparison
+import mbe_automation.structure.compare as compare
 import sys
 import pymatgen.core
 import pymatgen.io.ase
-
-
-class ReplicatedOutput:
-    def __init__(self, filename):
-        self.file = open(filename, 'w')
-        self.stdout = sys.stdout  # Original stdout
-
-    def write(self, message):
-        self.stdout.write(message)  # Print to screen
-        self.file.write(message)    # Write to file
-        self.file.flush()
-
-    def flush(self):
-        self.stdout.flush()
-        self.file.flush()
-
         
 def ClusterLabel(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
@@ -235,12 +219,6 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
          RelaxedMonomerXYZ, Ordering, ProjectDir, XYZDirs, CSVDirs, Methods,
          SymmetrizeUnitCell, ClusterComparisonAlgorithm):
     #
-    # Copy stdout to the project's log file. Output will be
-    # both displayed on screen and written to the log file.
-    #
-    ClusterGenLogFile = os.path.join(ProjectDir, "MBE.log")
-    sys.stdout = ReplicatedOutput(ClusterGenLogFile)
-    #
     # Threshold for symmetry equivalence of clusters
     # (RMSD of atomic positions, in Angstroms). This
     # threshold should be on the order of the uncertainty
@@ -258,10 +236,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     AlignMirrorImages = True
     
     StartTime = time.time()
-    print("")
-    print("Many-body expansion")
-    print("")
-    print(f"Project:   {ProjectDir}")
+    print(f"Data directory: {ProjectDir}")
     print(f"Unit cell: {UnitCellFile}")
     #
     # Unit cell
@@ -474,7 +449,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
                 # match candidates.
                 #
                 MatchCandidates, MinDist, AvDist, COMDist, MaxDist = \
-                    cluster_comparison.CompareDistances(Constituents,
+                    compare.CompareDistances(Constituents,
                                                         Clusters[ClusterType],
                                                         MinRij, MaxRij, AvRij, COMRij,
                                                         AlignmentThresh)
@@ -490,7 +465,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
                 for i in Constituents:
                     Molecule.extend(Monomers[i])
                 if ClusterComparisonAlgorithm == "MBTR":
-                    MBTR = cluster_comparison.MBTRDescriptor(Molecule)
+                    MBTR = compare.MBTRDescriptor(Molecule)
                     
                 if len(MatchCandidates) > 0:
                     for k in MatchCandidates:
@@ -499,7 +474,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
                         
                         if ClusterComparisonAlgorithm == "RMSD":
                             Molecule2 = Clusters[ClusterType][k]["Atoms"].copy()
-                            Dist = cluster_comparison.AlignMolecules_RMSD(Molecule, Molecule2)
+                            Dist = compare.AlignMolecules_RMSD(Molecule, Molecule2)
                             if Dist > AlignmentThresh and AlignMirrorImages:
                                 #
                                 # Test the mirror image of Molecule2. After enabling
@@ -515,12 +490,12 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
                                 Coords2 = Molecule2.get_positions()
                                 Coords2[:, 1] *= -1
                                 Molecule2.set_positions(Coords2)
-                                Dist2 = cluster_comparison.AlignMolecules_RMSD(Molecule, Molecule2)
+                                Dist2 = compare.AlignMolecules_RMSD(Molecule, Molecule2)
                                 Dist = min(Dist, Dist2)
                             
                         elif ClusterComparisonAlgorithm == "MBTR":
                             MBTR2 = Clusters[ClusterType][k]["MBTR"].copy()
-                            Dist = cluster_comparison.AlignMolecules_MBTR(MBTR, MBTR2)
+                            Dist = compare.AlignMolecules_MBTR(MBTR, MBTR2)
 
                         if Dist < AlignmentThresh:
                             NAlignments[ClusterType] += 1
@@ -593,6 +568,3 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     EndTime = time.time()
     print("")    
     print(f"All geometries computed in {EndTime-StartTime:.1f} seconds")
-    print(f"Summary written to {ClusterGenLogFile}")
-    sys.stdout.file.close()
-    sys.stdout = sys.stdout.stdout

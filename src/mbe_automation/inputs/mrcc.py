@@ -7,7 +7,7 @@ import subprocess
 import numpy as np
 import sys
 import re
-from .. import xyz
+import mbe_automation.structure.xyz as xyz
 from .. import directory_structure
 
 
@@ -132,7 +132,7 @@ def write_mrcc_input_files(FileContents, SubsystemLabels, molecule_label, job_di
 def Make(InputTemplates, ClusterTypes, MonomerRelaxation, InputDirs, XYZDirs):
     Write = {"dimers":write_dimer_inputs, "trimers":write_trimer_inputs, "tetramers":write_tetramer_inputs}
     for ClusterType in ClusterTypes:
-        xyz_files, molecule_idx, molecule_coords, labels = xyz.LoadXYZDir(XYZDirs[ClusterType])
+        xyz_files, molecule_idx, molecule_coords, labels = xyz.LoadDir(XYZDirs[ClusterType])
         for f in xyz_files:
            Write[ClusterType](InputDirs[ClusterType]["small-basis"],
                               InputTemplates["small-basis"],
@@ -142,7 +142,7 @@ def Make(InputTemplates, ClusterTypes, MonomerRelaxation, InputDirs, XYZDirs):
                               molecule_idx[f], molecule_coords[f], labels[f])
            
     if MonomerRelaxation:
-        MonomerCoords, Labels = xyz.LoadMonomerXYZDir(XYZDirs["monomers-supercell"], XYZDirs["monomers-relaxed"])
+        MonomerCoords, Labels = xyz.LoadMonomerDir(XYZDirs["monomers-supercell"], XYZDirs["monomers-relaxed"])
         for Label in Labels:
             for MonomerType in ["monomers-supercell", "monomers-relaxed"]:
                 for BasisType in ["small-basis", "large-basis"]:

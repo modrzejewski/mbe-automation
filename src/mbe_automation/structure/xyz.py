@@ -2,7 +2,7 @@ import os
 from os import path
 import sys
 
-def LoadXYZFile(xyz_path):
+def LoadFile(xyz_path):
     f = open(xyz_path)
     lines = f.readlines()
     NMonomers = len(lines[1].split())
@@ -51,7 +51,7 @@ def LoadXYZFile(xyz_path):
         return Na, Coords
 
 
-def LoadXYZDir(xyz_dir):
+def LoadDir(xyz_dir):
     xyz_files = []
     molecule_idx = {}
     molecule_coords = {}
@@ -60,14 +60,14 @@ def LoadXYZDir(xyz_dir):
         if f.upper().endswith(".XYZ"):
             xyz_files.append(path.join(xyz_dir, f))
     for f in xyz_files:
-        monomer_idx, coords, label = LoadXYZFile(f)
+        monomer_idx, coords, label = LoadFile(f)
         molecule_idx[f] = monomer_idx
         molecule_coords[f] = coords
         labels[f] = label
     return xyz_files, molecule_idx, molecule_coords, labels
 
 
-def LoadMonomerXYZDir(SupercellMonomerDir, RelaxedMonomerDir):
+def LoadMonomerDir(SupercellMonomerDir, RelaxedMonomerDir):
     MonomerCoords = {"monomers-relaxed": {}, "monomers-supercell": {}}
     Labels = []
     for f in sorted(os.listdir(RelaxedMonomerDir)):
@@ -76,8 +76,8 @@ def LoadMonomerXYZDir(SupercellMonomerDir, RelaxedMonomerDir):
             SupercellXYZ = path.join(SupercellMonomerDir, f"{Label}.xyz")
             RelaxedXYZ = path.join(RelaxedMonomerDir, f"{Label}.xyz")
             Labels.append(Label)
-            NAtomsSupercell, CoordsSupercell = LoadXYZFile(SupercellXYZ)
-            NAtomsRelaxed, CoordsRelaxed = LoadXYZFile(RelaxedXYZ)
+            NAtomsSupercell, CoordsSupercell = LoadFile(SupercellXYZ)
+            NAtomsRelaxed, CoordsRelaxed = LoadFile(RelaxedXYZ)
             if NAtomsSupercell != NAtomsRelaxed:
                 print("Inconsistent number of atoms in relaxed and supercell monomer coordinates")
                 sys.exit()
