@@ -112,6 +112,8 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
         if "MACE" in MethodsPBC:
             mbe_automation.inputs.mace.Make(directory_structure.INP_DIRS,
                                             directory_structure.XYZ_DIRS,
+                                            directory_structure.CSV_DIRS["MACE(PBC)"],
+                                            directory_structure.PLOT_DIRS["MACE(PBC)"],
                                             InputTemplates["MACE(PBC)"],
                                             QueueScriptTemplates["MACE(PBC)"],
                                             SymmetrizeUnitCell)

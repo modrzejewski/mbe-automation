@@ -3,25 +3,26 @@ from ase.atoms import Atoms
 from mace.calculators import MACECalculator
 from phonopy import Phonopy
 from phonopy.structure.atoms import PhonopyAtoms
-import matplotlib.pyplot as plt
 import time
+import numpy as np
 import mbe_automation.kpoints
 
 def phonopy(
         UnitCell,
         Calculator,
-        SupercellRadius=20.0,
-        Mesh=[20,20,20],
+        Temperatures=np.arange(0, 1001, 10),
+        SupercellRadius=30.0,
         SupercellDisplacement=0.01,
-        MinTemperature=0,
-        MaxTemperature=1000,
-        TemperatureStep=10,
-        Sigma=0.1,
-        DOSPlot="dos.png"):
+        MeshRadius=100.0):
 
     SupercellDims = mbe_automation.kpoints.RminSupercell(UnitCell, SupercellRadius)
-    print(f"Supercell radius: {SupercellRadius}")
-    print(f"Supercell dimensions: {SupercellDims[0]}×{SupercellDims[1]}×{SupercellDims[2]}")
+
+    print("")
+    print(f"Vibrations and thermal properties in the harmonic approximation")
+    print(f"Supercells for the numerical computation the dynamic matrix")
+    print(f"Minimum point-image distance: {SupercellRadius:.1f} Å")
+    print(f"Dimensions: {SupercellDims[0]}×{SupercellDims[1]}×{SupercellDims[2]}")
+    print(f"Displacement: {SupercellDisplacement:.3f} Å")
     
     phonopy_struct = PhonopyAtoms(
         symbols=UnitCell.get_chemical_symbols(),
@@ -36,9 +37,10 @@ def phonopy(
         
     phonons.generate_displacements(distance=SupercellDisplacement)
 
-    Supercells = phonon.get_supercells_with_displacements()
+    Supercells = phonons.get_supercells_with_displacements()
     Forces = []
-    NSupercells = len(supercells)
+    NSupercells = len(Supercells)
+    print(f"Number of supercells: {NSupercells}")
 
     start_time = time.time()
     last_time = start_time
@@ -55,42 +57,32 @@ def phonopy(
         progress = i * 100 // NSupercells
         if progress >= next_print:
             now = time.time()
-            print(f"Computed {progress}% of supercells ({now - last_time:.1f} s)")
+            print(f"Processed {progress}% of supercells (Δt={now - last_time:.1f} s)")
             last_time = now
             next_print += 10
 
-    phonon.set_forces(forces)
-    phonon.produce_force_constants()
-    phonon.set_mesh(mesh, is_gamma_center=True)
+    phonons.set_forces(Forces)
+    #
+    # Compute second-order dynamic matrix (Hessian)
+    # by numerical differentiation. The force vectors
+    # used to assemble the second derivatives are obtained
+    # from the list of the displaced supercells.
+    #
+    phonons.produce_force_constants()
+    phonons.run_mesh(mesh=MeshRadius)
+    #    
+    # Heat capacity, free energy, entropy due to harmonic vibrations
+    #
+    phonons.run_thermal_properties(temperatures=Temperatures)
+    thermodynamic_functions = phonons.get_thermal_properties_dict()
+    #
+    # Phonon density of states
+    #
+    phonons.run_total_dos()
+    phonon_dos = phonons.get_total_dos_dict()
+    
+    return thermodynamic_functions, phonon_dos
+    
 
-    # Thermal properties
-    phonon.set_thermal_properties(t_min=MinTemperature,
-                                  t_max=MaxTemperature,
-                                  t_step=TemperatureStep)
-    thermal_props = phonon.get_thermal_properties()
-    temperatures = thermal_props[:, 0]
-    free_energies = thermal_props[:, 1]
-
-    # DOS
-    phonon.set_total_DOS(sigma=Sigma)
-    freqs, dos = phonon.get_total_DOS()
-
-    # Plot DOS
-    plt.plot(freqs, dos, label='Phonon DOS')
-    plt.xlabel('Frequency (THz)')
-    plt.ylabel('DOS (states/THz/unit cell)')
-    plt.title('Phonon Density of States')
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(DOSPlot, dpi=300, bbox_inches='tight')
-    plt.close()
-
-    return {
-        "temperatures": temperatures,
-        "free_energies": free_energies,
-        "frequencies": freqs,
-        "dos": dos
-    }
 
 
