@@ -22,7 +22,7 @@ ProjectDirectory    = "./Projects/pbc-test"
                                                 # (3) HF(PBC)
                                                 #
                                                 
-Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)", "MACE(PBC)"]
+Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)", "MACE(PBC)", "DFTB+MBD(PBC)"]
 
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
@@ -123,6 +123,9 @@ InputTemplates = {
     },
     "MACE(PBC)": {
         "solid": "./templates/inputs/MACE(PBC)/solid.py"
+        },
+    "DFTB+MBD(PBC)": {
+        "solid": "./templates/inputs/DFTB+MBD(PBC)/solid.py"
         }
     }
                                                 #
@@ -154,7 +157,8 @@ QueueScriptTemplates = {
     "RPA":           "./templates/queue-scripts/Poznań/RPA.py",
     "LNO-CCSD(T)":   "./templates/queue-scripts/Poznań/MRCC.py",
     "HF(PBC)":       "./templates/queue-scripts/Poznań/PYSCF.py",
-    "MACE(PBC)":     "./templates/queue-scripts/Poznań/MACE.py"
+    "MACE(PBC)":     "./templates/queue-scripts/Poznań/MACE.py",
+    "DFTB+MBD(PBC)": "./templates/queue-scripts/Poznań/DFTB.py"
     }
                                                 #
                                                 # Use the spglib package to symmetrize the input

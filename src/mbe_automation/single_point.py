@@ -4,6 +4,7 @@ import mbe_automation.inputs.orca
 import mbe_automation.inputs.mrcc
 import mbe_automation.inputs.pyscf
 import mbe_automation.inputs.mace
+import mbe_automation.inputs.dftb
 from . import queue_scripts
 from . import directory_structure
 import os
@@ -116,6 +117,15 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                                             directory_structure.PLOT_DIRS["MACE(PBC)"],
                                             InputTemplates["MACE(PBC)"],
                                             QueueScriptTemplates["MACE(PBC)"],
+                                            SymmetrizeUnitCell)
+        if "DFTB+MBD" in MethodsPBC:
+            mbe_automation.inputs.dftb.Make(directory_structure.INP_DIRS,
+                                            directory_structure.XYZ_DIRS,
+                                            directory_structure.CSV_DIRS["DFTB+MBD(PBC)"],
+                                            directory_structure.ROOT_DIR,
+                                            directory_structure.PLOT_DIRS["DFTB+MBD(PBC)"],
+                                            InputTemplates["DFTB+MBD(PBC)"],
+                                            QueueScriptTemplates["DFTB+MBD(PBC)"],
                                             SymmetrizeUnitCell)
             
         DataAnalysisPath = os.path.join(ProjectDirectory, "DataAnalysis_HF(PBC).py")

@@ -1,6 +1,9 @@
 import mbe_automation.vibrations.harmonic
 import mbe_automation.structure.relax
+import mbe_automation.kpoints
 from ase.units import kJ, mol
+import numpy as np
+import ase.build
 import sys
 import matplotlib.pyplot as plt
 import phonopy.units
@@ -18,31 +21,16 @@ def thermodynamic(
         SupercellDisplacement=0.01,
         PreserveSpaceGroup=True):
 
-    print("")
     print("Thermodynamic properties")
-    NAtoms = len(Molecule)
-    if len(UnitCell) % NAtoms != 0:
-        print("Invalid number of atoms in the unit cell: cannot determine the number of molecules")
-        sys.exit(1)
-    NMoleculesPerCell = len(UnitCell) // NAtoms
-    print(f"Molecules per cell: {NMoleculesPerCell}")
-
-    Molecule.calc = Calculator
-    UnitCell.calc = Calculator
-    MoleculeEnergy = Molecule.get_potential_energy()
-    CellEnergy = UnitCell.get_potential_energy()
-    LatticeEnergy_NoOpt = (CellEnergy/NMoleculesPerCell - MoleculeEnergy) / (kJ/mol)
-
+    
+    LatticeEnergy_NoOpt = StaticLatticeEnergy(UnitCell, Molecule, Calculator, SupercellRadius)
     RelaxedMolecule = mbe_automation.structure.relax.isolated_molecule(Molecule, Calculator)
     RelaxedUnitCell = mbe_automation.structure.relax.atoms_and_cell(
         UnitCell,
         Calculator,
         preserve_space_group=PreserveSpaceGroup,
         constant_volume=ConstantVolume)
-
-    RelaxedMoleculeEnergy = RelaxedMolecule.get_potential_energy()
-    RelaxedCellEnergy = RelaxedUnitCell.get_potential_energy()
-    LatticeEnergy_Opt = (RelaxedCellEnergy/NMoleculesPerCell - RelaxedMoleculeEnergy) / (kJ/mol)
+    LatticeEnergy_Opt = StaticLatticeEnergy(RelaxedUnitCell, RelaxedMolecule, Calculator, SupercellRadius)
 
     MeshRadius = 100.0
     thermodynamic_functions, dos = mbe_automation.vibrations.harmonic.phonopy(
@@ -93,3 +81,25 @@ def thermodynamic(
     print(f"{'static lattice energy (relaxed coords)':40} {LatticeEnergy_Opt:.6f}")
 
 
+def StaticLatticeEnergy(UnitCell, Molecule, Calculator, SupercellRadius=None):
+    if SupercellRadius:
+        Dims = np.array(mbe_automation.kpoints.RminSupercell(UnitCell, SupercellRadius))
+        Cell = ase.build.make_supercell(UnitCell, np.diag(Dims))
+    else:
+        Cell = UniCell.copy()
+    Cell.calc = Calculator
+    Molecule.calc = Calculator    
+    NAtoms = len(Molecule)
+    if len(Cell) % NAtoms != 0:
+        print("Invalid number of atoms in the simulation cell: cannot determine the number of molecules")
+        sys.exit(1)
+    NMoleculesPerCell = len(Cell) // NAtoms
+    if SupercellRadius:
+        print(f"Static lattice energy: Γ-point, {Dims[0]}×{Dims[1]}×{Dims[2]} supercell with {NMoleculesPerCell} molecules")
+    else:
+        print(f"Static lattice energy: Γ-point, unit cell with {NMoleculesPerCell} molecules")
+
+    MoleculeEnergy = Molecule.get_potential_energy()
+    CellEnergy = Cell.get_potential_energy()
+    LatticeEnergy = (CellEnergy/NMoleculesPerCell - MoleculeEnergy) / (kJ/mol)
+    return LatticeEnergy
