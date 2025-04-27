@@ -12,7 +12,9 @@ import os.path
 def thermodynamic(
         UnitCell,
         Molecule,
-        Calculator,
+        Calc_Molecule,
+        Calc_UnitCell,
+        Calc_SuperCell,
         Temperatures,
         ConstantVolume=True,
         CSV_Dir="",
@@ -23,19 +25,21 @@ def thermodynamic(
 
     print("Thermodynamic properties")
     
-    LatticeEnergy_NoOpt = StaticLatticeEnergy(UnitCell, Molecule, Calculator, SupercellRadius)
-    RelaxedMolecule = mbe_automation.structure.relax.isolated_molecule(Molecule, Calculator)
+    LatticeEnergy_NoOpt = StaticLatticeEnergy(UnitCell, Molecule,
+                                              Calc_Molecule, Calc_UnitCell, SupercellRadius)
+    RelaxedMolecule = mbe_automation.structure.relax.isolated_molecule(Molecule, Calc_Molecule)
     RelaxedUnitCell = mbe_automation.structure.relax.atoms_and_cell(
         UnitCell,
-        Calculator,
+        Calc_UnitCell,
         preserve_space_group=PreserveSpaceGroup,
         constant_volume=ConstantVolume)
-    LatticeEnergy_Opt = StaticLatticeEnergy(RelaxedUnitCell, RelaxedMolecule, Calculator, SupercellRadius)
+    LatticeEnergy_Opt = StaticLatticeEnergy(RelaxedUnitCell, RelaxedMolecule,
+                                            Calc_Molecule, Calc_UnitCell, SupercellRadius)
 
     MeshRadius = 100.0
     thermodynamic_functions, dos = mbe_automation.vibrations.harmonic.phonopy(
         RelaxedUnitCell,
-        Calculator,
+        Calc_SuperCell,
         Temperatures,
         SupercellRadius,
         SupercellDisplacement,
@@ -81,14 +85,14 @@ def thermodynamic(
     print(f"{'static lattice energy (relaxed coords)':40} {LatticeEnergy_Opt:.6f}")
 
 
-def StaticLatticeEnergy(UnitCell, Molecule, Calculator, SupercellRadius=None):
+def StaticLatticeEnergy(UnitCell, Molecule, Calc_Molecule, Calc_UnitCell, SupercellRadius=None):
     if SupercellRadius:
         Dims = np.array(mbe_automation.kpoints.RminSupercell(UnitCell, SupercellRadius))
         Cell = ase.build.make_supercell(UnitCell, np.diag(Dims))
     else:
         Cell = UniCell.copy()
-    Cell.calc = Calculator
-    Molecule.calc = Calculator    
+    Cell.calc = Calc_UnitCell
+    Molecule.calc = Calc_Molecule    
     NAtoms = len(Molecule)
     if len(Cell) % NAtoms != 0:
         print("Invalid number of atoms in the simulation cell: cannot determine the number of molecules")

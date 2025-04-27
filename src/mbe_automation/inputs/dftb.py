@@ -7,7 +7,7 @@ import os
 import numpy as np
 
 def Make(InpDirs, XYZDirs, CSV_Dir, Root_Dir, Plot_Dir, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
-    Method = "DFTB+MBD(PBC)"
+    Method = "DFTB(PBC)"
     Params_Dir = os.path.join(Root_Dir, "params", "dftb", "3ob-3-1", "skfiles")
     WithoutGhosts, WithGhosts = mbe_automation.directory_structure.FindMonomerXYZ(XYZDirs["monomers-supercell"])
     RelaxedMonomers, _ = mbe_automation.directory_structure.FindMonomerXYZ(XYZDirs["monomers-relaxed"])

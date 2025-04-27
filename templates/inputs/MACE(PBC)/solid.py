@@ -11,7 +11,7 @@ import mbe_automation.properties
 import torch
 torch.set_default_dtype(torch.float64)
 
-Calculator = mace.calculators.mace_off(model="medium")
+Calc = mace.calculators.mace_off(model="medium")
 SupercellRadius = 30.0 # Minimum point-periodic image distance in the supercell (Angstrom)
 SupercellDisplacement = 0.01 # Displacement in Cartesian coordinated to compute numerical derivatives
 XYZ_Solid = "{XYZ_Solid}"
@@ -37,7 +37,9 @@ Molecule = read(XYZ_Molecule)
 mbe_automation.properties.thermodynamic(
     UnitCell,
     Molecule,
-    Calculator,
+    Calc,
+    Calc,
+    Calc,
     Temperatures,
     ConstantVolume,
     CSV_Dir,
