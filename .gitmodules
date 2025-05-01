@@ -1,3 +1,6 @@
 [submodule "params/dftb/3ob-3-1"]
 	path = params/dftb/3ob-3-1
 	url = https://github.com/dftbparams/3ob.git
+[submodule "src/mbdf"]
+	path = src/mbdf
+	url = https://github.com/dkhan42/cMBDF.git
