@@ -1,12 +1,7 @@
 import numpy as np
-import ase.geometry
 import ase.io
-import ase.build
-import ase.spacegroup.symmetrize
-import ase.spacegroup.utils
-from ase import Atoms, neighborlist
+from ase import Atoms
 import scipy
-from scipy import sparse
 import os.path
 import math
 import itertools
@@ -14,206 +9,13 @@ import time
 import subprocess
 import shutil
 import mbe_automation.structure.compare as compare
+import mbe_automation.structure.clusters as clusters
+import mbe_automation.structure.crystal as crystal
+import mbe_automation.ml.descriptors as descriptors
+import mbe_automation.ml.data_clustering as data_clustering
 import sys
 import pymatgen.core
 import pymatgen.io.ase
-        
-def ClusterLabel(Constituents, NMonomers):
-    d = math.ceil(math.log(NMonomers, 10))
-    prefixes = {1:"monomer", 2:"dimer", 3:"trimer", 4:"tetramer"}
-    Label = prefixes[len(Constituents)] + "-" + "-".join([str(i).zfill(d) for i in Constituents])
-    return Label
-
-
-def PrintUnitCellParams(UnitCell):
-    La, Lb, Lc = UnitCell.cell.lengths()
-    alpha, beta, gamma = UnitCell.cell.angles()
-    volume = UnitCell.cell.volume
-    print("Lattice parameters")
-    print(f"a = {La:.4f} Å")
-    print(f"b = {Lb:.4f} Å")
-    print(f"c = {Lc:.4f} Å")
-    print(f"α = {alpha:.3f}°")
-    print(f"β = {beta:.3f}°")
-    print(f"γ = {gamma:.3f}°")
-    print(f"V = {volume:.4f} Å³")
-
-
-def WriteClusterXYZ(FilePath, Constituents, Monomers):
-    #
-    # Write an xyz file with a comment line (i.e., the second line in the file)
-    # which specifies the number of atoms in each monomer.
-    #
-    ClusterSize = len(Constituents)
-    N = [len(Monomers[i]) for i in Constituents]
-    if ClusterSize == 1:
-        s = ""
-    else:
-        s = " ".join(str(i) for i in N)
-        
-    xyz = open(FilePath, "w")
-    xyz.write(f"{sum(N)}\n")
-    xyz.write(f"{s}\n")
-    for i in Constituents:
-        M = Monomers[i]
-        for element, (x, y, z) in zip(M.symbols, M.positions):
-            xyz.write(f"{element:6} {x:16.8f} {y:16.8f} {z:16.8f} \n")
-    xyz.write("\n")
-    xyz.close()
-
-
-def IntermolecularDistance(MolA, MolB):
-    posA = MolA.get_positions()
-    posB = MolB.get_positions()
-    Rij = scipy.spatial.distance.cdist(posA, posB)
-    MinRij = np.min(Rij)
-    MaxRij = np.max(Rij)
-    AvRij = np.mean(Rij)
-    return MinRij, AvRij, MaxRij
-
-
-def GetSupercellDimensions(UnitCell, SupercellRadius):
-    #
-    #     Determine the size of the supercell according to
-    #     the SupercellRadius parameter.
-    #
-    #     SupercellRadius is the maximum intermolecular distance, R,
-    #     measured between a molecule in the central unit cell and
-    #     any molecule belonging to the supercell.
-    #
-    #     The supercell dimension Na x Nb x Nc is automatically determined
-    #     such that Na, Nb, Nc are the minimum values such that the following
-    #     is satisfied
-    #
-    #     Dq > Hq + 2 * R
-    #
-    #     where
-    #            Dq is the height of the supercell in the qth direction
-    #            Hq is the height of the unit cell in the qth direction
-    #             R is the maximum intermolecular distance 
-    #
-    #     In other words, R is the thickness of the layer of cells
-    #     added to the central unit cell in order to build the supercell.
-    #
-    LatticeVectors = UnitCell.get_cell()
-    Volume = UnitCell.cell.volume
-    #
-    # Extra layer of cells to prevent the worst-case scenario: the outermost molecule
-    # is within the cutoff radius R (defined as the minimum interatomic distance),
-    # but the covalent bonds go through the boundary of the cell.
-    #
-    Delta = 1
-    N = [0, 0, 0]
-    for i in range(3):
-        axb = np.cross(LatticeVectors[(i + 1) % 3, :], LatticeVectors[(i + 2) % 3, :])
-        #
-        # Volume of a parallelepiped = ||a x b|| ||c|| |Cos(gamma)|
-        # Here, h is the height in the a x b direction
-        #
-        h = Volume / np.linalg.norm(axb)
-        N[i] = 2 * (math.ceil(SupercellRadius / h)+Delta) + 1
-        
-    return N[0], N[1], N[2]
-
-
-def GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs):
-    if Cutoffs["ghosts"] >= Cutoffs["dimers"]:
-        print(f"Cutoff for ghosts ({Cutoffs['ghosts']} Å) must be smaller than cutoff for dimers ({Cutoffs['dimers']} Å)")
-        sys.exit(1)
-
-    Ghosts = Atoms()
-    Rmax = Cutoffs["ghosts"]
-    posA = Monomers[Reference].get_positions()
-    for M in MonomersWithinCutoff["dimers"]:
-        MonomerB = Monomers[M]
-        if MinRij[Reference, M] < Rmax:
-            posB = MonomerB.get_positions()
-            Rij = scipy.spatial.distance.cdist(posA, posB)
-            columns_below_cutoff = np.where(np.any(Rij < Rmax, axis=0))[0]
-            selected_atoms = MonomerB[columns_below_cutoff]
-            Ghosts.extend(selected_atoms)
-            
-    return Ghosts
-
-
-def GenerateMonomers(UnitCell, Na, Nb, Nc):
-    Supercell = ase.build.make_supercell(UnitCell, np.diag(np.array([Na, Nb, Nc])))
-    BondCutoffs = neighborlist.natural_cutoffs(Supercell)
-    NeighborList = neighborlist.build_neighbor_list(Supercell, BondCutoffs)
-    ConnectivityMatrix = NeighborList.get_connectivity_matrix(sparse=True)
-    NMolecules, MoleculeIndices = sparse.csgraph.connected_components(ConnectivityMatrix)
-    NAtoms = len(MoleculeIndices)
-    print(f"Supercell: {Na}×{Nb}×{Nc}, includes {NAtoms} atoms")
-    print("Supercell vectors")
-    for q in range(3):
-        x, y, z = Supercell.cell[q]
-        v = ("a", "b", "c")[q]
-        print(f"{v} = [{x:10.3f}, {y:10.3f}, {z:10.3f}]")
-    #
-    # Find molecules for which no bond goes through
-    # the boundary of the supercell
-    #
-    Monomers = []
-    for m in range(NMolecules):
-        ConstituentAtoms = np.where(MoleculeIndices == m)[0]
-        #
-        # If any bond goes through the boundary of the supercell,
-        # this will be evident from nonzero vector Offsets,
-        # which contains the lattice vector multipliers
-        #
-        WholeMolecule = True
-        for a in ConstituentAtoms:
-            Neighbors, Offsets = NeighborList.get_neighbors(a)
-            for x in Offsets:
-                if np.count_nonzero(x) > 0:
-                    WholeMolecule = False
-                    break
-            if not WholeMolecule:
-                break
-        if WholeMolecule:
-            Molecule = Atoms()
-            for a in ConstituentAtoms:
-                Molecule.append(Supercell[a])
-            Monomers.append(Molecule)
-                
-    print(f"{len(Monomers)} monomers with all atoms within the supercell")
-    return Monomers
-
-
-def DetermineSpaceGroupSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-2):
-    print("Unit cell symmetry")
-    print(f"{'Threshold':<20}{'Hermann-Mauguin symbol':<30}{'Spacegroup number':<20}")
-    PrecisionThresholds = [1.0E-6, 1.0E-5, 1.0E-4, 1.0E-3, 1.0E-2, 1.0E-1]
-    for i, precision in enumerate(PrecisionThresholds):
-        spgdata = ase.spacegroup.symmetrize.check_symmetry(UnitCell, symprec=precision)
-        SymmetryIndex = spgdata.number
-        HMSymbol = spgdata.international
-        print(f"{precision:<20.6f}{HMSymbol:<30}{SymmetryIndex:<20}")
-        if i == 0:
-            HMSymbol_Input = HMSymbol
-
-    print(f"Symmetry refinement using spglib")
-    print(f"Sci. Technol. Adv. Mater. Meth. 4, 2384822 (2024);")
-    print(f"doi: 10.1080/27660400.2024.2384822")
-    print(f"Symmetrization threshold: {SymmetrizationThresh}")
-    SymmetrizedUnitCell = UnitCell.copy()
-    spgdata = ase.spacegroup.symmetrize.refine_symmetry(SymmetrizedUnitCell, symprec=SymmetrizationThresh)
-    HMSymbol_Symmetrized = spgdata.international
-    if HMSymbol_Symmetrized != HMSymbol_Input:
-        print(f"Symmetry refinement: {HMSymbol_Input} (input) -> {HMSymbol_Symmetrized} (symmetrized)")
-        SymmetryChanged = True
-    else:
-        print(f"Symmetry refinement did not change the space group")
-        SymmetryChanged = False
-    UnitCellXYZ = os.path.join(XYZDirs["unitcell"], "input_unit_cell.xyz")
-    UnitCell.write(UnitCellXYZ)
-    print(f"Input unit cell stored in {UnitCellXYZ}")
-    if SymmetryChanged:
-        SymmUnitCellXYZ = os.path.join(XYZDirs["unitcell"], "symmetrized_unit_cell.xyz")
-        SymmetrizedUnitCell.write(SymmUnitCellXYZ)    
-        print(f"Symmetrized unit cell stored in {SymmUnitCellXYZ}")
-    return SymmetrizedUnitCell, SymmetryChanged
-
     
 def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmbedding,
          RelaxedMonomerXYZ, Ordering, ProjectDir, XYZDirs, CSVDirs, Methods,
@@ -246,13 +48,13 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
         UnitCell = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
     else:
         UnitCell = ase.io.read(UnitCellFile)
-    SymmetrizedUnitCell, SymmetryChanged = DetermineSpaceGroupSymmetry(UnitCell, XYZDirs)
+    SymmetrizedUnitCell, SymmetryChanged = crystal.DetermineSpaceGroupSymmetry(UnitCell, XYZDirs)
     if SymmetrizeUnitCell and SymmetryChanged:
         print("Molecular clusters will be generated using symmetrized unit cell")
         UnitCell = SymmetrizedUnitCell
     else:
         print("Molecular clusters will be generated using input unit cell")    
-    PrintUnitCellParams(UnitCell)    
+    crystal.PrintUnitCellParams(UnitCell)    
     #
     # Determine the supercell size consistent
     # with the requested cutoff radii for clusters.
@@ -266,14 +68,24 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     for ClusterType in RequestedClusterTypes:
         if Cutoffs[ClusterType] > SupercellRadius:
             SupercellRadius = Cutoffs[ClusterType]
-    Na, Nb, Nc = GetSupercellDimensions(UnitCell, SupercellRadius)
+    Na, Nb, Nc = clusters.GetSupercellDimensions(UnitCell, SupercellRadius)
     #
     # List of molecules for which all atoms are
     # contained within the supercell and no covalent
     # bonds go throught the boundary
     #
-    Molecules = GenerateMonomers(UnitCell, Na, Nb, Nc)
+    Molecules = clusters.GenerateMonomers(UnitCell, Na, Nb, Nc)
     NMolecules = len(Molecules)
+    MonomerDescriptors = descriptors.global_MBDF(Molecules)
+    UniqueDescriptors = data_clustering.Hierarchical(MonomerDescriptors, threshold=1.0E-5)
+    NUniqueMolecules = UniqueDescriptors["n_clusters"]
+    print(f"Molecules in the supercell: {NMolecules}")
+    print(f"Symmetry-unique molecules in the supercell: {NUniqueMolecules}")
+    #
+    # Create a supercell which contains only whole molecules, i.e.,
+    # cleaned from all molecules which have at least one atom outside
+    # of the supercell
+    #
     Supercell = Atoms()
     for M in Molecules:
         Supercell.extend(M)
@@ -308,9 +120,9 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     # Write the xyz's of monomers in the supercell
     #
     Reference = 0
-    Label = ClusterLabel([Reference], NMonomers)
+    Label = clusters.Label([Reference], NMonomers)
     FilePath = os.path.join(XYZDirs["monomers-supercell"], f"{Label}.xyz")
-    WriteClusterXYZ(FilePath, [Reference], Monomers)
+    clusters.WriteClusterXYZ(FilePath, [Reference], Monomers)
     #
     # Write the xyz's of the relaxed monomers if the relaxation term is requested.
     #
@@ -327,9 +139,9 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
         # Name of the xyz file with a relaxed geometry is the same
         # as the corresponding monomer in the supercell.
         #
-        Label = ClusterLabel([Reference], NMonomers)
+        Label = clusters.Label([Reference], NMonomers)
         FilePath = os.path.join(XYZDirs["monomers-relaxed"], f"{Label}.xyz")
-        WriteClusterXYZ(FilePath, [Reference], RelaxedMonomers)
+        clusters.WriteClusterXYZ(FilePath, [Reference], RelaxedMonomers)
     #
     # Distances between monomers
     #
@@ -343,7 +155,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     Reference = 0
     MonomersWithinCutoff = {"dimers":[], "trimers":[], "tetramers":[]}
     for i in range(NMonomers):
-        a, b, c = IntermolecularDistance(Monomers[i], Monomers[Reference])
+        a, b, c = clusters.IntermolecularDistance(Monomers[i], Monomers[Reference])
         MinRij[i, Reference] = a
         MinRij[Reference, i] = a
         AvRij[i, Reference] = b
@@ -376,9 +188,9 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     if PBCEmbedding:
         if Cutoffs["ghosts"] < Cutoffs["dimers"]:
             print(f"Searching for ghost atoms within {Cutoffs['ghosts']} Å from the reference molecule")
-            Ghosts = GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs)
+            Ghosts = clusters.GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs)
             print(f"Found {len(Ghosts)} ghost atoms")
-            Label = ClusterLabel([Reference], NMonomers)
+            Label = clusters.Label([Reference], NMonomers)
             FilePath = os.path.join(XYZDirs["monomers-supercell"], f"{Label}+ghosts.xyz")
             Reference_Plus_Ghosts = Monomers[Reference] + Ghosts
             Reference_Plus_Ghosts.write(FilePath)
@@ -397,7 +209,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     if ClusterType:
         for j in MonomersWithinCutoff[ClusterType]:
             for i in MonomersWithinCutoff[ClusterType]:
-                a, b, c = IntermolecularDistance(Monomers[i], Monomers[j])
+                a, b, c = clusters.IntermolecularDistance(Monomers[i], Monomers[j])
                 MinRij[i, j] = a
                 MinRij[j, i] = a
                 AvRij[i, j] = b
@@ -506,7 +318,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
                 if Unique:
                     Cluster = {}
                     Cluster["Atoms"] = Molecule
-                    Cluster["Label"] = ClusterLabel(Constituents, NMonomers)
+                    Cluster["Label"] = clusters.Label(Constituents, NMonomers)
                     if ClusterComparisonAlgorithm == "MBTR":
                         Cluster["MBTR"] = MBTR
                     if n >= 3:
@@ -550,7 +362,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
             Constituents = C["Constituents"]
             Dir = XYZDirs[ClusterType]
             FilePath = os.path.join(f"{Dir}", f"{Label}.xyz")
-            WriteClusterXYZ(FilePath, Constituents, Monomers)
+            clusters.WriteClusterXYZ(FilePath, Constituents, Monomers)
             Col1 = Prefix
             Col2 = str(C["Replicas"])
             R1, R2, R3 = C["SumAvRij"], C["MaxMinRij"], C["MaxCOMRij"]
