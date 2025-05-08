@@ -11,5 +11,6 @@ scikit-learn
 spglib
 seekpath
 phonopy
-
+tqdm
+joblib
 
