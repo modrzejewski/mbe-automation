@@ -20,7 +20,8 @@ def Hierarchical(descriptors, threshold=None):
     """
     X = np.array(descriptors)
     print(f"Analyzing {X.shape[0]} molecules with {X.shape[1]}-dimensional feature vectors")
-    print(f"Hierarchical data clustering with distance threshold {threshold:.6f}")
+    print(f"Algorithm: hierarchical agglomerative clustering")
+    print(f"Max distance between feature vectors in the same cluster: {threshold:.6f}")
     
     # Perform single-linkage clustering
     Z = linkage(X, method='single')    
