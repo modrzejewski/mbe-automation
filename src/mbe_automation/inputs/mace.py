@@ -6,7 +6,7 @@ import sys
 import os
 import numpy as np
 
-def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
+def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
     Method = "MACE(PBC)"
         
     WithoutGhosts, WithGhosts = mbe_automation.directory_structure.FindMonomerXYZ(XYZDirs["monomers-supercell"])
@@ -35,6 +35,7 @@ def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, InputTemplates, QueueTemplate, Sym
         ),
         "CSV_Dir": os.path.relpath(CSV_Dir, PBCJobDir),
         "Plot_Dir": os.path.relpath(Plot_Dir, PBCJobDir),
+        "Training_Dir": os.path.relpath(ML_Dirs["training"], PBCJobDir),
         "TITLE" : "MACE(PBC)/solid",
         "INP_SCRIPT" : "solid.py",
         "LOG_FILE" : "solid.log"

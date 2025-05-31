@@ -8,6 +8,7 @@ import time
 import mace.calculators
 import sys
 import mbe_automation.properties
+import mbe_automation.ml.training_data
 import torch
 torch.set_default_dtype(torch.float64)
 
@@ -18,8 +19,12 @@ XYZ_Solid = "{XYZ_Solid}"
 XYZ_Molecule = "{XYZ_Molecule}"
 CSV_Dir = "{CSV_Dir}"
 Plots_Dir = "{Plot_Dir}"
+Training_Dir = "{Training_Dir}"
 Temperatures=np.arange(0, 401, 1)
 ConstantVolume = True
+
+HarmonicProperties = True
+MolecularDynamics = True
 
 print("Calculations with MACE")
 print(f"Coordinates (crystal structure): {{XYZ_Solid}}")
@@ -34,16 +39,22 @@ Plots_Dir = os.path.join(WorkDir, Plots_Dir)
 UnitCell = read(XYZ_Solid)
 Molecule = read(XYZ_Molecule)
 
-mbe_automation.properties.thermodynamic(
-    UnitCell,
-    Molecule,
-    Calc,
-    Calc,
-    Calc,
-    Temperatures,
-    ConstantVolume,
-    CSV_Dir,
-    Plots_Dir,
-    SupercellRadius,
-    SupercellDisplacement)
+if MolecularDynamics:
+    mbe_automation.ml.training_data.md_supercells()
+
+if HarmonicProperties:
+    mbe_automation.properties.thermodynamic(
+        UnitCell,
+        Molecule,
+        Calc,
+        Calc,
+        Calc,
+        Temperatures,
+        ConstantVolume,
+        CSV_Dir,
+        Plots_Dir,
+        SupercellRadius,
+        SupercellDisplacement)
+
+
 

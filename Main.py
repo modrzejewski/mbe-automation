@@ -87,7 +87,7 @@ RelaxedMonomerXYZ   = "./Systems/X23/05_anthracene/molecule.xyz"
                                                 #
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
-Cutoffs = {"dimers": 30.0,
+Cutoffs = {"dimers": 10.0,
            "trimers": 15.0,      
            "tetramers": 10.0,
            "ghosts": 4.0

@@ -115,6 +115,7 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                                             directory_structure.XYZ_DIRS,
                                             directory_structure.CSV_DIRS["MACE(PBC)"],
                                             directory_structure.PLOT_DIRS["MACE(PBC)"],
+                                            directory_structure.ML_DIRS["MACE(PBC)"],
                                             InputTemplates["MACE(PBC)"],
                                             QueueScriptTemplates["MACE(PBC)"],
                                             SymmetrizeUnitCell)
