@@ -2,7 +2,7 @@ import sys
 
 class ReplicatedOutput:
     def __init__(self, filename):
-        self.file = open(filename, 'w')
+        self.file = open(filename, 'w', encoding='utf-8')
         self.stdout = sys.stdout  # Original stdout
 
     def write(self, message):

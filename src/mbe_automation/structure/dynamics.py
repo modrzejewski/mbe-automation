@@ -66,10 +66,10 @@ def propagate(init_conf,
     #
     time_relaxation_fs = 100.0
     dyn = Bussi(
-        atoms,
-        timestep=time_step_fs*units.fs,
+        init_conf,
+        timestep=time_step_fs*ase.units.fs,
         temperature_K=temp_target_K,
-        taut=time_relaxation_fs*units.fs
+        taut=time_relaxation_fs*ase.units.fs
     )
 
     energies = []
@@ -118,8 +118,8 @@ def propagate(init_conf,
     }
 
 
-def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50, 
-            temp_target_K=300.0, temperature_sigma=1.0, figsize=(10, 8),
+def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50.0, 
+            temp_target_K=298.15, time_equilibration_fs=5000, figsize=(10, 8),
             plot_file="md_analysis.png"):
     """
     Analyze molecular dynamics results and generate plots.
@@ -164,30 +164,29 @@ def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50,
     df['temp_avg'] = df['temperature'].rolling(window=window_points, center=True).mean()
     df['energy_avg'] = df['energy'].rolling(window=window_points, center=True).mean()
     df['temp_std'] = df['temperature'].rolling(window=window_points, center=True).std()
-    
-    # Detect equilibration if temperature_sigma is provided
-    equilibrium_indices = None
-    equilibrium_start_time = None
-    equilibrium_start_idx = None
-    
-    # Find first point where std deviation falls below threshold
-    equilibrated_mask = df['temp_std'] < temperature_sigma
-    equilibrated_points = df[equilibrated_mask & df['temp_std'].notna()]
-        
+
+    # Time-based equilibration detection
+    equilibrated_mask = df['time'] >= time_equilibration_fs
+    equilibrated_points = df[equilibrated_mask]
+
     if len(equilibrated_points) > 0:
         equilibrium_start_idx = equilibrated_points.index[0]
         equilibrium_start_time = df.loc[equilibrium_start_idx, 'time']
         equilibrium_indices = df.index[equilibrium_start_idx:].tolist()
-        
-        print(f"Equilibration detected at t = {equilibrium_start_time:.0f} fs")
-        print(f"Temperature σ threshold: {temperature_sigma:.2f} K")
+    
+        print(f"Equilibration time reached at t = {equilibrium_start_time:.0f} fs")
+        print(f"Equilibration threshold: {time_equilibration_fs:.0f} fs")
         print(f"Equilibrium samples: {len(equilibrium_indices)} / {len(df)} total")
     else:
-        print(f"Warning: σ(T) < {temperature_sigma:.2f} K never reached within the window of {averaging_window_fs} fs")
+        print(f"Warning: Simulation shorter than equilibration time ({time_equilibration_fs:.0f} fs)")
         # Fall back to second half approach
         equilibrium_start_idx = len(df) // 2
         equilibrium_indices = df.index[equilibrium_start_idx:].tolist()
+    
+    max_time = df['time'].max()
+    print(f"Using fallback: second half of simulation (t > {max_time/2:.0f} fs)")
 
+    
     # Calculate some summary statistics using equilibrium samples
     eq_temp_avg = df.loc[equilibrium_indices, 'temperature'].mean()
     eq_temp_std = df.loc[equilibrium_indices, 'temperature'].std()
@@ -227,8 +226,7 @@ def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50,
     ax1.set_ylabel('Temperature (K)')
     ax1.legend()
     ax1.grid(True, alpha=0.3)
-    ax1.set_title('Molecular Dynamics Analysis')
-    
+
     # Lower panel: Energy
     ax2.plot(df['time'], df['energy'], alpha=0.7, color='lightblue', 
              linewidth=0.8, label='Instantaneous')
@@ -272,6 +270,7 @@ def sample_NVT(system,
                time_step_fs=0.5,
                sampling_interval_fs=50,
                averaging_window_fs=5000,
+               time_equilibration_fs=5000,
                trajectory_file="md.traj",
                plot_file="md.png"
                ):
@@ -295,7 +294,6 @@ def sample_NVT(system,
                            time_total_fs,
                            time_step_fs,
                            sampling_interval_fs,
-                           friction=0.01,
                            trajectory_file=trajectory_file
                            )
     
@@ -303,7 +301,7 @@ def sample_NVT(system,
                     averaging_window_fs,
                     sampling_interval_fs, 
                     temp_target_K,
-                    temperature_sigma=1.0,
+                    time_equilibration_fs,
                     figsize=(10, 8),
                     plot_file=plot_file
                     )

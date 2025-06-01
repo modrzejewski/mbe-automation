@@ -14,7 +14,8 @@ def supercell_md(unit_cell,
                  time_total_fs=50000,
                  time_step_fs=0.5,
                  sampling_interval_fs=50,
-                 averaging_window_fs=5000
+                 averaging_window_fs=5000,
+                 time_equilibration_fs=5000
                  ):
     #
     # Redirect all print instructions to the log file. Apply buffer
@@ -37,6 +38,7 @@ def supercell_md(unit_cell,
                                                  time_step_fs,
                                                  sampling_interval_fs,
                                                  averaging_window_fs,
+                                                 time_equilibration_fs,
                                                  trajectory_file=os.path.join(training_dir, "supercell_md.traj"),
                                                  plot_file=os.path.join(training_dir, "supercell_md.png")
                                                  )
@@ -54,7 +56,8 @@ def molecule_md(molecule,
                 time_total_fs=50000,
                 time_step_fs=0.5,
                 sampling_interval_fs=50,
-                averaging_window_fs=5000
+                averaging_window_fs=5000,
+                time_equilibration_fs=5000
                 ):
     #
     # Redirect all print instructions to the log file. Apply buffer
@@ -72,6 +75,7 @@ def molecule_md(molecule,
                                                  time_step_fs,
                                                  sampling_interval_fs,
                                                  averaging_window_fs,
+                                                 time_equilibration_fs,
                                                  trajectory_file=os.path.join(training_dir, "molecule_md.traj"),
                                                  plot_file=os.path.join(training_dir, "molecule_md.png")
                                                  )

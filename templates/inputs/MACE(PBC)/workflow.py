@@ -27,7 +27,7 @@ Training_Dir = "{Training_Dir}"
 #
 # Molecular dynamics
 #
-Training_Crystal_MD = False
+Training_Crystal_MD = True
 Training_Molecule_MD = True
                                    #
                                    # Thermostat temperature. Equilibrium is detected
@@ -36,15 +36,16 @@ Training_Molecule_MD = True
                                    # threshold.
                                    #
 temperature_K = 298.15
-time_total_fs = 5000
+time_total_fs = 50000
 time_step_fs = 0.5
-sampling_interval_fs = 10
+sampling_interval_fs = 50
+time_equilibration_fs = 5000
                                    #
-                                   # Time window for computing running averages.
+                                   # Time window for the plot of running average T and E.
                                    # Should be long enough to average over characteristic
                                    # motions present in the system.
                                    #
-averaging_window_fs = 1000
+averaging_window_fs = 5000
 #
 # Parameters for thermodynamic properties
 # in the harmonic approximation
@@ -89,7 +90,8 @@ if Training_Molecule_MD:
         time_total_fs,
         time_step_fs,
         sampling_interval_fs,
-        averaging_window_fs
+        averaging_window_fs,
+        time_equilibration_fs
     )
     
 if Training_Crystal_MD:
@@ -102,7 +104,8 @@ if Training_Crystal_MD:
         time_total_fs,
         time_step_fs,
         sampling_interval_fs,
-        averaging_window_fs
+        averaging_window_fs,
+        time_equilibration_fs
     )
 
 if HarmonicProperties:
