@@ -29,7 +29,7 @@ Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)", "MACE(PBC)", "DFTB(PBC)"]
                                                 # a CIF file or a POSCAR file.
                                                 #
                                                 
-UnitCellFile        = "./Systems/X23/05_anthracene/solid.xyz"
+UnitCellFile        = "./Systems/X23/07_CO2/solid.xyz"
 
                                                 #
                                                 # Types of calculated systems. Allowed values:
@@ -59,7 +59,7 @@ SystemTypes         = ["monomers", "dimers", "bulk"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/05_anthracene/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/07_CO2/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
@@ -122,7 +122,7 @@ InputTemplates = {
         "molecule": "./templates/inputs/HF(PBC)/pyscf/molecule.py"
     },
     "MACE(PBC)": {
-        "solid": "./templates/inputs/MACE(PBC)/solid.py"
+        "workflow": "./templates/inputs/MACE(PBC)/workflow.py"
         },
     "DFTB(PBC)": {
         "solid": "./templates/inputs/DFTB(PBC)/solid.py"
@@ -157,7 +157,10 @@ QueueScriptTemplates = {
     "RPA":           "./templates/queue-scripts/Poznań/RPA.py",
     "LNO-CCSD(T)":   "./templates/queue-scripts/Poznań/MRCC.py",
     "HF(PBC)":       "./templates/queue-scripts/Poznań/PYSCF.py",
-    "MACE(PBC)":     "./templates/queue-scripts/Poznań/MACE.py",
+    "MACE(PBC)":     {
+        "GPU": "./templates/queue-scripts/Poznań/MACE-GPU.py",
+        "CPU": "./templates/queue-scripts/Poznań/MACE-CPU.py"
+    },
     "DFTB(PBC)":     "./templates/queue-scripts/Poznań/DFTB.py"
     }
                                                 #

@@ -18,7 +18,7 @@ def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemp
         UnitCellFile = a
     else:
         UnitCellFile = b
-    print(f"Unit cell for MACE(PBC) calculations: {UnitCellFile}")
+    print(f"Unit cell for MACE calculations: {UnitCellFile}")
 
     PBCJobDir = InpDirs[Method]
     os.makedirs(PBCJobDir, exist_ok=True)
@@ -36,22 +36,23 @@ def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemp
         "CSV_Dir": os.path.relpath(CSV_Dir, PBCJobDir),
         "Plot_Dir": os.path.relpath(Plot_Dir, PBCJobDir),
         "Training_Dir": os.path.relpath(ML_Dirs["training"], PBCJobDir),
-        "TITLE" : "MACE(PBC)/solid",
-        "INP_SCRIPT" : "solid.py",
-        "LOG_FILE" : "solid.log"
+        "TITLE" : "MACE",
+        "INP_SCRIPT" : "workflow.py",
+        "LOG_FILE" : "workflow.log"
     }
     
-    f = open(InputTemplates["solid"], "r")
+    f = open(InputTemplates["workflow"], "r")
     s = f.read()
     f.close()
     PBCInput = s.format(**PBCJobParams)
-    with open(os.path.join(PBCJobDir, "solid.py"), "w") as f:
+    with open(os.path.join(PBCJobDir, "workflow.py"), "w") as f:
         f.write(PBCInput)
-        
-    with open(QueueTemplate, "r") as f:
-        s = f.read()
-    PBCQueue = s.format(**PBCJobParams)
-    with open(os.path.join(PBCJobDir, "submit_solid.py"), "w") as f:
-        f.write(PBCQueue) 
+
+    for device in ["CPU", "GPU"]:
+        with open(QueueTemplate[device], "r") as f:
+            s = f.read()
+            PBCQueue = s.format(**PBCJobParams)
+            with open(os.path.join(PBCJobDir, f"submit_{device}.py"), "w") as f:
+                f.write(PBCQueue) 
 
 

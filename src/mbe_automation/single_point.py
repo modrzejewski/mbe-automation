@@ -5,28 +5,14 @@ import mbe_automation.inputs.mrcc
 import mbe_automation.inputs.pyscf
 import mbe_automation.inputs.mace
 import mbe_automation.inputs.dftb
+import mbe_automation.display
 from . import queue_scripts
 from . import directory_structure
 import os
 import os.path
 import stat
 import shutil
-import sys
-
-class ReplicatedOutput:
-    def __init__(self, filename):
-        self.file = open(filename, 'w')
-        self.stdout = sys.stdout  # Original stdout
-
-    def write(self, message):
-        self.stdout.write(message)  # Print to screen
-        self.file.write(message)    # Write to file
-        self.file.flush()
-
-    def flush(self):
-        self.stdout.flush()
-        self.file.flush()
-        
+import sys        
 
 def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                    Ordering, InputTemplates, QueueScriptTemplates,
@@ -57,7 +43,7 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
     # both displayed on screen and written to the log file.
     #
     SummaryFile = os.path.join(directory_structure.PROJECT_DIR, "input_preparation.txt")
-    sys.stdout = ReplicatedOutput(SummaryFile)
+    sys.stdout = mbe_automation.display.ReplicatedOutput(SummaryFile)
 
     if not UseExistingXYZ:
         mbe_automation.mbe.Make(UnitCellFile,

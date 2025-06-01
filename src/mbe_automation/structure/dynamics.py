@@ -6,11 +6,14 @@ from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.md.verlet import VelocityVerlet
 from ase.md.velocitydistribution import Stationary, ZeroRotation, MaxwellBoltzmannDistribution
 from ase.md.langevin import Langevin
+from ase.md.bussi import Bussi
 from ase.io import read, write
+from ase.io.trajectory import Trajectory
 import ase.units
 from ase.atoms import Atoms
 from ase.md.andersen import Andersen
 import mbe_automation.kpoints
+import mbe_automation.display
 import os.path
 
 def propagate(init_conf,
@@ -19,7 +22,7 @@ def propagate(init_conf,
               time_total_fs=50000,
               time_step_fs=0.5,
               sampling_interval_fs=50,
-              friction=0.01
+              trajectory_file="md.traj"
               ):
     #
     # Example of MD/PIMD run parameters for molecular crystals
@@ -32,7 +35,7 @@ def propagate(init_conf,
     #
     # total time for full simulation: 50 ps
     # total time for generation of training structures: 5 ps
-    # time step: 0.5 fs
+    # time step: 0.5 fs (should be good enough even for PIMD calculations)
     # sampling time: 50 fs
     #    
     np.random.seed(701)
@@ -42,32 +45,63 @@ def propagate(init_conf,
     Stationary(init_conf)
     ZeroRotation(init_conf)
 
-    dyn = Langevin(init_conf,
-                   timestep=time_step_fs * ase.units.fs,
-                   temperature_K=temp_target_K,
-                   friction=friction)
+    # friction=0.01, # units of the friction parameter are fs**(-1)
+    # dyn = Langevin(init_conf,
+    #                timestep=time_step_fs * ase.units.fs,
+    #                temperature_K=temp_target_K,
+    #                friction=friction / ase.units.fs)
+
+    #
+    # Bussi-Donadio-Parinello thermostat
+    # Bussi et al. J. Chem. Phys. 126, 014101 (2007);
+    # doi: 10.1063/1.2408420
+    #
+    # The relaxation time, tau, is the only parameter that
+    # needs to specified for this thermostat. The results
+    # should be almost independent of tau within the range
+    # 10s fs up to 1000 fs, see figs 3-5.
+    #
+    # Relaxation time tau=100.0 fs works well for water
+    # and ice, see Figure 4.
+    #
+    time_relaxation_fs = 100.0
+    dyn = Bussi(
+        atoms,
+        timestep=time_step_fs*units.fs,
+        temperature_K=temp_target_K,
+        taut=time_relaxation_fs*units.fs
+    )
 
     energies = []
     instantaneous_temperatures = []
-    structures = []
     sampling_times = []
     total_steps = round(time_total_fs/time_step_fs)
+    display_frequency = 1
     last_printed_percentage = 0
+    traj = Trajectory(trajectory_file, 'w', init_conf)
+
+    print(f"Simulation time: {time_total_fs:.0f} fs")
+    print(f"Sampling every {sampling_interval_fs} fs")
+    print(f"Time step for numerical propagation: {time_step_fs} fs")
+    print(f"Number of MD steps: {total_steps}")
 
     def sample():
         energies.append(dyn.atoms.get_potential_energy())
         instantaneous_temperatures.append(dyn.atoms.get_temperature())
         sampling_times.append(dyn.get_time() / ase.units.fs)
-        structures.append(dyn.atoms.copy())
+        traj.write(dyn.atoms)
+        
+        print(f"Time: {sampling_times[-1]:8.2f} fs | Temp: {instantaneous_temperatures[-1]:8.2f} K | "
+              f"Energy: {energies[-1]:10.4f} eV")
         #
         # Calculate and print progress
-        #
+        #        
         current_step = dyn.nsteps
         percentage = (current_step / total_steps) * 100
         nonlocal last_printed_percentage
-        if percentage >= last_printed_percentage + 10:
-            print(f"{int(percentage // 10) * 10}% of MD steps completed")
-            last_printed_percentage = int(percentage // 10) * 10
+        if percentage >= last_printed_percentage + display_frequency:
+            print(f"{int(percentage // display_frequency) * display_frequency}% of MD steps completed")
+            last_printed_percentage = int(percentage // display_frequency) * display_frequency
 
     dyn.attach(sample, interval=round(sampling_interval_fs/time_step_fs))
     t0 = time.time()
@@ -75,18 +109,18 @@ def propagate(init_conf,
     t1 = time.time()
 
     print(f"MD finished in {(t1 - t0) / 60:.2f} minutes")
+    print(f"Trajectory saved to {trajectory_file}")
 
     return {
         'energies': np.array(energies),
         'temperatures': np.array(instantaneous_temperatures),
-        'structures': structures,
         'times': np.array(sampling_times)
     }
 
 
 def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50, 
             temp_target_K=300.0, temperature_sigma=1.0, figsize=(10, 8),
-            plot_file="md_analysis.png")
+            plot_file="md_analysis.png"):
     """
     Analyze molecular dynamics results and generate plots.
     
@@ -230,16 +264,17 @@ def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50,
     return stats
 
 
-def sample_supercells(unit_cell,
-                      calculator,
-                      supercell_radius=30.0,
-                      temp_target_K=298.15,
-                      total_time_fs=50000,
-                      time_step_fs=0.5,
-                      sampling_interval_fs=50,
-                      averaging_window_fs=5000,
-                      plot_dir
-                      ):
+def sample_NVT(system,
+               calculator,
+               training_dir,
+               temp_target_K=298.15,
+               time_total_fs=50000,
+               time_step_fs=0.5,
+               sampling_interval_fs=50,
+               averaging_window_fs=5000,
+               trajectory_file="md.traj",
+               plot_file="md.png"
+               ):
     #
     # Example of MD/PIMD run parameters for molecular crystals
     # from the X23 data set
@@ -253,20 +288,15 @@ def sample_supercells(unit_cell,
     # total time for generation of training structures: 5 ps
     # time step: 0.5 fs
     # sampling time: 50 fs
-    #    
-    print("Molecular dynamics")
-    dims = np.array(mbe_automation.kpoints.RminSupercell(unit_cell, supercell_radius))
-    super_cell = ase.build.make_supercell(unit_cell, np.diag(dims))
-    print(f"Supercell radius: {supercell_radius:.1f}")
-    print(f"Supercell dims: {dims[0]}×{dims[1]}×{dims[2]}")
-    
-    md_results = propagate(super_cell,
+    #        
+    md_results = propagate(system,
                            temp_target_K,
                            calculator,
                            time_total_fs,
                            time_step_fs,
                            sampling_interval_fs,
-                           friction=0.01
+                           friction=0.01,
+                           trajectory_file=trajectory_file
                            )
     
     stats = analyze(md_results,
@@ -275,7 +305,9 @@ def sample_supercells(unit_cell,
                     temp_target_K,
                     temperature_sigma=1.0,
                     figsize=(10, 8),
-                    plot_file=os.path.join(training_dir, "md_analysis.png")
+                    plot_file=plot_file
                     )
     
     return md_results
+
+
