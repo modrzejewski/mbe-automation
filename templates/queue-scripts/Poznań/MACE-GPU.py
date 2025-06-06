@@ -4,10 +4,10 @@
 #SBATCH --partition=tesla
 #SBATCH --nodes 1      
 #SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-node=8
-#SBATCH --cpus-per-task=32
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00
-#SBATCH --mem=300gb
+#SBATCH --mem=180gb
 
 import os
 import os.path
@@ -17,8 +17,8 @@ import subprocess
 InpScript = "{INP_SCRIPT}"
 LogFile = "{LOG_FILE}"
 
-os.environ["OMP_NUM_THREADS"] = "32"
-os.environ["MKL_NUM_THREADS"] = "32"
+os.environ["OMP_NUM_THREADS"] = "8"
+os.environ["MKL_NUM_THREADS"] = "8"
 #
 # Set up virtual environment
 # Make sure that the environment works properly on the coputer nodes.

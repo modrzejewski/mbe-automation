@@ -2,19 +2,13 @@ import ase
 import os
 import numpy as np
 import time
-from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
-from ase.md.verlet import VelocityVerlet
 from ase.md.velocitydistribution import Stationary, ZeroRotation, MaxwellBoltzmannDistribution
 from ase.md.langevin import Langevin
 from ase.md.bussi import Bussi
-from ase.io import read, write
 from ase.io.trajectory import Trajectory
 import ase.units
-from ase.atoms import Atoms
-from ase.md.andersen import Andersen
 import mbe_automation.kpoints
 import mbe_automation.display
-import os.path
 
 def propagate(init_conf,
               temp_target_K,
@@ -22,7 +16,8 @@ def propagate(init_conf,
               time_total_fs=50000,
               time_step_fs=0.5,
               sampling_interval_fs=50,
-              trajectory_file="md.traj"
+              trajectory_file="md.traj",
+              random_seed=42
               ):
     #
     # Example of MD/PIMD run parameters for molecular crystals
@@ -38,8 +33,14 @@ def propagate(init_conf,
     # time step: 0.5 fs (should be good enough even for PIMD calculations)
     # sampling time: 50 fs
     #    
-    np.random.seed(701)
+    np.random.seed(random_seed)
     init_conf.calc = calc
+    
+    # Validate inputs
+    if time_step_fs > 2.0:
+        print("Warning: time step > 2 fs may be too large for accurate dynamics")
+    if sampling_interval_fs < time_step_fs:
+        raise ValueError("Sampling interval must be >= time_step_fs")
 
     MaxwellBoltzmannDistribution(init_conf, temperature_K=temp_target_K)
     Stationary(init_conf)
@@ -72,12 +73,16 @@ def propagate(init_conf,
         taut=time_relaxation_fs*ase.units.fs
     )
 
-    energies = []
+    e_total = []
+    e_potential = []
+    e_kinetic = []
+    NAtoms = len(init_conf)
     instantaneous_temperatures = []
     sampling_times = []
     total_steps = round(time_total_fs/time_step_fs)
-    display_frequency = 1
-    last_printed_percentage = 0
+    display_frequency = 5
+    milestones = [0]
+    milestones_time = [time.time()]
     traj = Trajectory(trajectory_file, 'w', init_conf)
 
     print(f"Simulation time: {time_total_fs:.0f} fs")
@@ -86,22 +91,26 @@ def propagate(init_conf,
     print(f"Number of MD steps: {total_steps}")
 
     def sample():
-        energies.append(dyn.atoms.get_potential_energy())
-        instantaneous_temperatures.append(dyn.atoms.get_temperature())
+        Epot = dyn.atoms.get_potential_energy()
+        Ekin = dyn.atoms.get_kinetic_energy()
+        Etot = Epot + Ekin
+        e_potential.append(Epot / NAtoms)
+        e_kinetic.append(Ekin / NAtoms)
+        e_total.append(Etot / NAtoms)
+        T = Ekin / (3.0/2.0 * NAtoms * ase.units.kB)
+        instantaneous_temperatures.append(T)
         sampling_times.append(dyn.get_time() / ase.units.fs)
-        traj.write(dyn.atoms)
-        
-        print(f"Time: {sampling_times[-1]:8.2f} fs | Temp: {instantaneous_temperatures[-1]:8.2f} K | "
-              f"Energy: {energies[-1]:10.4f} eV")
+        traj.write(dyn.atoms)        
         #
         # Calculate and print progress
         #        
         current_step = dyn.nsteps
         percentage = (current_step / total_steps) * 100
-        nonlocal last_printed_percentage
-        if percentage >= last_printed_percentage + display_frequency:
-            print(f"{int(percentage // display_frequency) * display_frequency}% of MD steps completed")
-            last_printed_percentage = int(percentage // display_frequency) * display_frequency
+        if percentage >= milestones[-1] + display_frequency:
+            milestones.append(int(percentage // display_frequency) * display_frequency)
+            milestones_time.append(time.time())
+            Δt = milestones_time[-1] - milestones_time[-2]
+            print(f"{sampling_times[-1]:.1E} fs | {int(percentage // display_frequency) * display_frequency:>3}% completed | Δt={Δt/60:.1E} min")
 
     dyn.attach(sample, interval=round(sampling_interval_fs/time_step_fs))
     t0 = time.time()
@@ -112,7 +121,9 @@ def propagate(init_conf,
     print(f"Trajectory saved to {trajectory_file}")
 
     return {
-        'energies': np.array(energies),
+        'total energies': np.array(e_total),
+        'kinetic energies': np.array(e_kinetic),
+        'potential energies' : np.array(e_potential),
         'temperatures': np.array(instantaneous_temperatures),
         'times': np.array(sampling_times)
     }
@@ -134,8 +145,8 @@ def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50.0,
         Sampling interval used in the simulation (fs)
     temp_target_K : float
         Target temperature to show as reference line
-    temperature_sigma : float
-        Maximum allowed temperature standard deviation for equilibrium detection (K)
+    time_equilibration_fs : float
+        Time needed for reaching equilibrium (fs)
     figsize : tuple
         Figure size for plots (width, height)
     plot_file : str
@@ -154,7 +165,9 @@ def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50.0,
     df = pd.DataFrame({
         'time': md_results['times'],
         'temperature': md_results['temperatures'],
-        'energy': md_results['energies']
+        'total energy': md_results['total energies'],
+        'kinetic energy': md_results['kinetic energies'],
+        'potential energy': md_results['potential energies'],
     })
     
     # Calculate running averages and standard deviations
@@ -162,7 +175,9 @@ def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50.0,
     print(f"Computing running averages with window of {window_points} points ({averaging_window_fs} fs)")
     
     df['temp_avg'] = df['temperature'].rolling(window=window_points, center=True).mean()
-    df['energy_avg'] = df['energy'].rolling(window=window_points, center=True).mean()
+    df['total_energy_avg'] = df['total energy'].rolling(window=window_points, center=True).mean()
+    df['kinetic_energy_avg'] = df['kinetic energy'].rolling(window=window_points, center=True).mean()
+    df['potential_energy_avg'] = df['potential energy'].rolling(window=window_points, center=True).mean()
     df['temp_std'] = df['temperature'].rolling(window=window_points, center=True).std()
 
     # Time-based equilibration detection
@@ -181,28 +196,26 @@ def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50.0,
         print(f"Warning: Simulation shorter than equilibration time ({time_equilibration_fs:.0f} fs)")
         # Fall back to second half approach
         equilibrium_start_idx = len(df) // 2
+        equilibrium_start_time = df.loc[equilibrium_start_idx, 'time']
         equilibrium_indices = df.index[equilibrium_start_idx:].tolist()
     
     max_time = df['time'].max()
-    print(f"Using fallback: second half of simulation (t > {max_time/2:.0f} fs)")
-
     
     # Calculate some summary statistics using equilibrium samples
     eq_temp_avg = df.loc[equilibrium_indices, 'temperature'].mean()
     eq_temp_std = df.loc[equilibrium_indices, 'temperature'].std()
-    eq_energy_avg = df.loc[equilibrium_indices, 'energy'].mean()
-    eq_energy_std = df.loc[equilibrium_indices, 'energy'].std()
-    
-    if temperature_sigma is not None and equilibrium_start_time is not None:
-        print(f"\nEquilibrium Statistics (from t = {equilibrium_start_time:.0f} fs onwards):")
-    else:
-        print(f"\nEquilibrium Statistics (last 50% of simulation):")
-    
-    if temp_target_K:
-        print(f"Temperature: {eq_temp_avg:.1f} ± {eq_temp_std:.1f} K (target: {temp_target_K} K)")
-    else:
-        print(f"Temperature: {eq_temp_avg:.1f} ± {eq_temp_std:.1f} K")
-    print(f"Energy: {eq_energy_avg:.4f} ± {eq_energy_std:.4f} eV")
+    eq_total_energy_avg = df.loc[equilibrium_indices, 'total energy'].mean()
+    eq_total_energy_std = df.loc[equilibrium_indices, 'total energy'].std()
+    eq_kinetic_energy_avg = df.loc[equilibrium_indices, 'kinetic energy'].mean()
+    eq_kinetic_energy_std = df.loc[equilibrium_indices, 'kinetic energy'].std()
+    eq_potential_energy_avg = df.loc[equilibrium_indices, 'potential energy'].mean()
+    eq_potential_energy_std = df.loc[equilibrium_indices, 'potential energy'].std()
+
+    print("Equilibrium averages")
+    print(f"Temperature: {eq_temp_avg:.1f} ± {eq_temp_std:.1f} K (target: {temp_target_K} K)")
+    print(f"Total energy: {eq_total_energy_avg:.4f} ± {eq_total_energy_std:.4f} eV/atom")
+    print(f"Kinetic energy: {eq_kinetic_energy_avg:.4f} ± {eq_kinetic_energy_std:.4f} eV/atom")
+    print(f"Potential energy: {eq_potential_energy_avg:.4f} ± {eq_potential_energy_std:.4f} eV/atom")
 
     # Create the plots
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
@@ -227,13 +240,19 @@ def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50.0,
     ax1.legend()
     ax1.grid(True, alpha=0.3)
 
-    # Lower panel: Energy
-    ax2.plot(df['time'], df['energy'], alpha=0.7, color='lightblue', 
-             linewidth=0.8, label='Instantaneous')
-    ax2.plot(df['time'], df['energy_avg'], color='darkblue', linewidth=2, 
-             label=f'Running avg ({averaging_window_fs} fs)')
+    # Lower panel: Energies (clean version with only running averages)
+    ax2.plot(df['time'], df['potential_energy_avg'] - eq_potential_energy_avg, 
+             color='darkblue', linewidth=2, label='Potential energy')
+    ax2.plot(df['time'], df['kinetic_energy_avg'] - eq_kinetic_energy_avg, 
+             color='darkred', linewidth=2, label='Kinetic energy')
+    ax2.plot(df['time'], df['total_energy_avg'] - eq_total_energy_avg, 
+             color='black', linewidth=2, linestyle='--', label='Total energy')
+
+    # Add zero reference line (represents equilibrium values)
+    ax2.axhline(y=0, color='gray', linestyle=':', alpha=0.5)
+
     ax2.set_xlabel('Time (fs)')
-    ax2.set_ylabel('Energy (eV)')
+    ax2.set_ylabel('Running average - Equilibrium average (eV/atom)')
     ax2.legend()
     ax2.grid(True, alpha=0.3)
     
@@ -244,27 +263,25 @@ def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50.0,
     plt.close()
     
     # Return computed statistics
-    stats = {
-        'temp_avg': df['temp_avg'].values,
-        'energy_avg': df['energy_avg'].values,
-        'temp_std_rolling': df['temp_std'].values,
-        'equilibrium_indices': equilibrium_indices,
-        'equilibrium_start_time': equilibrium_start_time,
-        'equilibrium_start_idx': equilibrium_start_idx,
-        'equilibrium_stats': {
-            'temp_mean': eq_temp_avg,
-            'temp_std': eq_temp_std,
-            'energy_mean': eq_energy_avg,
-            'energy_std': eq_energy_std
-        }
+    equilibrium_stats = {
+        'indices': equilibrium_indices,
+        'start time': equilibrium_start_time,
+        'start index': equilibrium_start_idx,
+        'temperature average': eq_temp_avg,
+        'temperature σ': eq_temp_std,
+        'potential energy average': eq_potential_energy_avg,
+        'potential energy σ': eq_potential_energy_std,
+        'kinetic energy average': eq_kinetic_energy_avg,
+        'kinetic energy σ': eq_kinetic_energy_std,
+        'total energy average': eq_total_energy_avg,
+        'total energy σ': eq_total_energy_std
     }
     
-    return stats
+    return equilibrium_stats
 
 
 def sample_NVT(system,
                calculator,
-               training_dir,
                temp_target_K=298.15,
                time_total_fs=50000,
                time_step_fs=0.5,
@@ -272,7 +289,8 @@ def sample_NVT(system,
                averaging_window_fs=5000,
                time_equilibration_fs=5000,
                trajectory_file="md.traj",
-               plot_file="md.png"
+               plot_file="md.png",
+               random_seed=42
                ):
     #
     # Example of MD/PIMD run parameters for molecular crystals
@@ -294,17 +312,18 @@ def sample_NVT(system,
                            time_total_fs,
                            time_step_fs,
                            sampling_interval_fs,
-                           trajectory_file=trajectory_file
+                           trajectory_file=trajectory_file,
+                           random_seed=random_seed
                            )
     
-    stats = analyze(md_results,
-                    averaging_window_fs,
-                    sampling_interval_fs, 
-                    temp_target_K,
-                    time_equilibration_fs,
-                    figsize=(10, 8),
-                    plot_file=plot_file
-                    )
+    equilibrium_stats = analyze(md_results,
+                                averaging_window_fs,
+                                sampling_interval_fs, 
+                                temp_target_K,
+                                time_equilibration_fs,
+                                figsize=(10, 8),
+                                plot_file=plot_file
+                                )
     
     return md_results
 

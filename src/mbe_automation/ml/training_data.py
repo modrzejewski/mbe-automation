@@ -32,7 +32,6 @@ def supercell_md(unit_cell,
     
     mbe_automation.structure.dynamics.sample_NVT(super_cell,
                                                  calculator,
-                                                 training_dir,
                                                  temperature_K,
                                                  time_total_fs,
                                                  time_step_fs,
@@ -67,9 +66,9 @@ def molecule_md(molecule,
     sys.stdout = mbe_automation.display.ReplicatedOutput(summary_file)
 
     mbe_automation.display.framed("Molecular dynamics (single molecule)")
+    print(f"{len(molecule)} atoms in the molecule")
     mbe_automation.structure.dynamics.sample_NVT(molecule,
                                                  calculator,
-                                                 training_dir,
                                                  temperature_K,
                                                  time_total_fs,
                                                  time_step_fs,
