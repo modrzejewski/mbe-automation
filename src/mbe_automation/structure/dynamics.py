@@ -325,6 +325,6 @@ def sample_NVT(system,
                                 plot_file=plot_file
                                 )
     
-    return md_results
+    return md_results, equilibrium_stats
 
 
