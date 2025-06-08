@@ -29,20 +29,37 @@ Training_Dir = "{Training_Dir}"
 #
 Training_MD = True
                                    #
-                                   # Thermostat temperature. Equilibrium is detected
-                                   # when the standard deviation sigma(T) within the
-                                   # averaging window falls below predefined
-                                   # threshold.
+                                   # Thermostat temperature
                                    #
 temperature_K = 298.15
-time_total_fs = 50000
-time_step_fs = 0.5
-sampling_interval_fs = 50
+                                   #
+                                   # Time after which the system is assumed
+                                   # to reach thermal equilibrium. Structures
+                                   # are extracted from the trajectory only
+                                   # for t > time_equilibration_fs.
+                                   #
 time_equilibration_fs = 5000
                                    #
+                                   # Total time of the MD simulation including
+                                   # the equilibration time.
+                                   #
+time_total_fs = 50000
+                                   #
+                                   # Time step for numerical propagation.
+                                   # Typical values should be in the range
+                                   # of (0.5, 1.0) fs.
+                                   #
+time_step_fs = 0.5
+                                   #
+                                   # Intervals for trajectory sampling.
+                                   # Too small interval doesn't improve
+                                   # the sampling quality because
+                                   # the structures are too correlated.
+                                   #
+sampling_interval_fs = 50
+                                   #
                                    # Time window for the plot of running average T and E.
-                                   # Should be long enough to average over characteristic
-                                   # motions present in the system.
+                                   # Used only for data visualization.
                                    #
 averaging_window_fs = 5000
 #

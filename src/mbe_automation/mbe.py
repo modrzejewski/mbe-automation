@@ -11,8 +11,8 @@ import shutil
 import mbe_automation.structure.compare as compare
 import mbe_automation.structure.clusters as clusters
 import mbe_automation.structure.crystal as crystal
-import mbe_automation.ml.descriptors.MACE
-import mbe_automation.ml.descriptors.MBDF
+import mbe_automation.ml.descriptors.mace
+import mbe_automation.ml.descriptors.mbdf
 import mbe_automation.ml.descriptors.generic
 import mbe_automation.ml.data_clustering as data_clustering
 import sys
@@ -79,19 +79,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     #
     Molecules = clusters.GenerateMonomers(UnitCell, Na, Nb, Nc)
     NMolecules = len(Molecules)
-    # MACE_Calc = mace.calculators.mace_off(model="small")
-    # AtomicDescriptors, _, Reference_stats = mbe_automation.ml.descriptors.MACE.atomic([UnitCell],
-    #                                                                                   MACE_Calc)
-    # AtomicDescriptors, atomic_numbers, _, _ = mbe_automation.ml.descriptors.MACE.normalized_atomic(Molecules,
-    #                                                                                                MACE_Calc,
-    #                                                                                                Reference_stats)
-    # MonomerDescriptors = mbe_automation.ml.descriptors.generic.normalized_global(AtomicDescriptors, atomic_numbers)
-    # stats = descriptors.statistics(MonomerDescriptors)
-    # MonomerDescriptors = descriptors.global_MACE(Molecules[0:100], MACE_Calc)
-    # UniqueDescriptors = data_clustering.Hierarchical(MonomerDescriptors, threshold=1.0E-5)
-    # NUniqueMolecules = UniqueDescriptors["n_clusters"]
     print(f"Molecules in the supercell: {NMolecules}")
-    # print(f"Symmetry-unique molecules in the supercell: {NUniqueMolecules}")
     #
     # Create a supercell which contains only whole molecules, i.e.,
     # cleaned from all molecules which have at least one atom outside
