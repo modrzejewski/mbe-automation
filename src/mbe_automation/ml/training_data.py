@@ -12,6 +12,129 @@ import h5py
 import os
 import math
 
+def visualize_hdf5(hdf5_dataset):
+    """
+    Print ASCII tree visualization of HDF5 dataset structure.
+    
+    Parameters:
+    -----------
+    hdf5_dataset : str
+        Path to HDF5 file
+    """
+    if not os.path.exists(hdf5_dataset):
+        print(f"Error: File {hdf5_dataset} not found")
+        return
+    
+    def print_attrs(obj, indent=""):
+        """Print attributes of HDF5 object"""
+        if obj.attrs:
+            print(f"{indent}└── @attributes:")
+            for i, (key, value) in enumerate(obj.attrs.items()):
+                connector = "├──" if i < len(obj.attrs) - 1 else "└──"
+                print(f"{indent}    {connector} {key}: {value}")
+    
+    def print_tree(name, obj, indent="", is_last=True):
+        """Recursively print HDF5 tree structure"""
+        connector = "└──" if is_last else "├──"
+        
+        if isinstance(obj, h5py.Dataset):
+            # Print dataset with shape
+            print(f"{indent}{connector} {name}{'/':<25} # {obj.shape} - {obj.dtype}")
+        else:
+            # Print group
+            print(f"{indent}{connector} {name}/")
+            
+            # Get all items in this group
+            items = list(obj.items())
+            
+            # Print datasets first, then attributes
+            for i, (key, item) in enumerate(items):
+                is_last_item = (i == len(items) - 1)
+                next_indent = indent + ("    " if is_last else "│   ")
+                print_tree(key, item, next_indent, is_last_item)
+            
+            # Print attributes after datasets
+            if obj.attrs:
+                next_indent = indent + ("    " if is_last else "│   ")
+                print_attrs(obj, next_indent)
+    
+    try:
+        with h5py.File(hdf5_dataset, 'r') as f:
+            print(f"{os.path.basename(hdf5_dataset)}")
+            
+            # Get root level items
+            items = list(f.items())
+            
+            for i, (name, obj) in enumerate(items):
+                is_last = (i == len(items) - 1)
+                print_tree(name, obj, "", is_last)
+            
+            # Print root attributes if any
+            if f.attrs:
+                print_attrs(f, "")
+                
+    except Exception as e:
+        print(f"Error reading HDF5 file: {e}")
+
+
+def summarize_hdf5(hdf5_dataset):
+    """
+    Print summary statistics of HDF5 dataset.
+    
+    Parameters:
+    -----------
+    hdf5_dataset : str
+        Path to HDF5 file
+    """
+    if not os.path.exists(hdf5_dataset):
+        print(f"Error: File {hdf5_dataset} not found")
+        return
+    
+    try:
+        file_size = os.path.getsize(hdf5_dataset) / (1024**2)  # MB
+        print(f"\nFile: {hdf5_dataset}")
+        print(f"Size: {file_size:.2f} MB")
+        
+        with h5py.File(hdf5_dataset, 'r') as f:
+            print(f"\nDataset Summary:")
+            
+            system_types = []
+            for name in f.keys():
+                if name == 'clusters':
+                    cluster_types = list(f['clusters'].keys())
+                    system_types.extend([f"clusters/{ct}" for ct in cluster_types])
+                else:
+                    system_types.append(name)
+            
+            for system_type in system_types:
+                if system_type.startswith('clusters/'):
+                    group = f['clusters'][system_type.split('/')[1]]
+                    path = system_type
+                else:
+                    group = f[system_type]
+                    path = system_type
+                
+                if 'n_frames' in group.attrs:
+                    n_frames = group.attrs['n_frames']
+                    n_atoms = group.attrs['n_atoms']
+                    periodic = group.attrs.get('periodic', False)
+                    has_descriptors = 'feature_vectors' in group
+                    has_normalized = 'normalized_feature_vectors' in group
+                    
+                    print(f"  {path}:")
+                    print(f"    Structures: {n_frames} × {n_atoms} atoms")
+                    print(f"    Periodic: {periodic}")
+                    print(f"    MACE descriptors: {has_descriptors}")
+                    print(f"    Normalized: {has_normalized}")
+                    
+                    if has_descriptors and 'n_features' in group.attrs:
+                        n_features = group.attrs['n_features']
+                        print(f"    Feature dimension: {n_features}")
+            
+    except Exception as e:
+        print(f"Error reading HDF5 file: {e}")
+
+
 def unique_system_label(index, n_systems, system_type):
     singular_map = {
         "molecules": "molecule",
@@ -158,8 +281,8 @@ def supercell_md(unit_cell,
                                                  plot_file=os.path.join(training_dir, "supercell_md.png")
                                                  )
                                                  
-    eq_indices = equilibrium_stats["indices"]
-    systems = ase.io.read(trajectory_file, index=eq_indices)
+    starting_idx = equilibrium_stats["start index"]
+    systems = ase.io.read(trajectory_file, index=slice(starting_idx, None))
     save_structures(systems, hdf5_dataset, "crystals")
     print(f"Structures written to {hdf5_dataset}")
     
@@ -201,8 +324,8 @@ def molecule_md(molecule,
                                                  trajectory_file=trajectory_file,
                                                  plot_file=os.path.join(training_dir, "molecule_md.png")
                                                  )
-    eq_indices = equilibrium_stats["indices"]
-    systems = ase.io.read(trajectory_file, index=eq_indices)
+    starting_idx = equilibrium_stats["start index"]
+    systems = ase.io.read(trajectory_file, index=slice(starting_idx, None))
     save_structures(systems, hdf5_dataset, "molecules")
     print(f"Structures written to {hdf5_dataset}")
 
@@ -287,3 +410,5 @@ def NVT(unit_cell,
         system_types=["molecules", "crystals"],
         reference_system_type="crystals"
         )
+    visualize_hdf5(hdf5_dataset)
+    summarize_hdf5(hdf5_dataset)
