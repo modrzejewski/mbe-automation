@@ -27,8 +27,7 @@ Training_Dir = "{Training_Dir}"
 #
 # Molecular dynamics
 #
-Training_Crystal_MD = True
-Training_Molecule_MD = True
+Training_MD = True
                                    #
                                    # Thermostat temperature. Equilibrium is detected
                                    # when the standard deviation sigma(T) within the
@@ -81,22 +80,10 @@ Plots_Dir = os.path.join(WorkDir, Plots_Dir)
 UnitCell = read(XYZ_Solid)
 Molecule = read(XYZ_Molecule)
 
-if Training_Molecule_MD:
-    mbe_automation.ml.training_data.molecule_md(
-        Molecule,
-        Calc,
-        Training_Dir,
-        temperature_K,
-        time_total_fs,
-        time_step_fs,
-        sampling_interval_fs,
-        averaging_window_fs,
-        time_equilibration_fs
-    )
-    
-if Training_Crystal_MD:
-    mbe_automation.ml.training_data.supercell_md(
+if Training_MD:
+    mbe_automation.ml.training_data.NVT(
         UnitCell,
+        Molecule,
         Calc,
         SupercellRadius,
         Training_Dir,
@@ -107,7 +94,7 @@ if Training_Crystal_MD:
         averaging_window_fs,
         time_equilibration_fs
     )
-
+    
 if HarmonicProperties:
     mbe_automation.properties.thermodynamic(
         UnitCell,
