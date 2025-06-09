@@ -185,7 +185,7 @@ def save_structures(systems, hdf5_dataset, system_type):
         if len(atoms) != n_atoms:
             raise ValueError(f"System {i} has {len(atoms)} atoms, expected {n_atoms}")
     
-    atomic_numbers = np.zeros((n_frames, n_atoms))
+    atomic_numbers = np.zeros((n_frames, n_atoms), dtype=int)
     positions = np.zeros((n_frames, n_atoms, 3))
     for i, atoms in enumerate(systems):
         atomic_numbers[i] = atoms.get_atomic_numbers()
