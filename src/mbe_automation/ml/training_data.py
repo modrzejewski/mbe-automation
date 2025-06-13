@@ -77,64 +77,6 @@ def visualize_hdf5(hdf5_dataset):
         print(f"Error reading HDF5 file: {e}")
 
 
-def summarize_hdf5(hdf5_dataset):
-    """
-    Print summary statistics of HDF5 dataset.
-    
-    Parameters:
-    -----------
-    hdf5_dataset : str
-        Path to HDF5 file
-    """
-    if not os.path.exists(hdf5_dataset):
-        print(f"Error: File {hdf5_dataset} not found")
-        return
-    
-    try:
-        file_size = os.path.getsize(hdf5_dataset) / (1024**2)  # MB
-        print(f"\nFile: {hdf5_dataset}")
-        print(f"Size: {file_size:.2f} MB")
-        
-        with h5py.File(hdf5_dataset, 'r') as f:
-            print(f"\nDataset Summary:")
-            
-            system_types = []
-            for name in f.keys():
-                if name == 'clusters':
-                    cluster_types = list(f['clusters'].keys())
-                    system_types.extend([f"clusters/{ct}" for ct in cluster_types])
-                else:
-                    system_types.append(name)
-            
-            for system_type in system_types:
-                if system_type.startswith('clusters/'):
-                    group = f['clusters'][system_type.split('/')[1]]
-                    path = system_type
-                else:
-                    group = f[system_type]
-                    path = system_type
-                
-                if 'n_frames' in group.attrs:
-                    n_frames = group.attrs['n_frames']
-                    n_atoms = group.attrs['n_atoms']
-                    periodic = group.attrs.get('periodic', False)
-                    has_descriptors = 'feature_vectors' in group
-                    has_normalized = 'normalized_feature_vectors' in group
-                    
-                    print(f"  {path}:")
-                    print(f"    Structures: {n_frames} × {n_atoms} atoms")
-                    print(f"    Periodic: {periodic}")
-                    print(f"    MACE descriptors: {has_descriptors}")
-                    print(f"    Normalized: {has_normalized}")
-                    
-                    if has_descriptors and 'n_features' in group.attrs:
-                        n_features = group.attrs['n_features']
-                        print(f"    Feature dimension: {n_features}")
-            
-    except Exception as e:
-        print(f"Error reading HDF5 file: {e}")
-
-
 def unique_system_label(index, n_systems, system_type):
     singular_map = {
         "molecules": "molecule",
@@ -334,23 +276,19 @@ def molecule_md(molecule,
     sys.stdout = sys.stdout.stdout
 
     
-def NVT(unit_cell,
-        molecule,
-        calculator,
-        supercell_radius,
-        training_dir,
-        temperature_K=298.15,
-        time_total_fs=50000,
-        time_step_fs=0.5,
-        sampling_interval_fs=50,
-        averaging_window_fs=5000,
-        time_equilibration_fs=5000
-        ):
-    #
-    # HDF5 dataset with all structures and descriptors
-    #
-    hdf5_dataset = os.path.join(training_dir, "dataset.hdf5")
-    
+def run_NVT(unit_cell,
+            molecule,
+            calculator,
+            supercell_radius,
+            training_dir,
+            hdf5_dataset,
+            temperature_K=298.15,
+            time_total_fs=50000,
+            time_step_fs=0.5,
+            sampling_interval_fs=50,
+            averaging_window_fs=5000,
+            time_equilibration_fs=5000
+            ):
     #
     # Update the HDF5 dataset file with structures
     # sampled from the MD of a molecule. Only the
@@ -386,29 +324,6 @@ def NVT(unit_cell,
                  averaging_window_fs,
                  time_equilibration_fs
                  )
-    #
-    # Update the HDF5 dataset file with atom-centered
-    # descriptors from the MACE model. At this point
-    # no normalization of the descriptors (feature vectors)
-    # is applied.
-    #
-    mbe_automation.ml.descriptors.mace.atomic_hdf5(
-        hdf5_dataset,
-        calculator,
-        ["crystals", "molecules"])
-    #
-    # Update the HDF5 dataset file with normalized atom-centered
-    # descriptors.
-    #
-    # normalized_feature_vector = (feature_vector - feature_vector_mean) / feature_vector_sigma
-    #
-    # The normalization is done using per-element statistics based only
-    # on the crystal structures.
-    #
-    mbe_automation.ml.descriptors.generic.normalized_hdf5(
-        hdf5_dataset,
-        system_types=["molecules", "crystals"],
-        reference_system_type="crystals"
-        )
-    visualize_hdf5(hdf5_dataset)
-    summarize_hdf5(hdf5_dataset)
+    
+
+

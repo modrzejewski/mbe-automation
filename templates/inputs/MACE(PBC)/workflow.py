@@ -9,6 +9,7 @@ import mace.calculators
 import sys
 import mbe_automation.properties
 import mbe_automation.ml.training_data
+import mbe_automation.ml.descriptors.mace
 import torch
 torch.set_default_dtype(torch.float64)
 #
@@ -27,7 +28,10 @@ Training_Dir = "{Training_Dir}"
 #
 # Molecular dynamics
 #
-Training_MD = True
+Training = True
+
+HDF5_File = os.path.join(Training_Dir, "dataset.hdf5")
+
                                    #
                                    # Thermostat temperature
                                    #
@@ -79,7 +83,12 @@ HarmonicProperties = True
                                    #
 Temperatures=np.arange(0, 401, 1) 
 ConstantVolume = True
-SupercellDisplacement = 0.01 # Displacement in Cartesian coordinated to compute numerical derivatives
+                                   #
+                                   # Displacement in Angs of Cartesian coordinates used
+                                   # to compute numerical derivatives (passed to
+                                   # phonopy)
+                                   #
+SupercellDisplacement = 0.01
 #
 # ========================= End of user-defined parameters ===============================
 #
@@ -97,19 +106,39 @@ Plots_Dir = os.path.join(WorkDir, Plots_Dir)
 UnitCell = read(XYZ_Solid)
 Molecule = read(XYZ_Molecule)
 
-if Training_MD:
-    mbe_automation.ml.training_data.NVT(
+if Training:
+    #
+    # Run NVT molecular dynamics trajectory for the periodic
+    # cell and isolated molecule
+    #
+    mbe_automation.ml.training_data.run_NVT(
         UnitCell,
         Molecule,
         Calc,
         SupercellRadius,
         Training_Dir,
+        HDF5_File,
         temperature_K,
         time_total_fs,
         time_step_fs,
         sampling_interval_fs,
         averaging_window_fs,
         time_equilibration_fs
+    )
+    #
+    # Compute descriptors for the geometries
+    # present in the HDF5 dataset
+    #
+    mbe_automation.ml.descriptors.mace.update_hdf5(
+        hdf5_dataset=HDF5_File,
+        calculator=Calc,
+        system_types=["crystals", "molecules"],
+        reference_system_type="crystals")
+    #
+    # Print out the structure of the HDF5 file
+    #
+    mbe_automation.ml.training_data.visualize_hdf5(
+        hdf5_dataset=HDF5_File
     )
     
 if HarmonicProperties:

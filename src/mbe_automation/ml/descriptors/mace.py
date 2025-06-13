@@ -5,7 +5,7 @@ import sys
 from collections import Counter
 from ase import Atoms
 import h5py
-
+import mbe_automation.ml.descriptors.generic
 
 def atomic(systems, calc):
     """
@@ -75,7 +75,7 @@ def atomic(systems, calc):
 
 def atomic_hdf5(hdf5_dataset, calc, system_types):
     """
-    Compute and save MACE descriptors for specified system types in HDF5 file.
+    Compute and save atomic MACE descriptors for specified system types in HDF5 file.
     
     Parameters:
     -----------
@@ -144,3 +144,51 @@ def atomic_hdf5(hdf5_dataset, calc, system_types):
     print(f"\nAll descriptors saved to {hdf5_dataset}")
 
 
+def update_hdf5(hdf5_dataset, calculator,
+         system_types=["crystals", "molecules"],
+         reference_system_type="crystals"):
+    """
+    Compute and save both raw and normalized MACE descriptors for structures in an HDF5 dataset.
+    
+    Parameters
+    ----------
+    hdf5_dataset : str
+        Path to the HDF5 file containing structure data. The file will be modified
+        in-place to include the computed descriptors.
+    calculator : MACE calculator
+    system_types : list of str, optional
+        System types to process for descriptor computation. Valid options include:
+        "crystals", "molecules", "dimers", "trimers", "tetramers".
+        Default is ["crystals", "molecules"].
+    reference_system_type : str, optional
+        System type to use as reference for computing normalization statistics
+        (mean and standard deviation). Default is "crystals".
+    """
+    #
+    # Update the HDF5 dataset file with atom-centered
+    # descriptors from the MACE model. At this point
+    # no normalization of the descriptors (feature vectors)
+    # is applied.
+    #
+    atomic_hdf5(hdf5_dataset, calculator, system_types)
+    #
+    # Update the HDF5 dataset file with normalized atom-centered
+    # descriptors.
+    #
+    # normalized_feature_vector = (feature_vector - feature_vector_mean) / feature_vector_sigma
+    #
+    # The normalization is done using per-element statistics based only
+    # on the crystal structures.
+    #
+    mbe_automation.ml.descriptors.generic.normalized_hdf5(
+        hdf5_dataset,
+        system_types,
+        reference_system_type
+        )
+    #
+    # Permutationally invariant molecular descriptors needed for comparing molecules
+    # and cells
+    #
+    mbe_automation.ml.descriptors.generic.molecular_hdf5(
+        hdf5_dataset,
+        system_types)
