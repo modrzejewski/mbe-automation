@@ -144,7 +144,7 @@ def atomic_hdf5(hdf5_dataset, calc, system_types):
     print(f"\nAll descriptors saved to {hdf5_dataset}")
 
 
-def update_hdf5(hdf5_dataset, calculator,
+def write_to_hdf5(hdf5_dataset, calculator,
          system_types=["crystals", "molecules"],
          reference_system_type="crystals"):
     """

@@ -1,6 +1,7 @@
 import ase.spacegroup.symmetrize
 import ase.spacegroup.utils
 import os.path
+from ase import Atoms
 
 def PrintUnitCellParams(UnitCell):
     La, Lb, Lc = UnitCell.cell.lengths()
@@ -15,6 +16,35 @@ def PrintUnitCellParams(UnitCell):
     print(f"γ = {gamma:.3f}°")
     print(f"V = {volume:.4f} Å³")
 
+    
+def symmetrize(unit_cell: Atoms, symmetrization_thresh: float = 1.0E-2) -> Atoms:
+    """
+    Use spglib to remove the geometry optimization artifacts 
+    and refine the unit cell to the correct spacegroup symmetry.
+
+    """
+    tight_symmetry_thresh = 1.0E-6
+    spgdata = ase.spacegroup.symmetrize.check_symmetry(unit_cell, symprec=tight_symmetry_thresh)
+    input_spacegroup_index = spgdata.number
+    input_hmsymbol = spgdata.international
+
+    sym_unit_cell = unit_cell.copy()
+    ase.spacegroup.symmetrize.refine_symmetry(sym_unit_cell, symprec=symmetrization_thresh)
+    spgdata = ase.spacegroup.symmetrize.check_symmetry(sym_unit_cell, symprec=tight_symmetry_thresh)
+    sym_spacegroup_index = spgdata.number
+    sym_hmsymbol = spgdata.international
+
+    if sym_spacegroup_index != input_spacegroup_index:
+        print(f"Refined space group symmetry using spglib with symmetrization threshold {symmetrization_thresh}")
+        print(f"Sci. Technol. Adv. Mater. Meth. 4, 2384822 (2024);")
+        print(f"doi: 10.1080/27660400.2024.2384822")
+        print(f"input cell: {input_hmsymbol}, {input_spacegroup_index} -> refined: {sym_hmsymbol}, {sym_spacegroup_index}")
+    else:
+        print(f"No symmetry refinement needed")
+        print(f"input cell: {input_hmsymbol}, {input_spacegroup_index}")
+        
+    return sym_unit_cell
+        
 
 def DetermineSpaceGroupSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-2):
     print("Unit cell symmetry")

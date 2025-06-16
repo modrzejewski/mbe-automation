@@ -1,159 +1,62 @@
 import ase
 from ase.atoms import Atoms
-from ase.io import read
 import numpy as np
 import os
 import os.path
 import time
-import mace.calculators
 import sys
-import mbe_automation.properties
-import mbe_automation.ml.training_data
-import mbe_automation.ml.descriptors.mace
+import mace.calculators
+from mbe_automation.configs.training import TrainingConfig
+from mbe_automation.configs.properties import PropertiesConfig
+import mbe_automation.workflows
+import mbe_automation.io
 import torch
 torch.set_default_dtype(torch.float64)
 #
 # ============================== User-defined parameters =================================
 #
-# Unviersal parametrers for all enabled
-# types of calculations
-#
-Calc = mace.calculators.mace_off(model="small")
-SupercellRadius = 10.0 # Minimum point-periodic image distance in the supercell (Angstrom)
-XYZ_Solid = "{XYZ_Solid}"
-XYZ_Molecule = "{XYZ_Molecule}"
-CSV_Dir = "{CSV_Dir}"
-Plots_Dir = "{Plot_Dir}"
-Training_Dir = "{Training_Dir}"
-#
-# Molecular dynamics
+# Parametrers for both training and simulation
 #
 Training = True
-
-HDF5_File = os.path.join(Training_Dir, "dataset.hdf5")
-
-                                   #
-                                   # Thermostat temperature
-                                   #
-temperature_K = 298.15
-                                   #
-                                   # Time after which the system is assumed
-                                   # to reach thermal equilibrium. Structures
-                                   # are extracted from the trajectory only
-                                   # for t > time_equilibration_fs.
-                                   #
-time_equilibration_fs = 5000
-                                   #
-                                   # Total time of the MD simulation including
-                                   # the equilibration time.
-                                   #
-time_total_fs = 50000
-                                   #
-                                   # Time step for numerical propagation.
-                                   # Typical values should be in the range
-                                   # of (0.5, 1.0) fs.
-                                   #
-time_step_fs = 0.5
-                                   #
-                                   # Intervals for trajectory sampling.
-                                   # Too small interval doesn't improve
-                                   # the sampling quality because
-                                   # the structures are too correlated.
-                                   #
-sampling_interval_fs = 50
-                                   #
-                                   # Time window for the plot of running average T and E.
-                                   # Used only for data visualization.
-                                   #
-averaging_window_fs = 5000
-#
-# Parameters for thermodynamic properties
-# in the harmonic approximation
-#
-                                   #
-                                   # Enable computational path for harmonic properties.
-                                   # Second derivatives evaluated using finite
-                                   # differences with phonopy.
-                                   #
 HarmonicProperties = True
-                                   #
-                                   # Range of temperatures where thermodynamic properties
-                                   # are calculated, e.g., T's where Cv is evaluated from
-                                   # the phonon data
-                                   #
-Temperatures=np.arange(0, 401, 1) 
-ConstantVolume = True
-                                   #
-                                   # Displacement in Angs of Cartesian coordinates used
-                                   # to compute numerical derivatives (passed to
-                                   # phonopy)
-                                   #
-SupercellDisplacement = 0.01
-#
-# ========================= End of user-defined parameters ===============================
-#
+
+work_dir = os.path.abspath(os.path.dirname(__file__))
+
+training_config = TrainingConfig(
+    calculator = mace.calculators.mace_off(model="small"),
+    unit_cell = mbe_automation.io.read(os.path.join(work_dir, "{XYZ_Solid}")),
+    molecule = mbe_automation.io.read(os.path.join(work_dir, "{XYZ_Molecule}")),
+    supercell_radius = 15.0,
+    training_dir = "{Training_Dir}",
+    hdf5_dataset = os.path.join("{Training_Dir}", "training.hdf5"),
+    temperature_K = 298.15,
+    time_equilibration_fs = 5000,
+    time_total_fs = 50000,
+    time_step_fs = 0.5,
+    sampling_interval_fs = 50,
+    averaging_window_fs = 5000    
+    )
+
+properties_config = PropertiesConfig(
+    unit_cell = mbe_automation.io.read(os.path.join(work_dir, "{XYZ_Solid}")),
+    molecule = mbe_automation.io.read(os.path.join(work_dir, "{XYZ_Molecule}")),
+    calculator = mace.calculators.mace_off(model="small"),
+    optimize_lattice_vectors = False,
+    optimize_volume = False,
+    preserve_space_group = True,
+    supercell_radius = 30.0,
+    supercell_displacement = 0.01,
+    properties_dir = work_dir,
+    hdf5_dataset = os.path.join(work_dir, "properties.hdf5")
+)
 
 print("Calculations with MACE")
-print(f"Coordinates (crystal structure): {{XYZ_Solid}}")
-print(f"Coordinates (relaxed molecule): {{XYZ_Molecule}}")
-
-WorkDir = os.path.abspath(os.path.dirname(__file__))
-XYZ_Solid = os.path.join(WorkDir, XYZ_Solid)
-XYZ_Molecule = os.path.join(WorkDir, XYZ_Molecule)
-CSV_Dir = os.path.join(WorkDir, CSV_Dir)
-Plots_Dir = os.path.join(WorkDir, Plots_Dir)
-
-UnitCell = read(XYZ_Solid)
-Molecule = read(XYZ_Molecule)
 
 if Training:
-    #
-    # Run NVT molecular dynamics trajectory for the periodic
-    # cell and isolated molecule
-    #
-    mbe_automation.ml.training_data.run_NVT(
-        UnitCell,
-        Molecule,
-        Calc,
-        SupercellRadius,
-        Training_Dir,
-        HDF5_File,
-        temperature_K,
-        time_total_fs,
-        time_step_fs,
-        sampling_interval_fs,
-        averaging_window_fs,
-        time_equilibration_fs
-    )
-    #
-    # Compute descriptors for the geometries
-    # present in the HDF5 dataset
-    #
-    mbe_automation.ml.descriptors.mace.update_hdf5(
-        hdf5_dataset=HDF5_File,
-        calculator=Calc,
-        system_types=["crystals", "molecules"],
-        reference_system_type="crystals")
-    #
-    # Print out the structure of the HDF5 file
-    #
-    mbe_automation.ml.training_data.visualize_hdf5(
-        hdf5_dataset=HDF5_File
-    )
+    mber_automation.workflows.create_training_dataset_mace(training_config)
     
 if HarmonicProperties:
-    mbe_automation.properties.thermodynamic(
-        UnitCell,
-        Molecule,
-        Calc,
-        Calc,
-        Calc,
-        Temperatures,
-        ConstantVolume,
-        CSV_Dir,
-        Plots_Dir,
-        SupercellRadius,
-        SupercellDisplacement)
+    mbe_automation.workflows.compute_harmonic_properties(properties_config)
 
 
 

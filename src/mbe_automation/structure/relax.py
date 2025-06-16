@@ -8,27 +8,27 @@ optimizer_class = ase.optimize.BFGS
 def atoms_and_cell(UnitCell,
                    Calculator,
                    preserve_space_group=True,
-                   constant_volume=False,                   
-                   max_force_on_atom=1.0E-4, # eV/Angs/atom
+                   optimize_volume=False,
+                   max_force_on_atom=1.0E-3, # eV/Angs/atom
                    max_steps=1000):
     
     structure = UnitCell.copy()
     structure.calc = Calculator
     if preserve_space_group:
         structure.set_constraint(FixSymmetry(structure))
-    optimizer = optimizer_class(filter_class(structure, constant_volume=constant_volume))
+    optimizer = optimizer_class(filter_class(structure, constant_volume=(not optimize_volume)))
     optimizer.run(fmax=max_force_on_atom, steps=max_steps)
     return structure
 
 
-def atoms(Molecule,
-          Calculator,
+def atoms(unit_cell,
+          calculator,
           preserve_space_group=True,
-          max_force_on_atom=1.0E-4, # eV/Angs/atom
+          max_force_on_atom=1.0E-3, # eV/Angs/atom
           max_steps=1000):
 
-    structure = UnitCell.copy()
-    structure.calc = Calculator
+    structure = unit_cell.copy()
+    structure.calc = calculator
     if preserve_space_group:
         structure.set_constraint(FixSymmetry(structure))
     optimizer = optimizer_class(structure)
@@ -38,7 +38,7 @@ def atoms(Molecule,
 
 def isolated_molecule(Molecule,
                       Calculator,
-                      max_force_on_atom=1.0E-4, # eV/Angs/atom
+                      max_force_on_atom=1.0E-3, # eV/Angs/atom
                       max_steps=1000):
 
     structure = Molecule.copy()

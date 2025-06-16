@@ -276,54 +276,5 @@ def molecule_md(molecule,
     sys.stdout = sys.stdout.stdout
 
     
-def run_NVT(unit_cell,
-            molecule,
-            calculator,
-            supercell_radius,
-            training_dir,
-            hdf5_dataset,
-            temperature_K=298.15,
-            time_total_fs=50000,
-            time_step_fs=0.5,
-            sampling_interval_fs=50,
-            averaging_window_fs=5000,
-            time_equilibration_fs=5000
-            ):
-    #
-    # Update the HDF5 dataset file with structures
-    # sampled from the MD of a molecule. Only the
-    # structures obtained after time_equilibration_fs
-    # are saved.
-    #
-    molecule_md(molecule,
-                calculator,
-                training_dir,
-                hdf5_dataset,
-                temperature_K,
-                time_total_fs,
-                time_step_fs,
-                sampling_interval_fs,
-                averaging_window_fs,
-                time_equilibration_fs
-                )
-    #
-    # Update the HDF5 dataset file with structures
-    # sampled from the MD of a crystal. Only the
-    # structures obtained after time_equilibration_fs
-    # are saved.
-    #
-    supercell_md(unit_cell,
-                 calculator,
-                 supercell_radius,
-                 training_dir,
-                 hdf5_dataset,
-                 temperature_K,
-                 time_total_fs,
-                 time_step_fs,
-                 sampling_interval_fs,
-                 averaging_window_fs,
-                 time_equilibration_fs
-                 )
-    
 
 
