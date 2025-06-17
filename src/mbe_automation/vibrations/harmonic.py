@@ -1,6 +1,5 @@
 from ase.io import read
 from ase.atoms import Atoms
-from mace.calculators import MACECalculator
 from phonopy import Phonopy
 from phonopy.structure.atoms import PhonopyAtoms
 import time

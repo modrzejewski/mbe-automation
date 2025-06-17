@@ -1,10 +1,5 @@
-import ase
-from ase.atoms import Atoms
 import numpy as np
-import os
 import os.path
-import time
-import sys
 import mace.calculators
 from mbe_automation.configs.training import TrainingConfig
 from mbe_automation.configs.properties import PropertiesConfig
@@ -12,11 +7,7 @@ import mbe_automation.workflows
 import mbe_automation.io
 import torch
 torch.set_default_dtype(torch.float64)
-#
-# ============================== User-defined parameters =================================
-#
-# Parametrers for both training and simulation
-#
+
 Training = True
 HarmonicProperties = True
 
@@ -50,10 +41,8 @@ properties_config = PropertiesConfig(
     hdf5_dataset = os.path.join(work_dir, "properties.hdf5")
 )
 
-print("Calculations with MACE")
-
 if Training:
-    mber_automation.workflows.create_training_dataset_mace(training_config)
+    mbe_automation.workflows.create_training_dataset_mace(training_config)
     
 if HarmonicProperties:
     mbe_automation.workflows.compute_harmonic_properties(properties_config)

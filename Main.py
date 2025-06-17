@@ -10,7 +10,7 @@ import mbe_automation.single_point
                                                 # If the path already exists, e.g., it's your previous project,
                                                 # all existing files will be moved to a backup location.
                                                 #
-ProjectDirectory    = "./Projects/pbc-test"
+ProjectDirectory    = "./Projects/uma-test"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -22,14 +22,14 @@ ProjectDirectory    = "./Projects/pbc-test"
                                                 # (3) HF(PBC)
                                                 #
                                                 
-Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)", "MACE(PBC)", "DFTB(PBC)"]
+Methods = ["RPA", "LNO-CCSD(T)", "MACE(PBC)", "DFTB(PBC)", "UMA(PBC)"]
 
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 #
                                                 
-UnitCellFile        = "./Systems/X23/07_CO2/solid.xyz"
+UnitCellFile        = "./Systems/X23/04_ammonia/solid.xyz"
 
                                                 #
                                                 # Types of calculated systems. Allowed values:
@@ -59,7 +59,7 @@ SystemTypes         = ["monomers", "dimers", "bulk"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/07_CO2/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/04_ammonia/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
@@ -124,6 +124,9 @@ InputTemplates = {
     "MACE(PBC)": {
         "workflow": "./templates/inputs/MACE(PBC)/workflow.py"
         },
+    "UMA(PBC)": {
+        "workflow": "./templates/inputs/UMA(PBC)/workflow.py"
+        },
     "DFTB(PBC)": {
         "solid": "./templates/inputs/DFTB(PBC)/solid.py"
         }
@@ -160,6 +163,10 @@ QueueScriptTemplates = {
     "MACE(PBC)":     {
         "GPU": "./templates/queue-scripts/Poznań/MACE-GPU.py",
         "CPU": "./templates/queue-scripts/Poznań/MACE-CPU.py"
+    },
+    "UMA(PBC)":     {
+        "GPU": "./templates/queue-scripts/Poznań/UMA-GPU.py",
+        "CPU": "./templates/queue-scripts/Poznań/UMA-CPU.py"
     },
     "DFTB(PBC)":     "./templates/queue-scripts/Poznań/DFTB.py"
     }

@@ -174,6 +174,10 @@ def create_training_dataset_mace(config: TrainingConfig):
         config.hdf5_dataset,
         config.select_n_frames
     )
+    mbe_automation.ml.data_clustering.plot_cluster_sizes(
+        config.hdf5_dataset,
+        config.training_dir,
+        system_types=["crystals", "molecules"])
     #
     # Print out the structure of the HDF5 file
     #

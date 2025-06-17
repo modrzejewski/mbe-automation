@@ -4,6 +4,7 @@ import mbe_automation.inputs.orca
 import mbe_automation.inputs.mrcc
 import mbe_automation.inputs.pyscf
 import mbe_automation.inputs.mace
+import mbe_automation.inputs.uma
 import mbe_automation.inputs.dftb
 import mbe_automation.display
 from . import queue_scripts
@@ -104,6 +105,15 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                                             directory_structure.ML_DIRS["MACE(PBC)"],
                                             InputTemplates["MACE(PBC)"],
                                             QueueScriptTemplates["MACE(PBC)"],
+                                            SymmetrizeUnitCell)
+        if "UMA" in MethodsPBC:
+            mbe_automation.inputs.uma.Make(directory_structure.INP_DIRS,
+                                            directory_structure.XYZ_DIRS,
+                                            directory_structure.CSV_DIRS["UMA(PBC)"],
+                                            directory_structure.PLOT_DIRS["UMA(PBC)"],
+                                            directory_structure.ML_DIRS["UMA(PBC)"],
+                                            InputTemplates["UMA(PBC)"],
+                                            QueueScriptTemplates["UMA(PBC)"],
                                             SymmetrizeUnitCell)
         if "DFTB" in MethodsPBC:
             mbe_automation.inputs.dftb.Make(directory_structure.INP_DIRS,
