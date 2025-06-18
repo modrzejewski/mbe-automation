@@ -24,7 +24,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
     # needed only as a diagonostic value to estimate the
     # effect of geometry relaxation.
     #
-    lattice_energy_noopt = mbe_automation.properties.StaticLatticeEnergy(
+    lattice_energy_noopt = mbe_automation.properties.static_lattice_energy(
         unit_cell,
         molecule,
         config.calculator,
@@ -63,7 +63,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
     # Static lattice energy with both molecule and unit
     # cell optimized
     #
-    lattice_energy = mbe_automation.properties.StaticLatticeEnergy(
+    lattice_energy = mbe_automation.properties.static_lattice_energy(
         unit_cell,
         molecule,
         config.calculator,
@@ -74,7 +74,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
     # phonon dispersion, vibrational contributions
     # to entropy and free energy
     #
-    mbe_automation.properties.phonons(
+    mbe_automation.properties.phonons_from_finite_differences(
         unit_cell,
         config.calculator,
         config.temperatures,
