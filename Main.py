@@ -122,7 +122,8 @@ InputTemplates = {
         "molecule": "./templates/inputs/HF(PBC)/pyscf/molecule.py"
     },
     "MACE(PBC)": {
-        "workflow": "./templates/inputs/MACE(PBC)/workflow.py"
+        "training": "./templates/inputs/mace(pbc)/training.py",
+        "properties": "./templates/inputs/mace(pbc)/properties.py"
         },
     "UMA(PBC)": {
         "workflow": "./templates/inputs/UMA(PBC)/workflow.py"
@@ -161,8 +162,8 @@ QueueScriptTemplates = {
     "LNO-CCSD(T)":   "./templates/queue-scripts/Poznań/MRCC.py",
     "HF(PBC)":       "./templates/queue-scripts/Poznań/PYSCF.py",
     "MACE(PBC)":     {
-        "GPU": "./templates/queue-scripts/Poznań/MACE-GPU.py",
-        "CPU": "./templates/queue-scripts/Poznań/MACE-CPU.py"
+        "gpu": "./templates/queue-scripts/Poznań/mace-gpu.py",
+        "cpu": "./templates/queue-scripts/Poznań/mace-cpu.py"
     },
     "UMA(PBC)":     {
         "GPU": "./templates/queue-scripts/Poznań/UMA-GPU.py",

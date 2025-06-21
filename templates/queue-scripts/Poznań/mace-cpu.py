@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-#SBATCH --job-name="{TITLE}"
+#SBATCH --job-name="MACE"
 #SBATCH -A pl0458-01
-#SBATCH --partition=tesla
+#SBATCH -p altair 
 #SBATCH --nodes 1      
 #SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=48
 #SBATCH --time=24:00:00
 #SBATCH --mem=180gb
 
@@ -14,11 +13,11 @@ import os.path
 import sys
 import subprocess
 
-InpScript = "{INP_SCRIPT}"
-LogFile = "{LOG_FILE}"
+InpScript = "{inp_script}"
+LogFile = "{log_file}"
 
-os.environ["OMP_NUM_THREADS"] = "8"
-os.environ["MKL_NUM_THREADS"] = "8"
+os.environ["OMP_NUM_THREADS"] = "48"
+os.environ["MKL_NUM_THREADS"] = "48"
 #
 # Set up virtual environment
 # Make sure that the environment works properly on the coputer nodes.
@@ -41,3 +40,6 @@ with open(LogFile, "w") as log_file:
 
 
     
+
+
+

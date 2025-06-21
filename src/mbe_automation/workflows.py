@@ -8,9 +8,12 @@ import mbe_automation.display
 from mbe_automation.configs.training import TrainingConfig
 from mbe_automation.configs.properties import PropertiesConfig
 import mace.calculators
-
+import os
     
 def compute_harmonic_properties(config: PropertiesConfig):
+
+    os.makedirs(config.properties_dir, exist_ok=True)
+    
     if config.symmetrize_unit_cell:
         unit_cell = mbe_automation.structure.crystal.symmetrize(
             config.unit_cell
@@ -96,6 +99,8 @@ def compute_harmonic_properties(config: PropertiesConfig):
     
 
 def create_training_dataset_mace(config: TrainingConfig):
+
+    os.makedirs(config.training_dir, exist_ok=True)
     #
     # Create new/update HDF5 dataset with structures
     # sampled from the MD of a molecule. Only the
