@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#SBATCH --job-name="{TITLE}"
+#SBATCH --job-name="MACE"
 #SBATCH -A pl0458-01
 #SBATCH -p altair 
 #SBATCH --nodes 1      
@@ -13,8 +13,8 @@ import os.path
 import sys
 import subprocess
 
-InpScript = "{INP_SCRIPT}"
-LogFile = "{LOG_FILE}"
+InpScript = "{inp_script}"
+LogFile = "{log_file}"
 
 os.environ["OMP_NUM_THREADS"] = "48"
 os.environ["MKL_NUM_THREADS"] = "48"

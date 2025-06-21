@@ -10,7 +10,7 @@ import mbe_automation.single_point
                                                 # If the path already exists, e.g., it's your previous project,
                                                 # all existing files will be moved to a backup location.
                                                 #
-ProjectDirectory    = "./Projects/pbc-test"
+ProjectDirectory    = "./Projects/ammonia-test"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -22,14 +22,14 @@ ProjectDirectory    = "./Projects/pbc-test"
                                                 # (3) HF(PBC)
                                                 #
                                                 
-Methods = ["RPA", "LNO-CCSD(T)", "HF(PBC)", "MACE(PBC)", "DFTB(PBC)"]
+Methods = ["RPA", "LNO-CCSD(T)", "MACE(PBC)", "DFTB(PBC)", "UMA(PBC)"]
 
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 #
                                                 
-UnitCellFile        = "./Systems/X23/05_anthracene/solid.xyz"
+UnitCellFile        = "./Systems/X23/04_ammonia/solid.xyz"
 
                                                 #
                                                 # Types of calculated systems. Allowed values:
@@ -59,7 +59,7 @@ SystemTypes         = ["monomers", "dimers", "bulk"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/05_anthracene/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/04_ammonia/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
@@ -87,7 +87,7 @@ RelaxedMonomerXYZ   = "./Systems/X23/05_anthracene/molecule.xyz"
                                                 #
                                                 # The values of Cutoffs are in Angstroms.
                                                 #
-Cutoffs = {"dimers": 30.0,
+Cutoffs = {"dimers": 10.0,
            "trimers": 15.0,      
            "tetramers": 10.0,
            "ghosts": 4.0
@@ -122,7 +122,11 @@ InputTemplates = {
         "molecule": "./templates/inputs/HF(PBC)/pyscf/molecule.py"
     },
     "MACE(PBC)": {
-        "solid": "./templates/inputs/MACE(PBC)/solid.py"
+        "training": "./templates/inputs/mace(pbc)/training.py",
+        "properties": "./templates/inputs/mace(pbc)/properties.py"
+        },
+    "UMA(PBC)": {
+        "workflow": "./templates/inputs/UMA(PBC)/workflow.py"
         },
     "DFTB(PBC)": {
         "solid": "./templates/inputs/DFTB(PBC)/solid.py"
@@ -157,7 +161,14 @@ QueueScriptTemplates = {
     "RPA":           "./templates/queue-scripts/Poznań/RPA.py",
     "LNO-CCSD(T)":   "./templates/queue-scripts/Poznań/MRCC.py",
     "HF(PBC)":       "./templates/queue-scripts/Poznań/PYSCF.py",
-    "MACE(PBC)":     "./templates/queue-scripts/Poznań/MACE.py",
+    "MACE(PBC)":     {
+        "gpu": "./templates/queue-scripts/Poznań/mace-gpu.py",
+        "cpu": "./templates/queue-scripts/Poznań/mace-cpu.py"
+    },
+    "UMA(PBC)":     {
+        "GPU": "./templates/queue-scripts/Poznań/UMA-GPU.py",
+        "CPU": "./templates/queue-scripts/Poznań/UMA-CPU.py"
+    },
     "DFTB(PBC)":     "./templates/queue-scripts/Poznań/DFTB.py"
     }
                                                 #

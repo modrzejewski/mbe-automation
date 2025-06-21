@@ -10,12 +10,12 @@ SUBSYSTEM_LABELS = {
     }
 
 def SetUp(ProjectDir, MethodsMBE, MethodsPBC):
-    global ROOT_DIR, PROJECT_DIR, INP_DIRS, LOG_DIRS, CSV_DIRS, PLOT_DIRS
+    global ROOT_DIR, PROJECT_DIR, INP_DIRS, LOG_DIRS, CSV_DIRS, PLOT_DIRS, ML_DIRS
     global XYZ_DIRS, QUEUE_DIRS, QUEUE_MAIN_SCRIPT
     
     ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     PROJECT_DIR = path.realpath(ProjectDir)
-    INP_DIRS, LOG_DIRS, CSV_DIRS, PLOT_DIRS, XYZ_DIRS, QUEUE_DIRS = {}, {}, {}, {}, {}, {}
+    INP_DIRS, LOG_DIRS, CSV_DIRS, PLOT_DIRS, XYZ_DIRS, QUEUE_DIRS, ML_DIRS = {}, {}, {}, {}, {}, {}, {}
     #
     # If the project directory already exists, move the existing contents
     # to a backup location
@@ -94,7 +94,11 @@ def SetUp(ProjectDir, MethodsMBE, MethodsPBC):
         os.makedirs(CSV_DIRS[Method+"(PBC)"], exist_ok=True)
         os.makedirs(PLOT_DIRS[Method+"(PBC)"], exist_ok=True)
         os.makedirs(INP_DIRS[Method+"(PBC)"], exist_ok=True)
-            
+
+        ML_DIRS[Method+"(PBC)"] = {}
+        ML_DIRS[Method+"(PBC)"]["training"] = path.join(PROJECT_DIR, "training", Method)
+        os.makedirs(ML_DIRS[Method+"(PBC)"]["training"], exist_ok=True)
+
     QUEUE_MAIN_SCRIPT = {}
     for Method in MethodsMBE:
         QUEUE_MAIN_SCRIPT[Method] = path.join(PROJECT_DIR, f"RunTaskArray_{Method}.py")

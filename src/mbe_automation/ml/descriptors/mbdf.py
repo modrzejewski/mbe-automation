@@ -1,4 +1,4 @@
-from mbe_automation.ml.descriptors.cMBDF import generate_mbdf
+from mbe_automation.ml.descriptors.cmbdf import generate_mbdf
 import numpy as np
 import sys
 import os

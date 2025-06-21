@@ -4,29 +4,16 @@ import mbe_automation.inputs.orca
 import mbe_automation.inputs.mrcc
 import mbe_automation.inputs.pyscf
 import mbe_automation.inputs.mace
+import mbe_automation.inputs.uma
 import mbe_automation.inputs.dftb
+import mbe_automation.display
 from . import queue_scripts
 from . import directory_structure
 import os
 import os.path
 import stat
 import shutil
-import sys
-
-class ReplicatedOutput:
-    def __init__(self, filename):
-        self.file = open(filename, 'w')
-        self.stdout = sys.stdout  # Original stdout
-
-    def write(self, message):
-        self.stdout.write(message)  # Print to screen
-        self.file.write(message)    # Write to file
-        self.file.flush()
-
-    def flush(self):
-        self.stdout.flush()
-        self.file.flush()
-        
+import sys        
 
 def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                    Ordering, InputTemplates, QueueScriptTemplates,
@@ -57,7 +44,7 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
     # both displayed on screen and written to the log file.
     #
     SummaryFile = os.path.join(directory_structure.PROJECT_DIR, "input_preparation.txt")
-    sys.stdout = ReplicatedOutput(SummaryFile)
+    sys.stdout = mbe_automation.display.ReplicatedOutput(SummaryFile)
 
     if not UseExistingXYZ:
         mbe_automation.mbe.Make(UnitCellFile,
@@ -115,8 +102,18 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                                             directory_structure.XYZ_DIRS,
                                             directory_structure.CSV_DIRS["MACE(PBC)"],
                                             directory_structure.PLOT_DIRS["MACE(PBC)"],
+                                            directory_structure.ML_DIRS["MACE(PBC)"],
                                             InputTemplates["MACE(PBC)"],
                                             QueueScriptTemplates["MACE(PBC)"],
+                                            SymmetrizeUnitCell)
+        if "UMA" in MethodsPBC:
+            mbe_automation.inputs.uma.Make(directory_structure.INP_DIRS,
+                                            directory_structure.XYZ_DIRS,
+                                            directory_structure.CSV_DIRS["UMA(PBC)"],
+                                            directory_structure.PLOT_DIRS["UMA(PBC)"],
+                                            directory_structure.ML_DIRS["UMA(PBC)"],
+                                            InputTemplates["UMA(PBC)"],
+                                            QueueScriptTemplates["UMA(PBC)"],
                                             SymmetrizeUnitCell)
         if "DFTB" in MethodsPBC:
             mbe_automation.inputs.dftb.Make(directory_structure.INP_DIRS,
