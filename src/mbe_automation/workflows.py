@@ -4,10 +4,12 @@ import mbe_automation.ml.data_clustering
 import mbe_automation.properties
 import mbe_automation.structure.crystal
 import mbe_automation.structure.relax
+import mbe_automation.display
 from mbe_automation.configs.training import TrainingConfig
 from mbe_automation.configs.properties import PropertiesConfig
+import mace.calculators
 
-
+    
 def compute_harmonic_properties(config: PropertiesConfig):
     if config.symmetrize_unit_cell:
         unit_cell = mbe_automation.structure.crystal.symmetrize(
@@ -16,6 +18,9 @@ def compute_harmonic_properties(config: PropertiesConfig):
     else:
         unit_cell = config.unit_cell.copy()
     molecule = config.molecule.copy()
+
+    if isinstance(config.calculator, mace.calculators.MACECalculator):
+        mbe_automation.display.mace_summary(config.calculator)
     #
     # Lattice energy on input geometries, without any geometry
     # relaxation of the unit cell or the isolated molecule.

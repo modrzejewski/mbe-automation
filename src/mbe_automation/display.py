@@ -1,4 +1,5 @@
 import sys
+import mace.calculators
 
 class ReplicatedOutput:
     def __init__(self, filename):
@@ -70,3 +71,29 @@ def multiline_framed(lines, padding=10, min_width=30):
     
     print("└" + horizontal_line + "┘")
 
+
+def mace_summary(calculator: mace.calculators.MACECalculator) -> None:
+    """
+    Print essential MACE model information.
+    
+    Args:
+        calculator: MACECalculator instance
+    """
+    
+    model = calculator.models[0]
+    total_params = sum(p.numel() for p in model.parameters())
+    dtype = str(next(model.parameters()).dtype) if total_params > 0 else 'unknown'
+    r_max = getattr(model, 'r_max', 'N/A')
+    num_interactions = getattr(model, 'num_interactions', 'N/A')
+    device = str(next(model.parameters()).device)
+
+    print("MACE Model Summary:")
+    print("-" * 30)
+    print(f"Device:               {device}")
+    print(f"Total parameters:     {total_params:,}")
+    print(f"Data type:            {dtype}")
+    print(f"r_max:                {r_max}")
+    print(f"num_interactions:     {num_interactions}")
+    
+
+    

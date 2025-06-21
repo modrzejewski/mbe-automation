@@ -10,7 +10,7 @@ import mbe_automation.single_point
                                                 # If the path already exists, e.g., it's your previous project,
                                                 # all existing files will be moved to a backup location.
                                                 #
-ProjectDirectory    = "./Projects/uma-test"
+ProjectDirectory    = "./Projects/ammonia-test"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.

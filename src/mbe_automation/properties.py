@@ -8,6 +8,8 @@ import sys
 import matplotlib.pyplot as plt
 import phonopy.units
 import os.path
+import torch
+import mace.calculators
 
 def phonons_from_finite_differences(
         unit_cell,
@@ -81,26 +83,40 @@ def phonons_from_finite_differences(
     plt.close()
     
 
-def static_lattice_energy(UnitCell, Molecule, calculator, SupercellRadius=None):
-    if SupercellRadius:
-        Dims = np.array(mbe_automation.kpoints.RminSupercell(UnitCell, SupercellRadius))
-        Cell = ase.build.make_supercell(UnitCell, np.diag(Dims))
+def static_lattice_energy(UnitCell, Molecule, calculator, SupercellRadius):
+
+    if isinstance(calculator, mace.calculators.MACECalculator):
+        cuda_available = torch.cuda.is_available()
     else:
-        Cell = UnitCell.copy()
+        cuda_available = False
+        
+    if cuda_available:
+        torch.cuda.reset_peak_memory_stats()
+    
+    Dims = np.array(mbe_automation.kpoints.RminSupercell(UnitCell, SupercellRadius))
+    Cell = ase.build.make_supercell(UnitCell, np.diag(Dims))
     Cell.calc = calculator
     Molecule.calc = calculator
     NAtoms = len(Molecule)
     if len(Cell) % NAtoms != 0:
         raise ValueError("Invalid number of atoms in the simulation cell: cannot determine the number of molecules")
     NMoleculesPerCell = len(Cell) // NAtoms
-    if SupercellRadius:
-        print(f"Static lattice energy: Γ-point, {Dims[0]}×{Dims[1]}×{Dims[2]} supercell with {NMoleculesPerCell} molecules")
-    else:
-        print(f"Static lattice energy: Γ-point, unit cell with {NMoleculesPerCell} molecules")
+
+    print("Computing static lattice energy")
+    print(f"supercell     {Dims[0]}×{Dims[1]}×{Dims[2]}")
+    print(f"n_atoms       {len(Cell)}")
+    print(f"n_molecules   {NMoleculesPerCell}")
 
     MoleculeEnergy = Molecule.get_potential_energy()
     CellEnergy = Cell.get_potential_energy()
     LatticeEnergy = (CellEnergy/NMoleculesPerCell - MoleculeEnergy) / (kJ/mol)
+    
+    print(f"Lattice energy = {LatticeEnergy:.3f} kJ/mol/molecule")
+    
+    if cuda_available:
+        peak_gpu = torch.cuda.max_memory_allocated()
+        print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
+        
     return LatticeEnergy
 
 

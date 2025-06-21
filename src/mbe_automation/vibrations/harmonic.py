@@ -5,6 +5,20 @@ from phonopy.structure.atoms import PhonopyAtoms
 import time
 import numpy as np
 import mbe_automation.kpoints
+import torch
+import mace.calculators
+
+def calculate_forces(supercell, calculator):
+    s_ase = Atoms(
+        symbols=supercell.symbols,
+        scaled_positions=supercell.scaled_positions,
+        cell=supercell.cell,
+        pbc=True
+    )
+    s_ase.calc = calculator
+    forces = s_ase.get_forces()
+    return forces
+
 
 def phonopy(
         UnitCell,
@@ -14,6 +28,14 @@ def phonopy(
         SupercellDisplacement=0.01,
         MeshRadius=100.0):
 
+    if isinstance(Calculator, mace.calculators.MACECalculator):
+        cuda_available = torch.cuda.is_available()
+    else:
+        cuda_available = False
+        
+    if cuda_available:
+        torch.cuda.reset_peak_memory_stats()
+    
     SupercellDims = mbe_automation.kpoints.RminSupercell(UnitCell, SupercellRadius)
 
     print("")
@@ -46,13 +68,9 @@ def phonopy(
     next_print = 10
 
     for i, s in enumerate(Supercells, 1):
-        s_ase = Atoms(
-            symbols=s.symbols,
-            scaled_positions=s.scaled_positions,
-            cell=s.cell,
-            pbc=True)
-        s_ase.calc = Calculator
-        Forces.append(s_ase.get_forces())
+        forces = calculate_forces(s, Calculator)
+        Forces.append(forces)
+
         progress = i * 100 // NSupercells
         if progress >= next_print:
             now = time.time()
@@ -60,6 +78,10 @@ def phonopy(
             last_time = now
             next_print += 10
 
+    if cuda_available:
+        peak_gpu = torch.cuda.max_memory_allocated()
+        print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
+            
     phonons.set_forces(Forces)
     #
     # Compute second-order dynamic matrix (Hessian)
