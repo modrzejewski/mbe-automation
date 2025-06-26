@@ -68,10 +68,16 @@ class TrainingConfig:
                                    #
     time_equilibration_fs: float = 5000.0
     
-    # Clustering and frame selection
-    select_n_frames: Dict[str, int] = field(default_factory=lambda: {
+    select_n_systems: Dict[str, int] = field(default_factory=lambda: {
         "crystals": 10,
-        "molecules": 10
+        "molecules": 10,
+        "dimers": 100,
+        "trimers": 0,
+        "tetramers": 0
     })
+
+
+
+    
 
     

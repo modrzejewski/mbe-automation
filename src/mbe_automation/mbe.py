@@ -77,7 +77,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     # contained within the supercell and no covalent
     # bonds go throught the boundary
     #
-    Molecules = clusters.GenerateMonomers(UnitCell, Na, Nb, Nc)
+    Molecules = clusters.extract_molecules(UnitCell, Na, Nb, Nc)
     NMolecules = len(Molecules)
     print(f"Molecules in the supercell: {NMolecules}")
     #

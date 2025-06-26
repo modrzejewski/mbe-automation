@@ -25,17 +25,10 @@ def compute_linkage_matrix_hdf5(hdf5_dataset, system_types=["crystals", "molecul
     print(f"Computing linkage matrices for {len(system_types)} system types")
     print(f"HDF5 file: {hdf5_dataset}")
 
-    clusters = ["dimers", "trimers", "tetramers"]
-    
     with h5py.File(hdf5_dataset, 'r+') as f:
         for system_type in system_types:
             print(f"\nProcessing system type: {system_type}")
-
-            if system_type in clusters:
-                hdf5_path = f"clusters/{system_type}"
-            else:
-                hdf5_path = system_type
-            
+            hdf5_path = system_type            
             feature_data = f[hdf5_path]['molecular_feature_vectors'][:]            
             print(f"Loaded molecular feature vectors: {feature_data.shape}")
             
@@ -91,13 +84,8 @@ def find_representative_frames_hdf5(hdf5_dataset,
     system_types = target_n_frames.keys()
     with h5py.File(hdf5_dataset, 'r+') as f:
         for system_type in system_types:
-            print(f"\nProcessing system type: {system_type}")
-            
-            clusters = ["dimers", "trimers", "tetramers"]
-            if system_type in clusters:
-                hdf5_path = f"clusters/{system_type}"
-            else:
-                hdf5_path = system_type
+            print(f"\nProcessing system type: {system_type}")            
+            hdf5_path = system_type
 
             X = f[hdf5_path]['molecular_feature_vectors'][:]
             n_frames = f[hdf5_path].attrs["n_frames"]
@@ -106,9 +94,10 @@ def find_representative_frames_hdf5(hdf5_dataset,
             print(f"Hierarchical agglomerative clustering")
             print(f"Target number of representative data frames: {min(n_frames, target_n_frames[system_type])}")
             
-            frame_to_cluster_map = fcluster(Z,
-                                            min(n_frames, target_n_frames[system_type]),
-                                            criterion='maxclust') - 1
+            frame_to_cluster_map = fcluster(
+                Z,
+                min(n_frames, target_n_frames[system_type]),
+                criterion='maxclust') - 1
             n_representative_frames = len(np.unique(frame_to_cluster_map))
             
             n_similar_frames = np.zeros(n_representative_frames, dtype=int)
@@ -159,9 +148,6 @@ def plot_cluster_sizes(hdf5_dataset, training_dir, system_types=["crystals", "mo
         Saves plot to training_dir
     """
     
-    clusters = ["dimers", "trimers", "tetramers"]
-    
-    # Create figure with stacked subplots
     n_types = len(system_types)
     fig, axes = plt.subplots(n_types, 1, figsize=(10, 4*n_types), sharex=True)
     
@@ -171,50 +157,32 @@ def plot_cluster_sizes(hdf5_dataset, training_dir, system_types=["crystals", "mo
     
     with h5py.File(hdf5_dataset, 'r') as f:
         for idx, system_type in enumerate(system_types):
-            # Get HDF5 path
-            if system_type in clusters:
-                hdf5_path = f"clusters/{system_type}"
-            else:
-                hdf5_path = system_type
-            
-            # Check if required data exists
+            hdf5_path = system_type            
             if 'n_similar_frames' not in f[hdf5_path]:
                 print(f"Warning: No clustering data found for {system_type}")
                 continue
             
-            # Load data
             n_similar_frames = f[hdf5_path]['n_similar_frames'][:]
-            n_representative_frames = len(n_similar_frames)
-            
-            # Create cluster indices
+            n_representative_frames = len(n_similar_frames)            
             cluster_indices = np.arange(n_representative_frames)
             
-            # Plot on the appropriate subplot
             ax = axes[idx]
             ax.plot(cluster_indices, n_similar_frames, 'bo-', linewidth=2, markersize=6)
             
-            # Formatting
             ax.set_ylabel('Number of Similar Data Frames', fontsize=12)
             ax.set_title(f'{system_type.capitalize()}', fontsize=14)
             ax.grid(True, alpha=0.3)
             
-            # Add text annotation for total frames
             total_frames = np.sum(n_similar_frames)
             ax.text(0.02, 0.95, f'Total frames: {total_frames}', 
                    transform=ax.transAxes, verticalalignment='top',
                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
-    # Set x-label only on the bottom subplot
     axes[-1].set_xlabel('Representative Frame Index', fontsize=12)
-    
-    # Add main title
     fig.suptitle('Cluster Sizes by System Type', fontsize=16, y=0.995)
-    
     plt.tight_layout()
-    
-    # Save plot
     filename = os.path.join(training_dir, 'cluster_sizes.png')
     plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close(fig)  # Close figure to free memory
+    plt.close(fig)
     print(f"Plot saved as {filename}")
 

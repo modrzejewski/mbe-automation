@@ -79,3 +79,5 @@ def DetermineSpaceGroupSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-2
         SymmetrizedUnitCell.write(SymmUnitCellXYZ)    
         print(f"Symmetrized unit cell stored in {SymmUnitCellXYZ}")
     return SymmetrizedUnitCell, SymmetryChanged
+
+

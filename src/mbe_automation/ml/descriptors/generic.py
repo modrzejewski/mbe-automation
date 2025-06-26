@@ -45,24 +45,13 @@ def normalized_hdf5(hdf5_dataset, system_types, reference_system_type="crystals"
     reference_system_type : str, default="crystals"
         System type providing normalization statistics. 
     """
-    clusters = ["dimers", "trimers", "tetramers"]
     with h5py.File(hdf5_dataset, 'r+') as f:
-        if reference_system_type in clusters:
-            ref_path = f"clusters/{reference_system_type}"
-        else:
-            ref_path = reference_system_type
-            
-        ref_group = f[ref_path]
+        ref_group = f[reference_system_type]
         feature_vector_mean = ref_group['feature_vector_mean'][:]
         feature_vector_sigma = ref_group['feature_vector_sigma'][:]
         
         for system_type in system_types:
-            if system_type in clusters:
-                system_path = f"clusters/{system_type}"
-            else:
-                system_path = system_type
-                
-            group = f[system_path]
+            group = f[system_type]
             feature_vectors = group['feature_vectors'][:]
             atomic_numbers = group['atomic_numbers'][:]
             
@@ -126,15 +115,9 @@ def molecular_hdf5(hdf5_dataset, system_types=["molecules", "crystals"]):
     system_types : list
         System types for which to compute molecular descriptors
     """
-    clusters = ["dimers", "trimers", "tetramers"]
     with h5py.File(hdf5_dataset, 'r+') as f:
         for system_type in system_types:
-            if system_type in clusters:
-                system_path = f"clusters/{system_type}"
-            else:
-                system_path = system_type
-                
-            group = f[system_path]
+            group = f[system_type]
             normalized_feature_vectors = group['normalized_feature_vectors'][:]
             atomic_numbers = group['atomic_numbers'][:]
             
