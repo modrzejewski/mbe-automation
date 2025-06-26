@@ -2,7 +2,9 @@ import mbe_automation.ml.descriptors.mace
 import mbe_automation.ml.training_data
 import mbe_automation.ml.data_clustering
 import mbe_automation.properties
+import mbe_automation.vibrations.harmonic
 import mbe_automation.structure.crystal
+import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.display
 from mbe_automation.configs.training import TrainingConfig
@@ -106,9 +108,28 @@ def compute_harmonic_properties(config: PropertiesConfig):
 
     ΔE_vib = (molecule_properties["vibrational energy (kJ/mol)"] -
               crystal_properties["vibrational energy (kJ/mol)"])
-
+    #
+    # Sublimation enthalpy
+    # - harmonic approximation of crystal and molecular vibrations
+    # - noninteracting particle in a box approximation
+    #   for the translations of the molecule
+    # - rigid rotor/asymmetric top approximation for the rotations
+    #   of the molecule
+    #
+    # Definitions of the lattice energy, sublimation enthalpy
+    # (DeltaHsub) and the vibratonal contribution (DeltaEvib)
+    # are consistent with ref 1.
+    #
+    # Well-explained formulas are in ref 2.
+    #
+    # 1. Della Pia, Zen, Alfe, Michaelides, How Accurate are Simulations
+    #    and Experiments for the Lattice Energies of Molecular Crystals?
+    #    Phys. Rev. Lett. 133, 046401 (2024); doi: 10.1103/PhysRevLett.133.046401
+    # 2. Dolgonos, Hoja, Boese, Revised values for the X23 benchmark
+    #    set of molecular crystals,
+    #    Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
+    #
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
-
     sublimation_enthalpy = np.zeros(len(config.temperatures))
     for i, T in enumerate(config.temperatures):
         kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
