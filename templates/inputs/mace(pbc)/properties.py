@@ -4,6 +4,7 @@ import mace.calculators
 from mbe_automation.configs.properties import PropertiesConfig
 import mbe_automation.workflows
 import mbe_automation.io
+import torch
 
 xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
