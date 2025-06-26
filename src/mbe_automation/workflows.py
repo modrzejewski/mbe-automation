@@ -105,7 +105,6 @@ def compute_harmonic_properties(config: PropertiesConfig):
         config.calculator,
         config.temperatures
     )
-
     ΔE_vib = (molecule_properties["vibrational energy (kJ/mol)"] -
               crystal_properties["vibrational energy (kJ/mol)"])
     #
@@ -134,20 +133,20 @@ def compute_harmonic_properties(config: PropertiesConfig):
     for i, T in enumerate(config.temperatures):
         kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
         if rotor_type == "nonlinear":
-            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib + (3/2+3/2+1) * kbT
+            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib[i] + (3/2+3/2+1) * kbT
         elif rotor_type == "linear":
-            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib + (3/2+1+1) * kbT
+            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib[i] + (3/2+1+1) * kbT
         elif rotor_type == "monatomic":
-            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib + (3/2+1) * kbT
+            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib[i] + (3/2+1) * kbT
         
     
     print(f"Thermodynamic properties within the harmonic approximation")
     print(f"Energies (kJ/mol/molecule):")
     print(f"{'Elatt (input coords)':20} {lattice_energy_noopt:.3f}")
     print(f"{'Elatt (relaxed coords)':20} {lattice_energy:.3f}")
-    for i, T in enumerate(config.temperatures):
-        print(f"{'ΔEvib(T={T}K)':20} {ΔE_vib:.3f}")
-        print(f"{'ΔHsub(T={T}K)':20} {sublimation_enthalpy[i]:.3f}")
+    for i, T in enumerate(config.temperatures):        
+        print(f"ΔEvib(T={T}K) {ΔE_vib[i]:.3f}")
+        print(f"ΔHsub(T={T}K) {sublimation_enthalpy[i]:.3f}")
     
 
 def create_training_dataset_mace(config: TrainingConfig):

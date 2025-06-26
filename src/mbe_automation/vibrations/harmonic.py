@@ -30,7 +30,8 @@ def isolated_molecule(
     vib = ase.vibrations.Vibrations(molecule)
     vib.run()
     vib_energies = vib.get_energies()  # in eV
-    thermo = ase.thermochemistry.HarmonicThermo(vib_energies)
+    thermo = ase.thermochemistry.HarmonicThermo(vib_energies, ignore_imag_modes=True)
+    print(f"Number of imaginary modes: {thermo.n_imag}")
 
     n_temperatures = len(temperatures)
     F_vib = np.zeros(n_temperatures)
@@ -154,7 +155,7 @@ def phonopy(
     # Automatically determine the high-symmetry path
     # through the Brillouin zone
     #
-    phonons.auto_band_structure(is_band_connection=True)
+    phonons.auto_band_structure()
     
     return thermodynamic_functions, phonon_dos, phonons
 

@@ -71,8 +71,8 @@ def phonons_from_finite_differences(
     # (energy unit)/mol of unit cells to 
     # (energy unit)/mol of molecules
     #
-    F = F * (len(unit_cell)/len(molecule))
-    S = S * (len(unit_cell)/len(molecule))
+    F = F * (len(molecule)/len(unit_cell))
+    S = S * (len(molecule)/len(unit_cell))
     #
     # Vibrational contribution to the inernal energy
     # Includes zero-point energy

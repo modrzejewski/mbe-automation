@@ -1,7 +1,7 @@
 import numpy as np
 import ase
 import pyscf
-import pyscf.hessian
+import pyscf.hessian.thermo
 from typing import Tuple, Optional
 
 
