@@ -90,20 +90,12 @@ def atomic_hdf5(hdf5_dataset, calc, system_types):
         print(f"Processing {len(system_types)} system type(s)")
         
         for system_type in system_types:
-            if system_type in ['dimers', 'trimers', 'tetramers']:
-                system_path = f'clusters/{system_type}'
-                if 'clusters' not in f or system_type not in f['clusters']:
-                    print(f"Warning: {system_path} not found, skipping")
-                    continue
-                group = f['clusters'][system_type]
-            else:
-                system_path = system_type
-                if system_type not in f:
-                    print(f"Warning: {system_type} not found, skipping")
-                    continue
-                group = f[system_type]
+            if system_type not in f:
+                print(f"Warning: {system_type} not found, skipping")
+                continue
+            group = f[system_type]
             
-            print(f"\nProcessing {system_path}...")
+            print(f"\nProcessing {system_type}...")
             
             positions = group['positions'][:]
             atomic_numbers = group['atomic_numbers'][:]

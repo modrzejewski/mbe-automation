@@ -13,6 +13,7 @@ import mace.calculators
 
 def phonons_from_finite_differences(
         unit_cell,
+        molecule,
         calculator,
         temperatures,
         supercell_radius,
@@ -45,7 +46,8 @@ def phonons_from_finite_differences(
     #
     mbe_automation.vibrations.harmonic.my_plot_band_structure(
         phonons,
-        os.path.join(properties_dir, "phonon_dispersion.png")
+        os.path.join(properties_dir, "phonon_dispersion.png"),
+        band_connection=True
     )
 
     T = thermodynamic_functions["temperatures"]
@@ -64,6 +66,22 @@ def phonons_from_finite_differences(
     #
     CvInf = 3 * len(unit_cell) * phonopy.units.Avogadro * phonopy.units.kb_J
     Cv = Cv / CvInf
+    #
+    # Changing units of F, S from
+    # (energy unit)/mol of unit cells to 
+    # (energy unit)/mol of molecules
+    #
+    F = F * (len(molecule)/len(unit_cell))
+    S = S * (len(molecule)/len(unit_cell))
+    #
+    # Vibrational contribution to the inernal energy
+    # Includes zero-point energy
+    #
+    E_vib = np.zeros(len(temperatures))
+    E_vib = F + temperatures * S / 1000  # kJ/mol
+    #
+    # Plots
+    #
     plt.plot(T, Cv)
     plt.xlabel('Temperature (K)')
     plt.ylabel('Cv/(3*NAtoms*kb)')
@@ -71,9 +89,7 @@ def phonons_from_finite_differences(
     plt.tight_layout()
     plt.savefig(os.path.join(properties_dir, "heat_capacity.png"), dpi=300, bbox_inches='tight')
     plt.close()
-    #
-    # Plot
-    #
+
     plt.plot(T, S)
     plt.xlabel('Temperature (K)')
     plt.ylabel('Entropy (J/K/mol)')
@@ -81,8 +97,23 @@ def phonons_from_finite_differences(
     plt.tight_layout()
     plt.savefig(os.path.join(properties_dir, "entropy.png"), dpi=300, bbox_inches='tight')
     plt.close()
-    
 
+    plt.plot(T, F)
+    plt.xlabel('Temperature (K)')
+    plt.ylabel('Free energy (kJ/mol)')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(properties_dir, "free_energy.png"), dpi=300, bbox_inches='tight')
+    plt.close()
+
+    return {
+        "vibrational energy (kJ/mol)" : E_vib, 
+        "vibrational entropy (J/K/mol)" : S,
+        "vibrational Helmholtz free energy (kJ/mol)" : F,
+        "vibrational heat capacity" : Cv
+        }
+
+    
 def static_lattice_energy(UnitCell, Molecule, calculator, SupercellRadius):
 
     if isinstance(calculator, mace.calculators.MACECalculator):

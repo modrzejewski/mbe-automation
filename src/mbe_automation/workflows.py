@@ -2,14 +2,19 @@ import mbe_automation.ml.descriptors.mace
 import mbe_automation.ml.training_data
 import mbe_automation.ml.data_clustering
 import mbe_automation.properties
+import mbe_automation.vibrations.harmonic
 import mbe_automation.structure.crystal
+import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.display
 from mbe_automation.configs.training import TrainingConfig
 from mbe_automation.configs.properties import PropertiesConfig
 import mace.calculators
 import os
-    
+import ase.units
+import numpy as np
+
+
 def compute_harmonic_properties(config: PropertiesConfig):
 
     os.makedirs(config.properties_dir, exist_ok=True)
@@ -82,8 +87,9 @@ def compute_harmonic_properties(config: PropertiesConfig):
     # phonon dispersion, vibrational contributions
     # to entropy and free energy
     #
-    mbe_automation.properties.phonons_from_finite_differences(
+    crystal_properties = mbe_automation.properties.phonons_from_finite_differences(
         unit_cell,
+        molecule,
         config.calculator,
         config.temperatures,
         config.supercell_radius,
@@ -91,11 +97,56 @@ def compute_harmonic_properties(config: PropertiesConfig):
         config.properties_dir,
         config.hdf5_dataset
     )
+    #
+    # Vibrational contributions to E, S, F of the isolated molecule
+    #
+    molecule_properties = mbe_automation.vibrations.harmonic.isolated_molecule(
+        molecule,
+        config.calculator,
+        config.temperatures
+    )
+    ΔE_vib = (molecule_properties["vibrational energy (kJ/mol)"] -
+              crystal_properties["vibrational energy (kJ/mol)"])
+    #
+    # Sublimation enthalpy
+    # - harmonic approximation of crystal and molecular vibrations
+    # - noninteracting particle in a box approximation
+    #   for the translations of the molecule
+    # - rigid rotor/asymmetric top approximation for the rotations
+    #   of the molecule
+    #
+    # Definitions of the lattice energy, sublimation enthalpy
+    # (DeltaHsub) and the vibratonal contribution (DeltaEvib)
+    # are consistent with ref 1.
+    #
+    # Well-explained formulas are in ref 2.
+    #
+    # 1. Della Pia, Zen, Alfe, Michaelides, How Accurate are Simulations
+    #    and Experiments for the Lattice Energies of Molecular Crystals?
+    #    Phys. Rev. Lett. 133, 046401 (2024); doi: 10.1103/PhysRevLett.133.046401
+    # 2. Dolgonos, Hoja, Boese, Revised values for the X23 benchmark
+    #    set of molecular crystals,
+    #    Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
+    #
+    rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
+    sublimation_enthalpy = np.zeros(len(config.temperatures))
+    for i, T in enumerate(config.temperatures):
+        kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
+        if rotor_type == "nonlinear":
+            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib[i] + (3/2+3/2+1) * kbT
+        elif rotor_type == "linear":
+            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib[i] + (3/2+1+1) * kbT
+        elif rotor_type == "monatomic":
+            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib[i] + (3/2+1) * kbT
+        
     
     print(f"Thermodynamic properties within the harmonic approximation")
     print(f"Energies (kJ/mol/molecule):")
-    print(f"{'static lattice energy (input coords)':40} {lattice_energy_noopt:.3f}")
-    print(f"{'static lattice energy (relaxed coords)':40} {lattice_energy:.3f}")
+    print(f"{'Elatt (input coords)':20} {lattice_energy_noopt:.3f}")
+    print(f"{'Elatt (relaxed coords)':20} {lattice_energy:.3f}")
+    for i, T in enumerate(config.temperatures):        
+        print(f"ΔEvib(T={T}K) {ΔE_vib[i]:.3f}")
+        print(f"ΔHsub(T={T}K) {sublimation_enthalpy[i]:.3f}")
     
 
 def create_training_dataset_mace(config: TrainingConfig):
@@ -171,7 +222,7 @@ def create_training_dataset_mace(config: TrainingConfig):
     )
     #
     # Divide data into N data clusters, where N is specified
-    # in select_n_frames for each system type.
+    # in select_n_systems for each system type.
     #
     # Each data cluster is represented by a dataframe which
     # is closest to the cluster's average feature vector.
@@ -182,12 +233,28 @@ def create_training_dataset_mace(config: TrainingConfig):
     #
     mbe_automation.ml.data_clustering.find_representative_frames_hdf5(
         config.hdf5_dataset,
-        config.select_n_frames
+        {k: v for k, v in config.select_n_systems.items()
+         if k in ["crystals", "molecules"] and v > 0}
     )
+    #
+    # Extract dimers, trimers, and tetramers of molecules
+    # from the selected frames of molecular dynamics
+    #
+    mbe_automation.ml.data_clustering.find_representative_frames_hdf5(
+        config.hdf5_dataset,
+        {k: v for k, v in config.select_n_systems.items()
+         if k in ["dimers", "trimers", "tetramers"] and v > 0}
+    )
+    #
+    # Plot number of similar structures merged
+    # into a single data point
+    #
     mbe_automation.ml.data_clustering.plot_cluster_sizes(
         config.hdf5_dataset,
         config.training_dir,
-        system_types=["crystals", "molecules"])
+        system_types = {k: v for k, v in config.select_n_systems.items()
+                        if v > 0}
+    )
     #
     # Print out the structure of the HDF5 file
     #

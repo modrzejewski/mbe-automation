@@ -10,7 +10,7 @@ import mbe_automation.single_point
                                                 # If the path already exists, e.g., it's your previous project,
                                                 # all existing files will be moved to a backup location.
                                                 #
-ProjectDirectory    = "./Projects/ammonia-test"
+ProjectDirectory    = "./Projects/piracetam/VI"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -29,7 +29,7 @@ Methods = ["RPA", "LNO-CCSD(T)", "MACE(PBC)", "DFTB(PBC)", "UMA(PBC)"]
                                                 # a CIF file or a POSCAR file.
                                                 #
                                                 
-UnitCellFile        = "./Systems/X23/04_ammonia/solid.xyz"
+UnitCellFile        = "./Systems/piracetam/form_VI/POSCAR"
 
                                                 #
                                                 # Types of calculated systems. Allowed values:
@@ -59,7 +59,7 @@ SystemTypes         = ["monomers", "dimers", "bulk"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/04_ammonia/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/piracetam/conf_1/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs

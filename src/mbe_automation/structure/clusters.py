@@ -69,7 +69,13 @@ def GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs):
     return Ghosts
 
 
-def GenerateMonomers(UnitCell, Na, Nb, Nc):
+def extract_molecules(UnitCell, Na=1, Nb=1, Nc=1):
+    """
+    Extract a list of molecules for which all atoms are within
+    the Na x Nb x Nc supercell. The molecules for which any covalent
+    bond goes through the boundary of the supercell are discarded.
+
+    """
     Supercell = ase.build.make_supercell(UnitCell, np.diag(np.array([Na, Nb, Nc])))
     BondCutoffs = neighborlist.natural_cutoffs(Supercell)
     NeighborList = neighborlist.build_neighbor_list(Supercell, BondCutoffs)
@@ -123,8 +129,7 @@ def GetSupercellDimensions(UnitCell, SupercellRadius):
     #     any molecule belonging to the supercell.
     #
     #     The supercell dimension Na x Nb x Nc is automatically determined
-    #     such that Na, Nb, Nc are the minimum values such that the following
-    #     is satisfied
+    #     so that the following inequality is satisfied
     #
     #     Dq > Hq + 2 * R
     #
