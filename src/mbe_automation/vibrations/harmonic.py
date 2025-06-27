@@ -30,6 +30,21 @@ def isolated_molecule(
     vib = ase.vibrations.Vibrations(molecule)
     vib.run()
     vib_energies = vib.get_energies()  # in eV
+    n_atoms = len(molecule)
+    rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
+    print(f"rotor type: {rotor_type}")
+    if rotor_type == 'nonlinear':
+        vib_energies = vib_energies[-(3 * n_atoms - 6):]
+    elif rotor_type == 'linear':
+        vib_energies = vib_energies[-(3 * n_atoms - 5):]
+    elif rotor_type == 'monatomic':
+        vib_energies = []
+    else:
+        raise ValueError(f"Unsupported geometry: {geometry}")
+    
+    for i, energy in enumerate(vib_energies):
+        print(f"{i:6} {energy}")
+        
     thermo = ase.thermochemistry.HarmonicThermo(vib_energies, ignore_imag_modes=True)
     print(f"Number of imaginary modes: {thermo.n_imag}")
 
