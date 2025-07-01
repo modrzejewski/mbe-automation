@@ -156,12 +156,11 @@ def quasi_harmonic_approximation_properties(
         UnitCell,
         molecule,
         Calculator,
-        volume_strain_range=(-0.05, 0.05),
-        n_volumes=8,
         Temperatures=np.arange(0, 1001, 10),
         SupercellRadius=30.0,
         SupercellDisplacement=0.01,
-        MeshRadius=100.0,
+        volume_strain_range=(-0.05, 0.05),
+        n_volumes=8,
         eos_type='vinet'):
     """
     Perform quasi-harmonic approximation by sampling over volumes
@@ -231,8 +230,7 @@ def quasi_harmonic_approximation_properties(
                 Calculator,
                 Temperatures,
                 Supercell_Radius,
-                Supercell_Displacement,
-                Mesh_radius)  
+                Supercell_Displacement)  
         # Calculate electronic energy
         scaled_unit_cell.calc(Calculator) 
         e_electronic = scaled_unit_cell.get_potencial_energy()
