@@ -116,7 +116,6 @@ def phonopy(
     phonons = Phonopy(
         phonopy_struct,
         supercell_matrix=np.diag(SupercellDims))
-    print(phonons)
     phonons.generate_displacements(distance=SupercellDisplacement)
 
     Supercells = phonons.get_supercells_with_displacements()
@@ -172,7 +171,13 @@ def phonopy(
     # through the Brillouin zone
     #
     phonons.auto_band_structure()
-    
+    #
+    # Get gamma point freguencies
+    #
+    phonon.set_qpoints([[0, 0, 0]])  # Gamma point
+    frequencies, eigenvectors = phonon.get_frequencies_with_eigenvectors([0, 0, 0])
+    print(frequencies)
+
     return thermodynamic_functions, phonon_dos, phonons
 
 
