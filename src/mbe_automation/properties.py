@@ -12,6 +12,146 @@ import torch
 import mace.calculators
 import mbe_automation.structure.relax
 
+def phonons_from_finite_differences(
+        unit_cell,
+        molecule,
+        calculator,
+        temperatures,
+        supercell_radius,
+        supercell_displacement,
+        properties_dir,
+        hdf5_dataset
+):
+    
+    mesh_radius = 100.0
+    thermodynamic_functions, dos, phonons = mbe_automation.vibrations.harmonic.phonopy(
+        unit_cell,
+        calculator,
+        temperatures,
+        supercell_radius,
+        supercell_displacement,
+        mesh_radius)
+    # 
+    # Plot density of states
+    #
+    normalized_dos = dos["total_dos"] / (3 * len(unit_cell))
+    plt.plot(dos["frequency_points"], normalized_dos)
+    plt.xlabel('Frequency (THz)')
+    plt.ylabel('DOS (states/THz/(3*NAtoms))')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(properties_dir, "phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
+    plt.close()
+    #
+    # Plot phonon dispersion
+    #
+    mbe_automation.vibrations.harmonic.my_plot_band_structure(
+        phonons,
+        os.path.join(properties_dir, "phonon_dispersion.png"),
+        band_connection=True
+    )
+
+    T = thermodynamic_functions["temperatures"]
+    Cv = thermodynamic_functions["heat_capacity"]
+    F = thermodynamic_functions["free_energy"]
+    S = thermodynamic_functions["entropy"]
+    #
+    # Normalize Cv to Cv/CvInf where
+    # CvInf = lim(T->Inf) Cv(T) = 3 * N * kb 
+    # is the classical limit of heat capacity.
+    #
+    # Cv/CvInf is heat capacity per single
+    # atom in the unit cell. Cv/CvInf approaches
+    # 1.0 at high temperatures.
+    # 
+    #
+    CvInf = 3 * len(unit_cell) * phonopy.units.Avogadro * phonopy.units.kb_J
+    Cv = Cv / CvInf
+    #
+    # Changing units of F, S from
+    # (energy unit)/mol of unit cells to 
+    # (energy unit)/mol of molecules
+    #
+    F = F * (len(molecule)/len(unit_cell))
+    S = S * (len(molecule)/len(unit_cell))
+    #
+    # Vibrational contribution to the inernal energy
+    # Includes zero-point energy
+    #
+    E_vib = np.zeros(len(temperatures))
+    E_vib = F + temperatures * S / 1000  # kJ/mol
+    #
+    # Plots
+    #
+    plt.plot(T, Cv)
+    plt.xlabel('Temperature (K)')
+    plt.ylabel('Cv/(3*NAtoms*kb)')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(properties_dir, "heat_capacity.png"), dpi=300, bbox_inches='tight')
+    plt.close()
+
+    plt.plot(T, S)
+    plt.xlabel('Temperature (K)')
+    plt.ylabel('Entropy (J/K/mol)')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(properties_dir, "entropy.png"), dpi=300, bbox_inches='tight')
+    plt.close()
+
+    plt.plot(T, F)
+    plt.xlabel('Temperature (K)')
+    plt.ylabel('Free energy (kJ/mol)')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(properties_dir, "free_energy.png"), dpi=300, bbox_inches='tight')
+    plt.close()
+
+    return {
+        "vibrational energy (kJ/mol)" : E_vib,
+        "vibrational entropy (J/K/mol)" : S,
+        "vibrational Helmholtz free energy (kJ/mol)" : F,
+        "vibrational heat capacity" : Cv
+        }
+
+
+    
+def static_lattice_energy(UnitCell, Molecule, calculator, SupercellRadius):
+
+    if isinstance(calculator, mace.calculators.MACECalculator):
+        cuda_available = torch.cuda.is_available()
+    else:
+        cuda_available = False
+        
+    if cuda_available:
+        torch.cuda.reset_peak_memory_stats()
+    
+    Dims = np.array(mbe_automation.kpoints.RminSupercell(UnitCell, SupercellRadius))
+    Cell = ase.build.make_supercell(UnitCell, np.diag(Dims))
+    Cell.calc = calculator
+    Molecule.calc = calculator
+    NAtoms = len(Molecule)
+    if len(Cell) % NAtoms != 0:
+        raise ValueError("Invalid number of atoms in the simulation cell: cannot determine the number of molecules")
+    NMoleculesPerCell = len(Cell) // NAtoms
+
+    print("Computing static lattice energy")
+    print(f"supercell     {Dims[0]}×{Dims[1]}×{Dims[2]}")
+    print(f"n_atoms       {len(Cell)}")
+    print(f"n_molecules   {NMoleculesPerCell}")
+
+    MoleculeEnergy = Molecule.get_potential_energy()
+    CellEnergy = Cell.get_potential_energy()
+    LatticeEnergy = (CellEnergy/NMoleculesPerCell - MoleculeEnergy) / (kJ/mol)
+    
+    print(f"Lattice energy = {LatticeEnergy:.3f} kJ/mol/molecule")
+    
+    if cuda_available:
+        peak_gpu = torch.cuda.max_memory_allocated()
+        print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
+        
+    return LatticeEnergy
+
 def quasi_harmonic_approximation_properties(
         UnitCell,
         molecule,
@@ -157,147 +297,6 @@ def quasi_harmonic_approximation_properties(
     
     return qha_results, qha, phonon_objects
 
-
-
-def phonons_from_finite_differences(
-        unit_cell,
-        molecule,
-        calculator,
-        temperatures,
-        supercell_radius,
-        supercell_displacement,
-        properties_dir,
-        hdf5_dataset
-):
-    
-    mesh_radius = 100.0
-    thermodynamic_functions, dos, phonons = mbe_automation.vibrations.harmonic.phonopy(
-        unit_cell,
-        calculator,
-        temperatures,
-        supercell_radius,
-        supercell_displacement,
-        mesh_radius)
-    # 
-    # Plot density of states
-    #
-    normalized_dos = dos["total_dos"] / (3 * len(unit_cell))
-    plt.plot(dos["frequency_points"], normalized_dos)
-    plt.xlabel('Frequency (THz)')
-    plt.ylabel('DOS (states/THz/(3*NAtoms))')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(os.path.join(properties_dir, "phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
-    plt.close()
-    #
-    # Plot phonon dispersion
-    #
-    mbe_automation.vibrations.harmonic.my_plot_band_structure(
-        phonons,
-        os.path.join(properties_dir, "phonon_dispersion.png"),
-        band_connection=True
-    )
-
-    T = thermodynamic_functions["temperatures"]
-    Cv = thermodynamic_functions["heat_capacity"]
-    F = thermodynamic_functions["free_energy"]
-    S = thermodynamic_functions["entropy"]
-    #
-    # Normalize Cv to Cv/CvInf where
-    # CvInf = lim(T->Inf) Cv(T) = 3 * N * kb 
-    # is the classical limit of heat capacity.
-    #
-    # Cv/CvInf is heat capacity per single
-    # atom in the unit cell. Cv/CvInf approaches
-    # 1.0 at high temperatures.
-    # 
-    #
-    CvInf = 3 * len(unit_cell) * phonopy.units.Avogadro * phonopy.units.kb_J
-    Cv = Cv / CvInf
-    #
-    # Changing units of F, S from
-    # (energy unit)/mol of unit cells to 
-    # (energy unit)/mol of molecules
-    #
-    F = F * (len(molecule)/len(unit_cell))
-    S = S * (len(molecule)/len(unit_cell))
-    #
-    # Vibrational contribution to the inernal energy
-    # Includes zero-point energy
-    #
-    E_vib = np.zeros(len(temperatures))
-    E_vib = F + temperatures * S / 1000  # kJ/mol
-    #
-    # Plots
-    #
-    plt.plot(T, Cv)
-    plt.xlabel('Temperature (K)')
-    plt.ylabel('Cv/(3*NAtoms*kb)')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(os.path.join(properties_dir, "heat_capacity.png"), dpi=300, bbox_inches='tight')
-    plt.close()
-
-    plt.plot(T, S)
-    plt.xlabel('Temperature (K)')
-    plt.ylabel('Entropy (J/K/mol)')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(os.path.join(properties_dir, "entropy.png"), dpi=300, bbox_inches='tight')
-    plt.close()
-
-    plt.plot(T, F)
-    plt.xlabel('Temperature (K)')
-    plt.ylabel('Free energy (kJ/mol)')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(os.path.join(properties_dir, "free_energy.png"), dpi=300, bbox_inches='tight')
-    plt.close()
-
-    return {
-        "vibrational energy (kJ/mol)" : E_vib,
-        "vibrational entropy (J/K/mol)" : S,
-        "vibrational Helmholtz free energy (kJ/mol)" : F,
-        "vibrational heat capacity" : Cv
-        }
-
-
-    
-def static_lattice_energy(UnitCell, Molecule, calculator, SupercellRadius):
-
-    if isinstance(calculator, mace.calculators.MACECalculator):
-        cuda_available = torch.cuda.is_available()
-    else:
-        cuda_available = False
-        
-    if cuda_available:
-        torch.cuda.reset_peak_memory_stats()
-    
-    Dims = np.array(mbe_automation.kpoints.RminSupercell(UnitCell, SupercellRadius))
-    Cell = ase.build.make_supercell(UnitCell, np.diag(Dims))
-    Cell.calc = calculator
-    Molecule.calc = calculator
-    NAtoms = len(Molecule)
-    if len(Cell) % NAtoms != 0:
-        raise ValueError("Invalid number of atoms in the simulation cell: cannot determine the number of molecules")
-    NMoleculesPerCell = len(Cell) // NAtoms
-
-    print("Computing static lattice energy")
-    print(f"supercell     {Dims[0]}×{Dims[1]}×{Dims[2]}")
-    print(f"n_atoms       {len(Cell)}")
-    print(f"n_molecules   {NMoleculesPerCell}")
-
-    MoleculeEnergy = Molecule.get_potential_energy()
-    CellEnergy = Cell.get_potential_energy()
-    LatticeEnergy = (CellEnergy/NMoleculesPerCell - MoleculeEnergy) / (kJ/mol)
-    
-    print(f"Lattice energy = {LatticeEnergy:.3f} kJ/mol/molecule")
-    
-    if cuda_available:
-        peak_gpu = torch.cuda.max_memory_allocated()
-        print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
-        
-    return LatticeEnergy
 
 
 def plot_dispersion_with_phonopy(phonons, output_dir):
