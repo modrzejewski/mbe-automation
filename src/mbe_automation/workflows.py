@@ -150,7 +150,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
     #
     # Calculation of thermodynamic properties in quasi-harmonic-approximation
     #
-    qha_results, qha, phonon_objects = mbe_automation.properties.quasi_harmonic_approximation_properties(
+    qha_properties, qha, phonon_objects = mbe_automation.properties.quasi_harmonic_approximation_properties(
         unit_cell,
         molecule,
         config.calculator,
@@ -159,7 +159,10 @@ def compute_harmonic_properties(config: PropertiesConfig):
         config.supercell_displacement
     )
     print(f"Thermodynamic properties within the quasi harmonic approximation")
-    print(qha_results)
+    #
+    # Free energy for QHA aprrox
+    #
+    print("Cp", qha_properties('heat_capacity_P'))
 
 def create_training_dataset_mace(config: TrainingConfig):
 
