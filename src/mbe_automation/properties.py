@@ -11,7 +11,7 @@ import os.path
 import torch
 import mace.calculators
 import mbe_automation.structure.relax
-from phonopy.qha import qha
+from phonopy.qha import core.QHA as QHA
 
 def phonons_from_finite_differences(
         unit_cell,
