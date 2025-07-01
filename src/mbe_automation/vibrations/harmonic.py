@@ -481,3 +481,124 @@ def my_plot_band_structure_first_segment_only(phonons, output_path):
 #     plt.savefig(output_path, dpi=300, bbox_inches='tight',
 #                 facecolor='white', edgecolor='none')
 #     plt.close()
+def quasi_harmonic_approximation(
+        UnitCell,
+        Calculator,
+        volume_strain_range=(-0.1, 0.1),
+        n_volumes=11,
+        Temperatures=np.arange(0, 1001, 10),
+        SupercellRadius=30.0,
+        SupercellDisplacement=0.01,
+        MeshRadius=100.0,
+        eos_type='vinet'):
+    """
+    Perform quasi-harmonic approximation by sampling over volumes
+    
+    Parameters:
+    -----------
+    UnitCell : ASE Atoms
+        Unit cell structure
+    Calculator : ASE calculator
+        Force calculator
+    volume_strain_range : tuple
+        Range of volume strains (min_strain, max_strain)
+    n_volumes : int
+        Number of volume points to sample
+    eos_type : str
+        Equation of state type ('vinet', 'birch_murnaghan', etc.)
+    """
+    
+    original_cell = UnitCell.cell.copy()
+    original_volume = UnitCell.get_volume()
+    
+    print(f"\nQuasi-Harmonic Approximation")
+    print(f"Original volume: {original_volume:.2f} Ų")
+    print(f"Volume strain range: {volume_strain_range[0]:.1%} to {volume_strain_range[1]:.1%}")
+    print(f"Number of volume points: {n_volumes}")
+    print(f"EOS type: {eos_type}")
+    
+    # Generate volume points
+    strain_points = np.linspace(volume_strain_range[0], volume_strain_range[1], n_volumes)
+    volumes = []
+    electronic_energies = []
+    phonon_objects = []
+    
+    print("\nCalculating phonons at different volumes:")
+    
+    for i, strain in enumerate(strain_points):
+        print(f"\n--- Volume point {i+1}/{n_volumes} (strain: {strain:+.1%}) ---")
+        
+        # Scale the unit cell
+        volume_factor = 1 + strain
+        cell_factor = volume_factor**(1/3)
+        scaled_cell = original_cell * cell_factor
+        
+        # Create scaled unit cell
+        scaled_unitcell = UnitCell.copy()
+        scaled_unitcell.set_cell(scaled_cell, scale_atoms=True)
+        
+        # Calculate phonons at this volume
+        phonons, e_electronic, volume = phonopy(
+            scaled_unitcell, Calculator, Temperatures,
+            SupercellRadius, SupercellDisplacement, MeshRadius
+        )
+        
+        volumes.append(volume)
+        electronic_energies.append(e_electronic)
+        phonon_objects.append(phonons)
+        
+        print(f"Volume: {volume:.2f} Ų, Electronic energy: {e_electronic:.6f} eV")
+    
+    print(f"\nVolume range: {min(volumes):.2f} - {max(volumes):.2f} Ų")
+    
+    # Extract thermal properties for QHA
+    thermal_properties_list = []
+    for phonons in phonon_objects:
+        thermal_props = phonons.get_thermal_properties_dict()
+        thermal_properties_list.append(thermal_props)
+    
+    # Prepare data for QHA
+    volumes = np.array(volumes)
+    electronic_energies = np.array(electronic_energies)
+    
+    # Get free energies at each volume and temperature
+    free_energies = []
+    for thermal_props in thermal_properties_list:
+        # F_vib = thermal_props['free_energy'] is in kJ/mol per unit cell
+        # Convert to eV per unit cell for consistency with electronic energies
+        F_vib_eV = np.array(thermal_props['free_energy']) * ase.units.kJ / ase.units.mol / ase.units.eV
+        free_energies.append(F_vib_eV)
+    
+    free_energies = np.array(free_energies)  # Shape: (n_volumes, n_temperatures)
+    
+    # Create QHA object
+    qha = QHA(
+        volumes=volumes,
+        electronic_energies=electronic_energies,
+        eos=eos_type,
+        temperatures=Temperatures,
+        free_energy=free_energies.T,  # QHA expects shape (n_temperatures, n_volumes)
+        verbose=True
+    )
+    
+    # Run QHA analysis
+    print("\nPerforming QHA analysis...")
+    qha.run()
+    
+    # Get QHA results
+    qha_results = {
+        'temperatures': Temperatures,
+        'volumes': volumes,
+        'electronic_energies': electronic_energies,
+        'free_energies': free_energies,
+        'thermal_expansion': qha.thermal_expansion,
+        'heat_capacity_P': qha.heat_capacity_P,
+        'heat_capacity_V': qha.heat_capacity_V,
+        'gruneisen_temperature': qha.gruneisen_temperature,
+        'bulk_modulus': qha.bulk_modulus,
+        'helmholtz_volume': qha.helmholtz_volume,
+        'volume_temperature': qha.volume_temperature,
+        'gibbs_temperature': qha.gibbs_temperature
+    }
+    
+    return qha_results, qha, phonon_objects
