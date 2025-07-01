@@ -161,7 +161,7 @@ def quasi_harmonic_approximation_properties(
         SupercellRadius=30.0,
         SupercellDisplacement=0.01,
         volume_strain_range=(-0.05, 0.05),
-        n_volumes=8,
+        n_volumes=5,
         eos_type='vinet'):
     """
     Perform quasi-harmonic approximation by sampling over volumes
@@ -278,7 +278,7 @@ def quasi_harmonic_approximation_properties(
     free_energies = np.array(free_energies)  # Shape: (n_volumes, n_temperatures)
     entropies = np.array(entropies)
     vib_energies = np.array(vib_energies)
-    
+    capacity = np.array(capacity)
     # Create QHA object
     qha = QHA(
         volumes=volumes,
