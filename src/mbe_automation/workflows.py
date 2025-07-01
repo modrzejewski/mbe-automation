@@ -153,9 +153,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
         config.calculator,
         config.temperatures,
         config.supercell_radius,
-        config.supercell_displacement,
-        config.properties_dir,
-        config.hdf5_dataset
+        config.supercell_displacement
     )
     
 
