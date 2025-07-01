@@ -218,7 +218,7 @@ def quasi_harmonic_approximation_properties(
         # Relaxation of geometry of new unit cell
         # with fixed volume
         #
-        scaled_unitcell = mbe_automation.structure.relax.atoms(
+        scaled_unitcell = mbe_automation.structure.relax.atoms_and_cell(
                 scaled_unitcell,
                 Calculator,
                 preserve_space_group=True,
