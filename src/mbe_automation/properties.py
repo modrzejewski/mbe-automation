@@ -221,7 +221,7 @@ def quasi_harmonic_approximation_properties(
         scaled_unitcell = mbe_automation.structure.relax.atoms(
                 scaled_unitcell,
                 Calculator,
-                Preserve_space_group=True,
+                preserve_space_group=True,
                 optimize_volume=False
         )
         # Calculate phonons and sigle volume thermodynamic functions at this volume
