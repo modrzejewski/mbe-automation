@@ -174,8 +174,8 @@ def phonopy(
     #
     # Get gamma point freguencies
     #
-    phonon.set_qpoints([[0, 0, 0]])  # Gamma point
-    frequencies, eigenvectors = phonon.get_frequencies_with_eigenvectors([0, 0, 0])
+    phonons.set_qpoints([[0, 0, 0]])  # Gamma point
+    frequencies, eigenvectors = phonons.get_frequencies_with_eigenvectors([0, 0, 0])
     print(frequencies)
 
     return thermodynamic_functions, phonon_dos, phonons
