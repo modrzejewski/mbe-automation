@@ -174,7 +174,7 @@ def phonopy(
     #
     # Get gamma point freguencies
     #
-    phonons.set_qpoints([[0, 0, 0]])  # Gamma point
+    phonons.run_qpoints([[0, 0, 0]])  # Gamma point
     frequencies, eigenvectors = phonons.get_frequencies_with_eigenvectors([0, 0, 0])
     print(frequencies)
 
