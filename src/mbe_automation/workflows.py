@@ -162,6 +162,8 @@ def compute_harmonic_properties(config: PropertiesConfig):
     #
     # Free energy for QHA aprrox
     #
+    ΔE_vib = (molecule_properties["vibrational energy (kJ/mol)"] -
+              crystal_properties["vibrational energy (kJ/mol)"])
     print("Cp", qha_properties('heat_capacity_P'))
 
 def create_training_dataset_mace(config: TrainingConfig):
