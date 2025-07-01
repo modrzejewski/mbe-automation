@@ -12,6 +12,8 @@ import ase.thermochemistry
 import ase.vibrations
 import ase.units
 import matplotlib.pyplot as plt
+import mbe_automation.structure.relax
+
 
 def isolated_molecule(
         molecule,
@@ -182,7 +184,7 @@ def phonopy(
 def quasi_harmonic_approximation(
         UnitCell,
         Calculator,
-        volume_strain_range=(-0.1, 0.1),
+        volume_strain_range=(-0.05, 0.05),
         n_volumes=11,
         Temperatures=np.arange(0, 1001, 10),
         SupercellRadius=30.0,
@@ -205,7 +207,13 @@ def quasi_harmonic_approximation(
     eos_type : str
         Equation of state type ('vinet', 'birch_murnaghan', etc.)
     """
-    
+    #
+    # Calculations performed for a volume 
+    # of +/- 5% of the initial unit cell volume as
+    # Dolgonos, Hoja, Boese, Revised values for the X23 benchmark
+    # set of molecular crystals,
+    # Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
+    #
     original_cell = UnitCell.cell.copy()
     original_volume = UnitCell.get_volume()
     
@@ -234,7 +242,11 @@ def quasi_harmonic_approximation(
         # Create scaled unit cell
         scaled_unitcell = UnitCell.copy()
         scaled_unitcell.set_cell(scaled_cell, scale_atoms=True)
-        
+        scaled_unit_cell = mbe_automation.structure.relax.atoms(
+                unit_cell,
+                config.calculator,
+                config.preserve_space_group
+        )
         # Calculate phonons at this volume
         phonons, e_electronic, volume = phonopy(
             scaled_unitcell, Calculator, Temperatures,
