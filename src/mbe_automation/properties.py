@@ -218,22 +218,22 @@ def quasi_harmonic_approximation_properties(
         # Relaxation of geometry of new unit cell
         # with fixed volume
         #
-        scaled_unit_cell = mbe_automation.structure.relax.atoms(
-                scaled_unit_cell,
+        scaled_unitcell = mbe_automation.structure.relax.atoms(
+                scaled_unitcell,
                 Calculator,
                 Preserve_space_group=True,
                 optimize_volume=False
         )
         # Calculate phonons and sigle volume thermodynamic functions at this volume
         t_functions, _, phonons = mbe_automation.vibrations.harmonic.phonopy(
-                scaled_unit_cell,
+                scaled_unitcell,
                 Calculator,
                 Temperatures,
                 Supercell_Radius,
                 Supercell_Displacement)  
         # Calculate electronic energy
-        scaled_unit_cell.calc(Calculator) 
-        e_electronic = scaled_unit_cell.get_potencial_energy()
+        scaled_unitcell.calc(Calculator) 
+        e_electronic = scaledunitcell.get_potencial_energy()
         volumes.append(volume)
         electronic_energies.append(e_electronic)
         thermodynamic_functions.append(t_functions)
