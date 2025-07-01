@@ -12,7 +12,7 @@ import torch
 import mace.calculators
 import mbe_automation.structure.relax
 
-def quasi_harmonic_approximation(
+def quasi_harmonic_approximation_properties(
         UnitCell,
         molecule,
         Calculator,
