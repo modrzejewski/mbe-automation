@@ -29,7 +29,7 @@ def isolated_molecule(
     molecule.calc = calculator
     vib = ase.vibrations.Vibrations(molecule)
     vib.run()
-    pirnt(vib)
+    print(vib)
     vib_energies = vib.get_energies()  # in eV
     n_atoms = len(molecule)
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
