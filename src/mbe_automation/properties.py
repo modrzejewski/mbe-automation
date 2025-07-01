@@ -229,14 +229,14 @@ def quasi_harmonic_approximation_properties(
                 scaled_unitcell,
                 Calculator,
                 Temperatures,
-                Supercell_Radius,
-                Supercell_Displacement)  
+                SupercellRadius,
+                SupercellDisplacement)  
         # Calculate electronic energy
         e_electronic =  mbe_automation.properties.static_lattice_energy(
                 scaled_unitcell,
                 molecule,
                 Calculator,
-                Supercell_Radius
+                SupercellRadius
         )
         volumes.append(volume)
         electronic_energies.append(e_electronic)
