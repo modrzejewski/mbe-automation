@@ -224,6 +224,7 @@ def quasi_harmonic_approximation_properties(
                 preserve_space_group=True,
                 optimize_volume=False
         )
+        volume = scaled_unitcell.get_volume()
         # Calculate phonons and sigle volume thermodynamic functions at this volume
         t_functions, _, phonons = mbe_automation.vibrations.harmonic.phonopy(
                 scaled_unitcell,
