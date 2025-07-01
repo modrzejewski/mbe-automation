@@ -157,7 +157,7 @@ def quasi_harmonic_approximation_properties(
         UnitCell,
         molecule,
         Calculator,
-        Temperatures=np.arange(0, 1001, 10),
+        properties_dir,
         SupercellRadius=30.0,
         SupercellDisplacement=0.01,
         volume_strain_range=(-0.05, 0.05),
@@ -293,7 +293,8 @@ def quasi_harmonic_approximation_properties(
     # Run QHA analysis
     print("\nPerforming QHA analysis...")
     qha.run()
-    
+    plt = qha.plot()
+    plt.savefig(os.path.join(properties_dir, "qha.png"), dpi=300, bbox_inches='tight')
     # Get QHA results
     qha_results = {
         'temperatures': Temperatures,
@@ -311,6 +312,7 @@ def quasi_harmonic_approximation_properties(
         'volume_temperature': qha.volume_temperature,
         'gibbs_temperature': qha.gibbs_temperature
     }
+
     
     return qha_results, qha, phonon_objects
 
