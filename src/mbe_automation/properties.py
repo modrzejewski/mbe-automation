@@ -264,8 +264,8 @@ def quasi_harmonic_approximation_properties(
     entropies = []
     for thermal_props in thermal_properties_list:
         T = np.array(thermal_props['temperatures'])
-        F = np.array(thermal_props['free_energy']) * (len(molecule)/len(unit_cell))
-        S = np.array(thermal_props['entropy']) * (len(molecule)/len(unit_cell))
+        F = np.array(thermal_props['free_energy']) * (len(molecule)/len(UnitCell))
+        S = np.array(thermal_props['entropy']) * (len(molecule)/len(UnitCell))
         E_vib = F + T * S / 1000  # kJ/mol
         free_energies.append(F)
         entropies.append(S)
