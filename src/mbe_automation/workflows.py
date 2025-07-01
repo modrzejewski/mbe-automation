@@ -155,6 +155,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
         molecule,
         config.calculator,
         config.temperatures,
+        config.properties_dir,
         config.supercell_radius,
         config.supercell_displacement
     )
@@ -196,47 +197,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
                 # 3/2 kT (translation) + kT (PV work)
                 sublimation_enthalpy_qha_matrix[v, t] = -lattice_energy_v + ΔE_vib_qha_matrix[v, t] + (3/2+1) * kbT
 
-    # Now find the optimal values at each temperature (minimum sublimation enthalpy)
-    sublimation_enthalpy_qha_optimal = np.zeros(n_temperatures)
-    optimal_volumes = np.zeros(n_temperatures)
-    ΔE_vib_qha_optimal = np.zeros(n_temperatures)
 
-    for t in range(n_temperatures):
-        # Find volume that minimizes sublimation enthalpy at this temperature
-        optimal_volume_idx = np.argmin(sublimation_enthalpy_qha_matrix[:, t])
-    
-        sublimation_enthalpy_qha_optimal[t] = sublimation_enthalpy_qha_matrix[optimal_volume_idx, t]
-        optimal_volumes[t] = qha_properties['volumes'][optimal_volume_idx]
-        ΔE_vib_qha_optimal[t] = ΔE_vib_qha_matrix[optimal_volume_idx, t]
-    
-    plt.figure(figsize=(10, 6))
-    plt.plot(qha_properties["temperatures"], optimal_volumes, 'b-', linewidth=2, marker='o')
-    plt.xlabel('Temperature (K)')
-    plt.ylabel('Optimal Volume (AA^3)')
-    plt.grid(True, alpha=0.3)
-    plt.savefig(os.path.join(config.properties_dir, "volume_temp.png"), dpi=300, bbox_inches='tight')
-    plt.show()
-
-    # Print QHA thermodynamic properties
-    print(f"Thermodynamic properties within the quasi-harmonic approximation")
-    print(f"Energies (kJ/mol/molecule):")
-    print(f"{'Elatt (input coords)':20} {lattice_energy_noopt:.3f}")
-    print(f"{'Elatt (QHA, T=0K)':20} {qha_properties['electronic_energies'][0]:.3f}")
-
-    print(f"\nTemperature-dependent QHA results:")
-    print(f"{'T (K)':>8} {'V_opt (Ų)':>12} {'ΔEvib(QHA)':>12} {'ΔHsub(QHA)':>12} {'α (10⁻⁶/K)':>12}")
-    print("-" * 68)
-    for i, T in enumerate(config.temperatures):
-        # Calculate thermal expansion coefficient if possible
-        if i > 0 and config.temperatures[i] != config.temperatures[i-1]:
-            # α = (1/V)(dV/dT) approximated by finite differences
-            dV = optimal_volumes[i] - optimal_volumes[i-1]
-            dT = config.temperatures[i] - config.temperatures[i-1]
-            thermal_expansion_coeff = (1/optimal_volumes[i]) * (dV/dT) * 1e6  # Convert to 10⁻⁶/K
-        else:
-            thermal_expansion_coeff = 0.0
-    
-        print(f"{T:>8.0f} {optimal_volumes[i]:>12.3f} {ΔE_vib_qha_optimal[i]:>12.3f} {sublimation_enthalpy_qha_optimal[i]:>12.3f} {thermal_expansion_coeff:>12.3f}")
 
 
 
