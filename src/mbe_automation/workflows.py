@@ -226,6 +226,17 @@ def compute_harmonic_properties(config: PropertiesConfig):
     print(f"\nTemperature-dependent QHA results:")
     print(f"{'T (K)':>8} {'V_opt (Ų)':>12} {'ΔEvib(QHA)':>12} {'ΔHsub(QHA)':>12} {'α (10⁻⁶/K)':>12}")
     print("-" * 68)
+    for i, T in enumerate(config.temperatures):
+        # Calculate thermal expansion coefficient if possible
+        if i > 0 and config.temperatures[i] != config.temperatures[i-1]:
+            # α = (1/V)(dV/dT) approximated by finite differences
+            dV = optimal_volumes[i] - optimal_volumes[i-1]
+            dT = config.temperatures[i] - config.temperatures[i-1]
+            thermal_expansion_coeff = (1/optimal_volumes[i]) * (dV/dT) * 1e6  # Convert to 10⁻⁶/K
+        else:
+            thermal_expansion_coeff = 0.0
+    
+        print(f"{T:>8.0f} {optimal_volumes[i]:>12.3f} {ΔE_vib_qha_optimal[i]:>12.3f} {sublimation_enthalpy_qha_optimal[i]:>12.3f} {thermal_expansion_coeff:>12.3f}")
 
 
 
