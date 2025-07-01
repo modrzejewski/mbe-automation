@@ -147,6 +147,16 @@ def compute_harmonic_properties(config: PropertiesConfig):
     for i, T in enumerate(config.temperatures):        
         print(f"ΔEvib(T={T}K) {ΔE_vib[i]:.3f}")
         print(f"ΔHsub(T={T}K) {sublimation_enthalpy[i]:.3f}")
+    QHA_crystal_properties = mbe_automation.properties.quasi_harmonic_approximation_properties(
+        unit_cell,
+        molecule,
+        config.calculator,
+        config.temperatures,
+        config.supercell_radius,
+        config.supercell_displacement,
+        config.properties_dir,
+        config.hdf5_dataset
+    )
     
 
 def create_training_dataset_mace(config: TrainingConfig):
