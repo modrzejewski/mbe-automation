@@ -263,14 +263,17 @@ def quasi_harmonic_approximation_properties(
     free_energies = []
     vib_energies = []
     entropies = []
+    capacity = []
     for thermal_props in thermal_properties_list:
         T = np.array(thermal_props['temperatures'])
         F = np.array(thermal_props['free_energy']) * (len(molecule)/len(UnitCell))
         S = np.array(thermal_props['entropy']) * (len(molecule)/len(UnitCell))
+        Cv = np.array(thermal_props["heat_capacity"])
         E_vib = F + T * S / 1000  # kJ/mol
         free_energies.append(F)
         entropies.append(S)
         vib_energies.append(E_vib)
+        capacity.append(Cv) 
     
     free_energies = np.array(free_energies)  # Shape: (n_volumes, n_temperatures)
     entropies = np.array(entropies)
@@ -279,11 +282,12 @@ def quasi_harmonic_approximation_properties(
     # Create QHA object
     qha = QHA(
         volumes=volumes,
-        electronic_energies=electronic_energies,
+        electronic_energies=electronic_energies* (kJ / mol), #QHA expects it in eV
+        temperatures = Temperatures,
+        cv = capacity.T, # QHA expects shape (n_temperatures, n_volumes), expected units J/K/mol
+        entropy = entropies.T, # expected units J/K/mol
+        fe_phonon = free_energies.T, # expected units kJ/K/mol
         eos=eos_type,
-        temperatures=Temperatures,
-        free_energy=free_energies.T,  # QHA expects shape (n_temperatures, n_volumes)
-        verbose=True
     )
     
     # Run QHA analysis
