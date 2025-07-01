@@ -255,13 +255,20 @@ def quasi_harmonic_approximation_properties(
     
     # Get free energies at each volume and temperature
     free_energies = []
+    vib_energies = []
+    entropies = []
     for thermal_props in thermal_properties_list:
-        # F_vib = thermal_props['free_energy'] is in kJ/mol per unit cell
-        # Convert to eV per unit cell for consistency with electronic energies
-        F_vib_eV = np.array(thermal_props['free_energy']) * ase.units.kJ / ase.units.mol / ase.units.eV
-        free_energies.append(F_vib_eV)
+        T = np.array(thermal_props['temperatures'])
+        F = np.array(thermal_props['free_energy']) * (len(molecule)/len(unit_cell))
+        S = np.array(thermal_props['entropy']) * (len(molecule)/len(unit_cell))
+        E_vib = F + T * S / 1000  # kJ/mol
+        free_energies.append(F)
+        entropies.append(S)
+        vib_energies.append(E_vib)
     
     free_energies = np.array(free_energies)  # Shape: (n_volumes, n_temperatures)
+    entropies = np.array(entropies)
+    vib_energies = np.array(vib_energies)
     
     # Create QHA object
     qha = QHA(
@@ -283,6 +290,8 @@ def quasi_harmonic_approximation_properties(
         'volumes': volumes,
         'electronic_energies': electronic_energies,
         'free_energies': free_energies,
+        'entropies': entropies,
+        "vib_energies": vib_energies,
         'thermal_expansion': qha.thermal_expansion,
         'heat_capacity_P': qha.heat_capacity_P,
         'heat_capacity_V': qha.heat_capacity_V,
