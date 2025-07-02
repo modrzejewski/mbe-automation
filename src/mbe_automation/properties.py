@@ -235,12 +235,7 @@ def quasi_harmonic_approximation_properties(
                 SupercellRadius,
                 SupercellDisplacement)  
         # Calculate electronic energy
-        e_electronic =  mbe_automation.properties.static_lattice_energy(
-                scaled_unitcell,
-                molecule,
-                Calculator,
-                SupercellRadius
-        )
+        e_electronic =  scaled_unitcell.get_potential_energy()
         volumes.append(volume)
         electronic_energies.append(e_electronic)
         thermodynamic_functions.append(t_functions)
@@ -283,7 +278,7 @@ def quasi_harmonic_approximation_properties(
     # Create QHA object
     qha = QHA(
         volumes=volumes,
-        electronic_energies=electronic_energies* (kJ / mol), #QHA expects it in eV
+        electronic_energies=electronic_energies * (len(molecule)/len(UnitCell))
         temperatures = Temperatures,
         cv = capacity.T, # QHA expects shape (n_temperatures, n_volumes), expected units J/K/mol
         entropy = entropies.T, # expected units J/K/mol
