@@ -167,7 +167,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
     # QHA-based sublimation enthalpy calculation
     opt_volume = qha_properties['volume_temperature'] 
 
-    prin(opt_volume)
+    print(opt_volume)
     """
     # Calculate ΔE_vib matrix: [n_volumes, n_temperatures]
     ΔE_vib_qha_matrix = np.zeros((n_volumes, n_temperatures))
