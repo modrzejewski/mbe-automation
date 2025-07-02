@@ -157,9 +157,9 @@ def quasi_harmonic_approximation_properties(
         UnitCell,
         molecule,
         Calculator,
-        properties_dir,
         SupercellRadius,
         SupercellDisplacement,
+        properties_dir,
         volume_strain_range=(-0.05, 0.05),
         n_volumes=5,
         eos_type='vinet'):
