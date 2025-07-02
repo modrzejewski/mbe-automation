@@ -156,8 +156,8 @@ def compute_harmonic_properties(config: PropertiesConfig):
         config.calculator,
         config.temperatures,
         config.properties_dir,
-        config.supercell_radius,
-        config.supercell_displacement
+        SupercellRadius = config.supercell_radius,
+        SupercellDisplacement = config.supercell_displacement
     )
 
     print(f"Thermodynamic properties within the quasi harmonic approximation")
