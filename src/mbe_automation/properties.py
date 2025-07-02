@@ -228,7 +228,7 @@ def quasi_harmonic_approximation_properties(
         )
         volume = scaled_unitcell.get_volume()
         # Calculate phonons and sigle volume thermodynamic functions at this volume
-        t_functions, _, phonons = mbe_automation.vibrations.harmonic.phonopy(
+        _, _, phonons = mbe_automation.vibrations.harmonic.phonopy(
                 scaled_unitcell,
                 Calculator,
                 Temperatures,
@@ -269,7 +269,7 @@ def quasi_harmonic_approximation_properties(
         T = np.array(thermal_props['temperatures'])
         F = np.array(thermal_props['free_energy']) * (len(molecule)/len(UnitCell))
         S = np.array(thermal_props['entropy']) * (len(molecule)/len(UnitCell))
-        Cv = np.array(thermal_props["heat_capacity"])
+        Cv = np.array(thermal_props["heat_capacity"]) * (len(molecule)/len(UnitCell))
         E_vib = F + T * S / 1000  # kJ/mol
         free_energies.append(F)
         entropies.append(S)
