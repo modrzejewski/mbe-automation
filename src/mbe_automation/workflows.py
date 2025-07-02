@@ -200,8 +200,8 @@ def compute_harmonic_properties(config: PropertiesConfig):
     print(f"Thermodynamic properties within the quasi harmonic approximation")
     for v in range(n_volumes):
         for i, T in enumerate(config.temperatures):        
-            print(f"ΔEvib(T={T}K) {ΔE_vib_qha_matrix[i]:.3f}")
-            print(f"ΔHsub(T={T}K) {sublimation_enthalpy_qha_matrix[i]:.3f}")
+            print(f"ΔEvib(T={T}K) {ΔE_vib_qha_matrix[v,i]:.3f}")
+            print(f"ΔHsub(T={T}K) {sublimation_enthalpy_qha_matrix[v,i]:.3f}")
 
 
 
