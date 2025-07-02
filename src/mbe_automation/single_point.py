@@ -15,7 +15,7 @@ import stat
 import shutil
 import sys        
 
-def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
+def prepare_inputs(ProjectDirectory, ModelDirectory,UnitCellFile, SystemTypes, Cutoffs,
                    Ordering, InputTemplates, QueueScriptTemplates,
                    Methods, UseExistingXYZ,
                    ExistingXYZDirs=None,
@@ -105,7 +105,8 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                                             directory_structure.ML_DIRS["MACE(PBC)"],
                                             InputTemplates["MACE(PBC)"],
                                             QueueScriptTemplates["MACE(PBC)"],
-                                            SymmetrizeUnitCell)
+                                            SymmetrizeUnitCell,
+                                            ModelDirectory)
         if "UMA" in MethodsPBC:
             mbe_automation.inputs.uma.Make(directory_structure.INP_DIRS,
                                             directory_structure.XYZ_DIRS,
