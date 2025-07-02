@@ -34,6 +34,7 @@ def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemp
                 os.path.join(XYZDirs["monomers-relaxed"], RelaxedMonomers[Ref]),
                 PBCJobDir
             ),
+            "mace_model": os.path.relpath(ML_Dirs)
             "inp_script" : f"{task}.py",
             "log_file" : f"{task}.log"
         }
