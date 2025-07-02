@@ -308,7 +308,7 @@ def quasi_harmonic_approximation_properties(
         'heat_capacity_P': qha.heat_capacity_P_numerical,
         'heat_capacity_V': capacity,
         'gruneisen_temperature': qha.gruneisen_temperature,
-        'bulk_modulus': qha.bulk_modulus,
+        'bulk_modulus': qha.bulk_modulus_temperature,
         'helmholtz_volume': qha.helmholtz_volume,
         'volume_temperature': qha.volume_temperature,
         'gibbs_temperature': qha.gibbs_temperature
