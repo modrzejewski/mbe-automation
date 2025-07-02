@@ -162,7 +162,7 @@ def quasi_harmonic_approximation_properties(
         SupercellDisplacement,
         properties_dir,
         volume_strain_range=(-0.05, 0.05),
-        n_volumes=5,
+        n_volumes=8,
         eos_type='vinet'):
     """
     Perform quasi-harmonic approximation by sampling over volumes
