@@ -278,12 +278,12 @@ def quasi_harmonic_approximation_properties(
     # Create QHA object
     qha = QHA(
         volumes=volumes,
-        electronic_energies=electronic_energies * (len(molecule)/len(UnitCell)
+        electronic_energies=electronic_energies * (len(molecule)/len(UnitCell))
         temperatures = Temperatures,
         cv = capacity.T, # QHA expects shape (n_temperatures, n_volumes), expected units J/K/mol
         entropy = entropies.T, # expected units J/K/mol
         fe_phonon = free_energies.T, # expected units kJ/K/mol
-        eos=eos_type,
+        eos=eos_type
     )
     
     # Run QHA analysis
