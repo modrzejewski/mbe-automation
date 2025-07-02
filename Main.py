@@ -209,6 +209,7 @@ ClusterComparisonAlgorithm = "RMSD"
 
 
 mbe_automation.single_point.prepare_inputs(ProjectDirectory,
+                                           ModelDirectory,
                                            UnitCellFile,
                                            SystemTypes,
                                            Cutoffs,
