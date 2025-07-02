@@ -165,10 +165,10 @@ def compute_harmonic_properties(config: PropertiesConfig):
     # Free energy for QHA aprrox
     #
     # QHA-based sublimation enthalpy calculation
-    crystal_vib_energies_qha = qha_properties['vib_energies'] 
-    n_volumes, n_temperatures = crystal_vib_energies_qha.shape
-    molecule_vib_energies = molecule_properties["vibrational energy (kJ/mol)"]
-    
+    opt_volume = qha_properties['volume_temperature'] 
+
+    prin(opt_volume)
+    """
     # Calculate ΔE_vib matrix: [n_volumes, n_temperatures]
     ΔE_vib_qha_matrix = np.zeros((n_volumes, n_temperatures))
     for v in range(n_volumes):
@@ -203,7 +203,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
             print(f"ΔEvib(T={T}K) {ΔE_vib_qha_matrix[v,i]:.3f}")
             print(f"ΔHsub(T={T}K) {sublimation_enthalpy_qha_matrix[v,i]:.3f}")
 
-
+"""
 
 
 
