@@ -157,7 +157,7 @@ def quasi_harmonic_approximation_properties(
         UnitCell,
         molecule,
         Calculator,
-        Temperature,
+        Temperatures,
         SupercellRadius,
         SupercellDisplacement,
         properties_dir,
