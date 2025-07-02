@@ -13,7 +13,7 @@ class PropertiesConfig:
                                    # Range of temperatures at which entropy, free
                                    # energy, heat capacity etc. are computed
                                    #
-    temperatures: np.ndarray = field(default_factory=lambda: np.arange(0, 401, 1))
+    temperatures: np.ndarray = field(default_factory=lambda: np.arange(0, 301, 1))
     pressure: float = 101325.0      
                                    #
                                    # Refine the space group symmetry before
