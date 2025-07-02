@@ -201,7 +201,6 @@ def quasi_harmonic_approximation_properties(
     volumes = []
     electronic_energies = []
     phonon_objects = []
-    thermodynamic_functions = []
     
     print("\nCalculating phonons at different volumes:")
     
@@ -238,7 +237,6 @@ def quasi_harmonic_approximation_properties(
         e_electronic =  scaled_unitcell.get_potential_energy()
         volumes.append(volume)
         electronic_energies.append(e_electronic)
-        thermodynamic_functions.append(t_functions)
         phonon_objects.append(phonons)
         
         print(f"Volume: {volume:.2f} Ų, Electronic energy: {e_electronic:.6f} eV")
