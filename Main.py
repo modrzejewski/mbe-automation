@@ -20,10 +20,13 @@ ProjectDirectory    = "./Projects/piracetam/VI"
                                                 # (1) RPA
                                                 # (2) LNO-CCSD(T)
                                                 # (3) HF(PBC)
+                                                # (4) MACE machine lerarning potenctial
                                                 #
-                                                
 Methods = ["RPA", "LNO-CCSD(T)", "MACE(PBC)", "DFTB(PBC)", "UMA(PBC)"]
-
+                                                #
+                                                # Specify localization of mace potential
+                                                #
+ModelDirectory    = "~/models/mace/MACE-OFF24_medium.model"
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
