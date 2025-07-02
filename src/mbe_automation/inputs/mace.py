@@ -6,7 +6,7 @@ import sys
 import os
 import numpy as np
 
-def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell):
+def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell, ModelDirectory):
 
     for task in ["training", "properties"]:
         Method = "MACE"
@@ -34,7 +34,7 @@ def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemp
                 os.path.join(XYZDirs["monomers-relaxed"], RelaxedMonomers[Ref]),
                 PBCJobDir
             ),
-            "mace_model": os.path.relpath(ML_Dirs)
+            "mace_model": os.path.relpath(ModelDirectory)
             "inp_script" : f"{task}.py",
             "log_file" : f"{task}.log"
         }
