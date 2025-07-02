@@ -119,7 +119,7 @@ def phonopy(
         supercell_matrix=np.diag(SupercellDims))
     phonons.generate_displacements(distance=SupercellDisplacement)
 
-    Supercells = phonons.supercells_with_displacements()
+    Supercells = phonons.supercells_with_displacements
     Forces = []
     NSupercells = len(Supercells)
     print(f"Number of supercells: {NSupercells}")
