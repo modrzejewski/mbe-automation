@@ -131,7 +131,6 @@ def phonopy(
     for i, s in enumerate(Supercells, 1):
         forces = calculate_forces(s, Calculator)
         Forces.append(forces)
-
         progress = i * 100 // NSupercells
         if progress >= next_print:
             now = time.time()
@@ -143,7 +142,7 @@ def phonopy(
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
             
-    phonons.set_forces(Forces)
+    phonons.set_forces_energies(Forces,target = "forces")
     #
     # Compute second-order dynamic matrix (Hessian)
     # by numerical differentiation. The force vectors
