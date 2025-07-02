@@ -12,7 +12,7 @@ work_dir = os.path.abspath(os.path.dirname(__file__))
 properties_dir = os.path.join(work_dir, "properties")
 
 mace_calc = mace.calculators.MACECalculator(
-    model_paths=os.path.expanduser("{mace_model}"),
+    model_paths="{mace_model}",
     compute_atomic_stresses=False,
     default_dtype="float64",
     device=("cuda" if torch.cuda.is_available() else "cpu")
