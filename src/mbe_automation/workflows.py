@@ -166,44 +166,33 @@ def compute_harmonic_properties(config: PropertiesConfig):
     #
     # QHA-based sublimation enthalpy calculation
     opt_volume = qha_properties['volume_temperature'] 
-
-    print(opt_volume)
-    """
-    # Calculate ΔE_vib matrix: [n_volumes, n_temperatures]
-    ΔE_vib_qha_matrix = np.zeros((n_volumes, n_temperatures))
-    for v in range(n_volumes):
-        for t in range(n_temperatures):
-            ΔE_vib_qha_matrix[v, t] = molecule_vib_energies[t] - crystal_vib_energies_qha[v, t]
-
+    # Calculate ΔE_vib 
+    ΔE_vib_qha = (molecule_properties["vibrational energy (kJ/mol)"] -
+                  qha_properties["vibrational energy (kJ/mol)"])
+    lattice_energy_qha = qha_properties['lattice_energies (kJ/mol)']
     # Get rotor type for molecular contributions
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
 
-    # Calculate sublimation enthalpy matrix: [n_volumes, n_temperatures]
-    sublimation_enthalpy_qha_matrix = np.zeros((n_volumes, n_temperatures))
+    # Calculate sublimation enthalpy:
+    sublimation_enthalpy_qha = np.zeros(len(config.temperatures))
 
-    for v in range(n_volumes):
-        for t, T in enumerate(config.temperatures):
-            kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
-        
-            # Use lattice energy for this specific volume
-            lattice_energy_v = qha_properties['electronic_energies'][v]
-        
-            if rotor_type == "nonlinear":
-                # 3/2 kT (translation) + 3/2 kT (rotation) + kT (PV work)
-                sublimation_enthalpy_qha_matrix[v, t] = -lattice_energy_v + ΔE_vib_qha_matrix[v, t] + (3/2+3/2+1) * kbT
-            elif rotor_type == "linear":
-                # 3/2 kT (translation) + kT (rotation) + kT (PV work)
-                sublimation_enthalpy_qha_matrix[v, t] = -lattice_energy_v + ΔE_vib_qha_matrix[v, t] + (3/2+1+1) * kbT
-            elif rotor_type == "monatomic":
-                # 3/2 kT (translation) + kT (PV work)
-                sublimation_enthalpy_qha_matrix[v, t] = -lattice_energy_v + ΔE_vib_qha_matrix[v, t] + (3/2+1) * kbT
+    for t, T in enumerate(config.temperatures):
+        kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
+        # Use lattice energy for this specific volume
+        if rotor_type == "nonlinear":
+            # 3/2 kT (translation) + 3/2 kT (rotation) + kT (PV work)
+            sublimation_enthalpy_qha[t] = -lattice_energy_qha[t] + ΔE_vib_qha[t] + (3/2+3/2+1) * kbT
+        elif rotor_type == "linear":
+            # 3/2 kT (translation) + kT (rotation) + kT (PV work)
+            sublimation_enthalpy_qha[t] = -lattice_energy_qha[t] + ΔE_vib_qha[t] + (3/2+1+1) * kbT
+        elif rotor_type == "monatomic":
+            # 3/2 kT (translation) + kT (PV work)
+            sublimation_enthalpy_qha[t] = -lattice_energy_qha[t] + ΔE_vib_qha[t] + (3/2+1) * kbT
     print(f"Thermodynamic properties within the quasi harmonic approximation")
-    for v in range(n_volumes):
-        for i, T in enumerate(config.temperatures):        
-            print(f"ΔEvib(T={T}K) {ΔE_vib_qha_matrix[v,i]:.3f}")
-            print(f"ΔHsub(T={T}K) {sublimation_enthalpy_qha_matrix[v,i]:.3f}")
+    for i, T in enumerate(config.temperatures):        
+        print(f"ΔEvib(T={T}K) {ΔE_vib_qha[i]:.3f}")
+        print(f"ΔHsub(T={T}K) {sublimation_enthalpy_qha[i]:.3f}")
 
-"""
 
 
 
