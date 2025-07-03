@@ -344,15 +344,15 @@ def quasi_harmonic_approximation_properties(
                 
     # Get QHA results
     qha_results = {
-        'temperatures': Temperatures,
-        'tested_volumes': volumes,
-        'lattice_energies': qha_lattice_energies,
-        'free_energies': qha_free_energies,
-        'entropies': gha_entropies,
-        "vib_energies": qha_vib_energies,
+        'temperatures K': Temperatures,
+        'tested_volumes AA^3': volumes,
+        'lattice_energies kJ/mol': qha_lattice_energies,
+        'free_energies kJ/mol': qha_free_energies,
+        'entropies J/mol/K': gha_entropies,
+        "vib_energies kJ/mol": qha_vib_energies,
         'thermal_expansion': qha.thermal_expansion,
-        'heat_capacity_P': qha.heat_capacity_P_numerical,
-        'heat_capacity_V': qha_capacity,
+        'heat_capacity_P J/mol/K': qha.heat_capacity_P_numerical,
+        'heat_capacity_V J/mol/K': qha_capacity,
         'gruneisen_temperature': qha.gruneisen_temperature,
         'bulk_modulus': qha.bulk_modulus_temperature,
         'helmholtz_volume': qha.helmholtz_volume,
