@@ -289,17 +289,70 @@ def quasi_harmonic_approximation_properties(
     qha.run()
     plt = qha.plot()
     plt.savefig(os.path.join(properties_dir, "qha.png"), dpi=300, bbox_inches='tight')
+
+    opt_volume = qha.volume_temperature
+    zero_volume = UnitCell.get_volume()  #volume of a unit cell at 0K Temperature
+    qha_lattice_energies = []
+    qha_free_energies = []
+    qha_entropies.append(S)
+    qha_vib_energies.append(E_vib)
+    qha_capacity.append(Cv) 
+        
+    for i, V in enumerate(opt_volume):
+         T =  Temperatures[i]  
+         # Scale the unit cell
+         volume_factor = V/zero_volume
+         cell_factor = volume_factor**(1/3)
+         scaled_cell = original_cell * cell_factor
+        
+         # Create scaled unit cell
+         scaled_unitcell = UnitCell.copy()
+         scaled_unitcell.set_cell(scaled_cell, scale_atoms=True)
+         #
+         # Relaxation of geometry of new unit cell
+         # with fixed volume
+         #
+         scaled_unitcell = mbe_automation.structure.relax.atoms_and_cell(
+                scaled_unitcell,
+                Calculator,
+                preserve_space_group=True,
+                optimize_volume=False
+         )
+         
+         # Calculate phonons and sigle volume thermodynamic functions at this volume
+         _, _, phonons = mbe_automation.vibrations.harmonic.phonopy(
+                 scaled_unitcell,
+                 Calculator,
+                 Temperatures[i],
+                 SupercellRadius,
+                 SupercellDisplacement)  
+         # Calculate lattice energy
+         latice_energy =  static_lattice_energy(UnitCell, Molecule, Calculator, SupercellRadius)
+         qha_lattice_energies.append(latice_energy)
+         thermal_props = phonons.get_thermal_properties_dict()
+         F = np.array(thermal_props['free_energy']) * (len(molecule)/len(UnitCell))
+         S = np.array(thermal_props['entropy']) * (len(molecule)/len(UnitCell))
+         Cv = np.array(thermal_props["heat_capacity"]) * (len(molecule)/len(UnitCell))
+         E_vib = F + T * S / 1000  # kJ/mol
+         qha_free_energies.append(F)
+         qha_entropies.append(S)
+         qha_vib_energies.append(E_vib)
+         qha_capacity.append(Cv) 
+        
+         print(f"Temperature: {Temperatures[i]:.2f}, optimal volume: {V:.2f} Ų, Lattice energy: {latice_energy:.6f} eV")
+                
+                
     # Get QHA results
     qha_results = {
         'temperatures': Temperatures,
-        'volumes': volumes,
-        'electronic_energies': electronic_energies,
-        'free_energies': free_energies,
-        'entropies': entropies,
-        "vib_energies": vib_energies,
+        'tested_volumes': volumes,
+        'lattice_energies': qha_lattice_energies,
+        'free_energies': qha_free_energies,
+        'entropies': gha_entropies,
+        "vib_energies": qha_vib_energies,
         'thermal_expansion': qha.thermal_expansion,
         'heat_capacity_P': qha.heat_capacity_P_numerical,
-        'heat_capacity_V': capacity,
+        'heat_capacity_V': qha_capacity,
         'gruneisen_temperature': qha.gruneisen_temperature,
         'bulk_modulus': qha.bulk_modulus_temperature,
         'helmholtz_volume': qha.helmholtz_volume,
