@@ -294,9 +294,9 @@ def quasi_harmonic_approximation_properties(
     zero_volume = UnitCell.get_volume()  #volume of a unit cell at 0K Temperature
     qha_lattice_energies = []
     qha_free_energies = []
-    qha_entropies.append(S)
-    qha_vib_energies.append(E_vib)
-    qha_capacity.append(Cv) 
+    qha_entropies = []
+    qha_vib_energies =[]
+    qha_capacity = [] 
         
     for i, V in enumerate(opt_volume):
          T =  Temperatures[i]  
@@ -340,7 +340,8 @@ def quasi_harmonic_approximation_properties(
          qha_capacity.append(Cv) 
         
          print(f"Temperature: {Temperatures[i]:.2f}, optimal volume: {V:.2f} Ų, Lattice energy: {latice_energy:.6f} eV")
-                
+    
+
                 
     # Get QHA results
     qha_results = {
