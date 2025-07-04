@@ -323,7 +323,7 @@ def quasi_harmonic_approximation_properties(
                  SupercellRadius,
                  SupercellDisplacement)  
          # Calculate lattice energy
-         latice_energy =  static_lattice_energy(UnitCell, Molecule, Calculator, SupercellRadius)
+         latice_energy =  static_lattice_energy(UnitCell, molecule, Calculator, SupercellRadius)
          qha_lattice_energies.append(latice_energy)
          thermal_props = phonons.get_thermal_properties_dict()
          F = np.array(thermal_props['free_energy']) * (len(molecule)/len(UnitCell))
