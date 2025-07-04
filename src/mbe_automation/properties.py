@@ -112,12 +112,12 @@ def phonons_from_finite_differences(
     
     export_data_to_csv(
             Temperatures=Temperatures,
+            output_prefix="harmonic",
+            properties_dir,
             free_energies=F,
             entropies=S,
             vib_energies=E_vib,
-            capacity=Cv,
-            output_prefix="harmonic",
-            properties_dir)
+            capacity=Cv)
                 
     return {
         "vibrational energy (kJ/mol)" : E_vib,
@@ -432,9 +432,9 @@ def plot_dispersion_phonopy_builtin(phonons, output_dir):
         print(f"Built-in plotting failed: {e}")
 
 
-def export_data_to_csv(Temperatures, lattice_energies, opt_volume,
+def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_energies, opt_volume,
                           free_energies, entropies, vib_energies, 
-                          capacity, output_prefix="qha",properties_dir):
+                          capacity):
      if lattice_energies:
         if isinstance(lattice_energies[0], (list, np.ndarray)):
             lattice_energies_dict = {}
