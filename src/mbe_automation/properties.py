@@ -12,6 +12,8 @@ import torch
 import mace.calculators
 import mbe_automation.structure.relax
 from phonopy.qha.core import QHA
+import pandas as pd
+
 
 def phonons_from_finite_differences(
         unit_cell,
@@ -341,7 +343,16 @@ def quasi_harmonic_approximation_properties(
         
          print(f"Temperature: {Temperatures[i]:.2f}, optimal volume: {V:.2f} Ų, Lattice energy: {latice_energy:.6f} eV")
     
-
+    export_data_to_csv(
+            opt_volume=opt_volume,
+            Temperatures=Temperatures,
+            qha_lattice_energies=qha_lattice_energies,
+            qha_free_energies=qha_free_energies,
+            qha_entropies=qha_entropies,
+            qha_vib_energies=qha_vib_energies,
+            qha_capacity=qha_capacity,
+            output_prefix="qha",
+            properties_dir)
                 
     # Get QHA results
     qha_results = {
@@ -426,7 +437,104 @@ def plot_dispersion_phonopy_builtin(phonons, output_dir):
     except Exception as e:
         print(f"Built-in plotting failed: {e}")
 
-        
+
+def export_data_to_csv(opt_volume, Temperatures, qha_lattice_energies, 
+                          qha_free_energies, qha_entropies, qha_vib_energies, 
+                          qha_capacity, output_prefix="qha",properties_dir):
+
+    main_data = {
+        'Temperature_K': Temperatures,
+        'Optimal_Volume_A3': opt_volume,
+        'Lattice_Energy_eV': qha_lattice_energies
+    }
+    
+    df_main = pd.DataFrame(main_data)
+    main_path = os.path.join(properties_dir, f"{output_prefix}_main.csv")
+    df_main.to_csv(main_path, index=False)
+    print(f"File with lattice enrgies created successfully {main_path}")
+    if qha_free_energies:
+        if isinstance(qha_free_energies[0], (list, np.ndarray)):
+            free_energy_dict = {}
+            for i, temp in enumerate(Temperatures):
+                free_energy_dict[f'Free_Energy_T_{temp:.1f}K'] = qha_free_energies[i]
+            df_free = pd.DataFrame(free_energy_dict)
+        else:
+            df_free = pd.DataFrame({
+                'Temperature_K': Temperatures,
+                'Free_Energy': qha_free_energies
+            })
+        df_path = os.path.join(properties_dir, f"{output_prefix}_free_energies.csv")        
+        df_free.to_csv(df_path, index=False)
+        print(f"File with free enrgies created successfully {output_prefix}_free_energies.csv")
+
+    if qha_entropies:
+        if isinstance(qha_entropies[0], (list, np.ndarray)):
+            entropy_dict = {}
+            for i, temp in enumerate(Temperatures):
+                entropy_dict[f'Entropy_T_{temp:.1f}K'] = qha_entropies[i]
+            df_entropy = pd.DataFrame(entropy_dict)
+        else:
+            df_entropy = pd.DataFrame({
+                'Temperature_K': Temperatures,
+                'Entropy': qha_entropies
+            })
+        entropy_path = os.path.join(properties_dir, f"{output_prefix}_entropies.csv")  
+        df_entropy.to_csv(entropy_path, index=False)
+        print(f"File with enetropies created successfully {output_prefix}_entropies.csv")
+           
+
+    if qha_vib_energies:
+        if isinstance(qha_vib_energies[0], (list, np.ndarray)):
+            vib_energy_dict = {}
+            for i, temp in enumerate(Temperatures):
+                vib_energy_dict[f'Vib_Energy_T_{temp:.1f}K'] = qha_vib_energies[i]
+            df_vib = pd.DataFrame(vib_energy_dict)
+        else:
+            df_vib = pd.DataFrame({
+                'Temperature_K': Temperatures,
+                'Vibrational_Energy': qha_vib_energies
+            })
+        vib_path = os.path.join(properties_dir, f"{output_prefix}_vibrational_energies.csv")  
+        df_vib.to_csv(vib_path, index=False)
+        print(f"File with vibrational energies created successfully {output_prefix}_entropies.csv")
+    
+    if qha_capacity:
+        if isinstance(qha_capacity[0], (list, np.ndarray)):
+            capacity_dict = {}
+            for i, temp in enumerate(Temperatures):
+                capacity_dict[f'Heat_Capacity_T_{temp:.1f}K'] = qha_capacity[i]
+            df_capacity = pd.DataFrame(capacity_dict)
+        else:
+            df_capacity = pd.DataFrame({
+                'Temperature_K': Temperatures,
+                'Heat_Capacity': qha_capacity
+            })
+        cv_path = os.path.join(properties_dir, f"{output_prefix}_heat_capacities.csv") 
+        df_cv.to_csv(cv_path, index=False)
+        print(f"File with heat capacities created successfully {output_prefix}_heat_capacities.csv")
+    
+    try:
+        if all(not isinstance(data[0], (list, np.ndarray)) for data in 
+               [qha_free_energies, qha_entropies, qha_vib_energies, qha_capacity] if data):
+            
+            combined_data = {
+                'Temperature_K': Temperatures,
+                'Optimal_Volume_A3': opt_volume,
+                'Lattice_Energy_eV': qha_lattice_energies,
+                'Free_Energy': qha_free_energies if qha_free_energies else [None]*len(Temperatures),
+                'Entropy': qha_entropies if qha_entropies else [None]*len(Temperatures),
+                'Vibrational_Energy': qha_vib_energies if qha_vib_energies else [None]*len(Temperatures),
+                'Heat_Capacity': qha_capacity if qha_capacity else [None]*len(Temperatures)
+            }
+            
+            df_combined = pd.DataFrame(combined_data)
+            combined_path = os.path.join(properties_dir, f"{output_prefix}_combined.csv") 
+            df_combined.to_csv(combined_path, index=False)
+            print(f"File with every parameter created successfully {output_prefix}_combined.csv")
+    except:
+        print("Nie można utworzyć pliku kombinowanego - dane mają różne formaty")
+
+
 def diagnose_phonon_data(phonons):
     """
     Diagnostic function to understand the structure of phonon data
