@@ -177,6 +177,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
     sublimation_enthalpy_qha = np.zeros(len(config.temperatures))
 
     for t, T in enumerate(config.temperatures):
+        
         kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
         # Use lattice energy for this specific volume
         if rotor_type == "nonlinear":
@@ -188,10 +189,15 @@ def compute_harmonic_properties(config: PropertiesConfig):
         elif rotor_type == "monatomic":
             # 3/2 kT (translation) + kT (PV work)
             sublimation_enthalpy_qha[t] = -lattice_energy_qha[t] + ΔE_vib_qha[t] + (3/2+1) * kbT
+    
+    
+    
+    
     print(f"Thermodynamic properties within the quasi harmonic approximation")
     for i, T in enumerate(config.temperatures):        
         print(f"ΔEvib(T={T}K) {ΔE_vib_qha[i]:.3f}")
         print(f"ΔHsub(T={T}K) {sublimation_enthalpy_qha[i]:.3f}")
+    
 
 
 
