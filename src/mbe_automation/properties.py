@@ -113,7 +113,9 @@ def phonons_from_finite_differences(
     export_data_to_csv(
             Temperatures=Temperatures,
             output_prefix="harmonic",
-            properties_dir,
+            properties_dir = properties_dir,
+            lattice_energies = None,
+            opt_volume = None,
             free_energies=F,
             entropies=S,
             vib_energies=E_vib,
