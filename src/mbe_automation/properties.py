@@ -437,7 +437,7 @@ def plot_dispersion_phonopy_builtin(phonons, output_dir):
 def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_energies, opt_volume,
                           free_energies, entropies, vib_energies, 
                           capacity):
-    if lattice_energies:
+    if lattice_energies is not None:
         if isinstance(lattice_energies[0], (list, np.ndarray)):
             lattice_energies_dict = {}
             for i, temp in enumerate(Temperatures):
@@ -453,7 +453,7 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
         df_lattice_energies.to_csv(lattice_path, index=False)
         print(f"File with voptimal volume was created successfully {lattice_path}")
     
-    if opt_volume:
+    if opt_volume  is not None:
         if isinstance(opt_volume[0], (list, np.ndarray)):
             opt_volume_dict = {}
             for i, temp in enumerate(Temperatures):
@@ -470,7 +470,7 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
         print(f"File with voptimal volume was created successfully {opt_volume_path}")
 
 
-    if free_energies:
+    if free_energies  is not None:
         if isinstance(free_energies[0], (list, np.ndarray)):
             free_energy_dict = {}
             for i, temp in enumerate(Temperatures):
@@ -485,7 +485,7 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
         df_free.to_csv(df_path, index=False)
         print(f"File with free enrgies was created successfully {output_prefix}_free_energies.csv")
 
-    if entropies:
+    if entropies  is not None:
         if isinstance(entropies[0], (list, np.ndarray)):
             entropy_dict = {}
             for i, temp in enumerate(Temperatures):
@@ -501,7 +501,7 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
         print(f"File with enetropies created was successfully {output_prefix}_entropies.csv")
            
 
-    if vib_energies:
+    if vib_energies  is not None:
         if isinstance(vib_energies[0], (list, np.ndarray)):
             vib_energy_dict = {}
             for i, temp in enumerate(Temperatures):
@@ -516,7 +516,7 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
         df_vib.to_csv(vib_path, index=False)
         print(f"File with vibrational energies was created successfully {output_prefix}_entropies.csv")
     
-    if capacity:
+    if capacity  is not None:
         if isinstance(capacity[0], (list, np.ndarray)):
             capacity_dict = {}
             for i, temp in enumerate(Temperatures):
