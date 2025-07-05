@@ -295,6 +295,7 @@ def quasi_harmonic_approximation_properties(
     qha_entropies = []
     qha_vib_energies =[]
     qha_capacity = [] 
+    Temp = []
         
     for i, V in enumerate(opt_volume):
          T =  Temperatures[i]  
@@ -336,11 +337,12 @@ def quasi_harmonic_approximation_properties(
          qha_entropies.append(S)
          qha_vib_energies.append(E_vib)
          qha_capacity.append(Cv) 
+         Temp.append(Temperatures[i])
         
          print(f"Temperature: {Temperatures[i]:.2f}, optimal volume: {V:.2f} Ų, Lattice energy: {lattice_energy:.6f} eV")
     
     export_data_to_csv(
-            Temperatures=Temperatures,
+            Temperatures=Temp,
             output_prefix="qha",
             properties_dir = properties_dir,
             lattice_energies=qha_lattice_energies,
