@@ -341,14 +341,14 @@ def quasi_harmonic_approximation_properties(
     
     export_data_to_csv(
             Temperatures=Temperatures,
+            output_prefix="qha",
+            properties_dir,
             lattice_energies=qha_lattice_energies,
             opt_volume=opt_volume,
             free_energies=qha_free_energies,
             entropies=qha_entropies,
             vib_energies=qha_vib_energies,
-            capacity=qha_capacity,
-            output_prefix="qha",
-            properties_dir)
+            capacity=qha_capacity)
                 
     # Get QHA results
     qha_results = {
