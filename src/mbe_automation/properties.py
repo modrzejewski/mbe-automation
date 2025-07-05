@@ -111,7 +111,7 @@ def phonons_from_finite_differences(
     plt.close()
     
     export_data_to_csv(
-            Temperatures=Temperatures,
+            Temperatures=temperatures,
             output_prefix="harmonic",
             properties_dir = properties_dir,
             lattice_energies = None,
@@ -321,12 +321,12 @@ def quasi_harmonic_approximation_properties(
          _, _, phonons = mbe_automation.vibrations.harmonic.phonopy(
                  scaled_unitcell,
                  Calculator,
-                 Temperatures[i],
+                 [Temperatures[i]],
                  SupercellRadius,
                  SupercellDisplacement)  
          # Calculate lattice energy
-         latice_energy =  static_lattice_energy(UnitCell, molecule, Calculator, SupercellRadius)
-         qha_lattice_energies.append(latice_energy)
+         lattice_energy = static_lattice_energy(scaled_unitcell, molecule, Calculator, SupercellRadius)
+         qha_lattice_energies.append(lattice_energy)
          thermal_props = phonons.get_thermal_properties_dict()
          F = np.array(thermal_props['free_energy']) * (len(molecule)/len(UnitCell))
          S = np.array(thermal_props['entropy']) * (len(molecule)/len(UnitCell))
@@ -342,7 +342,7 @@ def quasi_harmonic_approximation_properties(
     export_data_to_csv(
             Temperatures=Temperatures,
             output_prefix="qha",
-            properties_dir,
+            properties_dir = properties_dir,
             lattice_energies=qha_lattice_energies,
             opt_volume=opt_volume,
             free_energies=qha_free_energies,
@@ -356,7 +356,7 @@ def quasi_harmonic_approximation_properties(
         'tested_volumes (AA^3)': volumes,
         'lattice_energies (kJ/mol)': qha_lattice_energies,
         'free_energies (kJ/mol)': qha_free_energies,
-        'entropies (J/mol/K)': gha_entropies,
+        'entropies (J/mol/K)': qha_entropies,
         "vib_energies (kJ/mol)": qha_vib_energies,
         'thermal_expansion': qha.thermal_expansion,
         'heat_capacity_P (J/mol/K)': qha.heat_capacity_P_numerical,
@@ -441,17 +441,17 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
         if isinstance(lattice_energies[0], (list, np.ndarray)):
             lattice_energies_dict = {}
             for i, temp in enumerate(Temperatures):
-                lattice_energies_dict[f'Optimal_Volume_T_{temp:.1f}K'] = lattice_energies[i]
+                lattice_energies_dict[f'Lattice_Energy_T_{temp:.1f}K'] = lattice_energies[i]
             df_lattice_energies = pd.DataFrame(lattice_energies_dict)
         else:
             df_lattice_energies = pd.DataFrame({
                 'Temperature_K': Temperatures,
-                'Optimal Volume':lattice_energies
+                'Lattice_Energy':lattice_energies
             })
   
-        opt_volume_path = os.path.join(properties_dir, f"{output_prefix}_optimal_volume.csv")
-        df_opt_volume.to_csv(opt_volume_path, index=False)
-        print(f"File with voptimal volume was created successfully {main_path}")
+        lattice_path = os.path.join(properties_dir, f"{output_prefix}_lattice_energie.csv")
+        df_lattice_energies.to_csv(lattice_path, index=False)
+        print(f"File with voptimal volume was created successfully {lattice_path}")
     
     if opt_volume:
         if isinstance(opt_volume[0], (list, np.ndarray)):
@@ -467,10 +467,10 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
   
         opt_volume_path = os.path.join(properties_dir, f"{output_prefix}_optimal_volume.csv")
         df_opt_volume.to_csv(opt_volume_path, index=False)
-        print(f"File with voptimal volume was created successfully {main_path}")
+        print(f"File with voptimal volume was created successfully {opt_volume_path}")
 
 
-   if free_energies:
+    if free_energies:
         if isinstance(free_energies[0], (list, np.ndarray)):
             free_energy_dict = {}
             for i, temp in enumerate(Temperatures):
@@ -538,7 +538,7 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
             combined_data = {
                 'Temperature_K': Temperatures,
                 'Optimal_Volume_A3': opt_volume if opt_volume else [None]*len(Temperatures),
-                'Lattice_Energy_eV': lattice_energies,
+                'Lattice_Energy_eV': lattice_energies if lattice_energies else [None]*len(Temperatures),
                 'Free_Energy': free_energies if free_energies else [None]*len(Temperatures),
                 'Entropy': entropies if entropies else [None]*len(Temperatures),
                 'Vibrational_Energy': vib_energies if vib_energies else [None]*len(Temperatures),
