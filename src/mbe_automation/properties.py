@@ -437,7 +437,7 @@ def plot_dispersion_phonopy_builtin(phonons, output_dir):
 def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_energies, opt_volume,
                           free_energies, entropies, vib_energies, 
                           capacity):
-     if lattice_energies:
+    if lattice_energies:
         if isinstance(lattice_energies[0], (list, np.ndarray)):
             lattice_energies_dict = {}
             for i, temp in enumerate(Temperatures):
@@ -453,7 +453,7 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
         df_lattice_energies.to_csv(lattice_path, index=False)
         print(f"File with voptimal volume was created successfully {lattice_path}")
     
-     if opt_volume:
+    if opt_volume:
         if isinstance(opt_volume[0], (list, np.ndarray)):
             opt_volume_dict = {}
             for i, temp in enumerate(Temperatures):
