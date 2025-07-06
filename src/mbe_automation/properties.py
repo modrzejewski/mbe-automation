@@ -339,7 +339,11 @@ def quasi_harmonic_approximation_properties(
         
          print(f"Temperature: {Temperatures[i]:.2f}, optimal volume: {V:.2f} Ų, Lattice energy: {lattice_energy:.6f} eV")
 
-
+    qha_free_energies = np.array(qha_free_energies)
+    qha_entropies = np.array(qha_entropies)
+    qha_vib_energies = np.array(qha_vib_energies)
+    qha_capacity = np.array(qha_capacity)
+    qha_lattice_energies = np.array(qha_lattice_energies)
     export_data_to_csv(
             Temperatures=Temperatures,
             output_prefix="qha",
