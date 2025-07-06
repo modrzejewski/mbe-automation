@@ -295,7 +295,6 @@ def quasi_harmonic_approximation_properties(
     qha_entropies = []
     qha_vib_energies =[]
     qha_capacity = [] 
-    Temp = []
         
     for i, V in enumerate(opt_volume):
          T =  Temperatures[i]  
@@ -329,20 +328,21 @@ def quasi_harmonic_approximation_properties(
          lattice_energy = static_lattice_energy(scaled_unitcell, molecule, Calculator, SupercellRadius)
          qha_lattice_energies.append(lattice_energy)
          thermal_props = phonons.get_thermal_properties_dict()
-         F = np.array(thermal_props['free_energy']) * (len(molecule)/len(UnitCell))
-         S = np.array(thermal_props['entropy']) * (len(molecule)/len(UnitCell))
-         Cv = np.array(thermal_props["heat_capacity"]) * (len(molecule)/len(UnitCell))
+         F = np.array(thermal_props['free_energy'])[0] * (len(molecule)/len(UnitCell))
+         S = np.array(thermal_props['entropy'])[0] * (len(molecule)/len(UnitCell))
+         Cv = np.array(thermal_props["heat_capacity"])[0] * (len(molecule)/len(UnitCell))
          E_vib = F + T * S / 1000  # kJ/mol
          qha_free_energies.append(F)
          qha_entropies.append(S)
          qha_vib_energies.append(E_vib)
          qha_capacity.append(Cv) 
-         Temp.append(Temperatures[i])
         
          print(f"Temperature: {Temperatures[i]:.2f}, optimal volume: {V:.2f} Ų, Lattice energy: {lattice_energy:.6f} eV")
-    
+
+    print(opt_volume.shape())
+    print(Temperatures.shape())
     export_data_to_csv(
-            Temperatures=Temp,
+            Temperatures=Temperatures,
             output_prefix="qha",
             properties_dir = properties_dir,
             lattice_energies=qha_lattice_energies,
