@@ -288,7 +288,7 @@ def quasi_harmonic_approximation_properties(
     plt = qha.plot()
     plt.savefig(os.path.join(properties_dir, "qha.png"), dpi=300, bbox_inches='tight')
 
-    opt_volume = qha.volume_temperature
+    opt_volume = np.array(qha.volume_temperature)
     zero_volume = UnitCell.get_volume()  #volume of a unit cell at 0K Temperature
     qha_lattice_energies = []
     qha_free_energies = []
@@ -339,8 +339,7 @@ def quasi_harmonic_approximation_properties(
         
          print(f"Temperature: {Temperatures[i]:.2f}, optimal volume: {V:.2f} Ų, Lattice energy: {lattice_energy:.6f} eV")
 
-    print(opt_volume.shape())
-    print(Temperatures.shape())
+
     export_data_to_csv(
             Temperatures=Temperatures,
             output_prefix="qha",
