@@ -176,10 +176,10 @@ def compute_harmonic_properties(config: PropertiesConfig):
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
 
     # Calculate sublimation enthalpy:
-    sublimation_enthalpy_qha = np.zeros(len(config.temperatures))
+    sublimation_enthalpy_qha = np.zeros(len(opt_volume))
 
-    for t, T in enumerate(config.temperatures):
-        
+    for t in range(len(opt_volume)):
+        T = config.temperatures[t+1] 
         kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
         # Use lattice energy for this specific volume
         if rotor_type == "nonlinear":
