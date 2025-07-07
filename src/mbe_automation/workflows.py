@@ -167,8 +167,10 @@ def compute_harmonic_properties(config: PropertiesConfig):
     # QHA-based sublimation enthalpy calculation
     opt_volume = qha_properties['volume_temperature'] 
     # Calculate ΔE_vib 
-    ΔE_vib_qha = (molecule_properties["vibrational energy (kJ/mol)"] -
-              qha_properties["vib_energies (kJ/mol)"])
+    molecule_vib_qha =np.array(molecule_properties["vibrational energy (kJ/mol)"])[1:]
+    crystal_vib_qha = np.array(qha_properties["vib_energies (kJ/mol)"])
+    ΔE_vib_qha = (molecule_vib_qha -
+              crystal_vib_qha)
     lattice_energy_qha = qha_properties['lattice_energies (kJ/mol)']
     # Get rotor type for molecular contributions
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
