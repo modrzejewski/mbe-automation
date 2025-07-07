@@ -470,7 +470,7 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
   
         lattice_path = os.path.join(properties_dir, f"{output_prefix}_lattice_energie.csv")
         df_lattice_energies.to_csv(lattice_path, index=False)
-        print(f"File with voptimal volume was created successfully {lattice_path}")
+        print(f"File with voptimal volume was created successfully {output_prefix}_lattice_energie.csv")
     
     if opt_volume  is not None:
         if isinstance(opt_volume[0], (list, np.ndarray)):
@@ -486,7 +486,7 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
   
         opt_volume_path = os.path.join(properties_dir, f"{output_prefix}_optimal_volume.csv")
         df_opt_volume.to_csv(opt_volume_path, index=False)
-        print(f"File with voptimal volume was created successfully {opt_volume_path}")
+        print(f"File with voptimal volume was created successfully {output_prefix}_optimal_volume.csv")
 
 
     if free_energies  is not None:
