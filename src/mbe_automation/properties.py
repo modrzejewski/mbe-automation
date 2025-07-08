@@ -297,7 +297,7 @@ def quasi_harmonic_approximation_properties(
     qha_vib_energies =[]
     qha_capacity = [] 
     Temp = []
-    CvInf = 3 * len(unit_cell) * phonopy.units.Avogadro * phonopy.units.kb_J
+    CvInf = 3 * len(UnitCell) * phonopy.units.Avogadro * phonopy.units.kb_J
     THZ_TO_CM1 = 1e12 * _hplanck / (_c * 100)  
     for i, V in enumerate(opt_volume):
          T =  Temperatures[i+1]  
@@ -333,7 +333,7 @@ def quasi_harmonic_approximation_properties(
                 phonons.run_total_dos()
                 dos = phonons.get_total_dos_dict()
                     
-                n_atoms = len(scaled_unitcell)
+                n_atoms = len(UnitCell)
         
                 # Normalize DOS (states per THz per mode)
                 normalized_dos = dos["total_dos"] / (3 * n_atoms)
