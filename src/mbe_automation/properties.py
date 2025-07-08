@@ -45,6 +45,15 @@ def phonons_from_finite_differences(
     plt.tight_layout()
     plt.savefig(os.path.join(properties_dir, "phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
     plt.close()
+        
+    df_dos = pd.DataFrame({
+                'Frequency_points': dos["frequency_points"],
+                'DOS':normalized_dos
+            })
+  
+    dos_path = os.path.join(properties_dir, f"harmonic_dos.csv")
+    df_dos.to_csv(dos_path, index=False)
+    print(f"File with voptimal volume was created successfully harmonic_dos.csv")
     #
     # Plot phonon dispersion
     #
@@ -345,6 +354,13 @@ def quasi_harmonic_approximation_properties(
                 plt.grid(True, alpha=0.3)                 
                 plt.savefig(os.path.join(properties_dir, "qha_phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
                 plt.close()
+                df_dos = pd.DataFrame({
+                        'Frequency_points': dos["frequency_points"],
+                        'DOS':normalized_dos
+                    })
+                dos_path = os.path.join(properties_dir, f"qha_dos.csv")
+                df_dos.to_csv(dos_path, index=False)
+                print(f"File with voptimal volume was created successfully qha_dos.csv")
             except Exception as e:
                 print(f"Error calculating DOS: {e}")
          # Calculate lattice energy
