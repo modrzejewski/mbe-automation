@@ -296,6 +296,7 @@ def quasi_harmonic_approximation_properties(
     qha_vib_energies =[]
     qha_capacity = [] 
     Temp = []
+    CvInf = 3 * len(unit_cell) * phonopy.units.Avogadro * phonopy.units.kb_J
     for i, V in enumerate(opt_volume):
          T =  Temperatures[i+1]  
          # Scale the unit cell
@@ -330,7 +331,8 @@ def quasi_harmonic_approximation_properties(
          thermal_props = phonons.get_thermal_properties_dict()
          F = np.array(thermal_props['free_energy'])[0] * (len(molecule)/len(UnitCell))
          S = np.array(thermal_props['entropy'])[0] * (len(molecule)/len(UnitCell))
-         Cv = np.array(thermal_props["heat_capacity"])[0] * (len(molecule)/len(UnitCell))
+         Cv = np.array(thermal_props["heat_capacity"])[0]
+         Cv = Cv / CvInf
          E_vib = F + T * S / 1000  # kJ/mol
          qha_free_energies.append(F)
          qha_entropies.append(S)
