@@ -1,7 +1,7 @@
 import mbe_automation.vibrations.harmonic
 import mbe_automation.structure.relax
 import mbe_automation.kpoints
-from ase.units import kJ, mol
+from ase.units import kJ, mol, _hplanck, _c
 import numpy as np
 import ase.build
 import sys
@@ -288,6 +288,7 @@ def quasi_harmonic_approximation_properties(
     plt = qha.plot()
     plt.savefig(os.path.join(properties_dir, "qha.png"), dpi=300, bbox_inches='tight')
 
+               
     opt_volume = np.array(qha.volume_temperature)
     zero_volume = UnitCell.get_volume()  #volume of a unit cell at 0K Temperature
     qha_lattice_energies = []
@@ -297,6 +298,7 @@ def quasi_harmonic_approximation_properties(
     qha_capacity = [] 
     Temp = []
     CvInf = 3 * len(unit_cell) * phonopy.units.Avogadro * phonopy.units.kb_J
+    THZ_TO_CM1 = 1e12 * _hplanck / (_c * 100)  
     for i, V in enumerate(opt_volume):
          T =  Temperatures[i+1]  
          # Scale the unit cell
@@ -324,7 +326,40 @@ def quasi_harmonic_approximation_properties(
                  Calculator,
                  [Temperatures[i]],
                  SupercellRadius,
-                 SupercellDisplacement)  
+                 SupercellDisplacement) 
+         if (T == 298):
+             phonons.run_total_dos()
+             dos = phonons.get_total_dos_dict()
+             normalized_dos = dos / (3 * len(unit_cell)) / THZ_TO_CM1
+             plt.plot(dos["frequency_points"], normalized_dos)
+             plt.xlabel('Frequency (cm-1)')
+             plt.ylabel('DOS (states/cm-1/(3*NAtoms))')
+             plt.grid(True)
+             plt.tight_layout()
+             plt.savefig(os.path.join(properties_dir, "phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
+             plt.close()
+         if abs(T - 298) < 1e-6:  # Better floating point comparison
+            try:
+                # Calculate DOS
+                phonons.run_total_dos()
+                dos = phonons.get_total_dos_dict()
+        
+                # Get unit cell for normalization
+                unit_cell = phonons.get_unitcell()
+                n_atoms = len(unit_cell)
+        
+                # Normalize DOS (states per THz per mode)
+                normalized_dos = dos["total_dos"] / (3 * n_atoms)
+        
+                # Create the plot
+                plt.figure(figsize=(8, 6))
+                plt.plot(dos["frequency_points"], normalized_dos, linewidth=2)
+                plt.xlabel('Frequency (THz)', fontsize=12)
+                plt.ylabel('DOS (states/THz/(3×N_atoms))', fontsize=12)
+                plt.title('Phonon Density of States at 298 K', fontsize=14)
+                plt.grid(True, alpha=0.3)                 
+                plt.savefig(os.path.join(properties_dir, "qha_phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
+                plt.close()
          # Calculate lattice energy
          lattice_energy = static_lattice_energy(scaled_unitcell, molecule, Calculator, SupercellRadius)
          qha_lattice_energies.append(lattice_energy)
