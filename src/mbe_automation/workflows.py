@@ -205,13 +205,11 @@ def compute_harmonic_properties(config: PropertiesConfig):
             sublimation_enthalpy_qha[t] = -lattice_energy_qha[t] + ΔE_vib_qha[t] + (3/2+1) * kbT
     
     
-    
-    
-    print(f"Thermodynamic properties within the quasi harmonic approximation")
+
     for t in range(max_index):       
         T = config.temperatures[t+1]         
-        print(f"ΔEvib(T={T}K) {ΔE_vib_qha[i]:.3f}")
-        print(f"ΔHsub(T={T}K) {sublimation_enthalpy_qha[i]:.3f}")
+        print(f"ΔEvib(T={T}K) {ΔE_vib_qha[t]:.3f}")
+        print(f"ΔHsub(T={T}K) {sublimation_enthalpy_qha[t]:.3f}")
 
     Temperatures = np.array(config.temperatures)[1:]
     
