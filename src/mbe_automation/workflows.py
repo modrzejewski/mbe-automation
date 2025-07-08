@@ -147,6 +147,16 @@ def compute_harmonic_properties(config: PropertiesConfig):
     for i, T in enumerate(config.temperatures):        
         print(f"ΔEvib(T={T}K) {ΔE_vib[i]:.3f}")
         print(f"ΔHsub(T={T}K) {sublimation_enthalpy[i]:.3f}")
+
+    df_harmonic = pd.DataFrame({
+                'Temperature_K': config.temperatures,
+                'ΔEvib': ΔE_vib,
+                'ΔHsub': sublimation_enthalpy
+            })
+  
+    harmonic_path = os.path.join(properties_dir, f"harmonic.csv")
+    df_harmonic.to_csv(harmonic_path, index=False)
+    print(f"File with harmonic ΔHsub and ΔEvib was created successfully harmonic.csv")
     #
     # Calculation of thermodynamic properties in quasi-harmonic-approximation
     #
@@ -171,14 +181,15 @@ def compute_harmonic_properties(config: PropertiesConfig):
     crystal_vib_qha = np.array(qha_properties["vib_energies (kJ/mol)"])
     ΔE_vib_qha = (molecule_vib_qha -
               crystal_vib_qha)
-    lattice_energy_qha = qha_properties['lattice_energies (kJ/mol)']
+    lattice_energy_qha = np.array(qha_properties['lattice_energies (kJ/mol)'])
     # Get rotor type for molecular contributions
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
 
     # Calculate sublimation enthalpy:
     sublimation_enthalpy_qha = np.zeros(len(opt_volume))
 
-    for t in range(len(opt_volume)):
+    max_index = min(len(opt_volume), len(lattice_energy_qha), len(ΔE_vib_qha), len(Qha_temperatures))
+    for t in range(max_index):       
         T = config.temperatures[t+1] 
         kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
         # Use lattice energy for this specific volume
@@ -199,7 +210,19 @@ def compute_harmonic_properties(config: PropertiesConfig):
     for i, T in enumerate(config.temperatures):        
         print(f"ΔEvib(T={T}K) {ΔE_vib_qha[i]:.3f}")
         print(f"ΔHsub(T={T}K) {sublimation_enthalpy_qha[i]:.3f}")
+
+    Temperatures = np.array(config.temperatures)[1:]
     
+    df_qha = pd.DataFrame({
+                'Temperature_K': Temperatures,
+                'ΔEvib': ΔE_vib_qha,
+                'ΔHsub': sublimation_enthalpy_qha
+            })
+    
+    qha_path = os.path.join(properties_dir, f"qha.csv")
+    df_qha.to_csv(qha_path, index=False)
+    print(f"File with quasi harmonic ΔHsub and ΔEvib was created successfully qha.csv")
+
 
 
 
