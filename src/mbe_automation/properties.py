@@ -334,10 +334,8 @@ def quasi_harmonic_approximation_properties(
                 dos = phonons.get_total_dos_dict()
                     
                 n_atoms = len(UnitCell)
-        
                 # Normalize DOS (states per THz per mode)
                 normalized_dos = dos["total_dos"] / (3 * n_atoms)
-        
                 # Create the plot
                 plt.figure(figsize=(8, 6))
                 plt.plot(dos["frequency_points"], normalized_dos, linewidth=2)
@@ -347,6 +345,8 @@ def quasi_harmonic_approximation_properties(
                 plt.grid(True, alpha=0.3)                 
                 plt.savefig(os.path.join(properties_dir, "qha_phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
                 plt.close()
+            except Exception as e:
+                print(f"Error calculating DOS: {e}")
          # Calculate lattice energy
          lattice_energy = static_lattice_energy(scaled_unitcell, molecule, Calculator, SupercellRadius)
          qha_lattice_energies.append(lattice_energy)
