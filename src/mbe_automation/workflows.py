@@ -13,6 +13,7 @@ import mace.calculators
 import os
 import ase.units
 import numpy as np
+import pandas as pd
 
 
 def compute_harmonic_properties(config: PropertiesConfig):
