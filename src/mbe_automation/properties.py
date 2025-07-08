@@ -327,26 +327,13 @@ def quasi_harmonic_approximation_properties(
                  [Temperatures[i]],
                  SupercellRadius,
                  SupercellDisplacement) 
-         if (T == 298):
-             phonons.run_total_dos()
-             dos = phonons.get_total_dos_dict()
-             normalized_dos = dos / (3 * len(unit_cell)) / THZ_TO_CM1
-             plt.plot(dos["frequency_points"], normalized_dos)
-             plt.xlabel('Frequency (cm-1)')
-             plt.ylabel('DOS (states/cm-1/(3*NAtoms))')
-             plt.grid(True)
-             plt.tight_layout()
-             plt.savefig(os.path.join(properties_dir, "phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
-             plt.close()
          if abs(T - 298) < 1e-6:  # Better floating point comparison
             try:
                 # Calculate DOS
                 phonons.run_total_dos()
                 dos = phonons.get_total_dos_dict()
-        
-                # Get unit cell for normalization
-                unit_cell = phonons.get_unitcell()
-                n_atoms = len(unit_cell)
+                    
+                n_atoms = len(scaled_unitcell)
         
                 # Normalize DOS (states per THz per mode)
                 normalized_dos = dos["total_dos"] / (3 * n_atoms)
