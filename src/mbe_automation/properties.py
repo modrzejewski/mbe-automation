@@ -274,7 +274,7 @@ def quasi_harmonic_approximation_properties(
     # Create QHA object
     qha = QHA(
         volumes=volumes,
-        electronic_energies=electronic_energies
+        electronic_energies=electronic_energies,
         temperatures = Temperatures,
         cv = capacity.T, # QHA expects shape (n_temperatures, n_volumes), expected units J/K/mol
         entropy = entropies.T, # expected units J/K/mol
