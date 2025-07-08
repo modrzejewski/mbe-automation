@@ -189,7 +189,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
     # Calculate sublimation enthalpy:
     sublimation_enthalpy_qha = np.zeros(len(opt_volume))
 
-    max_index = min(len(opt_volume), len(lattice_energy_qha), len(ΔE_vib_qha), len(Qha_temperatures))
+    max_index = min(len(opt_volume), len(lattice_energy_qha), len(ΔE_vib_qha), len(config.temperatures))
     for t in range(max_index):       
         T = config.temperatures[t+1] 
         kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
