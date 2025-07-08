@@ -155,7 +155,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
                 'ΔHsub': sublimation_enthalpy
             })
   
-    harmonic_path = os.path.join(properties_dir, f"harmonic.csv")
+    harmonic_path = os.path.join(config.properties_dir, f"harmonic.csv")
     df_harmonic.to_csv(harmonic_path, index=False)
     print(f"File with harmonic ΔHsub and ΔEvib was created successfully harmonic.csv")
     #
@@ -220,7 +220,7 @@ def compute_harmonic_properties(config: PropertiesConfig):
                 'ΔHsub': sublimation_enthalpy_qha
             })
     
-    qha_path = os.path.join(properties_dir, f"qha.csv")
+    qha_path = os.path.join(config.properties_dir, f"qha.csv")
     df_qha.to_csv(qha_path, index=False)
     print(f"File with quasi harmonic ΔHsub and ΔEvib was created successfully qha.csv")
 
