@@ -307,7 +307,7 @@ def quasi_harmonic_approximation_properties(
     qha_capacity = [] 
     Temp = []
     CvInf = 3 * len(UnitCell) * phonopy.units.Avogadro * phonopy.units.kb_J
-    THZ_TO_CM1 = 1e12 * _hplanck / (_c * 100)  
+ 
     for i, V in enumerate(opt_volume):
          T =  Temperatures[i+1]  
          # Scale the unit cell
@@ -347,7 +347,7 @@ def quasi_harmonic_approximation_properties(
                 normalized_dos = dos["total_dos"] / (3 * n_atoms)
                 # Create the plot
                 plt.figure(figsize=(8, 6))
-                plt.plot(dos["frequency_points"]/THZ_TO_CM1, normalized_dos, linewidth=2)
+                plt.plot(dos["frequency_points"], normalized_dos, linewidth=2)
                 plt.xlabel('Frequency (THz)', fontsize=12)
                 plt.ylabel('DOS (states/THz/(3×N_atoms))', fontsize=12)
                 plt.title('Phonon Density of States at 298 K', fontsize=14)
@@ -355,7 +355,7 @@ def quasi_harmonic_approximation_properties(
                 plt.savefig(os.path.join(properties_dir, "qha_phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
                 plt.close()
                 df_dos = pd.DataFrame({
-                        'Frequency_points': dos["frequency_points"]/THZ_TO_CM1,
+                        'Frequency_points': dos["frequency_points"],
                         'DOS':normalized_dos
                     })
                 dos_path = os.path.join(properties_dir, f"qha_dos.csv")
