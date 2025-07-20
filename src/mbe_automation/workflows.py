@@ -184,8 +184,12 @@ def harmonic_properties(config: PropertiesConfig):
     
 def quasi_harmonic_properties(config: PropertiesConfig):
 
-    os.makedirs(config.properties_dir, exist_ok=True)
+    print(f"Thermodynamic properties within the quasi-harmonic approximation")
+    print(f"Equation of state: {config.equation_of_state}")
+    print(f"Range of V/V₀: {config.volume_factors[0]:.3f} ... {config.volume_factors[-1]:.3f}")
+    print(f"Number of volumes: {len(config.volume_factors)}")
     
+    os.makedirs(config.properties_dir, exist_ok=True)    
     if config.symmetrize_unit_cell:
         unit_cell = mbe_automation.structure.crystal.symmetrize(
             config.unit_cell
@@ -221,6 +225,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
+    print(f"Reference volume V₀ = {V0:.2f} Å³/unit cell")
     #
     # Vibrational contributions to E, S, F of the isolated molecule
     #
@@ -242,7 +247,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     #
     # Equilibrium volume as a function of temperature
     #
-    V_eq = mbe_automation.vibrations.harmonic.equilibrium_volumes(
+    V_eq, F_tot_crystal_fit = mbe_automation.vibrations.harmonic.equilibrium_volumes(
         unit_cell_V0,
         molecule,
         config.calculator,
@@ -292,6 +297,12 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         E_vib_crystal[i] = F_vib_crystal[i] + T * S_vib_crystal[i] / 1000  # kJ/mol/unit cell
         E_el_crystal[i] = cell_energy_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
 
+    F_tot_crystal = E_el_crystal + F_vib_crystal
+    F_RMSD_per_atom = np.sqrt(np.mean((F_tot_crystal - F_tot_crystal_fit)**2)) / len(unit_cell_V0)
+    print(f"RMSD(F(actual)-F(EOS)) = {F_RMSD_per_atom} kJ/mol/atom")
+    for i, T in enumerate(temperatures):
+        print(f"Temp={T:.1f} F(actual)={F_tot_crystal[i]:.1f} F(EOS)={F_tot_crystal_fit[i]:.1f}")
+        
     E_vib_molecule = molecule_properties["vibrational energy (kJ/mol)"] # kJ/mol/molecule
     E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule
     #
@@ -300,8 +311,8 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     # and Experiments for the Lattice Energies of Molecular Crystals?
     # Phys. Rev. Lett. 133, 046401 (2024); doi: 10.1103/PhysRevLett.133.046401
     #
-    ΔE_vib = E_vib_molecule - E_vib_crystal * len(molecule)/len(scaled_unit_cell) # kJ/mol/molecule
-    E_latt = E_el_crystal * len(molecule)/len(scaled_unit_cell) - E_el_molecule # kJ/mol/molecule
+    ΔE_vib = E_vib_molecule - E_vib_crystal * len(molecule)/len(unit_cell_V0) # kJ/mol/molecule
+    E_latt = E_el_crystal * len(molecule)/len(unit_cell_V0) - E_el_molecule # kJ/mol/molecule
     ΔH_sub = np.zeros(n_temperatures)
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
     for i, T in enumerate(temperatures):
@@ -333,7 +344,6 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     df.to_hdf(config.hdf5_dataset, key="quasi-harmonic/thermochemistry", mode="a")
     df.round(2).to_csv(os.path.join(config.properties_dir, "quasi_harmonic_thermochemistry.csv"))
 
-    print(f"Thermodynamic properties within the quasi-harmonic approximation")
     cols_to_show = [
         "T (K)",
         "V_eq (Å³/unit cell)",

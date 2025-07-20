@@ -16,7 +16,7 @@ import ase.build
 import matplotlib.pyplot as plt
 import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
-
+from pymatgen.analysis.eos import EOS
 
 def isolated_molecule(
         molecule,
@@ -197,20 +197,13 @@ def equilibrium_volumes(
 ):
 
     reference_cell = unit_cell_V0.cell.copy()
-    reference_volume = unit_cell_V0.get_volume()
-    
-    print(f"\nQuasi-Harmonic Approximation of Unit Cell Volume")
-    print(f"Reference volume V₀ = {reference_volume:.2f} Å³")
-    print(f"Range of V/V₀: {volume_factors[0]:.3f} ... {volume_factors[-1]:.3f}")
-    print(f"Volume points: {len(volume_factors)}")
-    print(f"EOS: {equation_of_state}")
-
     n_volumes = len(volume_factors)
     n_temperatures = len(temperatures)
     V_sampled = np.zeros(n_volumes)
     E_el_V = np.zeros(n_volumes)
     F_vib_V_T = np.zeros((n_volumes, n_temperatures))
     V_eq_T = np.zeros(n_temperatures)
+    F_eq_T = np.zeros(n_temperatures)
     
     print("\nCalculating phonons at different volumes")
     
@@ -230,7 +223,7 @@ def equilibrium_volumes(
                 preserve_space_group=True,
                 optimize_volume=False
         )
-        V_sampled[i] = scaled_unit_cell.get_volume()
+        V_sampled[i] = scaled_unit_cell.get_volume() # Å³/unit cell
         _, _, p = phonons(
             scaled_unit_cell,
             calculator,
@@ -239,18 +232,20 @@ def equilibrium_volumes(
             supercell_displacement
         )  
         thermal_props = p.get_thermal_properties_dict()
-        F_vib_V_T[i, :] = thermal_props['free_energy']
-        E_el_V[i] = scaled_unit_cell.get_potential_energy()
+        F_vib_V_T[i, :] = thermal_props['free_energy'] # kJ/mol/unit cell
+        E_el_V[i] = scaled_unit_cell.get_potential_energy() # eV/unit cell
         
-        print(f"Volume: {V_sampled[i]:.2f} Å³")
+        print(f"Volume: {V_sampled[i]:.2f} Å³/unit cell")
         print(f"Electronic energy: {E_el_V[i]:.6f} eV/unit cell")
     
-    F_tot_V_T = F_vib_V_T + E_el_V
     for i, T in enumerate(temperatures):
-        F_tot, B0, B0prime, V_fit = phonopy.qha.eos.fit_to_eos(V_sampled, F_tot_V_T[:, i], equation_of_state)
-        V_eq_T[i] = V_fit
+        F_tot = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV + E_el_V[:] # eV/unit cell
+        eos = EOS(eos_name=equation_of_state)
+        eos_fit = eos.fit(V_sampled, F_tot)
+        F_eq_T[i] = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+        V_eq_T[i] = eos_fit.v0 # Å³/unit cell
 
-    return V_eq_T
+    return V_eq_T, F_eq_T
                 
 
 def my_plot_band_structure(phonons, output_path, band_connection=True):
