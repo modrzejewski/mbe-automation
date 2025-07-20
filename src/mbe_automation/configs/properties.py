@@ -50,15 +50,40 @@ class PropertiesConfig:
     hdf5_dataset: str = "./properties.hdf5"
                                    #
                                    # Size of the supercell used in the phonon
-                                   # calculation. The minimum point-image distance
-                                   # in Angstrom is translated into the corresponding
-                                   # nx * ny * nz shape of the supercell.
+                                   # calculation. The unit cell -> supercell matrix
+                                   # is computed according to the the minimum
+                                   # point-image distance in Angstrom.
                                    #
-    supercell_radius: float = 30.0
+    supercell_radius: float = 25.0
+                                   #
+                                   # Enforce diagonal supercell transformation
+                                   #
+    supercell_diagonal: bool = False
                                    #
                                    # Displacement in Angs of Cartesian coordinates used
                                    # to compute numerical derivatives (passed to
                                    # phonopy)
                                    #
     supercell_displacement: float = 0.01
-
+                                   #
+                                   # Scaling factors used to sample volumes around
+                                   # V0 in quasi-harmonic calculations, where V0 is the
+                                   # reference volume at T=0K.
+                                   #
+                                   # Recommendations:
+                                   #
+                                   # 1. +/- 5% of the initial unit cell volume as
+                                   # Dolgonos, Hoja, Boese, Revised values for the X23 benchmark
+                                   # set of molecular crystals,
+                                   # Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
+                                   #
+                                   # 2. V/V0=0.97 up to V/V0=1.06 according to the manual
+                                   # of CRYSTAL
+                                   #
+    volume_factors: list[float] = field(default_factory=lambda:
+                                        [0.97, 0.98, 0.99, 1.00, 1.01, 1.02, 1.03, 1.04, 1.05, 1.06])
+                                   #
+                                   # Equation of state used to fit energy
+                                   # as a function of volume
+                                   #
+    equation_of_state: str = "birch_murnaghan"

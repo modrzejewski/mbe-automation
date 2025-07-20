@@ -14,10 +14,12 @@ import os
 import ase.units
 import numpy as np
 import pandas as pd
+import h5py
 
-
-def compute_harmonic_properties(config: PropertiesConfig):
-
+def harmonic_properties(config: PropertiesConfig):
+    """
+    Thermodynamic properties in the harmonic approximation.
+    """
     os.makedirs(config.properties_dir, exist_ok=True)
     
     if config.symmetrize_unit_cell:
@@ -30,20 +32,6 @@ def compute_harmonic_properties(config: PropertiesConfig):
 
     if isinstance(config.calculator, mace.calculators.MACECalculator):
         mbe_automation.display.mace_summary(config.calculator)
-    #
-    # Lattice energy on input geometries, without any geometry
-    # relaxation of the unit cell or the isolated molecule.
-    #
-    # The lattice energy on the non-optimized structures is
-    # needed only as a diagonostic value to estimate the
-    # effect of geometry relaxation.
-    #
-    lattice_energy_noopt = mbe_automation.properties.static_lattice_energy(
-        unit_cell,
-        molecule,
-        config.calculator,
-        config.supercell_radius
-    )
     #
     # Optimize the geometry of the isolated molecule
     # and the unit cell.
@@ -74,29 +62,36 @@ def compute_harmonic_properties(config: PropertiesConfig):
             config.preserve_space_group
         )
     #
-    # Static lattice energy with both molecule and unit
-    # cell optimized
+    # Unit cell -> super cell transformation
     #
-    lattice_energy = mbe_automation.properties.static_lattice_energy(
+    # The criterion for the construction of the super cell is
+    #
+    # r >= config.supercell_radius
+    #
+    # where r is the distance between a point in the reference
+    # super cell and its nearest periodic image in any direction.
+    # The shape of the supercell is adjusted to satisfy the above
+    # condition with minimum volume/number of atoms.
+    #
+    # The shape optimization results in a non-diagonal transformation
+    # matrix for the lattice vectors.
+    #
+    supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(
         unit_cell,
-        molecule,
-        config.calculator,
-        config.supercell_radius
+        config.supercell_radius,
+        config.supercell_diagonal
     )
     #
     # Phonon frequencies, density of states,
     # phonon dispersion, vibrational contributions
     # to entropy and free energy
     #
-    crystal_properties = mbe_automation.properties.phonons_from_finite_differences(
+    _, _, phonons = mbe_automation.vibrations.harmonic.phonons(
         unit_cell,
-        molecule,
         config.calculator,
+        supercell_matrix,
         config.temperatures,
-        config.supercell_radius,
-        config.supercell_displacement,
-        config.properties_dir,
-        config.hdf5_dataset
+        config.supercell_displacement
     )
     #
     # Vibrational contributions to E, S, F of the isolated molecule
@@ -106,8 +101,18 @@ def compute_harmonic_properties(config: PropertiesConfig):
         config.calculator,
         config.temperatures
     )
-    ΔE_vib = (molecule_properties["vibrational energy (kJ/mol)"] -
-              crystal_properties["vibrational energy (kJ/mol)"])
+
+    temperatures = config.temperatures
+    n_temperatures = len(temperatures)
+    cell_energy_eV = unit_cell.get_potential_energy()
+    thermal_props = phonons.get_thermal_properties_dict()
+    F_vib_crystal = thermal_props['free_energy'] # kJ/mol/unit cell
+    S_vib_crystal = thermal_props['entropy'] # J/K/mol/unit cell
+    E_vib_crystal = F_vib_crystal + temperatures * S_vib_crystal / 1000  # kJ/mol/unit cell
+    E_el_crystal = cell_energy_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+
+    E_vib_molecule = molecule_properties["vibrational energy (kJ/mol)"] # kJ/mol/molecule
+    E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule
     #
     # Sublimation enthalpy
     # - harmonic approximation of crystal and molecular vibrations
@@ -129,102 +134,215 @@ def compute_harmonic_properties(config: PropertiesConfig):
     #    set of molecular crystals,
     #    Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
     #
+    # Vibrational energy, lattice energy, and sublimation enthalpy
+    # defined as in Della Pia, Zen, Alfe, Michaelides, How Accurate are Simulations
+    # and Experiments for the Lattice Energies of Molecular Crystals?
+    # Phys. Rev. Lett. 133, 046401 (2024); doi: 10.1103/PhysRevLett.133.046401
+    #
+    ΔE_vib = E_vib_molecule - E_vib_crystal * len(molecule)/len(unit_cell) # kJ/mol/molecule
+    E_latt = E_el_crystal * len(molecule)/len(unit_cell) - E_el_molecule # kJ/mol/molecule
+    ΔH_sub = np.zeros(n_temperatures)
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
-    sublimation_enthalpy = np.zeros(len(config.temperatures))
-    for i, T in enumerate(config.temperatures):
+    for i, T in enumerate(temperatures):
         kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
         if rotor_type == "nonlinear":
-            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib[i] + (3/2+3/2+1) * kbT
+            # 3/2 kT (translation) + 3/2 kT (rotation) + kT (PV work)
+            ΔH_sub[i] = -E_latt + ΔE_vib[i] + (3/2+3/2+1) * kbT
         elif rotor_type == "linear":
-            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib[i] + (3/2+1+1) * kbT
+            # 3/2 kT (translation) + kT (rotation) + kT (PV work)
+            ΔH_sub[i] = -E_latt + ΔE_vib[i] + (3/2+1+1) * kbT
         elif rotor_type == "monatomic":
-            sublimation_enthalpy[i] = -lattice_energy + ΔE_vib[i] + (3/2+1) * kbT
-        
-    
-    print(f"Thermodynamic properties within the harmonic approximation")
-    print(f"Energies (kJ/mol/molecule):")
-    print(f"{'Elatt (input coords)':20} {lattice_energy_noopt:.3f}")
-    print(f"{'Elatt (relaxed coords)':20} {lattice_energy:.3f}")
-    for i, T in enumerate(config.temperatures):        
-        print(f"ΔEvib(T={T}K) {ΔE_vib[i]:.3f}")
-        print(f"ΔHsub(T={T}K) {sublimation_enthalpy[i]:.3f}")
+            # 3/2 kT (translation) + kT (PV work)
+            ΔH_sub[i] = -E_latt + ΔE_vib[i] + (3/2+1) * kbT    
 
-    df_harmonic = pd.DataFrame({
-                'Temperature_K': config.temperatures,
-                'ΔEvib': ΔE_vib,
-                'ΔHsub': sublimation_enthalpy
-            })
-  
-    harmonic_path = os.path.join(config.properties_dir, f"harmonic.csv")
-    df_harmonic.to_csv(harmonic_path, index=False)
-    print(f"File with harmonic ΔHsub and ΔEvib was created successfully harmonic.csv")
+    df = pd.DataFrame({
+        "T (K)": temperatures,
+        "V (Å³/unit cell)": unit_cell.get_volume(),
+        "E_latt (kJ/mol/molecule)": E_latt,
+        "ΔEvib (kJ/mol/molecule)": ΔE_vib,
+        "ΔHsub (kJ/mol/molecule)": ΔH_sub,
+        "F_vib_crystal (kJ/mol/unit cell)": F_vib_crystal,
+        "S_vib_crystal (J/K/mol/unit cell)": S_vib_crystal,
+        "E_vib_crystal (kJ/mol/unit cell)": E_vib_crystal,
+        "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
+        "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,
+        "E_el_molecule (kJ/mol/molecule)": E_el_molecule
+    }).set_index("T (K)")
+
+    df.to_hdf(config.hdf5_dataset, key="harmonic/thermochemistry", mode="a")
+
+    print(f"Thermodynamic properties within the harmonic approximation")
+    cols_to_show = [
+        "T (K)",
+        "ΔHsub (kJ/mol/molecule)",
+        "ΔEvib (kJ/mol/molecule)",
+        "E_latt (kJ/mol/molecule)"
+    ]
+    print(df[cols_to_show].round(1))
+    print(f"Harmonic properties saved in {config.hdf5_dataset}")
+
+    
+def quasi_harmonic_properties(config: PropertiesConfig):
+
+    os.makedirs(config.properties_dir, exist_ok=True)
+    
+    if config.symmetrize_unit_cell:
+        unit_cell = mbe_automation.structure.crystal.symmetrize(
+            config.unit_cell
+        )
+    else:
+        unit_cell = config.unit_cell.copy()
+    molecule = config.molecule.copy()
+    
+    if isinstance(config.calculator, mace.calculators.MACECalculator):
+        mbe_automation.display.mace_summary(config.calculator)
     #
-    # Calculation of thermodynamic properties in quasi-harmonic-approximation
+    # Optimize the geometry of the isolated molecule
+    # and the unit cell.
     #
-    qha_properties, qha, phonon_objects = mbe_automation.properties.quasi_harmonic_approximation_properties(
+    molecule = mbe_automation.structure.relax.isolated_molecule(
+        molecule,
+        config.calculator
+    )
+    #
+    # Compute the reference cell volume (V0), lattice vectors, and atomic
+    # positions by minimization of the electronic
+    # energy. This corresponds to the periodic cell at T=0K
+    # without the effect of zero-point vibrations.
+    #
+    # The points on the volume axis will be determined
+    # by rescaling of V0.
+    #
+    unit_cell_V0 = mbe_automation.structure.relax.atoms_and_cell(
         unit_cell,
+        config.calculator,
+        config.preserve_space_group,
+        optimize_volume=True
+    )
+    V0 = unit_cell_V0.get_volume()
+    reference_cell = unit_cell_V0.cell.copy()
+    #
+    # Vibrational contributions to E, S, F of the isolated molecule
+    #
+    molecule_properties = mbe_automation.vibrations.harmonic.isolated_molecule(
+        molecule,
+        config.calculator,
+        config.temperatures
+    )
+    #
+    # The supercell transformation is computed here because
+    # the shape of the supercell should be kept constant
+    # even if we change the volume of the unit cell.
+    #
+    supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(
+        unit_cell_V0,
+        config.supercell_radius,
+        config.supercell_diagonal
+    )
+    #
+    # Equilibrium volume as a function of temperature
+    #
+    V_eq = mbe_automation.vibrations.harmonic.equilibrium_volumes(
+        unit_cell_V0,
         molecule,
         config.calculator,
         config.temperatures,
-        config.supercell_radius,
+        supercell_matrix,
         config.supercell_displacement,
-        config.properties_dir
+        config.properties_dir,
+        config.volume_factors,
+        config.equation_of_state
     )
+    #
+    # Harmonic properties at each volume
+    #
+    temperatures = config.temperatures
+    n_temperatures = len(temperatures)
+    F_vib_crystal = np.zeros(n_temperatures)
+    S_vib_crystal = np.zeros(n_temperatures)
+    E_vib_crystal = np.zeros(n_temperatures)
+    E_el_crystal = np.zeros(n_temperatures)
+    for i, V in enumerate(V_eq):
+        T =  temperatures[i]  
+        volume_factor = V / V0
+        cell_factor = volume_factor**(1/3)
+        scaled_cell = reference_cell * cell_factor
+        scaled_unit_cell = unit_cell_V0.copy()
+        scaled_unit_cell.set_cell(scaled_cell, scale_atoms=True)
+        #
+        # Relax geometry with fixed QHA equilibrium value
+        #
+        scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
+            scaled_unit_cell,
+            config.calculator,
+            preserve_space_group=True,
+            optimize_volume=False
+        )
+        _, _, phonons = mbe_automation.vibrations.harmonic.phonons(
+            scaled_unit_cell,
+            config.calculator,
+            supercell_matrix,
+            [T],
+            config.supercell_displacement
+        )
+        cell_energy_eV = scaled_unit_cell.get_potential_energy()
+        thermal_props = phonons.get_thermal_properties_dict()
+        F_vib_crystal[i] = thermal_props['free_energy'][0] # kJ/mol/unit cell
+        S_vib_crystal[i] = thermal_props['entropy'][0] # J/K/mol/unit cell
+        E_vib_crystal[i] = F_vib_crystal[i] + T * S_vib_crystal[i] / 1000  # kJ/mol/unit cell
+        E_el_crystal[i] = cell_energy_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
 
-    print(f"Thermodynamic properties within the quasi harmonic approximation")
+    E_vib_molecule = molecule_properties["vibrational energy (kJ/mol)"] # kJ/mol/molecule
+    E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule
     #
-    # Free energy for QHA aprrox
+    # Vibrational energy, lattice energy, and sublimation enthalpy
+    # defined as in Della Pia, Zen, Alfe, Michaelides, How Accurate are Simulations
+    # and Experiments for the Lattice Energies of Molecular Crystals?
+    # Phys. Rev. Lett. 133, 046401 (2024); doi: 10.1103/PhysRevLett.133.046401
     #
-    # QHA-based sublimation enthalpy calculation
-    opt_volume = qha_properties['volume_temperature'] 
-    # Calculate ΔE_vib 
-    molecule_vib_qha =np.array(molecule_properties["vibrational energy (kJ/mol)"])[1:]
-    crystal_vib_qha = np.array(qha_properties["vib_energies (kJ/mol)"])
-    ΔE_vib_qha = (molecule_vib_qha -
-              crystal_vib_qha)
-    lattice_energy_qha = np.array(qha_properties['lattice_energies (kJ/mol)'])
-    # Get rotor type for molecular contributions
+    ΔE_vib = E_vib_molecule - E_vib_crystal * len(molecule)/len(scaled_unit_cell) # kJ/mol/molecule
+    E_latt = E_el_crystal * len(molecule)/len(scaled_unit_cell) - E_el_molecule # kJ/mol/molecule
+    ΔH_sub = np.zeros(n_temperatures)
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
-
-    # Calculate sublimation enthalpy:
-    sublimation_enthalpy_qha = np.zeros(len(opt_volume))
-
-    max_index = min(len(opt_volume), len(lattice_energy_qha), len(ΔE_vib_qha), len(config.temperatures))
-    for t in range(max_index):       
-        T = config.temperatures[t+1] 
+    for i, T in enumerate(temperatures):
         kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
-        # Use lattice energy for this specific volume
         if rotor_type == "nonlinear":
             # 3/2 kT (translation) + 3/2 kT (rotation) + kT (PV work)
-            sublimation_enthalpy_qha[t] = -lattice_energy_qha[t] + ΔE_vib_qha[t] + (3/2+3/2+1) * kbT
+            ΔH_sub[i] = -E_latt[i] + ΔE_vib[i] + (3/2+3/2+1) * kbT
         elif rotor_type == "linear":
             # 3/2 kT (translation) + kT (rotation) + kT (PV work)
-            sublimation_enthalpy_qha[t] = -lattice_energy_qha[t] + ΔE_vib_qha[t] + (3/2+1+1) * kbT
+            ΔH_sub[i] = -E_latt[i] + ΔE_vib[i] + (3/2+1+1) * kbT
         elif rotor_type == "monatomic":
             # 3/2 kT (translation) + kT (PV work)
-            sublimation_enthalpy_qha[t] = -lattice_energy_qha[t] + ΔE_vib_qha[t] + (3/2+1) * kbT
-    
-    
+            ΔH_sub[i] = -E_latt[i] + ΔE_vib[i] + (3/2+1) * kbT    
 
-    for t in range(max_index):       
-        T = config.temperatures[t+1]         
-        print(f"ΔEvib(T={T}K) {ΔE_vib_qha[t]:.3f}")
-        print(f"ΔHsub(T={T}K) {sublimation_enthalpy_qha[t]:.3f}")
+    df = pd.DataFrame({
+        "T (K)": temperatures,
+        "V_eq (Å³/unit cell)": V_eq,
+        "E_latt (kJ/mol/molecule)": E_latt,
+        "ΔEvib (kJ/mol/molecule)": ΔE_vib,
+        "ΔHsub (kJ/mol/molecule)": ΔH_sub,
+        "F_vib_crystal (kJ/mol/unit cell)": F_vib_crystal,
+        "S_vib_crystal (J/K/mol/unit cell)": S_vib_crystal,
+        "E_vib_crystal (kJ/mol/unit cell)": E_vib_crystal,
+        "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
+        "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,
+        "E_el_molecule (kJ/mol/molecule)": E_el_molecule
+    }).set_index("T (K)")
 
-    Temperatures = np.array(config.temperatures)[1:]
-    
-    df_qha = pd.DataFrame({
-                'Temperature_K': Temperatures,
-                'ΔEvib': ΔE_vib_qha,
-                'ΔHsub': sublimation_enthalpy_qha
-            })
-    
-    qha_path = os.path.join(config.properties_dir, f"qha.csv")
-    df_qha.to_csv(qha_path, index=False)
-    print(f"File with quasi harmonic ΔHsub and ΔEvib was created successfully qha.csv")
+    df.to_hdf(config.hdf5_dataset, key="quasi-harmonic/thermochemistry", mode="a")
+    df.round(2).to_csv(os.path.join(config.properties_dir, "quasi_harmonic_thermochemistry.csv"))
 
-
-
+    print(f"Thermodynamic properties within the quasi-harmonic approximation")
+    cols_to_show = [
+        "T (K)",
+        "V_eq (Å³/unit cell)",
+        "ΔHsub (kJ/mol/molecule)",
+        "ΔEvib (kJ/mol/molecule)",
+        "E_latt (kJ/mol/molecule)"
+    ]
+    print(df[cols_to_show].round(1))
+    print(f"Quasi-harmonic properties saved in {config.hdf5_dataset}")
 
 
 def create_training_dataset_mace(config: TrainingConfig):

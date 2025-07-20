@@ -2,12 +2,18 @@ import ase.spacegroup.symmetrize
 import ase.spacegroup.utils
 import os.path
 from ase import Atoms
+import ase.build
+import doped.generation
+import doped.utils.supercells
+import pymatgen.io.phonopy
+import pymatgen.core.structure
+import pymatgen.core.lattice
 
-def PrintUnitCellParams(UnitCell):
-    La, Lb, Lc = UnitCell.cell.lengths()
-    alpha, beta, gamma = UnitCell.cell.angles()
-    volume = UnitCell.cell.volume
-    print("Lattice parameters")
+def PrintUnitCellParams(unit_cell):
+    La, Lb, Lc = unit_cell.cell.lengths()
+    alpha, beta, gamma = unit_cell.cell.angles()
+    volume = unit_cell.cell.volume
+    print("Cell parameters")
     print(f"a = {La:.4f} Å")
     print(f"b = {Lb:.4f} Å")
     print(f"c = {Lc:.4f} Å")
@@ -15,6 +21,10 @@ def PrintUnitCellParams(UnitCell):
     print(f"β = {beta:.3f}°")
     print(f"γ = {gamma:.3f}°")
     print(f"V = {volume:.4f} Å³")
+    print(f"Number of atoms {len(unit_cell)}")
+    tight_symmetry_thresh = 1.0E-6
+    spgdata = ase.spacegroup.symmetrize.check_symmetry(unit_cell, symprec=tight_symmetry_thresh)
+    print(f"Space group {spgdata.number} {spgdata.international}")
 
     
 def symmetrize(unit_cell: Atoms, symmetrization_thresh: float = 1.0E-2) -> Atoms:
@@ -81,3 +91,78 @@ def DetermineSpaceGroupSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-2
     return SymmetrizedUnitCell, SymmetryChanged
 
 
+def supercell_matrix(
+        unit_cell,
+        r_point_image,
+        diagonal=False
+):
+    """
+    Find the transformation of the unit cell vectors
+    which generates a super cell with the following
+    properties:
+    
+    1) The distance between a point within the supercell and its
+    periodic image in any direction equals r >= r_point_image.
+
+    2) The shape of the super cell is adjusted in such a way that
+    condition 1 is satisfied with as small volume as possible.
+
+    By default, the transformation matrix is non-diagonal,
+    which means that the lattice vectors of the super cell
+    can be linear combinations of the lattice vectors of
+    the unit cell with integer coefficients.
+
+    Use diagonal=True to get the standard
+    n1 x n2 x n3 super cell with condition 1 satisfied.
+    
+    The algorithm used here is from the doped library for
+    defect calculations. See ref 1 for demonstration.
+    
+    1. Kavanagh et al., doped: Python toolkit for robust and
+       repeatable charged defect supercell calculations.
+       Journal of Open Source Software, 6433, 9 (2024);
+       doi: 10.21105/joss.06433
+    """
+    print(f"Computing supercell with minimum point-image distance {r_point_image:.1f} Å")
+    structure = pymatgen.core.structure.Structure(
+                lattice=pymatgen.core.lattice.Lattice(
+                    matrix=unit_cell.get_cell(),
+                    pbc=(True, True, True)
+                ),
+                species=unit_cell.get_chemical_symbols(),
+                coords=unit_cell.get_positions(),
+                coords_are_cartesian=True
+    )
+    optimal_matrix = doped.generation.get_ideal_supercell_matrix(
+        structure,
+        min_image_distance=r_point_image,
+        min_atoms=len(unit_cell),
+        force_diagonal=diagonal,
+        ideal_threshold=0.1
+    )
+    supercell = structure.make_supercell(optimal_matrix)
+    r = doped.utils.supercells.get_min_image_distance(supercell)
+    print(f"Supercell transformation matrix")
+    for i, row in enumerate(optimal_matrix):
+        if i == 0:
+            print("⎡" + " ".join(f"{num:>3.0f}" for num in row) + " ⎤")
+        elif i == len(optimal_matrix) - 1:
+            print("⎣" + " ".join(f"{num:>3.0f}" for num in row) + " ⎦")
+        else:
+            print("⎢" + " ".join(f"{num:>3.0f}" for num in row) + " ⎥")
+    print(f"Actual point-image distance {r:.1f} Å")
+    print(f"Number of atoms {len(supercell)}")
+    return optimal_matrix
+
+
+def supercell(
+        unit_cell,
+        r_point_image,
+        diagonal=False
+):
+    transf = supercell_matrix(
+        unit_cell,
+        r_point_image,
+        diagonal
+    )
+    return ase.build.make_supercell(unit_cell, transf)
