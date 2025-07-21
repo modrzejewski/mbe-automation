@@ -167,10 +167,17 @@ def harmonic_properties(config: PropertiesConfig):
         "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
         "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,
         "E_el_molecule (kJ/mol/molecule)": E_el_molecule
-    }).set_index("T (K)")
+    })
 
-    df.to_hdf(config.hdf5_dataset, key="harmonic/thermochemistry", mode="a")
+    with h5py.File(config.hdf5_dataset, "a") as f:
+        group = f.require_group("harmonic/thermochemistry")
+        for col in df.columns:
+            if col in group:
+                del group[col]
+            group.create_dataset(col, data=df[col].values, dtype="float64")
 
+    df.round(2).to_csv(os.path.join(config.properties_dir, "harmonic_thermochemistry.csv"))
+    
     print(f"Thermodynamic properties within the harmonic approximation")
     cols_to_show = [
         "T (K)",
@@ -339,9 +346,15 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
         "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,
         "E_el_molecule (kJ/mol/molecule)": E_el_molecule
-    }).set_index("T (K)")
+    })
 
-    df.to_hdf(config.hdf5_dataset, key="quasi-harmonic/thermochemistry", mode="a")
+    with h5py.File(config.hdf5_dataset, "a") as f:
+        group = f.require_group("quasi-harmonic/thermochemistry")
+        for col in df.columns:
+            if col in group:
+                del group[col]
+            group.create_dataset(col, data=df[col].values, dtype="float64")
+
     df.round(2).to_csv(os.path.join(config.properties_dir, "quasi_harmonic_thermochemistry.csv"))
 
     cols_to_show = [

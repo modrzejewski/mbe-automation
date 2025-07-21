@@ -10,7 +10,7 @@ import mbe_automation.single_point
                                                 # If the path already exists, e.g., it's your previous project,
                                                 # all existing files will be moved to a backup location.
                                                 #
-ProjectDirectory    = "./Projects/piracetam/VI"
+ProjectDirectory    = "./Projects/01_1,4-cyclohexanedione"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -24,16 +24,16 @@ ProjectDirectory    = "./Projects/piracetam/VI"
                                                 #
 Methods = ["RPA", "LNO-CCSD(T)", "MACE(PBC)", "DFTB(PBC)", "UMA(PBC)"]
                                                 #
-                                                # Specify localization of mace potential
+                                                # Definition of the machine-learning
+                                                # interatomic potential
                                                 #
 ModelDirectory    = "~/models/mace/MACE-OFF24_medium.model"
+                                                #
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 #
-                                                
-UnitCellFile        = "./Systems/piracetam/form_VI/POSCAR"
-
+UnitCellFile        = "./Systems/X23/01_1,4-cyclohexanedione/solid.xyz"
                                                 #
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers, bulk.
@@ -62,7 +62,7 @@ SystemTypes         = ["monomers", "dimers", "bulk"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/piracetam/conf_1/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/01_1,4-cyclohexanedione/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
