@@ -11,6 +11,7 @@ from mbe_automation.configs.training import TrainingConfig
 from mbe_automation.configs.properties import PropertiesConfig
 import mace.calculators
 import os
+import os.path
 import ase.units
 import numpy as np
 import pandas as pd
@@ -21,6 +22,8 @@ def harmonic_properties(config: PropertiesConfig):
     Thermodynamic properties in the harmonic approximation.
     """
     os.makedirs(config.properties_dir, exist_ok=True)
+    geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
+    os.makedirs(geom_opt_dir, exist_ok=True)
     
     if config.symmetrize_unit_cell:
         unit_cell = mbe_automation.structure.crystal.symmetrize(
@@ -38,7 +41,8 @@ def harmonic_properties(config: PropertiesConfig):
     #
     molecule = mbe_automation.structure.relax.isolated_molecule(
         molecule,
-        config.calculator
+        config.calculator,
+        log=os.path.join(geom_opt_dir, "isolated_molecule.txt")
     )
     if config.optimize_lattice_vectors:
         #
@@ -49,7 +53,8 @@ def harmonic_properties(config: PropertiesConfig):
             unit_cell,
             config.calculator,
             config.preserve_space_group,
-            config.optimize_volume
+            config.optimize_volume,
+            log=os.path.join(geom_opt_dir, "unit_cell.txt")
         )
     else:
         #
@@ -59,7 +64,8 @@ def harmonic_properties(config: PropertiesConfig):
         unit_cell = mbe_automation.structure.relax.atoms(
             unit_cell,
             config.calculator,
-            config.preserve_space_group
+            config.preserve_space_group,
+            log=os.path.join(geom_opt_dir, "unit_cell.txt")
         )
     #
     # Unit cell -> super cell transformation
@@ -196,7 +202,10 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     print(f"Range of V/V₀: {config.volume_factors[0]:.3f} ... {config.volume_factors[-1]:.3f}")
     print(f"Number of volumes: {len(config.volume_factors)}")
     
-    os.makedirs(config.properties_dir, exist_ok=True)    
+    os.makedirs(config.properties_dir, exist_ok=True)
+    geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
+    os.makedirs(geom_opt_dir, exist_ok=True)
+
     if config.symmetrize_unit_cell:
         unit_cell = mbe_automation.structure.crystal.symmetrize(
             config.unit_cell
@@ -213,7 +222,8 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     #
     molecule = mbe_automation.structure.relax.isolated_molecule(
         molecule,
-        config.calculator
+        config.calculator,
+        log=os.path.join(geom_opt_dir, "isolated_molecule.txt")
     )
     #
     # Compute the reference cell volume (V0), lattice vectors, and atomic
@@ -228,11 +238,12 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         unit_cell,
         config.calculator,
         config.preserve_space_group,
-        optimize_volume=True
+        optimize_volume=True,
+        log=os.path.join(geom_opt_dir, "unit_cell_fully_relaxed.txt")
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
-    print(f"Reference volume V₀ = {V0:.2f} Å³/unit cell")
+    print(f"Volume after full relaxation V₀ = {V0:.2f} Å³/unit cell")
     #
     # Vibrational contributions to E, S, F of the isolated molecule
     #
@@ -288,7 +299,8 @@ def quasi_harmonic_properties(config: PropertiesConfig):
             scaled_unit_cell,
             config.calculator,
             preserve_space_group=True,
-            optimize_volume=False
+            optimize_volume=False,
+            log=os.path.join(geom_opt_dir, f"unit_cell_at_T={T:.4f}.txt")
         )
         _, _, phonons = mbe_automation.vibrations.harmonic.phonons(
             scaled_unit_cell,
@@ -306,9 +318,8 @@ def quasi_harmonic_properties(config: PropertiesConfig):
 
     F_tot_crystal = E_el_crystal + F_vib_crystal
     F_RMSD_per_atom = np.sqrt(np.mean((F_tot_crystal - F_tot_crystal_fit)**2)) / len(unit_cell_V0)
-    print(f"RMSD(F(actual)-F(EOS)) = {F_RMSD_per_atom} kJ/mol/atom")
-    for i, T in enumerate(temperatures):
-        print(f"Temp={T:.1f} F(actual)={F_tot_crystal[i]:.1f} F(EOS)={F_tot_crystal_fit[i]:.1f}")
+    F_RMSD_per_atom = F_RMSD_per_atom * (ase.units.kJ/ase.units.mol) / ase.units.eV # eV/atom
+    print(f"RMSD(F_tot_crystal(EOS)) = {F_RMSD_per_atom} eV/atom")
         
     E_vib_molecule = molecule_properties["vibrational energy (kJ/mol)"] # kJ/mol/molecule
     E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule

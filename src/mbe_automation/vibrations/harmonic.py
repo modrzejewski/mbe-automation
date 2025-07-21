@@ -17,6 +17,8 @@ import matplotlib.pyplot as plt
 import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
 from pymatgen.analysis.eos import EOS
+import os
+import os.path
 
 def isolated_molecule(
         molecule,
@@ -179,8 +181,7 @@ def phonons(
     #
     phonons.run_qpoints([[0, 0, 0]])  # Gamma point
     frequencies, eigenvectors = phonons.get_frequencies_with_eigenvectors([0, 0, 0])
-    print(frequencies)
-
+    
     return thermodynamic_functions, phonon_dos, phonons
 
 
@@ -195,6 +196,9 @@ def equilibrium_volumes(
         volume_factors,
         equation_of_state
 ):
+
+    geom_opt_dir = os.path.join(properties_dir, "geometry_optimization")
+    os.makedirs(geom_opt_dir, exist_ok=True)
 
     reference_cell = unit_cell_V0.cell.copy()
     n_volumes = len(volume_factors)
@@ -218,10 +222,11 @@ def equilibrium_volumes(
         # with fixed volume
         #
         scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
-                scaled_unit_cell,
-                calculator,
-                preserve_space_group=True,
-                optimize_volume=False
+            scaled_unit_cell,
+            calculator,
+            preserve_space_group=True,
+            optimize_volume=False,
+            log=os.path.join(geom_opt_dir, f"unit_cell_volume_factor={volume_factor:.4f}.txt")
         )
         V_sampled[i] = scaled_unit_cell.get_volume() # Å³/unit cell
         _, _, p = phonons(
