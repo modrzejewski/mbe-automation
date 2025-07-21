@@ -16,3 +16,5 @@ joblib
 h5py
 pandas
 ipi
+doped
+

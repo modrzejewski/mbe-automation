@@ -2,6 +2,7 @@ from ase.io import read
 from ase.atoms import Atoms
 from phonopy import Phonopy
 from phonopy.structure.atoms import PhonopyAtoms
+import phonopy.qha
 import time
 import numpy as np
 import mbe_automation.kpoints
@@ -11,9 +12,11 @@ import mbe_automation.structure.molecule
 import ase.thermochemistry
 import ase.vibrations
 import ase.units
+import ase.build
 import matplotlib.pyplot as plt
 import mbe_automation.structure.relax
-
+import mbe_automation.structure.crystal
+from pymatgen.analysis.eos import EOS
 
 def isolated_molecule(
         molecule,
@@ -42,7 +45,7 @@ def isolated_molecule(
     elif rotor_type == 'monatomic':
         vib_energies = []
     else:
-        raise ValueError(f"Unsupported geometry: {geometry}")
+        raise ValueError(f"Unsupported geometry: {rotor_type}")
     
     for i, energy in enumerate(vib_energies):
         print(f"{i:6} {energy}")
@@ -82,11 +85,11 @@ def calculate_forces(supercell, calculator):
     return forces
 
 
-def phonopy(
+def phonons(
         UnitCell,
         Calculator,
+        supercell_matrix,
         Temperatures=np.arange(0, 1001, 10),
-        SupercellRadius=30.0,
         SupercellDisplacement=0.01,
         MeshRadius=100.0):
 
@@ -97,15 +100,14 @@ def phonopy(
         
     if cuda_available:
         torch.cuda.reset_peak_memory_stats()
-    
-    SupercellDims = mbe_automation.kpoints.RminSupercell(UnitCell, SupercellRadius)
 
+    supercell = ase.build.make_supercell(UnitCell, supercell_matrix)
     print("")
-    print(f"Vibrations and thermal properties in the harmonic approximation")
-    print(f"Supercells for the numerical computation the dynamic matrix")
-    print(f"Minimum point-image distance: {SupercellRadius:.1f} Å")
-    print(f"Dimensions: {SupercellDims[0]}×{SupercellDims[1]}×{SupercellDims[2]}")
-    print(f"Displacement: {SupercellDisplacement:.3f} Å")
+    print(f"Harmonic approximation of thermodynamic properties")
+    print(f"Max displacement {SupercellDisplacement:.3f} Å")
+    mbe_automation.structure.crystal.PrintUnitCellParams(
+        supercell
+        )
     
     phonopy_struct = PhonopyAtoms(
         symbols=UnitCell.get_chemical_symbols(),
@@ -116,7 +118,8 @@ def phonopy(
 
     phonons = Phonopy(
         phonopy_struct,
-        supercell_matrix=np.diag(SupercellDims))
+        supercell_matrix)
+    
     phonons.generate_displacements(distance=SupercellDisplacement)
 
     Supercells = phonons.supercells_with_displacements
@@ -154,7 +157,7 @@ def phonopy(
     #    
     # Heat capacity, free energy, entropy due to harmonic vibrations
     # units kJ/(K*mol), kJ/mol, J/(K*mol),
-    # where 1 mol i N_A times number of molecules in primitve cell
+    # where 1 mol is N_A times number of molecules in primitve cell
     # (Source: https://phonopy.github.io/phonopy/setting-tags.html section Thermal properties related tags
     # In this code we do not specive the primitive matix while constracing phonon class,
     # than in our code the actual mol is mol of unit cells
@@ -172,13 +175,77 @@ def phonopy(
     #
     phonons.auto_band_structure()
     #
-    # Get gamma point freguencies
+    # Get gamma point frequencies
     #
     phonons.run_qpoints([[0, 0, 0]])  # Gamma point
     frequencies, eigenvectors = phonons.get_frequencies_with_eigenvectors([0, 0, 0])
     print(frequencies)
 
     return thermodynamic_functions, phonon_dos, phonons
+
+
+def equilibrium_volumes(
+        unit_cell_V0,
+        molecule,
+        calculator,
+        temperatures,
+        supercell_matrix,
+        supercell_displacement,
+        properties_dir,
+        volume_factors,
+        equation_of_state
+):
+
+    reference_cell = unit_cell_V0.cell.copy()
+    n_volumes = len(volume_factors)
+    n_temperatures = len(temperatures)
+    V_sampled = np.zeros(n_volumes)
+    E_el_V = np.zeros(n_volumes)
+    F_vib_V_T = np.zeros((n_volumes, n_temperatures))
+    V_eq_T = np.zeros(n_temperatures)
+    F_eq_T = np.zeros(n_temperatures)
+    
+    print("\nCalculating phonons at different volumes")
+    
+    for i, volume_factor in enumerate(volume_factors):
+        print(f"{i+1}/{n_volumes}: V/V₀ = {volume_factor:.3f}")        
+        cell_factor = volume_factor**(1/3)
+        scaled_cell = reference_cell * cell_factor
+        scaled_unit_cell = unit_cell_V0.copy()
+        scaled_unit_cell.set_cell(scaled_cell, scale_atoms=True)
+        #
+        # Relaxation of geometry of new unit cell
+        # with fixed volume
+        #
+        scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
+                scaled_unit_cell,
+                calculator,
+                preserve_space_group=True,
+                optimize_volume=False
+        )
+        V_sampled[i] = scaled_unit_cell.get_volume() # Å³/unit cell
+        _, _, p = phonons(
+            scaled_unit_cell,
+            calculator,
+            supercell_matrix,
+            temperatures,
+            supercell_displacement
+        )  
+        thermal_props = p.get_thermal_properties_dict()
+        F_vib_V_T[i, :] = thermal_props['free_energy'] # kJ/mol/unit cell
+        E_el_V[i] = scaled_unit_cell.get_potential_energy() # eV/unit cell
+        
+        print(f"Volume: {V_sampled[i]:.2f} Å³/unit cell")
+        print(f"Electronic energy: {E_el_V[i]:.6f} eV/unit cell")
+    
+    for i, T in enumerate(temperatures):
+        F_tot = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV + E_el_V[:] # eV/unit cell
+        eos = EOS(eos_name=equation_of_state)
+        eos_fit = eos.fit(V_sampled, F_tot)
+        F_eq_T[i] = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+        V_eq_T[i] = eos_fit.v0 # Å³/unit cell
+
+    return V_eq_T, F_eq_T
                 
 
 def my_plot_band_structure(phonons, output_path, band_connection=True):

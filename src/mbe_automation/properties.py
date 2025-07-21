@@ -10,17 +10,17 @@ import phonopy.units
 import os.path
 import torch
 import mace.calculators
-import mbe_automation.structure.relax
 from phonopy.qha.core import QHA
+import phonopy.qha.eos
 import pandas as pd
 
 
-def phonons_from_finite_differences(
+def phonons(
         unit_cell,
         molecule,
         calculator,
         temperatures,
-        supercell_radius,
+        supercell_matrix,
         supercell_displacement,
         properties_dir,
         hdf5_dataset
@@ -30,8 +30,8 @@ def phonons_from_finite_differences(
     thermodynamic_functions, dos, phonons = mbe_automation.vibrations.harmonic.phonopy(
         unit_cell,
         calculator,
+        supercell_matrix,
         temperatures,
-        supercell_radius,
         supercell_displacement,
         mesh_radius)
     # 
@@ -120,7 +120,7 @@ def phonons_from_finite_differences(
     plt.close()
     
     export_data_to_csv(
-            Temperatures=temperatures,
+            temperatures=temperatures,
             output_prefix="harmonic",
             properties_dir = properties_dir,
             lattice_energies = None,
@@ -175,260 +175,138 @@ def static_lattice_energy(UnitCell, Molecule, calculator, SupercellRadius):
         
     return LatticeEnergy
 
-def quasi_harmonic_approximation_properties(
-        UnitCell,
-        molecule,
-        Calculator,
-        Temperatures,
-        SupercellRadius,
-        SupercellDisplacement,
-        properties_dir,
-        volume_strain_range=(-0.05, 0.05),
-        n_volumes=8,
-        eos_type='vinet'):
-
-    #
-    # Calculations performed for a volume 
-    # of +/- 5% of the initial unit cell volume as
-    # Dolgonos, Hoja, Boese, Revised values for the X23 benchmark
-    # set of molecular crystals,
-    # Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
-    #
-    original_cell = UnitCell.cell.copy()
-    original_volume = UnitCell.get_volume()
-    
-    print(f"\nQuasi-Harmonic Approximation")
-    print(f"Original volume: {original_volume:.2f} Ų")
-    print(f"Volume strain range: {volume_strain_range[0]:.1%} to {volume_strain_range[1]:.1%}")
-    print(f"Number of volume points: {n_volumes}")
-    print(f"EOS type: {eos_type}")
-    
-    # Generate volume points
-    strain_points = np.linspace(volume_strain_range[0], volume_strain_range[1], n_volumes)
-    volumes = []
-    electronic_energies = []
-    phonon_objects = []
-    
-    print("\nCalculating phonons at different volumes:")
-    
-    for i, strain in enumerate(strain_points):
-        print(f"\n--- Volume point {i+1}/{n_volumes} (strain: {strain:+.1%}) ---")
-        
-        # Scale the unit cell
-        volume_factor = 1 + strain
-        cell_factor = volume_factor**(1/3)
-        scaled_cell = original_cell * cell_factor
-        
-        # Create scaled unit cell
-        scaled_unitcell = UnitCell.copy()
-        scaled_unitcell.set_cell(scaled_cell, scale_atoms=True)
-        #
-        # Relaxation of geometry of new unit cell
-        # with fixed volume
-        #
-        scaled_unitcell = mbe_automation.structure.relax.atoms_and_cell(
-                scaled_unitcell,
-                Calculator,
-                preserve_space_group=True,
-                optimize_volume=False
-        )
-        volume = scaled_unitcell.get_volume()
-        # Calculate phonons and sigle volume thermodynamic functions at this volume
-        _, _, phonons = mbe_automation.vibrations.harmonic.phonopy(
-                scaled_unitcell,
-                Calculator,
-                Temperatures,
-                SupercellRadius,
-                SupercellDisplacement)  
-        # Calculate electronic energy
-        e_electronic =  scaled_unitcell.get_potential_energy()
-        volumes.append(volume)
-        electronic_energies.append(e_electronic)
-        phonon_objects.append(phonons)
-        
-        print(f"Volume: {volume:.2f} Ų, Electronic energy: {e_electronic:.6f} eV")
-    
-    print(f"\nVolume range: {min(volumes):.2f} - {max(volumes):.2f} Ų")
-    
-    # Extract thermal properties for QHA
-    thermal_properties_list = []
-    for phonons in phonon_objects:
-        thermal_props = phonons.get_thermal_properties_dict()
-        thermal_properties_list.append(thermal_props)
-    
-    # Prepare data for QHA
-    volumes = np.array(volumes)
-    electronic_energies = np.array(electronic_energies)
-    
-    # Get free energies at each volume and temperature
-    free_energies = []
-    vib_energies = []
-    entropies = []
-    capacity = []
-    for thermal_props in thermal_properties_list:
-        T = np.array(thermal_props['temperatures'])
-        F = np.array(thermal_props['free_energy']) 
-        S = np.array(thermal_props['entropy'])
-        Cv = np.array(thermal_props["heat_capacity"])
-        E_vib = F + T * S / 1000  # kJ/mol
-        free_energies.append(F)
-        entropies.append(S)
-        vib_energies.append(E_vib)
-        capacity.append(Cv) 
-    
-    free_energies = np.array(free_energies)  # Shape: (n_volumes, n_temperatures)
-    entropies = np.array(entropies)
-    vib_energies = np.array(vib_energies)
-    capacity = np.array(capacity)
-    # Create QHA object
-    qha = QHA(
-        volumes=volumes,
-        electronic_energies=electronic_energies,
-        temperatures = Temperatures,
-        cv = capacity.T, # QHA expects shape (n_temperatures, n_volumes), expected units J/K/mol
-        entropy = entropies.T, # expected units J/K/mol
-        fe_phonon = free_energies.T, # expected units kJ/K/mol
-        eos=eos_type
-    )
-    
-    # Run QHA analysis
-    print("\nPerforming QHA analysis...")
-    qha.run()
-    plt = qha.plot()
-    plt.savefig(os.path.join(properties_dir, "qha.png"), dpi=300, bbox_inches='tight')
-
                
-    opt_volume = np.array(qha.volume_temperature)
-    zero_volume = UnitCell.get_volume()  #volume of a unit cell at 0K Temperature
-    qha_lattice_energies = []
-    qha_free_energies = []
-    qha_entropies = []
-    qha_vib_energies =[]
-    qha_capacity = [] 
-    Temp = []
-    CvInf = 3 * len(UnitCell) * phonopy.units.Avogadro * phonopy.units.kb_J
+    # opt_volumes = np.array(qha.volume_temperature)
+    # qha_lattice_energies = []
+    # qha_free_energies = []
+    # qha_entropies = []
+    # qha_vib_energies =[]
+    # qha_capacity = [] 
+    # Temp = []
+    # CvInf = 3 * len(UnitCell) * phonopy.units.Avogadro * phonopy.units.kb_J
  
-    for i, V in enumerate(opt_volume):
-         T =  Temperatures[i+1]  
-         # Scale the unit cell
-         volume_factor = V/zero_volume
-         cell_factor = volume_factor**(1/3)
-         scaled_cell = original_cell * cell_factor
+    # for i, V in enumerate(opt_volumes):
+    #      T =  temperatures[i+1]  
+    #      # Scale the unit cell
+    #      volume_factor = V/zero_volume
+    #      cell_factor = volume_factor**(1/3)
+    #      scaled_cell = original_cell * cell_factor
         
-         # Create scaled unit cell
-         scaled_unitcell = UnitCell.copy()
-         scaled_unitcell.set_cell(scaled_cell, scale_atoms=True)
-         #
-         # Relaxation of geometry of new unit cell
-         # with fixed volume
-         #
-         scaled_unitcell = mbe_automation.structure.relax.atoms_and_cell(
-                scaled_unitcell,
-                Calculator,
-                preserve_space_group=True,
-                optimize_volume=False
-         )
+    #      # Create scaled unit cell
+    #      scaled_unitcell = UnitCell.copy()
+    #      scaled_unitcell.set_cell(scaled_cell, scale_atoms=True)
+    #      #
+    #      # Relaxation of geometry of new unit cell
+    #      # with fixed volume
+    #      #
+    #      scaled_unitcell = mbe_automation.structure.relax.atoms_and_cell(
+    #             scaled_unitcell,
+    #             calculator,
+    #             preserve_space_group=True,
+    #             optimize_volume=False
+    #      )
          
-         # Calculate phonons and sigle volume thermodynamic functions at this volume
-         _, _, phonons = mbe_automation.vibrations.harmonic.phonopy(
-                 scaled_unitcell,
-                 Calculator,
-                 [Temperatures[i]],
-                 SupercellRadius,
-                 SupercellDisplacement) 
-         if abs(T - 298) < 1e-6:  # Better floating point comparison
-            try:
-                # Calculate DOS
-                phonons.run_total_dos()
-                dos = phonons.get_total_dos_dict()
+    #      # Calculate phonons and sigle volume thermodynamic functions at this volume
+    #      _, _, phonons = mbe_automation.vibrations.harmonic.phonopy(
+    #          scaled_unitcell,
+    #          calculator,
+    #          supercell_matrix,
+    #          [temperatures[i]],
+    #          supercell_displacement
+    #      ) 
+    #      if abs(T - 298) < 1e-6:  # Better floating point comparison
+    #         try:
+    #             # Calculate DOS
+    #             phonons.run_total_dos()
+    #             dos = phonons.get_total_dos_dict()
                     
-                n_atoms = len(UnitCell)
-                # Normalize DOS (states per THz per mode)
-                normalized_dos = dos["total_dos"] / (3 * n_atoms)
-                # Create the plot
-                plt.figure(figsize=(8, 6))
-                plt.plot(dos["frequency_points"], normalized_dos, linewidth=2)
-                plt.xlabel('Frequency (THz)', fontsize=12)
-                plt.ylabel('DOS (states/THz/(3×N_atoms))', fontsize=12)
-                plt.title('Phonon Density of States at 298 K', fontsize=14)
-                plt.grid(True, alpha=0.3)                 
-                plt.savefig(os.path.join(properties_dir, "qha_phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
-                plt.close()
-                df_dos = pd.DataFrame({
-                        'Frequency_points': dos["frequency_points"],
-                        'DOS':normalized_dos
-                    })
-                dos_path = os.path.join(properties_dir, f"qha_dos.csv")
-                df_dos.to_csv(dos_path, index=False)
-                print(f"File with voptimal volume was created successfully qha_dos.csv")
-            except Exception as e:
-                print(f"Error calculating DOS: {e}")
-         # Calculate lattice energy
-         lattice_energy = static_lattice_energy(scaled_unitcell, molecule, Calculator, SupercellRadius)
-         qha_lattice_energies.append(lattice_energy)
-         thermal_props = phonons.get_thermal_properties_dict()
-         F = np.array(thermal_props['free_energy'])[0] * (len(molecule)/len(UnitCell))
-         S = np.array(thermal_props['entropy'])[0] * (len(molecule)/len(UnitCell))
-         Cv = np.array(thermal_props["heat_capacity"])[0]
-         Cv = Cv / CvInf
-         E_vib = F + T * S / 1000  # kJ/mol
-         qha_free_energies.append(F)
-         qha_entropies.append(S)
-         qha_vib_energies.append(E_vib)
-         qha_capacity.append(Cv) 
-         Temp.append(T)
-         print(f"Temperature: {Temperatures[i]:.2f}, optimal volume: {V:.2f} Ų, Lattice energy: {lattice_energy:.6f} eV")
+    #             n_atoms = len(UnitCell)
+    #             # Normalize DOS (states per THz per mode)
+    #             normalized_dos = dos["total_dos"] / (3 * n_atoms)
+    #             # Create the plot
+    #             plt.figure(figsize=(8, 6))
+    #             plt.plot(dos["frequency_points"], normalized_dos, linewidth=2)
+    #             plt.xlabel('Frequency (THz)', fontsize=12)
+    #             plt.ylabel('DOS (states/THz/(3×N_atoms))', fontsize=12)
+    #             plt.title('Phonon Density of States at 298 K', fontsize=14)
+    #             plt.grid(True, alpha=0.3)                 
+    #             plt.savefig(os.path.join(properties_dir, "qha_phonon_density_of_states.png"), dpi=300, bbox_inches='tight')
+    #             plt.close()
+    #             df_dos = pd.DataFrame({
+    #                     'Frequency_points': dos["frequency_points"],
+    #                     'DOS':normalized_dos
+    #                 })
+    #             dos_path = os.path.join(properties_dir, f"qha_dos.csv")
+    #             df_dos.to_csv(dos_path, index=False)
+    #             print(f"File with voptimal volume was created successfully qha_dos.csv")
+    #         except Exception as e:
+    #             print(f"Error calculating DOS: {e}")
+    #      # Calculate lattice energy
+    #      lattice_energy = static_lattice_energy(scaled_unitcell, molecule, calculator, SupercellRadius)
+    #      qha_lattice_energies.append(lattice_energy)
+    #      thermal_props = phonons.get_thermal_properties_dict()
+    #      F = np.array(thermal_props['free_energy'])[0] * (len(molecule)/len(UnitCell))
+    #      S = np.array(thermal_props['entropy'])[0] * (len(molecule)/len(UnitCell))
+    #      Cv = np.array(thermal_props["heat_capacity"])[0]
+    #      Cv = Cv / CvInf
+    #      E_vib = F + T * S / 1000  # kJ/mol
+    #      qha_free_energies.append(F)
+    #      qha_entropies.append(S)
+    #      qha_vib_energies.append(E_vib)
+    #      qha_capacity.append(Cv) 
+    #      Temp.append(T)
+    #      print(f"Temperature: {temperatures[i]:.2f}, optimal volume: {V:.2f} Ų, Lattice energy: {lattice_energy:.6f} eV")
 
 
-    # Convert all lists to numpy arrays to ensure consistent shapes
-    qha_free_energies = np.array(qha_free_energies)
-    qha_entropies = np.array(qha_entropies)
-    qha_vib_energies = np.array(qha_vib_energies)
-    qha_capacity = np.array(qha_capacity)
-    qha_lattice_energies = np.array(qha_lattice_energies)
-    qha_temperatures = np.array(Temp)
-    # Debug: Print shapes to verify consistency
-    print(f"\nDEBUG: Array shapes:")
-    print(f"Temperatures: {Temperatures.shape}")
-    print(f"Qha_temperatures: {qha_temperatures.shape}")
-    print(f"qha_lattice_energies: {qha_lattice_energies.shape}")
-    print(f"opt_volume: {opt_volume.shape}")
-    print(f"qha_free_energies: {qha_free_energies.shape}")
-    print(f"qha_entropies: {qha_entropies.shape}")
-    print(f"qha_vib_energies: {qha_vib_energies.shape}")
-    print(f"qha_capacity: {qha_capacity.shape}")
+    # # Convert all lists to numpy arrays to ensure consistent shapes
+    # qha_free_energies = np.array(qha_free_energies)
+    # qha_entropies = np.array(qha_entropies)
+    # qha_vib_energies = np.array(qha_vib_energies)
+    # qha_capacity = np.array(qha_capacity)
+    # qha_lattice_energies = np.array(qha_lattice_energies)
+    # qha_temperatures = np.array(Temp)
+    # # Debug: Print shapes to verify consistency
+    # print(f"\nDEBUG: Array shapes:")
+    # print(f"temperatures: {temperatures.shape}")
+    # print(f"Qha_temperatures: {qha_temperatures.shape}")
+    # print(f"qha_lattice_energies: {qha_lattice_energies.shape}")
+    # print(f"opt_volume: {opt_volume.shape}")
+    # print(f"qha_free_energies: {qha_free_energies.shape}")
+    # print(f"qha_entropies: {qha_entropies.shape}")
+    # print(f"qha_vib_energies: {qha_vib_energies.shape}")
+    # print(f"qha_capacity: {qha_capacity.shape}")
                 
-    export_data_to_csv(
-            Temperatures=qha_temperatures,
-            output_prefix="qha",
-            properties_dir = properties_dir,
-            lattice_energies=qha_lattice_energies,
-            opt_volume=opt_volume,
-            free_energies=qha_free_energies,
-            entropies=qha_entropies,
-            vib_energies=qha_vib_energies,
-            capacity=qha_capacity)
+    # export_data_to_csv(
+    #         temperatures=qha_temperatures,
+    #         output_prefix="qha",
+    #         properties_dir = properties_dir,
+    #         lattice_energies=qha_lattice_energies,
+    #         opt_volume=opt_volume,
+    #         free_energies=qha_free_energies,
+    #         entropies=qha_entropies,
+    #         vib_energies=qha_vib_energies,
+    #         capacity=qha_capacity)
                 
-    # Get QHA results
-    qha_results = {
-        'temperatures (K)': Temperatures,
-        'tested_volumes (AA^3)': volumes,
-        'lattice_energies (kJ/mol)': qha_lattice_energies,
-        'free_energies (kJ/mol)': qha_free_energies,
-        'entropies (J/mol/K)': qha_entropies,
-        "vib_energies (kJ/mol)": qha_vib_energies,
-        'thermal_expansion': qha.thermal_expansion,
-        'heat_capacity_P (J/mol/K)': qha.heat_capacity_P_numerical,
-        'heat_capacity_V (J/mol/K)': qha_capacity,
-        'gruneisen_temperature': qha.gruneisen_temperature,
-        'bulk_modulus': qha.bulk_modulus_temperature,
-        'helmholtz_volume': qha.helmholtz_volume,
-        'volume_temperature': qha.volume_temperature,
-        'gibbs_temperature': qha.gibbs_temperature
-    }
+    # # Get QHA results
+    # qha_results = {
+    #     'temperatures (K)': temperatures,
+    #     'tested_volumes (AA^3)': volumes,
+    #     'lattice_energies (kJ/mol)': qha_lattice_energies,
+    #     'free_energies (kJ/mol)': qha_free_energies,
+    #     'entropies (J/mol/K)': qha_entropies,
+    #     "vib_energies (kJ/mol)": qha_vib_energies,
+    #     'thermal_expansion': qha.thermal_expansion,
+    #     'heat_capacity_P (J/mol/K)': qha.heat_capacity_P_numerical,
+    #     'heat_capacity_V (J/mol/K)': qha_capacity,
+    #     'gruneisen_temperature': qha.gruneisen_temperature,
+    #     'bulk_modulus': qha.bulk_modulus_temperature,
+    #     'helmholtz_volume': qha.helmholtz_volume,
+    #     'volume_temperature': qha.volume_temperature,
+    #     'gibbs_temperature': qha.gibbs_temperature
+    # }
 
     
-    return qha_results, qha, phonon_objects
+    # return qha_results, qha, phonon_objects
 
 
 
@@ -493,18 +371,18 @@ def plot_dispersion_phonopy_builtin(phonons, output_dir):
         print(f"Built-in plotting failed: {e}")
 
 
-def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_energies, opt_volume,
+def export_data_to_csv(temperatures,  output_prefix,properties_dir, lattice_energies, opt_volume,
                           free_energies, entropies, vib_energies, 
                           capacity):
     if lattice_energies is not None:
         if isinstance(lattice_energies[0], (list, np.ndarray)):
             lattice_energies_dict = {}
-            for i, temp in enumerate(Temperatures):
+            for i, temp in enumerate(temperatures):
                 lattice_energies_dict[f'Lattice_Energy_T_{temp:.1f}K'] = lattice_energies[i]
             df_lattice_energies = pd.DataFrame(lattice_energies_dict)
         else:
             df_lattice_energies = pd.DataFrame({
-                'Temperature_K': Temperatures,
+                'Temperature_K': temperatures,
                 'Lattice_Energy':lattice_energies
             })
   
@@ -515,12 +393,12 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
     if opt_volume  is not None:
         if isinstance(opt_volume[0], (list, np.ndarray)):
             opt_volume_dict = {}
-            for i, temp in enumerate(Temperatures):
+            for i, temp in enumerate(temperatures):
                 opt_volume_dict[f'Optimal_Volume_T_{temp:.1f}K'] = opt_volume[i]
             df_opt_volume = pd.DataFrame(opt_volume_dict)
         else:
             df_opt_volume = pd.DataFrame({
-                'Temperature_K': Temperatures,
+                'Temperature_K': temperatures,
                 'Optimal Volume':opt_volume 
             })
   
@@ -532,12 +410,12 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
     if free_energies  is not None:
         if isinstance(free_energies[0], (list, np.ndarray)):
             free_energy_dict = {}
-            for i, temp in enumerate(Temperatures):
+            for i, temp in enumerate(temperatures):
                 free_energy_dict[f'Free_Energy_T_{temp:.1f}K'] = free_energies[i]
             df_free = pd.DataFrame(free_energy_dict)
         else:
             df_free = pd.DataFrame({
-                'Temperature_K': Temperatures,
+                'Temperature_K': temperatures,
                 'Free_Energy': free_energies
             })
         df_path = os.path.join(properties_dir, f"{output_prefix}_free_energies.csv")        
@@ -547,12 +425,12 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
     if entropies  is not None:
         if isinstance(entropies[0], (list, np.ndarray)):
             entropy_dict = {}
-            for i, temp in enumerate(Temperatures):
+            for i, temp in enumerate(temperatures):
                 entropy_dict[f'Entropy_T_{temp:.1f}K'] = entropies[i]
             df_entropy = pd.DataFrame(entropy_dict)
         else:
             df_entropy = pd.DataFrame({
-                'Temperature_K': Temperatures,
+                'Temperature_K': temperatures,
                 'Entropy': entropies
             })
         entropy_path = os.path.join(properties_dir, f"{output_prefix}_entropies.csv")  
@@ -563,12 +441,12 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
     if vib_energies  is not None:
         if isinstance(vib_energies[0], (list, np.ndarray)):
             vib_energy_dict = {}
-            for i, temp in enumerate(Temperatures):
+            for i, temp in enumerate(temperatures):
                 vib_energy_dict[f'Vib_Energy_T_{temp:.1f}K'] = vib_energies[i]
             df_vib = pd.DataFrame(vib_energy_dict)
         else:
             df_vib = pd.DataFrame({
-                'Temperature_K': Temperatures,
+                'Temperature_K': temperatures,
                 'Vibrational_Energy': vib_energies
             })
         vib_path = os.path.join(properties_dir, f"{output_prefix}_vibrational_energies.csv")  
@@ -578,12 +456,12 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
     if capacity  is not None:
         if isinstance(capacity[0], (list, np.ndarray)):
             capacity_dict = {}
-            for i, temp in enumerate(Temperatures):
+            for i, temp in enumerate(temperatures):
                 capacity_dict[f'Heat_Capacity_T_{temp:.1f}K'] = capacity[i]
             df_capacity = pd.DataFrame(capacity_dict)
         else:
             df_capacity = pd.DataFrame({
-                'Temperature_K': Temperatures,
+                'Temperature_K': temperatures,
                 'Heat_Capacity': capacity
             })
         cv_path = os.path.join(properties_dir, f"{output_prefix}_heat_capacities.csv") 
@@ -595,13 +473,13 @@ def export_data_to_csv(Temperatures,  output_prefix,properties_dir, lattice_ener
                [free_energies, entropies, vib_energies, capacity] if data):
             
             combined_data = {
-                'Temperature_K': Temperatures,
-                'Optimal_Volume_A3': opt_volume if opt_volume else [None]*len(Temperatures),
-                'Lattice_Energy_eV': lattice_energies if lattice_energies else [None]*len(Temperatures),
-                'Free_Energy': free_energies if free_energies else [None]*len(Temperatures),
-                'Entropy': entropies if entropies else [None]*len(Temperatures),
-                'Vibrational_Energy': vib_energies if vib_energies else [None]*len(Temperatures),
-                'Heat_Capacity': capacity if capacity else [None]*len(Temperatures)
+                'Temperature_K': temperatures,
+                'Optimal_Volume_A3': opt_volume if opt_volume else [None]*len(temperatures),
+                'Lattice_Energy_eV': lattice_energies if lattice_energies else [None]*len(temperatures),
+                'Free_Energy': free_energies if free_energies else [None]*len(temperatures),
+                'Entropy': entropies if entropies else [None]*len(temperatures),
+                'Vibrational_Energy': vib_energies if vib_energies else [None]*len(temperatures),
+                'Heat_Capacity': capacity if capacity else [None]*len(temperatures)
             }
             
             df_combined = pd.DataFrame(combined_data)
