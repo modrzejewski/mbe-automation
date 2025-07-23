@@ -53,7 +53,6 @@ def harmonic_properties(config: PropertiesConfig):
             unit_cell,
             config.calculator,
             config.preserve_space_group,
-            config.optimize_volume,
             log=os.path.join(geom_opt_dir, "unit_cell.txt")
         )
     else:
@@ -199,8 +198,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
 
     print(f"Thermodynamic properties within the quasi-harmonic approximation")
     print(f"Equation of state: {config.equation_of_state}")
-    print(f"Range of V/V₀: {config.volume_factors[0]:.3f} ... {config.volume_factors[-1]:.3f}")
-    print(f"Number of volumes: {len(config.volume_factors)}")
+    print(f"Number of volumes: {len(config.pressure_range)}")
     
     os.makedirs(config.properties_dir, exist_ok=True)
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
@@ -238,7 +236,6 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         unit_cell,
         config.calculator,
         config.preserve_space_group,
-        optimize_volume=True,
         log=os.path.join(geom_opt_dir, "unit_cell_fully_relaxed.txt")
     )
     V0 = unit_cell_V0.get_volume()
@@ -273,7 +270,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         supercell_matrix,
         config.supercell_displacement,
         config.properties_dir,
-        config.volume_factors,
+        config.pressure_range,
         config.equation_of_state
     )
     #
@@ -295,13 +292,19 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         #
         # Relax geometry with fixed QHA equilibrium value
         #
-        scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
+        # scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
+        #     scaled_unit_cell,
+        #     config.calculator,
+        #     preserve_space_group=True,
+        #     optimize_volume=False,
+        #     log=os.path.join(geom_opt_dir, f"unit_cell_at_T={T:.4f}.txt")
+        # )
+        scaled_unit_cell = mbe_automation.structure.relax.atoms(
             scaled_unit_cell,
             config.calculator,
             preserve_space_group=True,
-            optimize_volume=False,
             log=os.path.join(geom_opt_dir, f"unit_cell_at_T={T:.4f}.txt")
-        )
+        )            
         _, _, phonons = mbe_automation.vibrations.harmonic.phonons(
             scaled_unit_cell,
             config.calculator,

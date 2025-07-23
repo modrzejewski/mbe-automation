@@ -193,7 +193,7 @@ def equilibrium_volumes(
         supercell_matrix,
         supercell_displacement,
         properties_dir,
-        volume_factors,
+        pressure_range,
         equation_of_state
 ):
 
@@ -201,7 +201,8 @@ def equilibrium_volumes(
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     reference_cell = unit_cell_V0.cell.copy()
-    n_volumes = len(volume_factors)
+    V0 = reference_cell.get_volume()
+    n_volumes = len(pressure_range)
     n_temperatures = len(temperatures)
     V_sampled = np.zeros(n_volumes)
     E_el_V = np.zeros(n_volumes)
@@ -211,12 +212,9 @@ def equilibrium_volumes(
     
     print("\nCalculating phonons at different volumes")
     
-    for i, volume_factor in enumerate(volume_factors):
-        print(f"{i+1}/{n_volumes}: V/V₀ = {volume_factor:.3f}")        
-        cell_factor = volume_factor**(1/3)
-        scaled_cell = reference_cell * cell_factor
+    for i, pressure in enumerate(pressure_range):
+        print(f"{i+1} p = {pressure:3f} GPa")        
         scaled_unit_cell = unit_cell_V0.copy()
-        scaled_unit_cell.set_cell(scaled_cell, scale_atoms=True)
         #
         # Relaxation of geometry of new unit cell
         # with fixed volume
@@ -225,8 +223,8 @@ def equilibrium_volumes(
             scaled_unit_cell,
             calculator,
             preserve_space_group=True,
-            optimize_volume=False,
-            log=os.path.join(geom_opt_dir, f"unit_cell_volume_factor={volume_factor:.4f}.txt")
+            pressure_GPa=pressure,
+            log=os.path.join(geom_opt_dir, f"unit_cell_pressure={pressure:.4f}_GPa.txt")
         )
         V_sampled[i] = scaled_unit_cell.get_volume() # Å³/unit cell
         _, _, p = phonons(
@@ -240,7 +238,7 @@ def equilibrium_volumes(
         F_vib_V_T[i, :] = thermal_props['free_energy'] # kJ/mol/unit cell
         E_el_V[i] = scaled_unit_cell.get_potential_energy() # eV/unit cell
         
-        print(f"Volume: {V_sampled[i]:.2f} Å³/unit cell")
+        print(f"V/V0 = {V_sampled[i]/V0:.2f} Å³/unit cell")
         print(f"Electronic energy: {E_el_V[i]:.6f} eV/unit cell")
     
     for i, T in enumerate(temperatures):
