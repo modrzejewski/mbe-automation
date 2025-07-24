@@ -201,7 +201,7 @@ def equilibrium_volumes(
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     reference_cell = unit_cell_V0.cell.copy()
-    V0 = reference_cell.get_volume()
+    V0 = unit_cell_V0.get_volume()
     n_volumes = len(pressure_range)
     n_temperatures = len(temperatures)
     V_sampled = np.zeros(n_volumes)
