@@ -9,7 +9,6 @@ import ase.units
 
 def atoms_and_cell(unit_cell,
                    calculator,
-                   preserve_space_group=True,
                    pressure_GPa=0.0, # gigapascals
                    max_force_on_atom=1.0E-3, # eV/Angs/atom
                    max_steps=1000,
@@ -19,8 +18,6 @@ def atoms_and_cell(unit_cell,
     pressure_eV_A3 = pressure_GPa * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
     relaxed_cell = unit_cell.copy()
     relaxed_cell.calc = calculator
-    if preserve_space_group:
-        relaxed_cell.set_constraint(FixSymmetry(relaxed_cell))
     frechet_filter = ase.filters.FrechetCellFilter(
         relaxed_cell,
         scalar_pressure=pressure_eV_A3

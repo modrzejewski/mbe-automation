@@ -52,7 +52,6 @@ def harmonic_properties(config: PropertiesConfig):
         unit_cell = mbe_automation.structure.relax.atoms_and_cell(
             unit_cell,
             config.calculator,
-            config.preserve_space_group,
             log=os.path.join(geom_opt_dir, "unit_cell.txt")
         )
     else:
@@ -235,7 +234,6 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     unit_cell_V0 = mbe_automation.structure.relax.atoms_and_cell(
         unit_cell,
         config.calculator,
-        config.preserve_space_group,
         log=os.path.join(geom_opt_dir, "unit_cell_fully_relaxed.txt")
     )
     V0 = unit_cell_V0.get_volume()
@@ -260,9 +258,12 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         config.supercell_diagonal
     )
     #
-    # Equilibrium volume as a function of temperature
+    # Equilibrium volume at temperature T
+    # Total free energy at temperature T computed from the equation of state
+    # Effective thermal pressure which should be included in the unit cell relaxation
+    # to force the equilibrium volume at temperature T
     #
-    V_eq, F_tot_crystal_fit = mbe_automation.vibrations.harmonic.equilibrium_volumes(
+    V_eq, F_tot_crystal_fit, p_effective = mbe_automation.vibrations.harmonic.equilibrium_VFp(
         unit_cell_V0,
         molecule,
         config.calculator,
@@ -282,29 +283,19 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     S_vib_crystal = np.zeros(n_temperatures)
     E_vib_crystal = np.zeros(n_temperatures)
     E_el_crystal = np.zeros(n_temperatures)
+    V_eq_actual = np.zeros(n_temperatures)
     for i, V in enumerate(V_eq):
         T =  temperatures[i]  
-        volume_factor = V / V0
-        cell_factor = volume_factor**(1/3)
-        scaled_cell = reference_cell * cell_factor
-        scaled_unit_cell = unit_cell_V0.copy()
-        scaled_unit_cell.set_cell(scaled_cell, scale_atoms=True)
         #
-        # Relax geometry with fixed QHA equilibrium value
+        # Relax geometry with an effective pressure which
+        # forces QHA equilibrium value
         #
-        # scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
-        #     scaled_unit_cell,
-        #     config.calculator,
-        #     preserve_space_group=True,
-        #     optimize_volume=False,
-        #     log=os.path.join(geom_opt_dir, f"unit_cell_at_T={T:.4f}.txt")
-        # )
-        scaled_unit_cell = mbe_automation.structure.relax.atoms(
-            scaled_unit_cell,
+        scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_V0,
             config.calculator,
-            preserve_space_group=True,
+            pressure_GPa=p_effective[i],
             log=os.path.join(geom_opt_dir, f"unit_cell_at_T={T:.4f}.txt")
-        )            
+        )
         _, _, phonons = mbe_automation.vibrations.harmonic.phonons(
             scaled_unit_cell,
             config.calculator,
@@ -318,6 +309,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         S_vib_crystal[i] = thermal_props['entropy'][0] # J/K/mol/unit cell
         E_vib_crystal[i] = F_vib_crystal[i] + T * S_vib_crystal[i] / 1000  # kJ/mol/unit cell
         E_el_crystal[i] = cell_energy_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+        V_eq_actual[i] = scaled_unit_cell.get_volume() # Å³/unit cell
 
     F_tot_crystal = E_el_crystal + F_vib_crystal
     F_RMSD_per_atom = np.sqrt(np.mean((F_tot_crystal - F_tot_crystal_fit)**2)) / len(unit_cell_V0)
@@ -350,7 +342,9 @@ def quasi_harmonic_properties(config: PropertiesConfig):
 
     df = pd.DataFrame({
         "T (K)": temperatures,
-        "V_eq (Å³/unit cell)": V_eq,
+        "V_eq_eos (Å³/unit cell)": V_eq,
+        "p_effective (GPa)": p_effective,
+        "V_eq_actual (Å³/unit cell)": V_eq_actual,
         "E_latt (kJ/mol/molecule)": E_latt,
         "ΔEvib (kJ/mol/molecule)": ΔE_vib,
         "ΔHsub (kJ/mol/molecule)": ΔH_sub,
@@ -369,17 +363,9 @@ def quasi_harmonic_properties(config: PropertiesConfig):
                 del group[col]
             group.create_dataset(col, data=df[col].values, dtype="float64")
 
-    df.round(2).to_csv(os.path.join(config.properties_dir, "quasi_harmonic_thermochemistry.csv"))
-
-    cols_to_show = [
-        "T (K)",
-        "V_eq (Å³/unit cell)",
-        "ΔHsub (kJ/mol/molecule)",
-        "ΔEvib (kJ/mol/molecule)",
-        "E_latt (kJ/mol/molecule)"
-    ]
-    print(df[cols_to_show].round(1))
-    print(f"Quasi-harmonic properties saved in {config.hdf5_dataset}")
+    df.round(3).to_csv(os.path.join(config.properties_dir, "quasi_harmonic_thermochemistry.csv"))
+    
+    print(f"Quasi-harmonic calculations completed")
 
 
 def create_training_dataset_mace(config: TrainingConfig):

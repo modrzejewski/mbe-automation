@@ -101,7 +101,7 @@ class PropertiesConfig:
                                    # doi: 10.1039/d5sc01325a
                                    #
     pressure_range: list[float] = field(default_factory=lambda:
-                                        [0.4, 0.3, 0.2, 0.1, 0.0, -0.1, -0.2, -0.3, -0.4])
+                                        [0.4, 0.3, 0.2, 0.1, 0.0, -0.1, -0.2, -0.3, -0.4, -0.5, -0.6])
                                    #
                                    # Equation of state used to fit energy
                                    # as a function of volume
