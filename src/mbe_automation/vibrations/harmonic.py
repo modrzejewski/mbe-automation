@@ -216,13 +216,12 @@ def equilibrium_VFp(
     
     for i, pressure in enumerate(pressure_range):
         print(f"{i+1} p = {pressure:3f} GPa")        
-        scaled_unit_cell = unit_cell_V0.copy()
         #
         # Relaxation of geometry of new unit cell
         # with fixed volume
         #
         scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
-            scaled_unit_cell,
+            unit_cell_V0,
             calculator,
             pressure_GPa=pressure,
             log=os.path.join(geom_opt_dir, f"unit_cell_pressure={pressure:.4f}_GPa.txt")
@@ -241,6 +240,8 @@ def equilibrium_VFp(
         
         print(f"V/V0 = {V_sampled[i]/V0:.2f} Å³/unit cell")
         print(f"Electronic energy: {E_el_V[i]:.6f} eV/unit cell")
+        print(f"Number of atoms in the primitive cell: {len(p.primitive)}", flush=True)
+        print(f"Number of atoms in the unit cell: {len(scaled_unit_cell)}", flush=True)
     
     for i, T in enumerate(temperatures):
         F_vib_V_eV = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV # eV/unit cell
