@@ -17,6 +17,9 @@ import matplotlib.pyplot as plt
 import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
 from pymatgen.analysis.eos import EOS
+import os
+import os.path
+import numpy.polynomial.polynomial as P
 
 def isolated_molecule(
         molecule,
@@ -179,12 +182,11 @@ def phonons(
     #
     phonons.run_qpoints([[0, 0, 0]])  # Gamma point
     frequencies, eigenvectors = phonons.get_frequencies_with_eigenvectors([0, 0, 0])
-    print(frequencies)
-
+    
     return thermodynamic_functions, phonon_dos, phonons
 
 
-def equilibrium_volumes(
+def equilibrium_VFp(
         unit_cell_V0,
         molecule,
         calculator,
@@ -192,36 +194,37 @@ def equilibrium_volumes(
         supercell_matrix,
         supercell_displacement,
         properties_dir,
-        volume_factors,
+        pressure_range,
         equation_of_state
 ):
 
+    geom_opt_dir = os.path.join(properties_dir, "geometry_optimization")
+    os.makedirs(geom_opt_dir, exist_ok=True)
+
     reference_cell = unit_cell_V0.cell.copy()
-    n_volumes = len(volume_factors)
+    V0 = unit_cell_V0.get_volume()
+    n_volumes = len(pressure_range)
     n_temperatures = len(temperatures)
     V_sampled = np.zeros(n_volumes)
     E_el_V = np.zeros(n_volumes)
     F_vib_V_T = np.zeros((n_volumes, n_temperatures))
     V_eq_T = np.zeros(n_temperatures)
     F_eq_T = np.zeros(n_temperatures)
+    p_eq_T = np.zeros(n_temperatures)
     
     print("\nCalculating phonons at different volumes")
     
-    for i, volume_factor in enumerate(volume_factors):
-        print(f"{i+1}/{n_volumes}: V/V₀ = {volume_factor:.3f}")        
-        cell_factor = volume_factor**(1/3)
-        scaled_cell = reference_cell * cell_factor
-        scaled_unit_cell = unit_cell_V0.copy()
-        scaled_unit_cell.set_cell(scaled_cell, scale_atoms=True)
+    for i, pressure in enumerate(pressure_range):
+        print(f"{i+1} p = {pressure:3f} GPa")        
         #
         # Relaxation of geometry of new unit cell
         # with fixed volume
         #
         scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
-                scaled_unit_cell,
-                calculator,
-                preserve_space_group=True,
-                optimize_volume=False
+            unit_cell_V0,
+            calculator,
+            pressure_GPa=pressure,
+            log=os.path.join(geom_opt_dir, f"unit_cell_pressure={pressure:.4f}_GPa.txt")
         )
         V_sampled[i] = scaled_unit_cell.get_volume() # Å³/unit cell
         _, _, p = phonons(
@@ -235,17 +238,53 @@ def equilibrium_volumes(
         F_vib_V_T[i, :] = thermal_props['free_energy'] # kJ/mol/unit cell
         E_el_V[i] = scaled_unit_cell.get_potential_energy() # eV/unit cell
         
-        print(f"Volume: {V_sampled[i]:.2f} Å³/unit cell")
+        print(f"V/V0 = {V_sampled[i]/V0:.2f} Å³/unit cell")
         print(f"Electronic energy: {E_el_V[i]:.6f} eV/unit cell")
+        print(f"Number of atoms in the primitive cell: {len(p.primitive)}", flush=True)
+        print(f"Number of atoms in the unit cell: {len(scaled_unit_cell)}", flush=True)
     
     for i, T in enumerate(temperatures):
-        F_tot = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV + E_el_V[:] # eV/unit cell
+        F_vib_V_eV = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV # eV/unit cell
+        F_tot_V = F_vib_V_eV[:] + E_el_V[:] # eV/unit cell
         eos = EOS(eos_name=equation_of_state)
-        eos_fit = eos.fit(V_sampled, F_tot)
+        eos_fit = eos.fit(V_sampled, F_tot_V)
         F_eq_T[i] = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
         V_eq_T[i] = eos_fit.v0 # Å³/unit cell
+        #
+        # Effective pressure (thermal pressure) which forces
+        # the equilibrum volume of the unit cell at
+        # temperature T
+        #
+        # V(equilibrium) = argmin(V) (Eel(V) + Fvib(V))
+        #
+        # At the minimum we have
+        #
+        # 0 = dEel/dV + dFvib/dV
+        #
+        # Thus, we can map the problem of free energy minimization
+        # at temperature T onto a unit cell relaxation at T=0
+        # with external isotropic pressure
+        #
+        # p_eq = dFvib/dV 
+        #
+        # Zero-point vibrational motion and thermal expansion will
+        # be included implicitly.
+        #
+        # See eq 20 in
+        # A. Otero-de-la-Roza and Erin R. Johnson,
+        # A benchmark for non-covalent interactions in solids,
+        # J. Chem. Phys. 137, 054103 (2012);
+        # doi: 10.1063/1.4738961
+        #
+        # Quartic polynomial fit to Fvib(V),
+        # see fig 2 in Otero-de-la-Roza et al.
+        #
+        coeffs = P.polyfit(V_sampled, F_vib_V_eV, 4)
+        F_vib_fit = P.Polynomial(coeffs) # eV/unit cell
+        dFdV = F_vib_fit.deriv(1) # eV/Å³/unit cell
+        p_eq_T[i] = dFdV(V_eq_T[i]) * (ase.units.eV/ase.units.Angstrom**3)/ase.units.GPa # GPa
 
-    return V_eq_T, F_eq_T
+    return V_eq_T, F_eq_T, p_eq_T
                 
 
 def my_plot_band_structure(phonons, output_path, band_connection=True):

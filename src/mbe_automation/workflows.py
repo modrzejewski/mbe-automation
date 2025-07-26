@@ -11,6 +11,7 @@ from mbe_automation.configs.training import TrainingConfig
 from mbe_automation.configs.properties import PropertiesConfig
 import mace.calculators
 import os
+import os.path
 import ase.units
 import numpy as np
 import pandas as pd
@@ -21,6 +22,8 @@ def harmonic_properties(config: PropertiesConfig):
     Thermodynamic properties in the harmonic approximation.
     """
     os.makedirs(config.properties_dir, exist_ok=True)
+    geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
+    os.makedirs(geom_opt_dir, exist_ok=True)
     
     if config.symmetrize_unit_cell:
         unit_cell = mbe_automation.structure.crystal.symmetrize(
@@ -38,7 +41,8 @@ def harmonic_properties(config: PropertiesConfig):
     #
     molecule = mbe_automation.structure.relax.isolated_molecule(
         molecule,
-        config.calculator
+        config.calculator,
+        log=os.path.join(geom_opt_dir, "isolated_molecule.txt")
     )
     if config.optimize_lattice_vectors:
         #
@@ -48,8 +52,7 @@ def harmonic_properties(config: PropertiesConfig):
         unit_cell = mbe_automation.structure.relax.atoms_and_cell(
             unit_cell,
             config.calculator,
-            config.preserve_space_group,
-            config.optimize_volume
+            log=os.path.join(geom_opt_dir, "unit_cell.txt")
         )
     else:
         #
@@ -59,7 +62,8 @@ def harmonic_properties(config: PropertiesConfig):
         unit_cell = mbe_automation.structure.relax.atoms(
             unit_cell,
             config.calculator,
-            config.preserve_space_group
+            config.preserve_space_group,
+            log=os.path.join(geom_opt_dir, "unit_cell.txt")
         )
     #
     # Unit cell -> super cell transformation
@@ -193,10 +197,12 @@ def quasi_harmonic_properties(config: PropertiesConfig):
 
     print(f"Thermodynamic properties within the quasi-harmonic approximation")
     print(f"Equation of state: {config.equation_of_state}")
-    print(f"Range of V/V₀: {config.volume_factors[0]:.3f} ... {config.volume_factors[-1]:.3f}")
-    print(f"Number of volumes: {len(config.volume_factors)}")
+    print(f"Number of volumes: {len(config.pressure_range)}")
     
-    os.makedirs(config.properties_dir, exist_ok=True)    
+    os.makedirs(config.properties_dir, exist_ok=True)
+    geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
+    os.makedirs(geom_opt_dir, exist_ok=True)
+
     if config.symmetrize_unit_cell:
         unit_cell = mbe_automation.structure.crystal.symmetrize(
             config.unit_cell
@@ -213,7 +219,8 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     #
     molecule = mbe_automation.structure.relax.isolated_molecule(
         molecule,
-        config.calculator
+        config.calculator,
+        log=os.path.join(geom_opt_dir, "isolated_molecule.txt")
     )
     #
     # Compute the reference cell volume (V0), lattice vectors, and atomic
@@ -227,12 +234,11 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     unit_cell_V0 = mbe_automation.structure.relax.atoms_and_cell(
         unit_cell,
         config.calculator,
-        config.preserve_space_group,
-        optimize_volume=True
+        log=os.path.join(geom_opt_dir, "unit_cell_fully_relaxed.txt")
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
-    print(f"Reference volume V₀ = {V0:.2f} Å³/unit cell")
+    print(f"Volume after full relaxation V₀ = {V0:.2f} Å³/unit cell")
     #
     # Vibrational contributions to E, S, F of the isolated molecule
     #
@@ -252,9 +258,12 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         config.supercell_diagonal
     )
     #
-    # Equilibrium volume as a function of temperature
+    # Equilibrium volume at temperature T
+    # Total free energy at temperature T computed from the equation of state
+    # Effective thermal pressure which should be included in the unit cell relaxation
+    # to force the equilibrium volume at temperature T
     #
-    V_eq, F_tot_crystal_fit = mbe_automation.vibrations.harmonic.equilibrium_volumes(
+    V_eq, F_tot_crystal_fit, p_effective = mbe_automation.vibrations.harmonic.equilibrium_VFp(
         unit_cell_V0,
         molecule,
         config.calculator,
@@ -262,7 +271,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         supercell_matrix,
         config.supercell_displacement,
         config.properties_dir,
-        config.volume_factors,
+        config.pressure_range,
         config.equation_of_state
     )
     #
@@ -274,21 +283,18 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     S_vib_crystal = np.zeros(n_temperatures)
     E_vib_crystal = np.zeros(n_temperatures)
     E_el_crystal = np.zeros(n_temperatures)
+    V_eq_actual = np.zeros(n_temperatures)
     for i, V in enumerate(V_eq):
         T =  temperatures[i]  
-        volume_factor = V / V0
-        cell_factor = volume_factor**(1/3)
-        scaled_cell = reference_cell * cell_factor
-        scaled_unit_cell = unit_cell_V0.copy()
-        scaled_unit_cell.set_cell(scaled_cell, scale_atoms=True)
         #
-        # Relax geometry with fixed QHA equilibrium value
+        # Relax geometry with an effective pressure which
+        # forces QHA equilibrium value
         #
         scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
-            scaled_unit_cell,
+            unit_cell_V0,
             config.calculator,
-            preserve_space_group=True,
-            optimize_volume=False
+            pressure_GPa=p_effective[i],
+            log=os.path.join(geom_opt_dir, f"unit_cell_at_T={T:.4f}.txt")
         )
         _, _, phonons = mbe_automation.vibrations.harmonic.phonons(
             scaled_unit_cell,
@@ -303,12 +309,12 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         S_vib_crystal[i] = thermal_props['entropy'][0] # J/K/mol/unit cell
         E_vib_crystal[i] = F_vib_crystal[i] + T * S_vib_crystal[i] / 1000  # kJ/mol/unit cell
         E_el_crystal[i] = cell_energy_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+        V_eq_actual[i] = scaled_unit_cell.get_volume() # Å³/unit cell
 
     F_tot_crystal = E_el_crystal + F_vib_crystal
     F_RMSD_per_atom = np.sqrt(np.mean((F_tot_crystal - F_tot_crystal_fit)**2)) / len(unit_cell_V0)
-    print(f"RMSD(F(actual)-F(EOS)) = {F_RMSD_per_atom} kJ/mol/atom")
-    for i, T in enumerate(temperatures):
-        print(f"Temp={T:.1f} F(actual)={F_tot_crystal[i]:.1f} F(EOS)={F_tot_crystal_fit[i]:.1f}")
+    F_RMSD_per_atom = F_RMSD_per_atom * (ase.units.kJ/ase.units.mol) / ase.units.eV # eV/atom
+    print(f"RMSD(F_tot_crystal(EOS)) = {F_RMSD_per_atom} eV/atom")
         
     E_vib_molecule = molecule_properties["vibrational energy (kJ/mol)"] # kJ/mol/molecule
     E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule
@@ -336,7 +342,9 @@ def quasi_harmonic_properties(config: PropertiesConfig):
 
     df = pd.DataFrame({
         "T (K)": temperatures,
-        "V_eq (Å³/unit cell)": V_eq,
+        "V_eq_eos (Å³/unit cell)": V_eq,
+        "p_effective (GPa)": p_effective,
+        "V_eq_actual (Å³/unit cell)": V_eq_actual,
         "E_latt (kJ/mol/molecule)": E_latt,
         "ΔEvib (kJ/mol/molecule)": ΔE_vib,
         "ΔHsub (kJ/mol/molecule)": ΔH_sub,
@@ -355,17 +363,9 @@ def quasi_harmonic_properties(config: PropertiesConfig):
                 del group[col]
             group.create_dataset(col, data=df[col].values, dtype="float64")
 
-    df.round(2).to_csv(os.path.join(config.properties_dir, "quasi_harmonic_thermochemistry.csv"))
-
-    cols_to_show = [
-        "T (K)",
-        "V_eq (Å³/unit cell)",
-        "ΔHsub (kJ/mol/molecule)",
-        "ΔEvib (kJ/mol/molecule)",
-        "E_latt (kJ/mol/molecule)"
-    ]
-    print(df[cols_to_show].round(1))
-    print(f"Quasi-harmonic properties saved in {config.hdf5_dataset}")
+    df.round(3).to_csv(os.path.join(config.properties_dir, "quasi_harmonic_thermochemistry.csv"))
+    
+    print(f"Quasi-harmonic calculations completed")
 
 
 def create_training_dataset_mace(config: TrainingConfig):

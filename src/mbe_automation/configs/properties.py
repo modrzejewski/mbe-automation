@@ -83,6 +83,26 @@ class PropertiesConfig:
     volume_factors: list[float] = field(default_factory=lambda:
                                         [0.97, 0.98, 0.99, 1.00, 1.01, 1.02, 1.03, 1.04, 1.05, 1.06])
                                    #
+                                   # Range of external isotropic pressures applied
+                                   # to sample different cell volumes.
+                                   #
+                                   # Cells at different volumes are then used to establish
+                                   # the equation of state.
+                                   #
+                                   # Recommendation:
+                                   #
+                                   # -0.4 kbar ... +0.4 kbar
+                                   #
+                                   # is used in
+                                   #
+                                   # Flaviano Della Pia et al. Accurate and efficient machine learning
+                                   # interatomic potentials for finite temperature modelling of
+                                   # molecular crystals, Chem. Sci., 2025, 16, 11419;
+                                   # doi: 10.1039/d5sc01325a
+                                   #
+    pressure_range: list[float] = field(default_factory=lambda:
+                                        [0.4, 0.3, 0.2, 0.1, 0.0, -0.1, -0.2, -0.3, -0.4, -0.5, -0.6])
+                                   #
                                    # Equation of state used to fit energy
                                    # as a function of volume
                                    #
