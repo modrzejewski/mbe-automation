@@ -27,17 +27,7 @@ class PropertiesConfig:
                                    # done with or without change of the cell
                                    # volume.
                                    #
-    optimize_lattice_vectors: bool = False
-                                   #
-                                   # Allow volume changes during geometry optimization
-                                   # of the unit cell.
-                                   #
-    optimize_volume: bool = False
-                                   #
-                                   # Preserve space group symmetry during
-                                   # geometry optimization of the unit cell.
-                                   #
-    preserve_space_group: bool = True
+    optimize_lattice_vectors: bool = True
                                    #
                                    # Directory to store processed results: plots,
                                    # tables, etc.

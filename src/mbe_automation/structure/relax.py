@@ -22,7 +22,7 @@ def atoms_and_cell(unit_cell,
         relaxed_cell,
         scalar_pressure=pressure_eV_A3
     )
-    optimizer = optimizer_class(
+    optimizer = ase.optimize.precon.PreconLBFGS(
         frechet_filter,
         logfile=log
     )
@@ -55,7 +55,6 @@ def atoms_and_cell(unit_cell,
 
 def atoms(unit_cell,
           calculator,
-          preserve_space_group=True,
           max_force_on_atom=1.0E-3, # eV/Angs/atom
           max_steps=1000,
           log="geometry_opt.txt"
@@ -63,8 +62,6 @@ def atoms(unit_cell,
 
     structure = unit_cell.copy()
     structure.calc = calculator
-    if preserve_space_group:
-        structure.set_constraint(FixSymmetry(structure))
     optimizer = optimizer_class(
         structure,
         logfile=log

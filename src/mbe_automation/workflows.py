@@ -62,7 +62,6 @@ def harmonic_properties(config: PropertiesConfig):
         unit_cell = mbe_automation.structure.relax.atoms(
             unit_cell,
             config.calculator,
-            config.preserve_space_group,
             log=os.path.join(geom_opt_dir, "unit_cell.txt")
         )
     #
@@ -121,9 +120,9 @@ def harmonic_properties(config: PropertiesConfig):
     # Sublimation enthalpy
     # - harmonic approximation of crystal and molecular vibrations
     # - noninteracting particle in a box approximation
-    #   for the translations of the molecule
+    #   for the translations of the isolated molecule
     # - rigid rotor/asymmetric top approximation for the rotations
-    #   of the molecule
+    #   of the isolated molecule
     #
     # Definitions of the lattice energy, sublimation enthalpy
     # (DeltaHsub) and the vibratonal contribution (DeltaEvib)
@@ -180,17 +179,8 @@ def harmonic_properties(config: PropertiesConfig):
                 del group[col]
             group.create_dataset(col, data=df[col].values, dtype="float64")
 
-    df.round(2).to_csv(os.path.join(config.properties_dir, "harmonic_thermochemistry.csv"))
-    
-    print(f"Thermodynamic properties within the harmonic approximation")
-    cols_to_show = [
-        "T (K)",
-        "ΔHsub (kJ/mol/molecule)",
-        "ΔEvib (kJ/mol/molecule)",
-        "E_latt (kJ/mol/molecule)"
-    ]
-    print(df[cols_to_show].round(1))
-    print(f"Harmonic properties saved in {config.hdf5_dataset}")
+    df.round(3).to_csv(os.path.join(config.properties_dir, "harmonic_thermochemistry.csv"))
+    print(f"Harmonic calculations completed")
 
     
 def quasi_harmonic_properties(config: PropertiesConfig):

@@ -5,7 +5,6 @@ from phonopy.structure.atoms import PhonopyAtoms
 import phonopy.qha
 import time
 import numpy as np
-import mbe_automation.kpoints
 import torch
 import mace.calculators
 import mbe_automation.structure.molecule
@@ -74,7 +73,6 @@ def isolated_molecule(
         "zero-point energy (kJ/mol)": ZPE
         }
     
-
 
 def calculate_forces(supercell, calculator):
     s_ase = Atoms(
