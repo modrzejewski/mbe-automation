@@ -87,12 +87,13 @@ def calculate_forces(supercell, calculator):
 
 
 def phonons(
-        UnitCell,
+        unit_cell,
         Calculator,
         supercell_matrix,
         Temperatures=np.arange(0, 1001, 10),
         SupercellDisplacement=0.01,
-        MeshRadius=100.0):
+        MeshRadius=100.0,
+        automatic_primitive_cell=True):
 
     if isinstance(Calculator, mace.calculators.MACECalculator):
         cuda_available = torch.cuda.is_available()
@@ -102,40 +103,49 @@ def phonons(
     if cuda_available:
         torch.cuda.reset_peak_memory_stats()
 
-    supercell = ase.build.make_supercell(UnitCell, supercell_matrix)
+    supercell = ase.build.make_supercell(unit_cell, supercell_matrix)
     print("")
-    print(f"Harmonic approximation of thermodynamic properties")
-    print(f"Max displacement {SupercellDisplacement:.3f} Å")
+    print(f"Calculation of phonons using finite differences")
+    print(f"Max displacement: {SupercellDisplacement:.3f} Å")
     mbe_automation.structure.crystal.PrintUnitCellParams(
         supercell
         )
     
     phonopy_struct = PhonopyAtoms(
-        symbols=UnitCell.get_chemical_symbols(),
-        cell=UnitCell.cell,
-        masses=UnitCell.get_masses(),
-        scaled_positions=UnitCell.get_scaled_positions()
+        symbols=unit_cell.get_chemical_symbols(),
+        cell=unit_cell.cell,
+        masses=unit_cell.get_masses(),
+        scaled_positions=unit_cell.get_scaled_positions()
     )
 
     phonons = Phonopy(
         phonopy_struct,
-        supercell_matrix)
+        supercell_matrix,
+        primitive_matrix=("auto" if automatic_primitive_cell else None)
+    )
     
     phonons.generate_displacements(distance=SupercellDisplacement)
 
-    Supercells = phonons.supercells_with_displacements
+    supercells = phonons.supercells_with_displacements
     Forces = []
-    NSupercells = len(Supercells)
-    print(f"Number of supercells: {NSupercells}")
-
+    n_supercells = len(supercells)
+    n_atoms_unit_cell = len(unit_cell)
+    n_atoms_primitive_cell = len(phonons.primitive)
+    n_atoms_super_cell = len(supercells[0])
+    
+    print(f"{n_supercells} supercells")
+    print(f"{n_atoms_unit_cell} atoms in the unit cell")
+    print(f"{n_atoms_primitive_cell} atoms in the primitive cell")
+    print(f"{n_atoms_super_cell} atoms in the supercell")
+    
     start_time = time.time()
     last_time = start_time
     next_print = 10
 
-    for i, s in enumerate(Supercells, 1):
+    for i, s in enumerate(supercells, 1):
         forces = calculate_forces(s, Calculator)
         Forces.append(forces)
-        progress = i * 100 // NSupercells
+        progress = i * 100 // n_supercells
         if progress >= next_print:
             now = time.time()
             print(f"Processed {progress}% of supercells (Δt={now - last_time:.1f} s)")
@@ -164,27 +174,20 @@ def phonons(
     # than in our code the actual mol is mol of unit cells
     #
     phonons.run_thermal_properties(temperatures=Temperatures)
-    thermodynamic_functions = phonons.get_thermal_properties_dict()
     #
     # Phonon density of states
     #
     phonons.run_total_dos()
-    phonon_dos = phonons.get_total_dos_dict()
     #
     # Automatically determine the high-symmetry path
     # through the Brillouin zone
     #
     phonons.auto_band_structure()
-    #
-    # Get gamma point frequencies
-    #
-    phonons.run_qpoints([[0, 0, 0]])  # Gamma point
-    frequencies, eigenvectors = phonons.get_frequencies_with_eigenvectors([0, 0, 0])
     
-    return thermodynamic_functions, phonon_dos, phonons
+    return phonons
 
 
-def equilibrium_VFp(
+def equilibrium_curve(
         unit_cell_V0,
         molecule,
         calculator,
@@ -199,8 +202,8 @@ def equilibrium_VFp(
     geom_opt_dir = os.path.join(properties_dir, "geometry_optimization")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
-    reference_cell = unit_cell_V0.cell.copy()
     V0 = unit_cell_V0.get_volume()
+    n_atoms_unit_cell = len(unit_cell_V0)
     n_volumes = len(pressure_range)
     n_temperatures = len(temperatures)
     V_sampled = np.zeros(n_volumes)
@@ -209,11 +212,12 @@ def equilibrium_VFp(
     V_eq_T = np.zeros(n_temperatures)
     F_eq_T = np.zeros(n_temperatures)
     p_eq_T = np.zeros(n_temperatures)
+    B_eq_T = np.zeros(n_temperatures)
     
-    print("\nCalculating phonons at different volumes")
+    print("Cell volume vs pressure curve")
+    print("Volume of the reference unit cell: {V0:.3f} Å³/unit cell")
     
     for i, pressure in enumerate(pressure_range):
-        print(f"{i+1} p = {pressure:3f} GPa")        
         #
         # Relaxation of geometry of new unit cell
         # with fixed volume
@@ -225,21 +229,25 @@ def equilibrium_VFp(
             log=os.path.join(geom_opt_dir, f"unit_cell_pressure={pressure:.4f}_GPa.txt")
         )
         V_sampled[i] = scaled_unit_cell.get_volume() # Å³/unit cell
-        _, _, p = phonons(
+        p = phonons(
             scaled_unit_cell,
             calculator,
             supercell_matrix,
             temperatures,
             supercell_displacement
-        )  
+        )
+        n_atoms_primitive_cell = len(p.primitive)
+        alpha = n_atoms_unit_cell / n_atoms_primitive_cell
         thermal_props = p.get_thermal_properties_dict()
-        F_vib_V_T[i, :] = thermal_props['free_energy'] # kJ/mol/unit cell
+        F_vib_V_T[i, :] = thermal_props['free_energy'] * alpha # kJ/mol/unit cell
         E_el_V[i] = scaled_unit_cell.get_potential_energy() # eV/unit cell
-        
-        print(f"V/V0 = {V_sampled[i]/V0:.2f} Å³/unit cell")
-        print(f"Electronic energy: {E_el_V[i]:.6f} eV/unit cell")
-        print(f"Number of atoms in the primitive cell: {len(p.primitive)}", flush=True)
-        print(f"Number of atoms in the unit cell: {len(scaled_unit_cell)}", flush=True)
+
+        print(f"p = {pressure:3f} GPa | V/V0 = {V_sampled[i]/V0:.4f}")
+
+    eos = EOS(eos_name=equation_of_state)
+    eos_fit = eos.fit(V_sampled, E_el_V)
+    B0 = eos_fit.b0_GPa
+    print("Bulk modulus computed from electronic energy vs volume: {B0:.1f} GPa")
     
     for i, T in enumerate(temperatures):
         F_vib_V_eV = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV # eV/unit cell
@@ -248,6 +256,7 @@ def equilibrium_VFp(
         eos_fit = eos.fit(V_sampled, F_tot_V)
         F_eq_T[i] = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
         V_eq_T[i] = eos_fit.v0 # Å³/unit cell
+        B_eq_T[i] = eos_fit.b0_GPa # GPa
         #
         # Effective pressure (thermal pressure) which forces
         # the equilibrum volume of the unit cell at
@@ -282,7 +291,7 @@ def equilibrium_VFp(
         dFdV = F_vib_fit.deriv(1) # eV/Å³/unit cell
         p_eq_T[i] = dFdV(V_eq_T[i]) * (ase.units.eV/ase.units.Angstrom**3)/ase.units.GPa # GPa
 
-    return V_eq_T, F_eq_T, p_eq_T
+    return V_eq_T, F_eq_T, p_eq_T, B_eq_T, B0
                 
 
 def my_plot_band_structure(phonons, output_path, band_connection=True):
