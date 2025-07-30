@@ -14,7 +14,6 @@ class PropertiesConfig:
                                    # energy, heat capacity etc. are computed
                                    #
     temperatures: np.ndarray = field(default_factory=lambda: np.arange(0, 301, 1))
-    pressure: float = 101325.0      
                                    #
                                    # Refine the space group symmetry before
                                    # computing any properties and before'
@@ -74,10 +73,11 @@ class PropertiesConfig:
                                         [0.97, 0.98, 0.99, 1.00, 1.01, 1.02, 1.03, 1.04, 1.05, 1.06])
                                    #
                                    # Range of external isotropic pressures applied
-                                   # to sample different cell volumes.
+                                   # to sample different cell volumes and fit
+                                   # the equation of state
                                    #
-                                   # Cells at different volumes are then used to establish
-                                   # the equation of state.
+                                   # The corresponding F_tot(V(p)) are used to establish
+                                   # to fit F_tot(V) and p_effective(V).
                                    #
                                    # Recommendation:
                                    #
@@ -91,7 +91,7 @@ class PropertiesConfig:
                                    # doi: 10.1039/d5sc01325a
                                    #
     pressure_range: list[float] = field(default_factory=lambda:
-                                        [0.4, 0.3, 0.2, 0.1, 0.0, -0.1, -0.2, -0.3, -0.4, -0.5, -0.6])
+                                        [0.4, 0.3, 0.2, 0.1, 0.0, -0.1, -0.2, -0.3, -0.4])
                                    #
                                    # Equation of state used to fit energy
                                    # as a function of volume

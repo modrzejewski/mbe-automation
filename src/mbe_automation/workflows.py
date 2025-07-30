@@ -280,6 +280,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     S_vib_crystal = np.zeros(n_temperatures)
     E_vib_crystal = np.zeros(n_temperatures)
     E_el_crystal = np.zeros(n_temperatures)
+    E_latt = np.zeros(n_temperatures)
     V_eq_actual = np.zeros(n_temperatures)
     for i, V in enumerate(V_eq):
         T =  temperatures[i]  
@@ -329,7 +330,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     ΔH_sub = np.zeros(n_temperatures)
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
     for i, T in enumerate(temperatures):
-        E_latt = E_el_crystal * beta - E_el_molecule # kJ/mol/molecule
+        E_latt[i] = E_el_crystal[i] * beta - E_el_molecule # kJ/mol/molecule
         kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
         if rotor_type == "nonlinear":
             # 3/2 kT (translation) + 3/2 kT (rotation) + kT (PV work)

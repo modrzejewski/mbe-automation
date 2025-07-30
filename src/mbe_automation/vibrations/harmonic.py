@@ -215,7 +215,7 @@ def equilibrium_curve(
     B_eq_T = np.zeros(n_temperatures)
     
     print("Cell volume vs pressure curve")
-    print("Volume of the reference unit cell: {V0:.3f} Å³/unit cell")
+    print(f"Volume of the reference unit cell: {V0:.3f} Å³/unit cell")
     
     for i, pressure in enumerate(pressure_range):
         #
@@ -247,7 +247,7 @@ def equilibrium_curve(
     eos = EOS(eos_name=equation_of_state)
     eos_fit = eos.fit(V_sampled, E_el_V)
     B0 = eos_fit.b0_GPa
-    print("Bulk modulus computed from electronic energy vs volume: {B0:.1f} GPa")
+    print(f"Bulk modulus computed from E_el_crystal(V): {B0:.1f} GPa")
     
     for i, T in enumerate(temperatures):
         F_vib_V_eV = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV # eV/unit cell
