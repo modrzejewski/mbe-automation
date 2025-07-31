@@ -2,6 +2,8 @@ import os.path
 from ase.constraints import FixSymmetry
 import ase.optimize
 from ase.optimize.fire2 import FIRE2
+from ase.optimize.precon import Exp
+from ase.optimize.precon.lbfgs import PreconLBFGS
 import ase.filters
 filter_class = ase.filters.FrechetCellFilter
 import ase.units
@@ -23,10 +25,10 @@ def atoms_and_cell(unit_cell,
         constant_volume=(not optimize_volume),
         scalar_pressure=pressure_eV_A3
     )
-    optimizer = FIRE2(
+    optimizer = PreconLBFGS(
         atoms=frechet_filter,
-        logfile=log,
-        use_abc=True
+        precon=Exp(),
+        logfile=log
     )
     optimizer.run(
         fmax=max_force_on_atom,
