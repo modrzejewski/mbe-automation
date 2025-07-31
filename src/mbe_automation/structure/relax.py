@@ -1,15 +1,15 @@
 import os.path
 from ase.constraints import FixSymmetry
-from ase.optimize.precon import PreconLBFGS
+import ase.optimize
+from ase.optimize.fire2 import FIRE2
 import ase.filters
 filter_class = ase.filters.FrechetCellFilter
-import ase.optimize
-optimizer_class = ase.optimize.precon.PreconLBFGS
 import ase.units
 
 def atoms_and_cell(unit_cell,
                    calculator,
                    pressure_GPa=0.0, # gigapascals
+                   optimize_volume=True,
                    max_force_on_atom=1.0E-3, # eV/Angs/atom
                    max_steps=1000,
                    log="geometry_opt.txt"
@@ -20,11 +20,13 @@ def atoms_and_cell(unit_cell,
     relaxed_cell.calc = calculator
     frechet_filter = ase.filters.FrechetCellFilter(
         relaxed_cell,
+        constant_volume=(not optimize_volume),
         scalar_pressure=pressure_eV_A3
     )
-    optimizer = ase.optimize.precon.PreconLBFGS(
-        frechet_filter,
-        logfile=log
+    optimizer = FIRE2(
+        atoms=frechet_filter,
+        logfile=log,
+        use_abc=True
     )
     optimizer.run(
         fmax=max_force_on_atom,
@@ -62,11 +64,15 @@ def atoms(unit_cell,
 
     structure = unit_cell.copy()
     structure.calc = calculator
-    optimizer = optimizer_class(
+    optimizer = FIRE2(
         structure,
-        logfile=log
+        logfile=log,
+        use_abc=True
     )
-    optimizer.run(fmax=max_force_on_atom, steps=max_steps)
+    optimizer.run(
+        fmax=max_force_on_atom,
+        steps=max_steps
+    )
     return structure
 
 
@@ -79,10 +85,14 @@ def isolated_molecule(Molecule,
 
     structure = Molecule.copy()
     structure.calc = Calculator
-    optimizer = optimizer_class(
+    optimizer = FIRE2(
         structure,
-        logfile=log
+        logfile=log,
+        use_abc=True
     )
-    optimizer.run(fmax=max_force_on_atom, steps=max_steps)
+    optimizer.run(
+        fmax=max_force_on_atom,
+        steps=max_steps
+    )
     return structure
 
