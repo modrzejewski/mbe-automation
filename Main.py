@@ -24,10 +24,10 @@ ProjectDirectory    = "./Projects/01_1,4-cyclohexanedione"
                                                 #
 Methods = ["RPA", "LNO-CCSD(T)", "MACE(PBC)", "DFTB(PBC)", "UMA(PBC)"]
                                                 #
-                                                # Definition of the machine-learning
+                                                # Parameters of the machine-learning
                                                 # interatomic potential
                                                 #
-ModelDirectory    = "~/models/mace/MACE-OFF24_medium.model"
+ModelDirectory    = "~/models/michaelides_2025/01_cyclohexanedione/MACE_model_swa.model"
                                                 #
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,

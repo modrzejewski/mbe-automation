@@ -57,6 +57,7 @@ def atoms_and_cell(unit_cell,
         relaxed_cell = mbe_automation.structure.crystal.symmetrize(
             relaxed_cell
             )
+        relaxed_cell.calc = calculator
 
     print("Relaxation completed")
     max_force = np.abs(relaxed_cell.get_forces()).max()
