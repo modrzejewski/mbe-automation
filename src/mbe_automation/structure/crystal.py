@@ -48,10 +48,9 @@ def symmetrize(unit_cell: Atoms, symmetrization_thresh: float = 1.0E-2) -> Atoms
         print(f"Refined space group symmetry using spglib with symmetrization threshold {symmetrization_thresh}")
         print(f"Sci. Technol. Adv. Mater. Meth. 4, 2384822 (2024);")
         print(f"doi: 10.1080/27660400.2024.2384822")
-        print(f"input cell: {input_hmsymbol}, {input_spacegroup_index} -> refined: {sym_hmsymbol}, {sym_spacegroup_index}")
+        print(f"Refinement: {input_hmsymbol}, {input_spacegroup_index} -> {sym_hmsymbol}, {sym_spacegroup_index}")
     else:
-        print(f"No symmetry refinement needed")
-        print(f"input cell: {input_hmsymbol}, {input_spacegroup_index}")
+        print(f"Perfect cell symmetry, no refinement needed: {input_hmsymbol}, {input_spacegroup_index}")
         
     return sym_unit_cell
         

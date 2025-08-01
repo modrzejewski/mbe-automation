@@ -46,23 +46,28 @@ def harmonic_properties(config: PropertiesConfig):
     )
     if config.optimize_lattice_vectors:
         #
-        # Optimize: atomic positions within the cell,
-        # lattice vectors and, optionally, cell volume
+        # Optimize atomic positions within the cell,
+        # lattice vectors and cell volume. The final volume
+        # will correspond to the minimum on the electronic
+        # energy surface without any thermal/ZPE vibrational
+        # contributions.
         #
         unit_cell = mbe_automation.structure.relax.atoms_and_cell(
             unit_cell,
             config.calculator,
-            log=os.path.join(geom_opt_dir, "unit_cell.txt")
+            symmetrize_final_structure=config.symmetrize_unit_cell,
+            log=os.path.join(geom_opt_dir, "unit_cell_fully_relaxed.txt")
         )
     else:
         #
         # Optimize only the atomic positions within
-        # constant unit cell
+        # a constant unit cell
         #
         unit_cell = mbe_automation.structure.relax.atoms(
             unit_cell,
             config.calculator,
-            log=os.path.join(geom_opt_dir, "unit_cell.txt")
+            symmetrize_final_structure=config.symmetrize_unit_cell,
+            log=os.path.join(geom_opt_dir, "unit_cell_optimized_atomic_positions.txt")
         )
     n_atoms_unit_cell = len(unit_cell)
     #
@@ -253,22 +258,24 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     #
     # Equilibrium properties at temperature T and zero pressure:
     #
-    # 1. cell volume V
+    # 1. cell volumes V
     # 2. total free energy F_tot (electronic energy + vibrational energy)
-    # 3. effective thermal pressure p_effective
-    #    including p_effective during cell relaxation gives cell volume V
-    # 4. bulk modulus B
+    # 3. effective thermal pressures p_effective which simulate the effect
+    #    of ZPE and thermal motion on the cell relaxation
+    # 4. bulk moduli B(T)
     #
-    V_eq, F_tot_crystal_fit, p_effective, B_eq, B0 = mbe_automation.vibrations.harmonic.equilibrium_curve(
+    V_eos, F_tot_crystal_fit, p_effective, B_eq, B0 = mbe_automation.vibrations.harmonic.equilibrium_curve(
         unit_cell_V0,
-        molecule,
         config.calculator,
         config.temperatures,
         supercell_matrix,
         config.supercell_displacement,
         config.properties_dir,
         config.pressure_range,
-        config.equation_of_state
+        config.volume_range,
+        config.equation_of_state,
+        config.eos_sampling,
+        config.symmetrize_unit_cell
     )
     #
     # Harmonic properties at each volume
@@ -281,27 +288,50 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     E_vib_crystal = np.zeros(n_temperatures)
     E_el_crystal = np.zeros(n_temperatures)
     E_latt = np.zeros(n_temperatures)
-    V_eq_actual = np.zeros(n_temperatures)
-    for i, V in enumerate(V_eq):
-        T =  temperatures[i]  
-        #
-        # Relax geometry with an effective pressure which
-        # forces QHA equilibrium value
-        #
-        scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
-            unit_cell_V0,
-            config.calculator,
-            pressure_GPa=p_effective[i],
-            log=os.path.join(geom_opt_dir, f"unit_cell_at_T={T:.4f}.txt")
+    V_actual = np.zeros(n_temperatures)
+    for i, V in enumerate(V_eos):
+        T =  temperatures[i]
+        unit_cell_T = unit_cell_V0.copy()
+        unit_cell_T.set_cell(
+            unit_cell_V0.cell * (V/V0)**(1/3),
+            scale_atoms=True
         )
+        if config.eos_sampling == "pressure":
+            #
+            # Relax geometry with an effective pressure which
+            # forces QHA equilibrium value
+            #
+            unit_cell_T = mbe_automation.structure.relax.atoms_and_cell(
+                unit_cell_T,
+                config.calculator,
+                pressure_GPa=p_effective[i],
+                optimize_lattice_vectors=True,
+                optimize_volume=True,
+                symmetrize_final_structure=config.symmetrize_unit_cell,
+                log=os.path.join(geom_opt_dir, f"unit_cell_at_T={T:.4f}.txt")
+            )
+        elif config.eos_sampling == "volume":
+            #
+            # Relax atomic positions and lattice vectors
+            # under the constraint of constant volume
+            #
+            unit_cell_T = mbe_automation.structure.relax.atoms_and_cell(
+                unit_cell_T,
+                config.calculator,                
+                pressure_GPa=0.0,
+                optimize_lattice_vectors=True,
+                optimize_volume=False,
+                symmetrize_final_structure=config.symmetrize_unit_cell,
+                log=os.path.join(geom_opt_dir, f"unit_cell_at_T={T:.4f}.txt")
+            )
         phonons = mbe_automation.vibrations.harmonic.phonons(
-            scaled_unit_cell,
+            unit_cell_T,
             config.calculator,
             supercell_matrix,
             [T],
             config.supercell_displacement
         )
-        cell_energy_eV = scaled_unit_cell.get_potential_energy()
+        cell_energy_eV = unit_cell_T.get_potential_energy()
         n_atoms_primitive_cell = len(phonons.primitive)
         alpha = n_atoms_unit_cell/n_atoms_primitive_cell
         thermal_props = phonons.get_thermal_properties_dict()
@@ -309,7 +339,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         S_vib_crystal[i] = thermal_props['entropy'][0] * alpha # J/K/mol/unit cell
         E_vib_crystal[i] = F_vib_crystal[i] + T * S_vib_crystal[i] / 1000  # kJ/mol/unit cell
         E_el_crystal[i] = cell_energy_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
-        V_eq_actual[i] = scaled_unit_cell.get_volume() # Å³/unit cell
+        V_actual[i] = unit_cell_T.get_volume() # Å³/unit cell
 
     F_tot_crystal = E_el_crystal + F_vib_crystal
     F_RMSD_per_atom = np.sqrt(np.mean((F_tot_crystal - F_tot_crystal_fit)**2)) / len(unit_cell_V0)
@@ -344,9 +374,9 @@ def quasi_harmonic_properties(config: PropertiesConfig):
 
     df = pd.DataFrame({
         "T (K)": temperatures,
-        "V_eos (Å³/unit cell)": V_eq,
+        "V_eos (Å³/unit cell)": V_eos,
         "p_effective (GPa)": p_effective,
-        "V_actual (Å³/unit cell)": V_eq_actual,
+        "V_actual (Å³/unit cell)": V_actual,
         "E_latt (kJ/mol/molecule)": E_latt,
         "ΔEvib (kJ/mol/molecule)": ΔE_vib,
         "ΔHsub (kJ/mol/molecule)": ΔH_sub,

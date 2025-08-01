@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, List
+from typing import Any, List, Literal
 from ase import Atoms
 import numpy as np
 
@@ -69,8 +69,8 @@ class PropertiesConfig:
                                    # 2. V/V0=0.97 up to V/V0=1.06 according to the manual
                                    # of CRYSTAL
                                    #
-    volume_factors: list[float] = field(default_factory=lambda:
-                                        [0.97, 0.98, 0.99, 1.00, 1.01, 1.02, 1.03, 1.04, 1.05, 1.06])
+    volume_range: list[float] = field(default_factory=lambda:
+                                      [0.97, 0.98, 0.99, 1.00, 1.01, 1.02, 1.03, 1.04, 1.05, 1.06])
                                    #
                                    # Range of external isotropic pressures applied
                                    # to sample different cell volumes and fit
@@ -97,3 +97,15 @@ class PropertiesConfig:
                                    # as a function of volume
                                    #
     equation_of_state: str = "birch_murnaghan"
+                                   #
+                                   # Algorithm used to generate points on
+                                   # the equilibrium curve:
+                                   #
+                                   # 1) pressure: cell relaxations are performed in the presence
+                                   #    of external isotropic pressure which simulates the effect
+                                   #    of thermal motion.
+                                   #
+                                   # 2) volume: cell relaxations are performed with the constant
+                                   #    volume constraint.
+                                   #
+    eos_sampling: Literal["pressure", "volume"] = "volume"

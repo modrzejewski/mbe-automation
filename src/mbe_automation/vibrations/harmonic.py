@@ -15,6 +15,7 @@ import ase.build
 import matplotlib.pyplot as plt
 import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
+import mbe_automation.display
 from pymatgen.analysis.eos import EOS
 import os
 import os.path
@@ -88,14 +89,14 @@ def calculate_forces(supercell, calculator):
 
 def phonons(
         unit_cell,
-        Calculator,
+        calculator,
         supercell_matrix,
-        Temperatures=np.arange(0, 1001, 10),
-        SupercellDisplacement=0.01,
-        MeshRadius=100.0,
+        temperatures=np.arange(0, 1001, 10),
+        supercell_displacement=0.01,
+        mesh_radius=100.0,
         automatic_primitive_cell=True):
 
-    if isinstance(Calculator, mace.calculators.MACECalculator):
+    if isinstance(calculator, mace.calculators.MACECalculator):
         cuda_available = torch.cuda.is_available()
     else:
         cuda_available = False
@@ -106,7 +107,7 @@ def phonons(
     supercell = ase.build.make_supercell(unit_cell, supercell_matrix)
     print("")
     print(f"Calculation of phonons using finite differences")
-    print(f"Max displacement: {SupercellDisplacement:.3f} Å")
+    print(f"Max displacement: {supercell_displacement:.3f} Å")
     mbe_automation.structure.crystal.PrintUnitCellParams(
         supercell
         )
@@ -124,7 +125,7 @@ def phonons(
         primitive_matrix=("auto" if automatic_primitive_cell else None)
     )
     
-    phonons.generate_displacements(distance=SupercellDisplacement)
+    phonons.generate_displacements(distance=supercell_displacement)
 
     supercells = phonons.supercells_with_displacements
     Forces = []
@@ -143,7 +144,7 @@ def phonons(
     next_print = 10
 
     for i, s in enumerate(supercells, 1):
-        forces = calculate_forces(s, Calculator)
+        forces = calculate_forces(s, calculator)
         Forces.append(forces)
         progress = i * 100 // n_supercells
         if progress >= next_print:
@@ -152,6 +153,7 @@ def phonons(
             last_time = now
             next_print += 10
 
+    print("Calculation of force set completed")
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
@@ -164,16 +166,16 @@ def phonons(
     # from the list of the displaced supercells.
     #
     phonons.produce_force_constants()
-    phonons.run_mesh(mesh=MeshRadius)
+    phonons.run_mesh(mesh=mesh_radius)
     #    
     # Heat capacity, free energy, entropy due to harmonic vibrations
     # units kJ/(K*mol), kJ/mol, J/(K*mol),
     # where 1 mol is N_A times number of molecules in primitve cell
     # (Source: https://phonopy.github.io/phonopy/setting-tags.html section Thermal properties related tags
-    # In this code we do not specive the primitive matix while constracing phonon class,
+    # In this code we do not specive the primitive matrix while constracing phonon class,
     # than in our code the actual mol is mol of unit cells
     #
-    phonons.run_thermal_properties(temperatures=Temperatures)
+    phonons.run_thermal_properties(temperatures)
     #
     # Phonon density of states
     #
@@ -189,22 +191,27 @@ def phonons(
 
 def equilibrium_curve(
         unit_cell_V0,
-        molecule,
         calculator,
         temperatures,
         supercell_matrix,
         supercell_displacement,
         properties_dir,
         pressure_range,
-        equation_of_state
+        volume_range,
+        equation_of_state,
+        eos_sampling,
+        symmetrize_unit_cell
 ):
 
     geom_opt_dir = os.path.join(properties_dir, "geometry_optimization")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     V0 = unit_cell_V0.get_volume()
+    if eos_sampling == "pressure":
+        n_volumes = len(pressure_range)
+    elif eos_sampling == "volume":
+        n_volumes = len(volume_range)
     n_atoms_unit_cell = len(unit_cell_V0)
-    n_volumes = len(pressure_range)
     n_temperatures = len(temperatures)
     V_sampled = np.zeros(n_volumes)
     E_el_V = np.zeros(n_volumes)
@@ -214,23 +221,50 @@ def equilibrium_curve(
     p_eq_T = np.zeros(n_temperatures)
     B_eq_T = np.zeros(n_temperatures)
     
-    print("Cell volume vs pressure curve")
+    mbe_automation.display.framed("Equation of state")
     print(f"Volume of the reference unit cell: {V0:.3f} Å³/unit cell")
-    
-    for i, pressure in enumerate(pressure_range):
-        #
-        # Relaxation of geometry of new unit cell
-        # with fixed volume
-        #
-        scaled_unit_cell = mbe_automation.structure.relax.atoms_and_cell(
-            unit_cell_V0,
-            calculator,
-            pressure_GPa=pressure,
-            log=os.path.join(geom_opt_dir, f"unit_cell_pressure={pressure:.4f}_GPa.txt")
-        )
-        V_sampled[i] = scaled_unit_cell.get_volume() # Å³/unit cell
+
+    for i in range(n_volumes):
+        if eos_sampling == "pressure":
+            #
+            # Relaxation of geometry under external
+            # pressure
+            #
+            thermal_pressure = pressure_range[i]
+            unit_cell_V = mbe_automation.structure.relax.atoms_and_cell(
+                unit_cell_V0,
+                calculator,
+                pressure_GPa=thermal_pressure,
+                optimize_lattice_vectors=True,
+                optimize_volume=True,
+                symmetrize_final_structure=symmetrize_unit_cell,
+                log=os.path.join(geom_opt_dir, f"unit_cell_pressure={thermal_pressure:.4f}_GPa.txt")
+            )
+        elif eos_sampling == "volume":
+            #
+            # Relaxation of atomic positions and lattice
+            # vectors under the constraint of constant
+            # volume
+            #
+            V = V0 * volume_range[i]
+            unit_cell_V = unit_cell_V0.copy()
+            unit_cell_V.set_cell(
+                unit_cell_V0.cell * (V/V0)**(1/3),
+                scale_atoms=True
+            )
+            unit_cell_V = mbe_automation.structure.relax.atoms_and_cell(
+                unit_cell_V,
+                calculator,                
+                pressure_GPa=0.0,
+                optimize_lattice_vectors=True,
+                optimize_volume=False,
+                symmetrize_final_structure=symmetrize_unit_cell,
+                log=os.path.join(geom_opt_dir, f"unit_cell_V={V/V0:.3f}V0.txt")
+            )
+            
+        V_sampled[i] = unit_cell_V.get_volume() # Å³/unit cell
         p = phonons(
-            scaled_unit_cell,
+            unit_cell_V,
             calculator,
             supercell_matrix,
             temperatures,
@@ -240,10 +274,8 @@ def equilibrium_curve(
         alpha = n_atoms_unit_cell / n_atoms_primitive_cell
         thermal_props = p.get_thermal_properties_dict()
         F_vib_V_T[i, :] = thermal_props['free_energy'] * alpha # kJ/mol/unit cell
-        E_el_V[i] = scaled_unit_cell.get_potential_energy() # eV/unit cell
-
-        print(f"p = {pressure:3f} GPa | V/V0 = {V_sampled[i]/V0:.4f}")
-
+        E_el_V[i] = unit_cell_V.get_potential_energy() # eV/unit cell
+        
     eos = EOS(eos_name=equation_of_state)
     eos_fit = eos.fit(V_sampled, E_el_V)
     B0 = eos_fit.b0_GPa
@@ -451,147 +483,4 @@ def my_plot_band_structure_first_segment_only(phonons, output_path):
                 facecolor='white', edgecolor='none')
     plt.close()
 
-
-# def my_plot_band_structure(phonons, output_path):
-#     """Plot only the first segment of the band structure."""
-#     import matplotlib.pyplot as plt
-#     import numpy as np
-    
-#     if phonons._band_structure is None:
-#         raise RuntimeError("run_band_structure has to be done.")
-    
-#     # Get the number of paths
-#     n_paths = len([x for x in phonons._band_structure.path_connections if not x])
-    
-#     # Create figure with all subplots but we'll only show the first one
-#     fig, axs = plt.subplots(1, n_paths, figsize=(6, 6), sharey=True)
-#     axs = axs if isinstance(axs, (list, np.ndarray)) else [axs]
-    
-#     # Plot the band structure to all axes (required by phonopy)
-#     phonons._band_structure.plot(axs)
-    
-#     # Hide all subplots except the first one
-#     for i, ax in enumerate(axs):
-#         if i == 0:  # Keep only the first subplot
-#             # Style the first subplot
-#             ax.set_ylim(0, 7)
-#             ax.set_ylabel("Frequency / THz", fontsize=14)
-            
-#             # Clean grid
-#             ax.grid(True, alpha=0.3, linewidth=0.5)
-#             ax.set_axisbelow(True)
-            
-#             # Set tick parameters
-#             ax.tick_params(labelsize=12, width=1.2, length=4)
-            
-#             # Style the plot borders
-#             for spine in ax.spines.values():
-#                 spine.set_linewidth(1.2)
-#                 spine.set_color('black')
-            
-#             ax.set_facecolor('white')
-            
-#             # Format high-symmetry point labels
-#             labels = ax.get_xticklabels()
-#             for label in labels:
-#                 text = label.get_text()
-#                 if text in ['GAMMA', 'G']:
-#                     label.set_text('Γ')
-            
-#             # Add vertical lines at high-symmetry points
-#             x_ticks = ax.get_xticks()
-#             for x_tick in x_ticks:
-#                 if x_tick != 0 and x_tick != max(x_ticks):
-#                     ax.axvline(x=x_tick, color='gray', linewidth=0.8, alpha=0.7)
-#         else:
-#             # Hide other subplots
-#             ax.set_visible(False)
-    
-#     # Adjust the figure to show only the first subplot
-#     plt.tight_layout()
-    
-#     # Manually adjust the subplot position to use the full figure width
-#     if len(axs) > 1:
-#         pos = axs[0].get_position()
-#         axs[0].set_position([pos.x0, pos.y0, pos.width * n_paths, pos.height])
-    
-#     plt.savefig(output_path, dpi=300, bbox_inches='tight',
-#                 facecolor='white', edgecolor='none')
-#     plt.close()
-    
-    
-# def my_plot_band_structure_first_segment_only(phonons, output_path):
-#     """Alternative approach: Extract and plot only the first segment data."""
-#     import matplotlib.pyplot as plt
-#     import numpy as np
-    
-#     if phonons._band_structure is None:
-#         raise RuntimeError("run_band_structure has to be done.")
-    
-#     # Get band structure data
-#     frequencies = phonons._band_structure.frequencies
-#     distances = phonons._band_structure.distances
-#     path_connections = phonons._band_structure.path_connections
-    
-#     # Convert to numpy arrays if they're lists
-#     frequencies = np.array(frequencies)
-#     distances = np.array(distances)
-    
-#     # Find the first segment (before the first connection break)
-#     first_break = None
-#     for i, connection in enumerate(path_connections):
-#         if not connection:  # False means a break in the path
-#             first_break = i + 1
-#             break
-    
-#     if first_break is None:
-#         first_break = len(frequencies)
-    
-#     # Extract first segment data
-#     first_segment_frequencies = frequencies[:first_break]
-#     first_segment_distances = distances[:first_break]
-    
-#     # Create the plot
-#     fig, ax = plt.subplots(1, 1, figsize=(4, 6))
-    
-#     # Plot each band
-#     if len(first_segment_frequencies.shape) == 1:
-#         # Handle 1D case (single band)
-#         ax.plot(first_segment_distances, first_segment_frequencies, 'r-', linewidth=1.0)
-#     else:
-#         # Handle 2D case (multiple bands)
-#         for band_idx in range(first_segment_frequencies.shape[1]):
-#             ax.plot(first_segment_distances, first_segment_frequencies[:, band_idx], 
-#                     'r-', linewidth=1.0)
-    
-#     # Style the plot
-#     ax.set_ylim(0, 7)
-#     ax.set_ylabel("Frequency / THz", fontsize=14)
-#     ax.set_xlim(first_segment_distances[0], first_segment_distances[-1])
-    
-#     # Clean grid
-#     ax.grid(True, alpha=0.3, linewidth=0.5)
-#     ax.set_axisbelow(True)
-    
-#     # Set tick parameters
-#     ax.tick_params(labelsize=12, width=1.2, length=4)
-    
-#     # Style the plot borders
-#     for spine in ax.spines.values():
-#         spine.set_linewidth(1.2)
-#         spine.set_color('black')
-    
-#     ax.set_facecolor('white')
-    
-#     # Set x-axis labels for the first segment (typically Γ to X)
-#     ax.set_xticks([first_segment_distances[0], first_segment_distances[-1]])
-#     ax.set_xticklabels(['Γ', 'X'])  # Adjust these labels based on your actual path
-    
-#     # Add vertical line at the end point
-#     ax.axvline(x=first_segment_distances[-1], color='gray', linewidth=0.8, alpha=0.7)
-    
-#     plt.tight_layout()
-#     plt.savefig(output_path, dpi=300, bbox_inches='tight',
-#                 facecolor='white', edgecolor='none')
-#     plt.close()
 
