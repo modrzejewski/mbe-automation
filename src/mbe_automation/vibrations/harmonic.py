@@ -160,7 +160,7 @@ def phonons(
     
     for i, s in enumerate(supercells, 1):
         forces = calculate_forces(s, calculator)
-        forces_set.append(forces)
+        force_set.append(forces)
         progress = i * 100 // n_supercells
         if progress >= next_print:
             now = time.time()
