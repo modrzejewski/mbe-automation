@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import mace.calculators
 import mbe_automation.structure.molecule
+import mbe_automation.display
 import ase.thermochemistry
 import ase.vibrations
 import ase.units
@@ -104,31 +105,40 @@ def phonons(
     if cuda_available:
         torch.cuda.reset_peak_memory_stats()
 
-    supercell = ase.build.make_supercell(unit_cell, supercell_matrix)
-    print("")
-    print(f"Calculation of phonons using finite differences")
-    print(f"Max displacement: {supercell_displacement:.3f} Å")
-    mbe_automation.structure.crystal.PrintUnitCellParams(
-        supercell
-        )
+    mbe_automation.display.framed("Phonopy calculation")
+    print(f"Max displacement Δq={supercell_displacement:.3f} Å")
     
     phonopy_struct = PhonopyAtoms(
-        symbols=unit_cell.get_chemical_symbols(),
-        cell=unit_cell.cell,
+        symbols=unit_cell.symbols,
+        cell=unit_cell.cell.array,
         masses=unit_cell.get_masses(),
         scaled_positions=unit_cell.get_scaled_positions()
     )
-
+    #    
+    # Note regarding the use of primitive cells in phonopy.
+    #
+    # The units of physical quantities such as heat capacity,
+    # free energy, entropy etc. will depend on how you initialize
+    # the Phonopy class.
+    #
+    # variant 1:
+    # units kJ/K/mol/primitive cell, kJ/mol/primitive cell, J/K/mol/primitive cell
+    # if the primitive cell is specified while constracing Phonopy class
+    # (source: https://phonopy.github.io/phonopy/setting-tags.html section Thermal properties related tags)
+    #
+    # variant 2:
+    # units kJ/K/mol/unit cell, kJ/mol/unit cell, J/K/mol/unit cell
+    # if the primitive cell matrix is set to None during initialization.
+    #
     phonons = Phonopy(
         phonopy_struct,
         supercell_matrix,
         primitive_matrix=("auto" if automatic_primitive_cell else None)
     )
-    
     phonons.generate_displacements(distance=supercell_displacement)
 
     supercells = phonons.supercells_with_displacements
-    Forces = []
+    force_set = []
     n_supercells = len(supercells)
     n_atoms_unit_cell = len(unit_cell)
     n_atoms_primitive_cell = len(phonons.primitive)
@@ -138,14 +148,19 @@ def phonons(
     print(f"{n_atoms_unit_cell} atoms in the unit cell")
     print(f"{n_atoms_primitive_cell} atoms in the primitive cell")
     print(f"{n_atoms_super_cell} atoms in the supercell")
-    
+    #
+    # Compute second-order dynamic matrix (Hessian)
+    # by numerical differentiation. The force vectors
+    # used to assemble the second derivatives are obtained
+    # from the list of the displaced supercells.
+    #
     start_time = time.time()
     last_time = start_time
     next_print = 10
-
+    
     for i, s in enumerate(supercells, 1):
         forces = calculate_forces(s, calculator)
-        Forces.append(forces)
+        forces_set.append(forces)
         progress = i * 100 // n_supercells
         if progress >= next_print:
             now = time.time()
@@ -158,24 +173,10 @@ def phonons(
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
             
-    phonons._set_forces_energies(Forces,target = "forces")
-    #
-    # Compute second-order dynamic matrix (Hessian)
-    # by numerical differentiation. The force vectors
-    # used to assemble the second derivatives are obtained
-    # from the list of the displaced supercells.
-    #
+    phonons.forces = force_set
     phonons.produce_force_constants()
     phonons.run_mesh(mesh=mesh_radius)
-    #    
-    # Heat capacity, free energy, entropy due to harmonic vibrations
-    # units kJ/(K*mol), kJ/mol, J/(K*mol),
-    # where 1 mol is N_A times number of molecules in primitve cell
-    # (Source: https://phonopy.github.io/phonopy/setting-tags.html section Thermal properties related tags
-    # In this code we do not specive the primitive matrix while constracing phonon class,
-    # than in our code the actual mol is mol of unit cells
-    #
-    phonons.run_thermal_properties(temperatures)
+    phonons.run_thermal_properties(temperatures=temperatures)
     #
     # Phonon density of states
     #
