@@ -92,8 +92,8 @@ def phonons(
         unit_cell,
         calculator,
         supercell_matrix,
-        temperatures=np.arange(0, 1001, 10),
-        supercell_displacement=0.01,
+        temperatures,
+        supercell_displacement,
         mesh_radius=100.0,
         automatic_primitive_cell=True):
 
