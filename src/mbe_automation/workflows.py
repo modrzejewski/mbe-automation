@@ -193,7 +193,7 @@ import h5py
     
 def quasi_harmonic_properties(config: PropertiesConfig):
 
-    print(f"Thermodynamic properties within the quasi-harmonic approximation")
+    mbe_automation.display.framed("Quasi-harmonic approximation")
     print(f"Equation of state: {config.equation_of_state}")
     print(f"Number of volumes: {len(config.pressure_range)}")
     
@@ -202,7 +202,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     if config.symmetrize_unit_cell:
-        unit_cell = mbe_automation.structure.crystal.symmetrize(
+        unit_cell, input_space_group = mbe_automation.structure.crystal.symmetrize(
             config.unit_cell
         )
     else:
