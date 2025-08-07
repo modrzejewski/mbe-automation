@@ -44,7 +44,7 @@ def check_symmetry(
     return spgdata.number, spgdata.international
     
     
-def symmetrize(unit_cell: Atoms, symmetrization_thresh: float = 1.0E-2) -> tuple[Atoms, int]
+def symmetrize(unit_cell: Atoms, symmetrization_thresh: float = 1.0E-2) -> tuple[Atoms, int]:
     """
     Use spglib to remove the geometry optimization artifacts 
     and refine the unit cell to the closest space group.
