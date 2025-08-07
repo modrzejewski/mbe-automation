@@ -26,33 +26,53 @@ def PrintUnitCellParams(unit_cell):
     spgdata = ase.spacegroup.symmetrize.check_symmetry(unit_cell, symprec=tight_symmetry_thresh)
     print(f"Space group {spgdata.number} {spgdata.international}")
 
+
+def check_symmetry(
+        unit_cell: Atoms,
+        symmetry_thresh = 1.0E-5 # tight symmetry tolerance used in Phonopy
+):
+    """
+    Detect space group symmetry.
+
+    Uses spglib
+
+    Sci. Technol. Adv. Mater. Meth. 4, 2384822 (2024);
+    doi: 10.1080/27660400.2024.2384822
+    """
+
+    spgdata = ase.spacegroup.symmetrize.check_symmetry(unit_cell, symprec=symmetry_thresh)
+    return spgdata.number, spgdata.international
     
-def symmetrize(unit_cell: Atoms, symmetrization_thresh: float = 1.0E-2) -> Atoms:
+    
+def symmetrize(unit_cell: Atoms, symmetrization_thresh: float = 1.0E-2) -> tuple[Atoms, int]
     """
     Use spglib to remove the geometry optimization artifacts 
-    and refine the unit cell to the correct spacegroup symmetry.
+    and refine the unit cell to the closest space group.
 
     """
-    tight_symmetry_thresh = 1.0E-6
-    spgdata = ase.spacegroup.symmetrize.check_symmetry(unit_cell, symprec=tight_symmetry_thresh)
-    input_spacegroup_index = spgdata.number
-    input_hmsymbol = spgdata.international
-
+    #
+    # Check the symmetry of the input unit cell
+    # with tight tolerance
+    #
+    input_spacegroup_index, input_hmsymbol = check_symmetry(unit_cell)
+    #
+    # Find the closest space group using
+    # lower symmetrization tolerance
+    #
     sym_unit_cell = unit_cell.copy()
     ase.spacegroup.symmetrize.refine_symmetry(sym_unit_cell, symprec=symmetrization_thresh)
-    spgdata = ase.spacegroup.symmetrize.check_symmetry(sym_unit_cell, symprec=tight_symmetry_thresh)
-    sym_spacegroup_index = spgdata.number
-    sym_hmsymbol = spgdata.international
+    #
+    # Check the symmetry of the symmetrized
+    # cell with tight tolerance
+    #
+    sym_spacegroup_index, sym_hmsymbol = check_symmetry(sym_unit_cell)
 
     if sym_spacegroup_index != input_spacegroup_index:
-        print(f"Refined space group symmetry using spglib with symmetrization threshold {symmetrization_thresh}")
-        print(f"Sci. Technol. Adv. Mater. Meth. 4, 2384822 (2024);")
-        print(f"doi: 10.1080/27660400.2024.2384822")
-        print(f"Refinement: {input_hmsymbol}, {input_spacegroup_index} -> {sym_hmsymbol}, {sym_spacegroup_index}")
+        print(f"Refined space group: [{input_hmsymbol}][{input_spacegroup_index}] → [{sym_hmsymbol}][{sym_spacegroup_index}]")
     else:
-        print(f"Perfect cell symmetry, no refinement needed: {input_hmsymbol}, {input_spacegroup_index}")
+        print(f"Perfect symmetry, no refinement: [{input_hmsymbol}][{input_spacegroup_index}]")
         
-    return sym_unit_cell
+    return sym_unit_cell, sym_spacegroup_index
         
 
 def DetermineSpaceGroupSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-2):
@@ -115,14 +135,14 @@ def supercell_matrix(
     n1 x n2 x n3 super cell with condition 1 satisfied.
     
     The algorithm used here is from the doped library for
-    defect calculations. See ref 1 for demonstration.
+    defect calculations. See ref 1.
     
     1. Kavanagh et al., doped: Python toolkit for robust and
        repeatable charged defect supercell calculations.
        Journal of Open Source Software, 6433, 9 (2024);
        doi: 10.21105/joss.06433
     """
-    print(f"Computing supercell with minimum point-image distance {r_point_image:.1f} Å")
+    print(f"Supercell transformation with minimum point-image radius R={r_point_image:.1f} Å")
     structure = pymatgen.core.structure.Structure(
                 lattice=pymatgen.core.lattice.Lattice(
                     matrix=unit_cell.get_cell(),
@@ -141,7 +161,6 @@ def supercell_matrix(
     )
     supercell = structure.make_supercell(optimal_matrix)
     r = doped.utils.supercells.get_min_image_distance(supercell)
-    print(f"Supercell transformation matrix")
     for i, row in enumerate(optimal_matrix):
         if i == 0:
             print("⎡" + " ".join(f"{num:>3.0f}" for num in row) + " ⎤")
@@ -159,6 +178,9 @@ def supercell(
         r_point_image,
         diagonal=False
 ):
+    """
+    Construct a supercell with a specified point-periodic image distance.
+    """
     transf = supercell_matrix(
         unit_cell,
         r_point_image,

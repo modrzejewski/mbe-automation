@@ -7,6 +7,7 @@ from ase.optimize.precon.lbfgs import PreconLBFGS
 import ase.filters
 import ase.units
 import mbe_automation.structure.crystal
+import mbe_automation.display
 import numpy as np
 
 def atoms_and_cell(unit_cell,
@@ -17,24 +18,31 @@ def atoms_and_cell(unit_cell,
                    symmetrize_final_structure=True,
                    max_force_on_atom=1.0E-3, # eV/Angs/atom
                    max_steps=1000,
-                   log="geometry_opt.txt"
+                   log="geometry_opt.txt",
+                   system_label=None
                    ):
     """
     Optimize atomic positions and lattice vectors simultaneously.
     """
 
-    print("Periodic cell relaxation")
+    if system_label:
+        mbe_automation.display.multiline_framed([
+            "Relaxation",
+            system_label])
+    else:
+        mbe_automation.display.framed("Relaxation")
+        
     print(f"Optimize lattice vectors      {optimize_lattice_vectors}")
     print(f"Optimize volume               {optimize_volume}")
     print(f"Symmetrize relaxed structure  {symmetrize_final_structure}")
     print(f"Max force threshold           {max_force_on_atom:.1e} eV/Å")
-    print(f"Log file                      {log}")
 
     pressure_eV_A3 = pressure_GPa * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
     relaxed_cell = unit_cell.copy()
     relaxed_cell.calc = calculator
     
     if optimize_lattice_vectors:
+        print("Applying Frechet cell filter to optimize atoms and lattice vectors simultaneously")
         opt_structure = ase.filters.FrechetCellFilter(
             relaxed_cell,
             constant_volume=(not optimize_volume),
@@ -54,14 +62,16 @@ def atoms_and_cell(unit_cell,
     )
     if symmetrize_final_structure:
         print("Post-relaxation symmetry refinement")
-        relaxed_cell = mbe_automation.structure.crystal.symmetrize(
+        relaxed_cell, space_group = mbe_automation.structure.crystal.symmetrize(
             relaxed_cell
             )
         relaxed_cell.calc = calculator
+    else:
+        space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_cell)
 
     print("Relaxation completed")
     max_force = np.abs(relaxed_cell.get_forces()).max()
-    print(f"Max force component: {max_force:.6f} eV/Å")
+    print(f"Max residual force component: {max_force:.6f} eV/Å")
 
     if optimize_lattice_vectors:
         stress = relaxed_cell.get_stress(voigt=False)
@@ -74,7 +84,7 @@ def atoms_and_cell(unit_cell,
             max_stress = np.abs(stress).max()
             print(f"Max stress: {max_stress:.6f} eV/Å³")
 
-    return relaxed_cell
+    return relaxed_cell, space_group
 
 
 def atoms(unit_cell,
@@ -82,7 +92,8 @@ def atoms(unit_cell,
           symmetrize_final_structure=True,
           max_force_on_atom=1.0E-3, # eV/Angs/atom
           max_steps=1000,
-          log="geometry_opt.txt"
+          log="geometry_opt.txt",
+          system_label=None
           ):
     """
     Optimize atomic positions within a constant unit cell.
@@ -97,7 +108,8 @@ def atoms(unit_cell,
         symmetrize_final_structure=symmetrize_final_structure,
         max_force_on_atom=max_force_on_atom,
         max_steps=max_steps,
-        log=log
+        log=log,
+        system_label=system_label
     )
 
 
@@ -105,12 +117,22 @@ def isolated_molecule(molecule,
                       calculator,
                       max_force_on_atom=1.0E-3, # eV/Angs/atom
                       max_steps=1000,
-                      log="geometry_opt.txt"
+                      log="geometry_opt.txt",
+                      system_label=None
                       ):
     """
     Optimize atomic coordinates in a gas-phase finite system.
     """
 
+    if system_label:
+        mbe_automation.display.multiline_framed([
+            "Relaxation",
+            system_label])
+    else:
+        mbe_automation.display.framed("Relaxation")
+        
+    print(f"Max force threshold           {max_force_on_atom:.1e} eV/Å")
+    
     relaxed_molecule = molecule.copy()
     relaxed_molecule.calc = calculator
     optimizer = PreconLBFGS(
@@ -121,5 +143,10 @@ def isolated_molecule(molecule,
         fmax=max_force_on_atom,
         steps=max_steps
     )
+
+    print("Relaxation completed")
+    max_force = np.abs(relaxed_molecule.get_forces()).max()
+    print(f"Max residual force component: {max_force:.6f} eV/Å")
+    
     return relaxed_molecule
 

@@ -21,6 +21,8 @@ from pymatgen.analysis.eos import EOS
 import os
 import os.path
 import numpy.polynomial.polynomial as P
+from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
+import sys
 
 def isolated_molecule(
         molecule,
@@ -94,8 +96,11 @@ def phonons(
         supercell_matrix,
         temperatures,
         supercell_displacement,
+        
         mesh_radius=100.0,
-        automatic_primitive_cell=True):
+        automatic_primitive_cell=True,
+        system_label=None
+):
 
     if isinstance(calculator, mace.calculators.MACECalculator):
         cuda_available = torch.cuda.is_available()
@@ -105,7 +110,13 @@ def phonons(
     if cuda_available:
         torch.cuda.reset_peak_memory_stats()
 
-    mbe_automation.display.framed("Phonopy calculation")
+    if system_label:
+        mbe_automation.display.multiline_framed([
+            "Phonons",
+            system_label])
+    else:
+        mbe_automation.display.framed("Phonons")
+        
     print(f"Max displacement Δq={supercell_displacement:.3f} Å")
     
     phonopy_struct = PhonopyAtoms(
@@ -168,7 +179,7 @@ def phonons(
             last_time = now
             next_print += 10
 
-    print("Calculation of force set completed")
+    print("Force set completed")
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
@@ -190,8 +201,67 @@ def phonons(
     return phonons
 
 
+def eos_fit_with_uncertainty(
+        V,
+        E,
+        equation_of_state,
+        mask
+):
+    """
+    Fit energy/free energy/Gibbs enthalpy using a specified
+    analytic formula for E(V).
+
+    Estimate the uncertainty of the fitted parameters
+    by removing a single data point from the fitting
+    set as in
+
+    Flaviano Della Pia et al. Accurate and efficient machine learning
+    interatomic potentials for finite temperature
+    modelling of molecular crystals, Chem. Sci. 16, 11419 (2025);
+    doi: 10.1039/d5sc01325a
+    """
+    
+    min_n_eos = 4
+    n_eos = len(V[mask])
+    if n_eos < min_n_eos:
+        raise ValueError(f"Cannot perform EOS fit: not enough points available (need {min_n_eos}, got {n_eos})")
+    
+    eos = EOS(eos_name=equation_of_state)
+    eos_fit = eos.fit(V[mask], E[mask])
+    E_min = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+    V_min = eos_fit.v0 # Å³/unit cell
+    B = eos_fit.b0_GPa # GPa
+
+    if n_eos > min_n_eos:
+        idx = np.where(mask)[0]
+        E_min_perturbed = np.zeros(n_eos)
+        V_min_perturbed = np.zeros(n_eos)
+        B_perturbed = np.zeros(n_eos)
+        
+        for k in range(n_eos):
+            removed = np.zeros_like(mask, dtype=bool)
+            removed[idx[k]] = True
+            eos_fit = eos.fit(V[mask&~removed], E[mask&~removed])
+            E_min_perturbed[k] = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+            V_min_perturbed[k] = eos_fit.v0 # Å³/unit cell
+            B_perturbed[k] = eos_fit.b0_GPa # GPa
+
+        δE_min = np.abs(E_min_perturbed - E_min).max()
+        δV_min = np.abs(V_min_perturbed - V_min).max()
+        δB = np.abs(B_perturbed - B).max()
+        
+    else:
+
+        δE_min = np.nan
+        δV_min = np.nan
+        δB = np.nan
+
+    return E_min, δE_min, V_min, δV_min, B, δB
+
+
 def equilibrium_curve(
         unit_cell_V0,
+        reference_space_group,
         calculator,
         temperatures,
         supercell_matrix,
@@ -201,7 +271,11 @@ def equilibrium_curve(
         volume_range,
         equation_of_state,
         eos_sampling,
-        symmetrize_unit_cell
+        symmetrize_unit_cell,
+        imaginary_mode_threshold,
+        skip_structures_with_imaginary_modes,
+        skip_structures_with_broken_symmetry,
+        hdf5_dataset
 ):
 
     geom_opt_dir = os.path.join(properties_dir, "geometry_optimization")
@@ -215,12 +289,18 @@ def equilibrium_curve(
     n_atoms_unit_cell = len(unit_cell_V0)
     n_temperatures = len(temperatures)
     V_sampled = np.zeros(n_volumes)
+    space_groups = np.zeros(n_volumes, dtype=int)
+    real_freqs = np.zeros(n_volumes, dtype=bool)
     E_el_V = np.zeros(n_volumes)
     F_vib_V_T = np.zeros((n_volumes, n_temperatures))
     V_eq_T = np.zeros(n_temperatures)
+    δV_eq_T = np.zeros(n_temperatures)
     F_eq_T = np.zeros(n_temperatures)
-    p_eq_T = np.zeros(n_temperatures)
+    δF_eq_T = np.zeros(n_temperatures)
     B_eq_T = np.zeros(n_temperatures)
+    δB_eq_T = np.zeros(n_temperatures)
+    p_eq_T = np.zeros(n_temperatures)
+    system_labels = []
     
     mbe_automation.display.framed("Equation of state")
     print(f"Volume of the reference unit cell: {V0:.3f} Å³/unit cell")
@@ -229,17 +309,20 @@ def equilibrium_curve(
         if eos_sampling == "pressure":
             #
             # Relaxation of geometry under external
-            # pressure
+            # pressure. Volume of the cell will adjust
+            # to the pressure.
             #
             thermal_pressure = pressure_range[i]
-            unit_cell_V = mbe_automation.structure.relax.atoms_and_cell(
+            label = f"unit_cell_eos_p_thermal_{thermal_pressure:.4f}_GPa"
+            unit_cell_V, space_groups[i] = mbe_automation.structure.relax.atoms_and_cell(
                 unit_cell_V0,
                 calculator,
                 pressure_GPa=thermal_pressure,
                 optimize_lattice_vectors=True,
                 optimize_volume=True,
                 symmetrize_final_structure=symmetrize_unit_cell,
-                log=os.path.join(geom_opt_dir, f"unit_cell_pressure={thermal_pressure:.4f}_GPa.txt")
+                log=os.path.join(geom_opt_dir, f"{label}.txt"),
+                system_label=label
             )
         elif eos_sampling == "volume":
             #
@@ -253,43 +336,79 @@ def equilibrium_curve(
                 unit_cell_V0.cell * (V/V0)**(1/3),
                 scale_atoms=True
             )
-            unit_cell_V = mbe_automation.structure.relax.atoms_and_cell(
+            label = f"unit_cell_eos_V_{V/V0:.4f}"
+            unit_cell_V, space_groups[i] = mbe_automation.structure.relax.atoms_and_cell(
                 unit_cell_V,
                 calculator,                
                 pressure_GPa=0.0,
                 optimize_lattice_vectors=True,
                 optimize_volume=False,
                 symmetrize_final_structure=symmetrize_unit_cell,
-                log=os.path.join(geom_opt_dir, f"unit_cell_V={V/V0:.3f}V0.txt")
+                log=os.path.join(geom_opt_dir, f"{label}.txt"),
+                system_label=label
             )
             
+        system_labels.append(label)
         V_sampled[i] = unit_cell_V.get_volume() # Å³/unit cell
         p = phonons(
             unit_cell_V,
             calculator,
             supercell_matrix,
             temperatures,
-            supercell_displacement
+            supercell_displacement,
+            system_label=label
         )
+        has_imaginary_modes = band_structure(
+            p,
+            imaginary_mode_threshold=imaginary_mode_threshold,
+            properties_dir=properties_dir,
+            hdf5_dataset=hdf5_dataset,
+            system_label=label
+        )
+        real_freqs[i] = (not has_imaginary_modes)
         n_atoms_primitive_cell = len(p.primitive)
         alpha = n_atoms_unit_cell / n_atoms_primitive_cell
         thermal_props = p.get_thermal_properties_dict()
         F_vib_V_T[i, :] = thermal_props['free_energy'] * alpha # kJ/mol/unit cell
         E_el_V[i] = unit_cell_V.get_potential_energy() # eV/unit cell
+
+    preserved_symmetry = space_groups == reference_space_group
         
-    eos = EOS(eos_name=equation_of_state)
-    eos_fit = eos.fit(V_sampled, E_el_V)
-    B0 = eos_fit.b0_GPa
-    print(f"Bulk modulus computed from E_el_crystal(V): {B0:.1f} GPa")
+    mask = np.ones(n_volumes, dtype=bool)
+    if skip_structures_with_imaginary_modes:
+        mask = mask & real_freqs
+    if skip_structures_with_broken_symmetry:
+        mask = mask & preserved_symmetry
+    #
+    # Summary of systems included in the EOS fit
+    #
+    print(f"{'#':<5} {'system':<60} {'all frequencies real':<25} "
+          f"{'preserved symmetry':<20} {'space group':<15} {'included in EOS fit':<25}")
+    for i in range(n_volumes):
+        print(f"{i:<5} {system_labels[i]:<60} "
+              f"{'Yes' if real_freqs[i] else 'No':<25} "
+              f"{'Yes' if preserved_symmetry[i] else 'No':<20} "
+              f"{space_groups[i]:<15} "
+              f"{'Yes' if mask[i] else 'No':<25}")
+    print("")
+            
+    _, _, _, _, B0, δB0 = eos_fit_with_uncertainty(
+        V_sampled,
+        E_el_V,
+        equation_of_state,
+        mask
+    )
+    print(f"Bulk modulus computed using E_el_crystal(V): {B0:.1f}±{δB0:.1f} GPa")
     
     for i, T in enumerate(temperatures):
         F_vib_V_eV = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV # eV/unit cell
         F_tot_V = F_vib_V_eV[:] + E_el_V[:] # eV/unit cell
-        eos = EOS(eos_name=equation_of_state)
-        eos_fit = eos.fit(V_sampled, F_tot_V)
-        F_eq_T[i] = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
-        V_eq_T[i] = eos_fit.v0 # Å³/unit cell
-        B_eq_T[i] = eos_fit.b0_GPa # GPa
+        F_eq_T[i], δF_eq_T[i], V_eq_T[i], δV_eq_T[i], B_eq_T[i], δB_eq_T[i] = eos_fit_with_uncertainty(
+            V_sampled,
+            F_tot_V,
+            equation_of_state,
+            mask
+        )
         #
         # Effective pressure (thermal pressure) which forces
         # the equilibrum volume of the unit cell at
@@ -407,6 +526,55 @@ def my_plot_band_structure(phonons, output_path, band_connection=True):
     plt.savefig(output_path, dpi=300, bbox_inches='tight',
                 facecolor='white', edgecolor='none')
     plt.close()
+
+
+def band_structure(
+        phonons,
+        n_points=101,
+        band_connection=True,
+        imaginary_mode_threshold=-0.01,
+        properties_dir="",
+        hdf5_dataset=None,
+        system_label=""
+):
+    """
+    Determine the high-symmetry path through
+    the Brillouin zone using the seekpath
+    library.
+
+    """
+        
+    bands, labels, path_connections = get_band_qpoints_by_seekpath(
+        phonons.primitive,
+        n_points,
+        is_const_interval=True
+    )
+    phonons.run_band_structure(
+        bands,
+        with_eigenvectors=True,            
+        with_group_velocities=False,
+        is_band_connection=band_connection,
+        path_connections=path_connections,
+        labels=labels,
+        is_legacy_plot=False,
+    )
+        
+    plt = phonons.plot_band_structure()
+    plots_dir = os.path.join(properties_dir, "phonon_band_structure")
+    os.makedirs(plots_dir, exist_ok=True)
+    plt.savefig(os.path.join(plots_dir, f"{system_label}.png"))
+    plt.close()
+        
+    min_freq = 0.0
+    n_paths = len(phonons.band_structure.frequencies)
+    for i in range(n_paths):
+        freqs = phonons.band_structure.frequencies[i]
+        kpoints = phonons.band_structure.qpoints[i]
+        min_freq = min(min_freq, np.min(freqs))
+        
+    has_imaginary_modes = (min_freq < imaginary_mode_threshold)
+            
+    return has_imaginary_modes
     
     
 def my_plot_band_structure_first_segment_only(phonons, output_path):
