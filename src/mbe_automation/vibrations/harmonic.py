@@ -575,6 +575,7 @@ def band_structure(
     )
         
     plt = phonons.plot_band_structure()
+    plt.ylim(top=10.0)
     plots_dir = os.path.join(properties_dir, "phonon_band_structure")
     os.makedirs(plots_dir, exist_ok=True)
     plt.savefig(os.path.join(plots_dir, f"{system_label}.png"))

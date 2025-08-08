@@ -412,6 +412,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
 
     relaxed_properties = {
         "V_actual (Å³/unit cell)": V_actual,
+        "V/V₀": V_actual / V0,
         "E_latt (kJ/mol/molecule)": E_latt,
         "ΔEvib (kJ/mol/molecule)": ΔE_vib,
         "ΔHsub (kJ/mol/molecule)": ΔH_sub,
