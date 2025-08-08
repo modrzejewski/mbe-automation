@@ -260,15 +260,16 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         config.supercell_diagonal
     )
     #
-    # Equilibrium properties at temperature T and zero pressure:
+    # Equilibrium properties at temperature T interpolated
+    # using an analytical form of the equation of state:
     #
     # 1. cell volumes V
-    # 2. total free energy F_tot (electronic energy + vibrational energy)
-    # 3. effective thermal pressures p_effective which simulate the effect
+    # 2. total free energies F_tot (electronic energy + vibrational energy)
+    # 3. effective thermal pressures p_thermal, which simulate the effect
     #    of ZPE and thermal motion on the cell relaxation
     # 4. bulk moduli B(T)
     #
-    V_eos, F_tot_crystal_fit, p_effective, B_eq, B0 = mbe_automation.vibrations.harmonic.equilibrium_curve(
+    eos_properties = mbe_automation.vibrations.harmonic.equilibrium_curve(
         unit_cell_V0,
         reference_space_group,
         config.calculator,
@@ -300,7 +301,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     V_actual = np.zeros(n_temperatures)
     space_groups = np.zeros(n_temperatures, dtype=int)
     has_imaginary_modes = np.zeros(n_temperatures, dtype=bool)
-    for i, V in enumerate(V_eos):
+    for i, V in enumerate(eos_properties["V_eos (Å³/unit cell)"]):
         T =  temperatures[i]
         unit_cell_T = unit_cell_V0.copy()
         unit_cell_T.set_cell(
@@ -316,7 +317,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
             unit_cell_T, space_groups[i] = mbe_automation.structure.relax.atoms_and_cell(
                 unit_cell_T,
                 config.calculator,
-                pressure_GPa=p_effective[i],
+                pressure_GPa=eos_properties["p_thermal (GPa)"][i],
                 optimize_lattice_vectors=True,
                 optimize_volume=True,
                 symmetrize_final_structure=config.symmetrize_unit_cell,
@@ -365,9 +366,10 @@ def quasi_harmonic_properties(config: PropertiesConfig):
 
     all_freqs_real = ~has_imaginary_modes
     F_tot_crystal = E_el_crystal + F_vib_crystal
-    F_RMSD_per_atom = np.sqrt(np.mean((F_tot_crystal - F_tot_crystal_fit)**2)) / len(unit_cell_V0)
+    F_tot_crystal_eos = eos_properties["F_tot_crystal_eos (kJ/mol/unit cell)"]
+    F_RMSD_per_atom = np.sqrt(np.mean((F_tot_crystal - F_tot_crystal_eos)**2)) / len(unit_cell_V0)
     F_RMSD_per_atom = F_RMSD_per_atom * (ase.units.kJ/ase.units.mol) / ase.units.eV # eV/atom
-    print(f"RMSD(F_tot_crystal(EOS)) = {F_RMSD_per_atom} eV/atom")
+    print(f"Error in F_tot_crystal due to numerical fit: RMSD={F_RMSD_per_atom} eV/atom")
         
     E_vib_molecule = molecule_properties["vibrational energy (kJ/mol)"] # kJ/mol/molecule
     E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule
@@ -408,10 +410,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
             # 3/2 kT (translation) + kT (PV work)
             ΔH_sub[i] = -E_latt[i] + ΔE_vib[i] + (3/2+1) * kbT    
 
-    df = pd.DataFrame({
-        "T (K)": temperatures,
-        "V_eos (Å³/unit cell)": V_eos,
-        "p_effective (GPa)": p_effective,
+    relaxed_properties = {
         "V_actual (Å³/unit cell)": V_actual,
         "E_latt (kJ/mol/molecule)": E_latt,
         "ΔEvib (kJ/mol/molecule)": ΔE_vib,
@@ -422,19 +421,22 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
         "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,
         "E_el_molecule (kJ/mol/molecule)": E_el_molecule,
-        "B (GPa)": B_eq,
         "space group": space_groups,
         "all frequencies real": all_freqs_real
-    })
+    }        
+
+    df1 = pd.DataFrame(eos_properties)
+    df2 = pd.DataFrame(relaxed_properties)
+    df = pd.concat([df1, df2], axis=1)
 
     with h5py.File(config.hdf5_dataset, "a") as f:
-        group = f.require_group("quasi-harmonic/thermochemistry")
+        group = f.require_group("quasi-harmonic/temperature_dependent_properties")
         for col in df.columns:
             if col in group:
                 del group[col]
             group.create_dataset(col, data=df[col].values, dtype="float64")
 
-    df.round(3).to_csv(os.path.join(config.properties_dir, "quasi_harmonic_thermochemistry.csv"))
+    df.round(3).to_csv(os.path.join(config.properties_dir, "temperature_dependent_properties.csv"))
     
     print(f"Quasi-harmonic calculations completed")
 

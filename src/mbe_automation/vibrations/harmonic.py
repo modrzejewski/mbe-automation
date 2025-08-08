@@ -23,6 +23,7 @@ import os.path
 import numpy.polynomial.polynomial as P
 from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 import sys
+import pandas as pd
 
 def isolated_molecule(
         molecule,
@@ -205,7 +206,8 @@ def eos_fit_with_uncertainty(
         V,
         E,
         equation_of_state,
-        mask
+        mask,
+        estimate_uncertainty=True
 ):
     """
     Fit energy/free energy/Gibbs enthalpy using a specified
@@ -231,17 +233,18 @@ def eos_fit_with_uncertainty(
     E_min = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
     V_min = eos_fit.v0 # Å³/unit cell
     B = eos_fit.b0_GPa # GPa
-
-    if n_eos > min_n_eos:
+    print(f"mask = {mask}")
+    
+    if n_eos > min_n_eos and estimate_uncertainty:
         idx = np.where(mask)[0]
         E_min_perturbed = np.zeros(n_eos)
         V_min_perturbed = np.zeros(n_eos)
-        B_perturbed = np.zeros(n_eos)
-        
+        B_perturbed = np.zeros(n_eos)        
         for k in range(n_eos):
-            removed = np.zeros_like(mask, dtype=bool)
-            removed[idx[k]] = True
-            eos_fit = eos.fit(V[mask&~removed], E[mask&~removed])
+            mask_2 = mask.copy()
+            mask_2[idx[k]] = False
+            print(f"mask_2 = {mask_2}")
+            eos_fit = eos.fit(V[mask_2], E[mask_2])
             E_min_perturbed[k] = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
             V_min_perturbed[k] = eos_fit.v0 # Å³/unit cell
             B_perturbed[k] = eos_fit.b0_GPa # GPa
@@ -293,13 +296,13 @@ def equilibrium_curve(
     real_freqs = np.zeros(n_volumes, dtype=bool)
     E_el_V = np.zeros(n_volumes)
     F_vib_V_T = np.zeros((n_volumes, n_temperatures))
-    V_eq_T = np.zeros(n_temperatures)
-    δV_eq_T = np.zeros(n_temperatures)
-    F_eq_T = np.zeros(n_temperatures)
-    δF_eq_T = np.zeros(n_temperatures)
-    B_eq_T = np.zeros(n_temperatures)
-    δB_eq_T = np.zeros(n_temperatures)
-    p_eq_T = np.zeros(n_temperatures)
+    V_eos = np.zeros(n_temperatures)
+    δV_eos = np.zeros(n_temperatures)
+    F_tot_eos = np.zeros(n_temperatures)
+    δF_tot_eos = np.zeros(n_temperatures)
+    B_eos = np.zeros(n_temperatures)
+    δB_eos = np.zeros(n_temperatures)
+    p_thermal_eos = np.zeros(n_temperatures)
     system_labels = []
     
     mbe_automation.display.framed("Equation of state")
@@ -382,11 +385,11 @@ def equilibrium_curve(
     #
     # Summary of systems included in the EOS fit
     #
-    print(f"{'#':<5} {'system':<60} {'all frequencies real':<25} "
+    print(f"{'system':<30} {'all freqs real':<15} "
           f"{'preserved symmetry':<20} {'space group':<15} {'included in EOS fit':<25}")
     for i in range(n_volumes):
-        print(f"{i:<5} {system_labels[i]:<60} "
-              f"{'Yes' if real_freqs[i] else 'No':<25} "
+        print(f"{system_labels[i]:<30} "
+              f"{'Yes' if real_freqs[i] else 'No':<15} "
               f"{'Yes' if preserved_symmetry[i] else 'No':<20} "
               f"{space_groups[i]:<15} "
               f"{'Yes' if mask[i] else 'No':<25}")
@@ -403,11 +406,12 @@ def equilibrium_curve(
     for i, T in enumerate(temperatures):
         F_vib_V_eV = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV # eV/unit cell
         F_tot_V = F_vib_V_eV[:] + E_el_V[:] # eV/unit cell
-        F_eq_T[i], δF_eq_T[i], V_eq_T[i], δV_eq_T[i], B_eq_T[i], δB_eq_T[i] = eos_fit_with_uncertainty(
+        F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = eos_fit_with_uncertainty(
             V_sampled,
             F_tot_V,
             equation_of_state,
-            mask
+            mask,
+            estimate_uncertainty=False
         )
         #
         # Effective pressure (thermal pressure) which forces
@@ -424,7 +428,7 @@ def equilibrium_curve(
         # at temperature T onto a unit cell relaxation at T=0
         # with external isotropic pressure
         #
-        # p_eq = dFvib/dV 
+        # p_thermal = dFvib/dV 
         #
         # Zero-point vibrational motion and thermal expansion will
         # be included implicitly.
@@ -441,10 +445,21 @@ def equilibrium_curve(
         coeffs = P.polyfit(V_sampled, F_vib_V_eV, 4)
         F_vib_fit = P.Polynomial(coeffs) # eV/unit cell
         dFdV = F_vib_fit.deriv(1) # eV/Å³/unit cell
-        p_eq_T[i] = dFdV(V_eq_T[i]) * (ase.units.eV/ase.units.Angstrom**3)/ase.units.GPa # GPa
+        p_thermal_eos[i] = dFdV(V_eos[i]) * (ase.units.eV/ase.units.Angstrom**3)/ase.units.GPa # GPa
 
-    return V_eq_T, F_eq_T, p_eq_T, B_eq_T, B0
-                
+    equilibrium_properties = {
+        "T (K)": temperatures,
+        "V_eos (Å³/unit cell)": V_eos,
+        "δV_eos (Å³/unit cell)": δV_eos,
+        "p_thermal (GPa)": p_thermal_eos,
+        "F_tot_crystal_eos (kJ/mol/unit cell)": F_tot_eos,
+        "δF_tot_crystal_eos (kJ/mol/unit cell)": δF_tot_eos,
+        "B (GPa)": B_eos,
+        "δB (GPa)": δB_eos
+    }
+
+    return equilibrium_properties
+           
 
 def my_plot_band_structure(phonons, output_path, band_connection=True):
     """Plot only the first segment of the band structure.
