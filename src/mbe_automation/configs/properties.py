@@ -61,6 +61,7 @@ class PropertiesConfig:
                                    # to compute numerical derivatives (Angstrom)
                                    #
     supercell_displacement: float = 0.01
+    symmetrize_force_constants: bool = True
                                    #
                                    # Scaling factors used to sample volumes around
                                    # V0 in quasi-harmonic calculations, where V0 is the

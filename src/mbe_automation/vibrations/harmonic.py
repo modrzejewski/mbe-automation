@@ -97,10 +97,10 @@ def phonons(
         supercell_matrix,
         temperatures,
         supercell_displacement,
-        
+        symmetrize_force_constants=True,
         mesh_radius=100.0,
         automatic_primitive_cell=True,
-        system_label=None
+        system_label=None        
 ):
 
     if isinstance(calculator, mace.calculators.MACECalculator):
@@ -187,6 +187,10 @@ def phonons(
             
     phonons.forces = force_set
     phonons.produce_force_constants()
+    if symmetrize_force_constants:
+        # phonons.symmetrize_force_constants(use_symfc_projector=True)
+        print("Performing symmetrization of force constants")
+        phonons.symmetrize_force_constants_by_space_group()
     phonons.run_mesh(mesh=mesh_radius)
     phonons.run_thermal_properties(temperatures=temperatures)
     #
@@ -374,6 +378,8 @@ def equilibrium_curve(
         thermal_props = p.get_thermal_properties_dict()
         F_vib_V_T[i, :] = thermal_props['free_energy'] * alpha # kJ/mol/unit cell
         E_el_V[i] = unit_cell_V.get_potential_energy() # eV/unit cell
+
+        print(f"Vibrational energy per unit cell {F_vib_V_T}")
 
     preserved_symmetry = space_groups == reference_space_group
         
