@@ -186,7 +186,6 @@ def phonons(
             
     phonons.forces = force_set
     phonons.produce_force_constants(
-        fc_calculator="symfc",
         show_drift=True,
         fc_calculator_log_level=1
     )
