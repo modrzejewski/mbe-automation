@@ -175,11 +175,11 @@ def phonons(
         progress = i * 100 // n_supercells
         if progress >= next_print:
             now = time.time()
-            print(f"Processed {progress}% of supercells (Δt={now - last_time:.1f} s)")
+            print(f"Processed {progress}% of supercells (Δt={now - last_time:.1f} s)", flush=True)
             last_time = now
             next_print += 10
 
-    print("Force set completed")
+    print("Force set completed", flush=True)
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
@@ -189,17 +189,14 @@ def phonons(
         show_drift=True,
         fc_calculator_log_level=1
     )
+    print(f"Force constants completed", flush=True)
+    
     phonons.run_mesh(mesh=mesh_radius)
     phonons.run_thermal_properties(temperatures=temperatures)
     #
     # Phonon density of states
     #
     phonons.run_total_dos()
-    #
-    # Automatically determine the high-symmetry path
-    # through the Brillouin zone
-    #
-    phonons.auto_band_structure()
     
     return phonons
 
@@ -393,7 +390,7 @@ def equilibrium_curve(
     # Summary of systems included in the EOS fit
     #
     print(f"{'system':<30} {'all freqs real':<15} "
-          f"{'preserved symmetry':<20} {'space group':<15} {'included in EOS fit':<25}")
+          f"{'preserved symmetry':<20} {'space group':<15} {'included in EOS':<25}")
     for i in range(n_volumes):
         print(f"{system_labels[i]:<30} "
               f"{'Yes' if real_freqs[i] else 'No':<15} "

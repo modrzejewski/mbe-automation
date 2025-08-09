@@ -38,53 +38,58 @@ def atoms_and_cell(unit_cell,
     print(f"Max force threshold           {max_force_on_atom:.1e} eV/Å")
 
     pressure_eV_A3 = pressure_GPa * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
-    relaxed_cell = unit_cell.copy()
-    relaxed_cell.calc = calculator
+    relaxed_system = unit_cell.copy()
+    relaxed_system.calc = calculator
+    if symmetrize_final_structure:
+        relaxed_system.set_constraint(FixSymmetry(relaxed_system))
     
     if optimize_lattice_vectors:
-        print("Applying Frechet cell filter to optimize atoms and lattice vectors simultaneously")
-        opt_structure = ase.filters.FrechetCellFilter(
-            relaxed_cell,
+        print("Applying Frechet cell filter")
+        atoms_and_lattice = ase.filters.FrechetCellFilter(
+            relaxed_system,
             constant_volume=(not optimize_volume),
             scalar_pressure=pressure_eV_A3
         )
-    else:
-        opt_structure = relaxed_cell
+        optimizer_1 = PreconLBFGS(
+            atoms=atoms_and_lattice,
+            precon=Exp(),
+            logfile=log
+        )
+        optimizer_1.run(
+            fmax=max_force_on_atom,
+            steps=max_steps
+        )
         
-    optimizer = PreconLBFGS(
-        atoms=opt_structure,
+    optimizer_2 = PreconLBFGS(
+        atoms=relaxed_system,
         precon=Exp(),
         logfile=log
     )
-    optimizer.run(
+    optimizer_2.run(
         fmax=max_force_on_atom,
         steps=max_steps
-    )
+    )        
+    space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
+    
     if symmetrize_final_structure:
-        print("Post-relaxation symmetry refinement")
-        relaxed_cell, space_group = mbe_automation.structure.crystal.symmetrize(
-            relaxed_cell
-            )
-        relaxed_cell.calc = calculator
-    else:
-        space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_cell)
+        relaxed_system.set_constraint()
 
-    print("Relaxation completed")
-    max_force = np.abs(relaxed_cell.get_forces()).max()
-    print(f"Max residual force component: {max_force:.6f} eV/Å")
+    print("Relaxation completed", flush=True)
+    max_force = np.abs(relaxed_system.get_forces()).max()
+    print(f"Max residual force component: {max_force:.6f} eV/Å", flush=True)
 
-    if optimize_lattice_vectors:
-        stress = relaxed_cell.get_stress(voigt=False)
-        if not optimize_volume:
-            hydrostatic = np.trace(stress) / 3.0
-            stress_dev = stress - np.eye(3) * hydrostatic  # remove volume-changing part
-            max_stress = np.abs(stress_dev).max()
-            print(f"Max deviatoric stress: {max_stress:.6f} eV/Å³")
-        else:
-            max_stress = np.abs(stress).max()
-            print(f"Max stress: {max_stress:.6f} eV/Å³")
+    # if optimize_lattice_vectors:
+    #     stress = relaxed_cell.get_stress(voigt=False)
+    #     if not optimize_volume:
+    #         hydrostatic = np.trace(stress) / 3.0
+    #         stress_dev = stress - np.eye(3) * hydrostatic  # remove volume-changing part
+    #         max_stress = np.abs(stress_dev).max()
+    #         print(f"Max deviatoric stress: {max_stress:.6f} eV/Å³")
+    #     else:
+    #         max_stress = np.abs(stress).max()
+    #         print(f"Max stress: {max_stress:.6f} eV/Å³")
 
-    return relaxed_cell, space_group
+    return relaxed_system, space_group
 
 
 def atoms(unit_cell,
@@ -144,9 +149,9 @@ def isolated_molecule(molecule,
         steps=max_steps
     )
 
-    print("Relaxation completed")
+    print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_molecule.get_forces()).max()
-    print(f"Max residual force component: {max_force:.6f} eV/Å")
+    print(f"Max residual force component: {max_force:.6f} eV/Å", flush=True)
     
     return relaxed_molecule
 
