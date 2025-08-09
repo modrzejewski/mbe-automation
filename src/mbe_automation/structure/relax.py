@@ -69,7 +69,7 @@ def atoms_and_cell(unit_cell,
         fmax=max_force_on_atom,
         steps=max_steps
     )        
-    space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
+    space_group, space_group_symbol = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
     
     if symmetrize_final_structure:
         relaxed_system.set_constraint()
@@ -77,6 +77,7 @@ def atoms_and_cell(unit_cell,
     print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_system.get_forces()).max()
     print(f"Max residual force component: {max_force:.6f} eV/Å", flush=True)
+    print(f"Space group: [{space_group_symbol}][{space_group}]")
 
     # if optimize_lattice_vectors:
     #     stress = relaxed_cell.get_stress(voigt=False)
