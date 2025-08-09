@@ -28,6 +28,11 @@ class PropertiesConfig:
                                    #
     optimize_lattice_vectors: bool = True
                                    #
+                                   # Threshold for maximum resudual force
+                                   # after geometry relaxation (eV/Angs)
+                                   #
+    max_force_on_atom = 1.0E-4
+                                   #
                                    # Directory to store processed results: plots,
                                    # tables, etc.
                                    #
@@ -61,7 +66,6 @@ class PropertiesConfig:
                                    # to compute numerical derivatives (Angstrom)
                                    #
     supercell_displacement: float = 0.01
-    symmetrize_force_constants: bool = True
                                    #
                                    # Scaling factors used to sample volumes around
                                    # V0 in quasi-harmonic calculations, where V0 is the
@@ -78,7 +82,7 @@ class PropertiesConfig:
                                    # of CRYSTAL
                                    #
     volume_range: list[float] = field(default_factory=lambda:
-                                      [0.97, 0.98, 0.99, 1.00, 1.01, 1.02, 1.03, 1.04, 1.05, 1.06])
+                                      [0.94, 0.96, 0.98, 1.00, 1.02, 1.04, 1.06])
                                    #
                                    # Range of external isotropic pressures applied
                                    # to sample different cell volumes and fit

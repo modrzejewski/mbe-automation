@@ -211,14 +211,12 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     
     if isinstance(config.calculator, mace.calculators.MACECalculator):
         mbe_automation.display.mace_summary(config.calculator)
-    #
-    # Optimize the geometry of the isolated molecule
-    # and the unit cell.
-    #
+
     label = "isolated_molecule"
     molecule = mbe_automation.structure.relax.isolated_molecule(
         molecule,
         config.calculator,
+        max_force_on_atom=config.max_force_on_atom,
         log=os.path.join(geom_opt_dir, f"{label}.txt"),
         system_label=label
     )
@@ -235,6 +233,10 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     unit_cell_V0, reference_space_group = mbe_automation.structure.relax.atoms_and_cell(
         unit_cell,
         config.calculator,
+        optimize_lattice_vectors=True,
+        optimize_volume=True,
+        symmetrize_final_structure=config.symmetrize_unit_cell,
+        max_force_on_atom=config.max_force_on_atom,
         log=os.path.join(geom_opt_dir, f"{label}.txt"),
         system_label=label
     )
@@ -275,6 +277,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         config.calculator,
         config.temperatures,
         supercell_matrix,
+        config.max_force_on_atom,
         config.supercell_displacement,
         config.properties_dir,
         config.pressure_range,
@@ -321,6 +324,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
                 optimize_lattice_vectors=True,
                 optimize_volume=True,
                 symmetrize_final_structure=config.symmetrize_unit_cell,
+                max_force_on_atom=config.max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
@@ -336,6 +340,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
                 optimize_lattice_vectors=True,
                 optimize_volume=False,
                 symmetrize_final_structure=config.symmetrize_unit_cell,
+                max_force_on_atom=config.max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )

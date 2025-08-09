@@ -97,7 +97,6 @@ def phonons(
         supercell_matrix,
         temperatures,
         supercell_displacement,
-        symmetrize_force_constants=True,
         mesh_radius=100.0,
         automatic_primitive_cell=True,
         system_label=None        
@@ -186,11 +185,11 @@ def phonons(
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
             
     phonons.forces = force_set
-    phonons.produce_force_constants()
-    if symmetrize_force_constants:
-        # phonons.symmetrize_force_constants(use_symfc_projector=True)
-        print("Performing symmetrization of force constants")
-        phonons.symmetrize_force_constants_by_space_group()
+    phonons.produce_force_constants(
+        fc_calculator="symfc",
+        show_drift=True,
+        fc_calculator_log_level=1
+    )
     phonons.run_mesh(mesh=mesh_radius)
     phonons.run_thermal_properties(temperatures=temperatures)
     #
@@ -272,6 +271,7 @@ def equilibrium_curve(
         calculator,
         temperatures,
         supercell_matrix,
+        max_force_on_atom,
         supercell_displacement,
         properties_dir,
         pressure_range,
@@ -328,6 +328,7 @@ def equilibrium_curve(
                 optimize_lattice_vectors=True,
                 optimize_volume=True,
                 symmetrize_final_structure=symmetrize_unit_cell,
+                max_force_on_atom=max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
@@ -351,6 +352,7 @@ def equilibrium_curve(
                 optimize_lattice_vectors=True,
                 optimize_volume=False,
                 symmetrize_final_structure=symmetrize_unit_cell,
+                max_force_on_atom=max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
