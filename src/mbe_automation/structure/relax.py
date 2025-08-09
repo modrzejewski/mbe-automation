@@ -42,6 +42,16 @@ def atoms_and_cell(unit_cell,
     relaxed_system.calc = calculator
     if symmetrize_final_structure:
         relaxed_system.set_constraint(FixSymmetry(relaxed_system))
+
+    optimizer = PreconLBFGS(
+        atoms=relaxed_system,
+        precon=Exp(),
+        logfile=log
+    )
+    optimizer.run(
+        fmax=max_force_on_atom,
+        steps=max_steps
+    )
     
     if optimize_lattice_vectors:
         print("Applying Frechet cell filter")
@@ -50,29 +60,21 @@ def atoms_and_cell(unit_cell,
             constant_volume=(not optimize_volume),
             scalar_pressure=pressure_eV_A3
         )
-        optimizer_1 = PreconLBFGS(
+        optimizer = PreconLBFGS(
             atoms=atoms_and_lattice,
             precon=Exp(),
             logfile=log
         )
-        optimizer_1.run(
+        optimizer.run(
             fmax=max_force_on_atom,
             steps=max_steps
         )
         
-    optimizer_2 = PreconLBFGS(
-        atoms=relaxed_system,
-        precon=Exp(),
-        logfile=log
-    )
-    optimizer_2.run(
-        fmax=max_force_on_atom,
-        steps=max_steps
-    )        
-    space_group, space_group_symbol = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
-    
     if symmetrize_final_structure:
-        relaxed_system.set_constraint()
+        relaxed_system, _ = mbe_automation.structure.crystal.symmetrize(relaxed_system)
+        
+    space_group, space_group_symbol = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
+    relaxed_system.set_constraint()
 
     print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_system.get_forces()).max()
