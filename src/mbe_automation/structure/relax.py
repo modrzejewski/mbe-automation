@@ -73,7 +73,6 @@ def atoms_and_cell(unit_cell,
         relaxed_system.calc = calculator
     else:
         space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_cell)
-        relaxed_system.set_constraint()
 
     print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_system.get_forces()).max()

@@ -235,6 +235,20 @@ def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0, n_atoms_unit_cell):
     else:
         raise ValueError(f"Unknown EOS: {equation_of_state}")
 
+    print("Attempting fit")
+    print("Volumes")
+    print(V, flush=True)
+    print("Energies")
+    print(E, flush=True)
+    print("xdata")
+    print(xdata, flush=True)
+    print("ydata")
+    print(ydata, flush=True)
+    print(f"V0 = {V0}")
+    print(f"n_atoms_unit_cell={n_atoms_unit_cell}")
+    print(f"E_el_V0={E_el_V0}")
+    print("--- calling scipy.optimize.curve_fit ----")
+    
     popt, pcov = scipy.optimize.curve_fit(
         eos_func,
         xdata,
@@ -243,8 +257,10 @@ def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0, n_atoms_unit_cell):
     )
     perr = np.sqrt(np.diag(pcov))
 
+
     print("Covariance matrix")
     print(pcov, flush=True)
+    print("---- end of covariance matrix -----")
     
     E_min = (popt[0] * n_atoms_unit_cell + E_el_V0) * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
     δE_min = perr[0] * n_atoms_unit_cell * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell    
