@@ -137,7 +137,8 @@ class PropertiesConfig:
     skip_structures_with_imaginary_modes: bool = True
                                    #
                                    # Remove from the equation of state
-                                   # the structures where symmetry breaks
-                                   # during relaxation
+                                   # the structures with expanded volume
+                                   # if the space group is different from
+                                   # that of the fully relaxed cell at T=0.
                                    #
-    skip_structures_with_broken_symmetry: bool = True
+    skip_structures_with_broken_symmetry: bool = False

@@ -24,6 +24,7 @@ import numpy.polynomial.polynomial as P
 from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 import sys
 import pandas as pd
+import scipy.optimize
 
 def isolated_molecule(
         molecule,
@@ -201,6 +202,60 @@ def phonons(
     return phonons
 
 
+def birch_murnaghan(volume, e0, v0, b0, b1):
+        """BirchMurnaghan equation from PRB 70, 224107."""
+        eta = (v0 / volume) ** (1 / 3)
+        return e0 + 9 * b0 * v0 / 16 * (eta**2 - 1) ** 2 * (6 + b1 * (eta**2 - 1.0) - 4 * eta**2)
+
+    
+def vinet(volume, e0, v0, b0, b1):
+        """Vinet equation from PRB 70, 224107."""
+        eta = (volume / v0) ** (1 / 3)
+        return e0 + 2 * b0 * v0 / (b1 - 1.0) ** 2 * (
+            2 - (5 + 3 * b1 * (eta - 1.0) - 3 * eta) * np.exp(-3 * (b1 - 1.0) * (eta - 1.0) / 2.0)
+        )
+
+def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0, n_atoms_unit_cell):
+    """
+    Fit energy/free energy/Gibbs enthalpy using a specified
+    analytic formula for E(V).
+    """
+    
+    xdata = V / n_atoms_unit_cell
+    ydata = (E - E_el_V0) / n_atoms_unit_cell
+    E_initial = 0.0
+    V_initial = V0 / n_atoms_unit_cell
+    B_initial = 10.0 * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
+    B_prime_initial = 4.0
+
+    if equation_of_state == "vinet":
+        eos_func = vinet
+    elif equation_of_state == "birch_murnaghan":
+        eos_func = birch_murnaghan
+    else:
+        raise ValueError(f"Unknown EOS: {equation_of_state}")
+
+    popt, pcov = scipy.optimize.curve_fit(
+        eos_func,
+        xdata,
+        ydata,
+        p0=np.array([E_initial, V_initial, B_initial, B_prime_initial])
+    )
+    perr = np.sqrt(np.diag(pcov))
+
+    print("Covariance matrix")
+    print(pcov, flush=True)
+    
+    E_min = (popt[0] * n_atoms_unit_cell + E_el_V0) * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+    δE_min = perr[0] * n_atoms_unit_cell * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell    
+    V_min = popt[1] * n_atoms_unit_cell # Å³/unit cell
+    δV_min = perr[1] * n_atoms_unit_cell
+    B_min = popt[2] * (ase.units.eV/ase.units.Angstrom**3)/ase.units.GPa # GPa
+    δB_min = perr[2] * (ase.units.eV/ase.units.Angstrom**3)/ase.units.GPa # GPa
+
+    return E_min, δE_min, V_min, δV_min, B_min, δB_min
+    
+
 def eos_fit_with_uncertainty(
         V,
         E,
@@ -285,6 +340,8 @@ def equilibrium_curve(
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     V0 = unit_cell_V0.get_volume()
+    E_el_V0 = unit_cell_V0.get_potential_energy() # eV/unit cell
+    
     if eos_sampling == "pressure":
         n_volumes = len(pressure_range)
     elif eos_sampling == "volume":
@@ -399,24 +456,42 @@ def equilibrium_curve(
               f"{'Yes' if mask[i] else 'No':<25}")
     print("")
             
-    _, _, _, _, B0, δB0 = eos_fit_with_uncertainty(
-        V_sampled,
-        E_el_V,
+    # _, _, _, _, B0, δB0 = eos_fit_with_uncertainty(
+    #     V_sampled,
+    #     E_el_V,
+    #     equation_of_state,
+    #     mask
+    # )
+    fit_params = eos_curve_fit(
+        V_sampled[mask],
+        E_el_V[mask],
         equation_of_state,
-        mask
+        V0,
+        E_el_V0,
+        n_atoms_unit_cell
     )
-    print(f"Bulk modulus computed using E_el_crystal(V): {B0:.1f}±{δB0:.1f} GPa")
+    _, _, _, _, B0, δB0 = fit_params
+    print(f"Bulk modulus computed using E_el_crystal(V): {B0:.1f}±{δB0:.2f} GPa")
     
     for i, T in enumerate(temperatures):
         F_vib_V_eV = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV # eV/unit cell
         F_tot_V = F_vib_V_eV[:] + E_el_V[:] # eV/unit cell
-        F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = eos_fit_with_uncertainty(
-            V_sampled,
-            F_tot_V,
+        # F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = eos_fit_with_uncertainty(
+        #     V_sampled,
+        #     F_tot_V,
+        #     equation_of_state,
+        #     mask,
+        #     estimate_uncertainty=False
+        # )
+        fit_params = eos_curve_fit(
+            V_sampled[mask],
+            F_tot_V[mask],
             equation_of_state,
-            mask,
-            estimate_uncertainty=False
+            V0,
+            E_el_V0,
+            n_atoms_unit_cell
         )
+        F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = fit_params
         #
         # Effective pressure (thermal pressure) which forces
         # the equilibrum volume of the unit cell at

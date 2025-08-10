@@ -40,18 +40,6 @@ def atoms_and_cell(unit_cell,
     pressure_eV_A3 = pressure_GPa * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
     relaxed_system = unit_cell.copy()
     relaxed_system.calc = calculator
-    if symmetrize_final_structure:
-        relaxed_system.set_constraint(FixSymmetry(relaxed_system))
-
-    optimizer = PreconLBFGS(
-        atoms=relaxed_system,
-        precon=Exp(),
-        logfile=log
-    )
-    optimizer.run(
-        fmax=max_force_on_atom,
-        steps=max_steps
-    )
     
     if optimize_lattice_vectors:
         print("Applying Frechet cell filter")
@@ -65,32 +53,31 @@ def atoms_and_cell(unit_cell,
             precon=Exp(),
             logfile=log
         )
-        optimizer.run(
-            fmax=max_force_on_atom,
-            steps=max_steps
+    else:
+        optimizer = PreconLBFGS(
+            atoms=relaxed_system,
+            precon=Exp(),
+            logfile=log
         )
         
-    if symmetrize_final_structure:
-        relaxed_system, _ = mbe_automation.structure.crystal.symmetrize(relaxed_system)
+    optimizer.run(
+        fmax=max_force_on_atom,
+        steps=max_steps
+    )        
         
-    space_group, space_group_symbol = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
-    relaxed_system.set_constraint()
+    if symmetrize_final_structure:
+        print("Post-relaxation symmetry refinement")
+        relaxed_cell, space_group = mbe_automation.structure.crystal.symmetrize(
+            relaxed_system
+            )
+        relaxed_system.calc = calculator
+    else:
+        space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_cell)
+        relaxed_system.set_constraint()
 
     print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_system.get_forces()).max()
     print(f"Max residual force component: {max_force:.6f} eV/Å", flush=True)
-    print(f"Space group: [{space_group_symbol}][{space_group}]")
-
-    # if optimize_lattice_vectors:
-    #     stress = relaxed_cell.get_stress(voigt=False)
-    #     if not optimize_volume:
-    #         hydrostatic = np.trace(stress) / 3.0
-    #         stress_dev = stress - np.eye(3) * hydrostatic  # remove volume-changing part
-    #         max_stress = np.abs(stress_dev).max()
-    #         print(f"Max deviatoric stress: {max_stress:.6f} eV/Å³")
-    #     else:
-    #         max_stress = np.abs(stress).max()
-    #         print(f"Max stress: {max_stress:.6f} eV/Å³")
 
     return relaxed_system, space_group
 
