@@ -64,8 +64,14 @@ class PropertiesConfig:
                                    #
                                    # Displacement length applied in Phonopy
                                    # to compute numerical derivatives (Angstrom)
-                                   #
+                                   #    
     supercell_displacement: float = 0.01
+                                   #
+                                   # Enable automatic primitive cell determination
+                                   # in Phonopy. If disabled, Phonopy assumes that
+                                   # the input unit cell is the primitive cell.
+                                   #
+    automatic_primitive_cell = False
                                    #
                                    # Scaling factors used to sample volumes around
                                    # V0 in quasi-harmonic calculations, where V0 is the

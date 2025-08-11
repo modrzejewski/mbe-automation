@@ -279,6 +279,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         supercell_matrix,
         config.max_force_on_atom,
         config.supercell_displacement,
+        config.automatic_primitive_cell,
         config.properties_dir,
         config.pressure_range,
         config.volume_range,
@@ -350,6 +351,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
             supercell_matrix,
             [T],
             config.supercell_displacement,
+            automatic_primitive_cell=config.automatic_primitive_cell,
             system_label=label
         )
         has_imaginary_modes[i] = mbe_automation.vibrations.harmonic.band_structure(

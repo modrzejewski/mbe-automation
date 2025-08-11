@@ -354,6 +354,7 @@ def equilibrium_curve(
         supercell_matrix,
         max_force_on_atom,
         supercell_displacement,
+        automatic_primitive_cell,
         properties_dir,
         pressure_range,
         volume_range,
@@ -448,6 +449,7 @@ def equilibrium_curve(
             supercell_matrix,
             temperatures,
             supercell_displacement,
+            automatic_primitive_cell=automatic_primitive_cell,
             system_label=label
         )
         dos = phonon_density_of_states(p)
