@@ -209,6 +209,9 @@ def phonon_density_of_states(p):
         frequencies=p.total_dos.frequency_points,
         densities=p.total_dos.dos
         )
+
+    norm = np.trapezoid(p.total_dos.dos, p.total_dos.frequency_points)
+    print(f"Norm of DOS: {norm}")
     
     return dos
 
