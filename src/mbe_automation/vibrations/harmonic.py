@@ -25,6 +25,7 @@ from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 import sys
 import pandas as pd
 import scipy.optimize
+from pymatgen.phonon.dos import PhononDos
 
 def isolated_molecule(
         molecule,
@@ -55,9 +56,6 @@ def isolated_molecule(
     else:
         raise ValueError(f"Unsupported geometry: {rotor_type}")
     
-    for i, energy in enumerate(vib_energies):
-        print(f"{i:6} {energy}")
-        
     thermo = ase.thermochemistry.HarmonicThermo(vib_energies, ignore_imag_modes=True)
     print(f"Number of imaginary modes: {thermo.n_imag}")
 
@@ -200,6 +198,19 @@ def phonons(
     phonons.run_total_dos()
     
     return phonons
+
+
+def phonon_density_of_states(p):
+
+    p.run_total_dos(
+        use_tetrahedron_method=True
+    )
+    dos = PhononDos(
+        frequencies=p.total_dos.frequency_points,
+        densities=p.total_dos.dos
+        )
+    
+    return dos
 
 
 def birch_murnaghan(volume, e0, v0, b0, b1):
@@ -436,6 +447,7 @@ def equilibrium_curve(
             supercell_displacement,
             system_label=label
         )
+        dos = phonon_density_of_states(p)
         has_imaginary_modes = band_structure(
             p,
             imaginary_mode_threshold=imaginary_mode_threshold,
@@ -448,6 +460,10 @@ def equilibrium_curve(
         alpha = n_atoms_unit_cell / n_atoms_primitive_cell
         thermal_props = p.get_thermal_properties_dict()
         F_vib_V_T[i, :] = thermal_props['free_energy'] * alpha # kJ/mol/unit cell
+        print(f"F_vib_V_T old = {F_vib_V_T[i, :]}")
+        for j, T in enumerate(temperatures):
+            F_vib_V_T[i, j] = dos.helmholtz_free_energy(temp=T) / 1000        
+        print(f"F_vib_V_T new = {F_vib_V_T[i, :]}", flush=True)
         E_el_V[i] = unit_cell_V.get_potential_energy() # eV/unit cell
 
         print(f"Vibrational energy per unit cell {F_vib_V_T}")
