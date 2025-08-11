@@ -244,14 +244,6 @@ def quasi_harmonic_properties(config: PropertiesConfig):
     reference_cell = unit_cell_V0.cell.copy()
     print(f"Volume after full relaxation V₀ = {V0:.2f} Å³/unit cell")
     #
-    # Vibrational contributions to E, S, F of the isolated molecule
-    #
-    molecule_properties = mbe_automation.vibrations.harmonic.isolated_molecule(
-        molecule,
-        config.calculator,
-        config.temperatures
-    )
-    #
     # The supercell transformation is computed here because
     # the shape of the supercell should be kept constant
     # even if we change the volume of the unit cell.
@@ -260,6 +252,29 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         unit_cell_V0,
         config.supercell_radius,
         config.supercell_diagonal
+    )
+    #
+    # Phonon properties of the fully relaxed cell
+    # (the harmonic approximation)
+    #
+    phonons = mbe_automation.vibrations.harmonic.phonons(
+        unit_cell_V0,
+        config.calculator,
+        supercell_matrix,
+        config.temperatures,
+        config.supercell_displacement,
+        automatic_primitive_cell=config.automatic_primitive_cell,
+        system_label=label
+    )
+    interp_mesh = phonons.mesh.mesh_numbers
+    print(f"Fourier interpolation mesh size: {interp_pesh}")
+    #
+    # Vibrational contributions to E, S, F of the isolated molecule
+    #
+    molecule_properties = mbe_automation.vibrations.harmonic.isolated_molecule(
+        molecule,
+        config.calculator,
+        config.temperatures
     )
     #
     # Equilibrium properties at temperature T interpolated
@@ -277,6 +292,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         config.calculator,
         config.temperatures,
         supercell_matrix,
+        interp_mesh,
         config.max_force_on_atom,
         config.supercell_displacement,
         config.automatic_primitive_cell,
@@ -351,6 +367,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
             supercell_matrix,
             [T],
             config.supercell_displacement,
+            interp_mesh=interp_mesh,
             automatic_primitive_cell=config.automatic_primitive_cell,
             system_label=label
         )

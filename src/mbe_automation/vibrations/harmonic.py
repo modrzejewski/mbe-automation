@@ -96,7 +96,7 @@ def phonons(
         supercell_matrix,
         temperatures,
         supercell_displacement,
-        mesh_radius=100.0,
+        interp_mesh=100.0,
         automatic_primitive_cell=True,
         system_label=None        
 ):
@@ -189,12 +189,8 @@ def phonons(
         fc_calculator_log_level=1
     )
     print(f"Force constants completed", flush=True)
-    
-    phonons.run_mesh(mesh=mesh_radius)
+    phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
     phonons.run_thermal_properties(temperatures=temperatures)
-    #
-    # Phonon density of states
-    #
     phonons.run_total_dos()
     
     return phonons
@@ -352,6 +348,7 @@ def equilibrium_curve(
         calculator,
         temperatures,
         supercell_matrix,
+        interp_mesh,
         max_force_on_atom,
         supercell_displacement,
         automatic_primitive_cell,
@@ -446,9 +443,10 @@ def equilibrium_curve(
         p = phonons(
             unit_cell_V,
             calculator,
-            supercell_matrix,
+            supercell_matrix,            
             temperatures,
             supercell_displacement,
+            interp_mesh=interp_mesh,
             automatic_primitive_cell=automatic_primitive_cell,
             system_label=label
         )
@@ -465,10 +463,10 @@ def equilibrium_curve(
         alpha = n_atoms_unit_cell / n_atoms_primitive_cell
         thermal_props = p.get_thermal_properties_dict()
         F_vib_V_T[i, :] = thermal_props['free_energy'] * alpha # kJ/mol/unit cell
-        print(f"F_vib_V_T old = {F_vib_V_T[i, :]}")
-        for j, T in enumerate(temperatures):
-            F_vib_V_T[i, j] = dos.helmholtz_free_energy(temp=T) / 1000        
-        print(f"F_vib_V_T new = {F_vib_V_T[i, :]}", flush=True)
+        # print(f"F_vib_V_T old = {F_vib_V_T[i, :]}")
+        # for j, T in enumerate(temperatures):
+        #     F_vib_V_T[i, j] = dos.helmholtz_free_energy(temp=T) / 1000        
+        # print(f"F_vib_V_T new = {F_vib_V_T[i, :]}", flush=True)
         E_el_V[i] = unit_cell_V.get_potential_energy() # eV/unit cell
 
         print(f"Vibrational energy per unit cell {F_vib_V_T}")
