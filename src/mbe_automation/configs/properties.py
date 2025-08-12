@@ -58,6 +58,20 @@ class PropertiesConfig:
                                    # is computed according to the the minimum
                                    # point-image distance in Angstrom.
                                    #
+                                   # Recommendations:
+                                   #
+                                   # (1) Point-periodic image distance R=24 Angstrom
+                                   #     defines the large supercell for phonon calculations in
+                                   #     Firaha et al., Predicting crystal form stability under
+                                   #     real-world conditions, Nature, 623, 324 (2023);
+                                   #     doi: 10.1038/s41586-023-06587-3
+                                   #
+                                   # (2) R=24 Angstrom provides highly converged results
+                                   #     in force constants fitting, see Figure 2a in 
+                                   #     Zhu et al., A high-throughput framework for
+                                   #     lattice dynamics, Nature Materials, 10, 258 (2024);
+                                   #     doi: 10.1038/s41524-024-01437-w
+                                   #
     supercell_radius: float = 25.0
                                    #
                                    # Diagonal supercell transformation:

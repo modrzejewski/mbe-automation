@@ -43,6 +43,16 @@ def atoms_and_cell(unit_cell,
     
     if optimize_lattice_vectors:
         print("Applying Frechet cell filter")
+        #
+        # Cell filter is required for simultaneous
+        # optimization of atomic positions and cell vectors
+        #
+        # Frechet cell filter gives good convergence
+        # for cell relaxation when used with macine-learning
+        # interatomic potentials, see Table 2 in 
+        # ACS Materials Lett. 7, 2105 (2025);
+        # doi: 10.1021/acsmaterialslett.5c00093
+        #
         atoms_and_lattice = ase.filters.FrechetCellFilter(
             relaxed_system,
             constant_volume=(not optimize_volume),

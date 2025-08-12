@@ -497,8 +497,7 @@ def equilibrium_curve(
         E_el_V[mask],
         equation_of_state,
         V0,
-        E_el_V0,
-        n_atoms_unit_cell
+        E_el_V0
     )
     _, _, _, _, B0, δB0 = fit_params
     print(f"Bulk modulus computed using E_el_crystal(V): {B0:.1f}±{δB0:.2f} GPa")
@@ -517,8 +516,7 @@ def equilibrium_curve(
             F_tot_V[mask],
             equation_of_state,
             V0,
-            E_el_V0,
-            n_atoms_unit_cell
+            E_el_V0
         )
         F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = fit_params
         #
