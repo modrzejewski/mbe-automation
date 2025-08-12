@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
 import mbe_automation.display
-from pymatgen.analysis.eos import EOS
 import os
 import os.path
 import numpy.polynomial.polynomial as P
@@ -276,66 +275,6 @@ def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0):
     return E_min, δE_min, V_min, δV_min, B_min, δB_min
     
 
-def eos_fit_with_uncertainty(
-        V,
-        E,
-        equation_of_state,
-        mask,
-        estimate_uncertainty=True
-):
-    """
-    Fit energy/free energy/Gibbs enthalpy using a specified
-    analytic formula for E(V).
-
-    Estimate the uncertainty of the fitted parameters
-    by removing a single data point from the fitting
-    set as in
-
-    Flaviano Della Pia et al. Accurate and efficient machine learning
-    interatomic potentials for finite temperature
-    modelling of molecular crystals, Chem. Sci. 16, 11419 (2025);
-    doi: 10.1039/d5sc01325a
-    """
-    
-    min_n_eos = 4
-    n_eos = len(V[mask])
-    if n_eos < min_n_eos:
-        raise ValueError(f"Cannot perform EOS fit: not enough points available (need {min_n_eos}, got {n_eos})")
-    
-    eos = EOS(eos_name=equation_of_state)
-    eos_fit = eos.fit(V[mask], E[mask])
-    E_min = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
-    V_min = eos_fit.v0 # Å³/unit cell
-    B = eos_fit.b0_GPa # GPa
-    print(f"mask = {mask}")
-    
-    if n_eos > min_n_eos and estimate_uncertainty:
-        idx = np.where(mask)[0]
-        E_min_perturbed = np.zeros(n_eos)
-        V_min_perturbed = np.zeros(n_eos)
-        B_perturbed = np.zeros(n_eos)        
-        for k in range(n_eos):
-            mask_2 = mask.copy()
-            mask_2[idx[k]] = False
-            print(f"mask_2 = {mask_2}")
-            eos_fit = eos.fit(V[mask_2], E[mask_2])
-            E_min_perturbed[k] = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
-            V_min_perturbed[k] = eos_fit.v0 # Å³/unit cell
-            B_perturbed[k] = eos_fit.b0_GPa # GPa
-
-        δE_min = np.abs(E_min_perturbed - E_min).max()
-        δV_min = np.abs(V_min_perturbed - V_min).max()
-        δB = np.abs(B_perturbed - B).max()
-        
-    else:
-
-        δE_min = np.nan
-        δV_min = np.nan
-        δB = np.nan
-
-    return E_min, δE_min, V_min, δV_min, B, δB
-
-
 def equilibrium_curve(
         unit_cell_V0,
         reference_space_group,
@@ -457,13 +396,7 @@ def equilibrium_curve(
         alpha = n_atoms_unit_cell / n_atoms_primitive_cell
         thermal_props = p.get_thermal_properties_dict()
         F_vib_V_T[i, :] = thermal_props['free_energy'] * alpha # kJ/mol/unit cell
-        # print(f"F_vib_V_T old = {F_vib_V_T[i, :]}")
-        # for j, T in enumerate(temperatures):
-        #     F_vib_V_T[i, j] = dos.helmholtz_free_energy(temp=T) / 1000        
-        # print(f"F_vib_V_T new = {F_vib_V_T[i, :]}", flush=True)
         E_el_V[i] = unit_cell_V.get_potential_energy()*ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
-
-        print(f"Vibrational energy per unit cell {F_vib_V_T}")
 
     preserved_symmetry = space_groups == reference_space_group
         
@@ -483,14 +416,8 @@ def equilibrium_curve(
               f"{'Yes' if preserved_symmetry[i] else 'No':<20} "
               f"{space_groups[i]:<15} "
               f"{'Yes' if mask[i] else 'No':<25}")
-    print("")
-            
-    # _, _, _, _, B0, δB0 = eos_fit_with_uncertainty(
-    #     V_sampled,
-    #     E_el_V,
-    #     equation_of_state,
-    #     mask
-    # )
+    print("", flush=True)
+
     fit_params = eos_curve_fit(
         V_sampled[mask],
         E_el_V[mask],
@@ -503,13 +430,6 @@ def equilibrium_curve(
     
     for i, T in enumerate(temperatures):
         F_tot_V = F_vib_V_T[:, i] + E_el_V[:] # kJ/mol/unit cell
-        # F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = eos_fit_with_uncertainty(
-        #     V_sampled,
-        #     F_tot_V,
-        #     equation_of_state,
-        #     mask,
-        #     estimate_uncertainty=False
-        # )
         fit_params = eos_curve_fit(
             V_sampled[mask],
             F_tot_V[mask],
