@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
-from typing import Any, List, Literal
+from typing import Any, List, Literal, Union
 from ase import Atoms
 import numpy as np
+import numpy.typing as npt
 
 @dataclass
 class PropertiesConfig:
@@ -9,6 +10,15 @@ class PropertiesConfig:
     unit_cell: Atoms
     molecule: Atoms
     calculator: Any
+                                   #
+                                   # Level of theory
+                                   #
+    theory_level: Literal["harmonic", "quasi-harmonic"] = "quasi-harmonic"
+                                   #
+                                   # Fourier interpolation mesh used to
+                                   # perform integration over the Brillouin zone
+                                   #
+    fourier_interpolation_mesh: npt.NDArray[np.float64] | float | np.floating = 200.0
                                    #
                                    # Range of temperatures at which phonons
                                    # and thermodynamic properties are computed

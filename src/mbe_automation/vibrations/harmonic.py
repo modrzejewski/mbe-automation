@@ -225,17 +225,17 @@ def vinet(volume, e0, v0, b0, b1):
             2 - (5 + 3 * b1 * (eta - 1.0) - 3 * eta) * np.exp(-3 * (b1 - 1.0) * (eta - 1.0) / 2.0)
         )
 
-def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0, n_atoms_unit_cell):
+def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0):
     """
     Fit energy/free energy/Gibbs enthalpy using a specified
     analytic formula for E(V).
     """
     
-    xdata = V / n_atoms_unit_cell
-    ydata = (E - E_el_V0) / n_atoms_unit_cell
+    xdata = V
+    ydata = E - E_el_V0
     E_initial = 0.0
-    V_initial = V0 / n_atoms_unit_cell
-    B_initial = 10.0 * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
+    V_initial = V0
+    B_initial = 10.0 * ase.units.GPa/(ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)
     B_prime_initial = 4.0
 
     if equation_of_state == "vinet":
@@ -266,18 +266,13 @@ def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0, n_atoms_unit_cell):
         p0=np.array([E_initial, V_initial, B_initial, B_prime_initial])
     )
     perr = np.sqrt(np.diag(pcov))
-
-
-    print("Covariance matrix")
-    print(pcov, flush=True)
-    print("---- end of covariance matrix -----")
     
-    E_min = (popt[0] * n_atoms_unit_cell + E_el_V0) * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
-    δE_min = perr[0] * n_atoms_unit_cell * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell    
-    V_min = popt[1] * n_atoms_unit_cell # Å³/unit cell
-    δV_min = perr[1] * n_atoms_unit_cell
-    B_min = popt[2] * (ase.units.eV/ase.units.Angstrom**3)/ase.units.GPa # GPa
-    δB_min = perr[2] * (ase.units.eV/ase.units.Angstrom**3)/ase.units.GPa # GPa
+    E_min = popt[0] + E_el_V0 # kJ/mol/unit cell
+    δE_min = perr[0] # kJ/mol/unit cell    
+    V_min = popt[1] # Å³/unit cell
+    δV_min = perr[1] # Å³/unit cell
+    B_min = popt[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
+    δB_min = perr[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
 
     return E_min, δE_min, V_min, δV_min, B_min, δB_min
     
@@ -368,7 +363,7 @@ def equilibrium_curve(
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     V0 = unit_cell_V0.get_volume()
-    E_el_V0 = unit_cell_V0.get_potential_energy() # eV/unit cell
+    E_el_V0 = unit_cell_V0.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
     
     if eos_sampling == "pressure":
         n_volumes = len(pressure_range)
@@ -467,7 +462,7 @@ def equilibrium_curve(
         # for j, T in enumerate(temperatures):
         #     F_vib_V_T[i, j] = dos.helmholtz_free_energy(temp=T) / 1000        
         # print(f"F_vib_V_T new = {F_vib_V_T[i, :]}", flush=True)
-        E_el_V[i] = unit_cell_V.get_potential_energy() # eV/unit cell
+        E_el_V[i] = unit_cell_V.get_potential_energy()*ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
 
         print(f"Vibrational energy per unit cell {F_vib_V_T}")
 
@@ -509,8 +504,7 @@ def equilibrium_curve(
     print(f"Bulk modulus computed using E_el_crystal(V): {B0:.1f}±{δB0:.2f} GPa")
     
     for i, T in enumerate(temperatures):
-        F_vib_V_eV = F_vib_V_T[:, i] * (ase.units.kJ/ase.units.mol)/ase.units.eV # eV/unit cell
-        F_tot_V = F_vib_V_eV[:] + E_el_V[:] # eV/unit cell
+        F_tot_V = F_vib_V_T[:, i] + E_el_V[:] # kJ/mol/unit cell
         # F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = eos_fit_with_uncertainty(
         #     V_sampled,
         #     F_tot_V,
@@ -556,10 +550,10 @@ def equilibrium_curve(
         # Quartic polynomial fit to Fvib(V),
         # see fig 2 in Otero-de-la-Roza et al.
         #
-        coeffs = P.polyfit(V_sampled, F_vib_V_eV, 4)
-        F_vib_fit = P.Polynomial(coeffs) # eV/unit cell
-        dFdV = F_vib_fit.deriv(1) # eV/Å³/unit cell
-        p_thermal_eos[i] = dFdV(V_eos[i]) * (ase.units.eV/ase.units.Angstrom**3)/ase.units.GPa # GPa
+        coeffs = P.polyfit(V_sampled, F_vib_V_T[:, i], 4)
+        F_vib_fit = P.Polynomial(coeffs) # kJ/mol/unit cell
+        dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
+        p_thermal_eos[i] = dFdV(V_eos[i]) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
 
     equilibrium_properties = {
         "T (K)": temperatures,

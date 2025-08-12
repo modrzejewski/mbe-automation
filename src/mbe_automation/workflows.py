@@ -263,11 +263,12 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         supercell_matrix,
         config.temperatures,
         config.supercell_displacement,
+        interp_mesh=config.fourier_interpolation_mesh,
         automatic_primitive_cell=config.automatic_primitive_cell,
         system_label=label
     )
     interp_mesh = phonons.mesh.mesh_numbers
-    print(f"Fourier interpolation mesh size: {interp_mesh}")
+    print(f"Fourier interpolation mesh: {interp_mesh[0]}×{interp_mesh[1]}×{interp_mesh[2]}")
     #
     # Vibrational contributions to E, S, F of the isolated molecule
     #
