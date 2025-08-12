@@ -267,7 +267,7 @@ def quasi_harmonic_properties(config: PropertiesConfig):
         system_label=label
     )
     interp_mesh = phonons.mesh.mesh_numbers
-    print(f"Fourier interpolation mesh size: {interp_pesh}")
+    print(f"Fourier interpolation mesh size: {interp_mesh}")
     #
     # Vibrational contributions to E, S, F of the isolated molecule
     #
