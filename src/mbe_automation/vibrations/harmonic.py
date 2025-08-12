@@ -255,7 +255,6 @@ def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0):
     print("ydata")
     print(ydata, flush=True)
     print(f"V0 = {V0}")
-    print(f"n_atoms_unit_cell={n_atoms_unit_cell}")
     print(f"E_el_V0={E_el_V0}")
     print("--- calling scipy.optimize.curve_fit ----")
     

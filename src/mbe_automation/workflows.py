@@ -194,8 +194,6 @@ import h5py
 def quasi_harmonic_properties(config: PropertiesConfig):
 
     mbe_automation.display.framed("Quasi-harmonic approximation")
-    print(f"Equation of state: {config.equation_of_state}")
-    print(f"Number of volumes: {len(config.pressure_range)}")
     
     os.makedirs(config.properties_dir, exist_ok=True)
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
