@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
 import mbe_automation.display
+import mbe_automation.hdf5
 import os
 import os.path
 import numpy.polynomial.polynomial as P

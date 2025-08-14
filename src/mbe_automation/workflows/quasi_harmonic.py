@@ -12,6 +12,7 @@ import ase.units
 import numpy as np
 import pandas as pd
 import h5py
+import mbe_automation.hdf5
 
 
 def run(config: PropertiesConfig):
