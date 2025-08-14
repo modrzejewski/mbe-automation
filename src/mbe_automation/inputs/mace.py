@@ -6,9 +6,9 @@ import sys
 import os
 import numpy as np
 
-def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell, ModelDirectory):
+def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell, mlip_parameters):
 
-    for task in ["training", "properties"]:
+    for workflow in ["training_dataset", "quasi_harmonic"]:
         Method = "MACE"
         WithoutGhosts, WithGhosts = mbe_automation.directory_structure.FindMonomerXYZ(XYZDirs["monomers-supercell"])
         RelaxedMonomers, _ = mbe_automation.directory_structure.FindMonomerXYZ(XYZDirs["monomers-relaxed"])
@@ -34,23 +34,23 @@ def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemp
                 os.path.join(XYZDirs["monomers-relaxed"], RelaxedMonomers[Ref]),
                 PBCJobDir
             ),
-            "mace_model": os.path.relpath(ModelDirectory),
-            "inp_script" : f"{task}.py",
-            "log_file" : f"{task}.log"
+            "mlip_parameters": os.path.relpath(mlip_parameters),
+            "inp_script" : f"{workflow}.py",
+            "log_file" : f"{workflow}.txt"
         }
     
-        f = open(InputTemplates[task], "r")
+        f = open(InputTemplates[workflow], "r")
         s = f.read()
         f.close()
         PBCInput = s.format(**PBCJobParams)
-        with open(os.path.join(PBCJobDir, f"{task}.py"), "w") as f:
+        with open(os.path.join(PBCJobDir, f"{workflow}.py"), "w") as f:
             f.write(PBCInput)
 
         for device in ["cpu", "gpu"]:
             with open(QueueTemplate[device], "r") as f:
                 s = f.read()
                 PBCQueue = s.format(**PBCJobParams)
-            with open(os.path.join(PBCJobDir, f"submit_{task}_{device}.py"), "w") as f:
+            with open(os.path.join(PBCJobDir, f"submit_{workflow}_{device}.py"), "w") as f:
                 f.write(PBCQueue) 
 
 

@@ -171,4 +171,4 @@ class PropertiesConfig:
                                    # if the space group is different from
                                    # that of the fully relaxed cell at T=0.
                                    #
-    skip_structures_with_broken_symmetry: bool = False
+    skip_structures_with_broken_symmetry: bool = True

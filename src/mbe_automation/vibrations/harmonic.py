@@ -24,7 +24,6 @@ from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 import sys
 import pandas as pd
 import scipy.optimize
-from pymatgen.phonon.dos import PhononDos
 
 def isolated_molecule(
         molecule,
@@ -93,7 +92,6 @@ def phonons(
         unit_cell,
         calculator,
         supercell_matrix,
-        temperatures,
         supercell_displacement,
         interp_mesh=100.0,
         automatic_primitive_cell=True,
@@ -188,27 +186,10 @@ def phonons(
         fc_calculator_log_level=1
     )
     print(f"Force constants completed", flush=True)
+    
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
-    phonons.run_thermal_properties(temperatures=temperatures)
-    phonons.run_total_dos()
     
     return phonons
-
-
-def phonon_density_of_states(p):
-
-    p.run_total_dos(
-        use_tetrahedron_method=True
-    )
-    dos = PhononDos(
-        frequencies=p.total_dos.frequency_points,
-        densities=p.total_dos.dos
-        )
-
-    norm = np.trapezoid(p.total_dos.dos, p.total_dos.frequency_points)
-    print(f"Norm of DOS: {norm}")
-    
-    return dos
 
 
 def birch_murnaghan(volume, e0, v0, b0, b1):
@@ -377,13 +358,11 @@ def equilibrium_curve(
             unit_cell_V,
             calculator,
             supercell_matrix,            
-            temperatures,
             supercell_displacement,
             interp_mesh=interp_mesh,
             automatic_primitive_cell=automatic_primitive_cell,
             system_label=label
         )
-        dos = phonon_density_of_states(p)
         has_imaginary_modes = band_structure(
             p,
             imaginary_mode_threshold=imaginary_mode_threshold,
@@ -391,15 +370,11 @@ def equilibrium_curve(
             hdf5_dataset=hdf5_dataset,
             system_label=label
         )
-        real_freqs[i] = (not has_imaginary_modes)
-        n_atoms_primitive_cell = len(p.primitive)
-        alpha = n_atoms_unit_cell / n_atoms_primitive_cell
-        thermal_props = p.get_thermal_properties_dict()
-        F_vib_V_T[i, :] = thermal_props['free_energy'] * alpha # kJ/mol/unit cell
+        real_freqs[i] = (not has_imaginary_modes)        
+        F_vib_V_T[i, :] = phonon_properties(p, temperatures)["F_vib_crystal (kJ/mol/unit cell)"]
         E_el_V[i] = unit_cell_V.get_potential_energy()*ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
 
     preserved_symmetry = space_groups == reference_space_group
-        
     mask = np.ones(n_volumes, dtype=bool)
     if skip_structures_with_imaginary_modes:
         mask = mask & real_freqs
@@ -616,6 +591,36 @@ def band_structure(
     has_imaginary_modes = (min_freq < imaginary_mode_threshold)
             
     return has_imaginary_modes
+
+
+def phonon_properties(phonons, temperatures):
+    """
+    Physical properties derived from the harmonic model
+    of crystal vibrations.
+    """
+    n_atoms_unit_cell = len(phonons.unitcell)
+    n_atoms_primitive_cell = len(phonons.primitive)
+    alpha = n_atoms_unit_cell/n_atoms_primitive_cell
+    
+    phonons.run_thermal_properties(temperatures=temperatures)
+    _, F_vib_crystal, S_vib_crystal, Cv_vib_crystal = phonons.thermal_properties.thermal_properties
+    
+    ZPE_crystal = phonons.thermal_properties.zero_point_energy * alpha # kJ/mol/unit cell
+    F_vib_crystal *= alpha # kJ/mol/unit cell
+    S_vib_crystal *= alpha # J/K/mol/unit cell
+    Cv_vib_crystal *= alpha # J/K/mol/unit cell
+    E_vib_crystal = F_vib_crystal + temperatures * S_vib_crystal / 1000 # kJ/mol/unit cell
+
+    properties = {
+        "T (K)": temperatures,
+        "F_vib_crystal (kJ/mol/unit cell)": F_vib_crystal,
+        "S_vib_crystal (J/K/mol/unit cell)": S_vib_crystal,
+        "E_vib_crystal (kJ/mol/unit cell)": E_vib_crystal,
+        "ZPE_crystal (kJ/mol/unit cell)": ZPE_crystal,
+        "Cv_vib_crystal (J/K/mol/unit cell)": Cv_vib_crystal
+    }
+
+    return properties
     
     
 def my_plot_band_structure_first_segment_only(phonons, output_path):
