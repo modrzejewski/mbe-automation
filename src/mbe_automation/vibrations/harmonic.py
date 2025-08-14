@@ -69,10 +69,10 @@ def isolated_molecule(
         E_vib[i] = thermo.get_internal_energy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol
         
     return {
-        "vibrational energy (kJ/mol)": E_vib,
-        "vibrational entropy (J/K/mol)": S_vib,
-        "vibrational Helmholtz free energy (kJ/mol)": F_vib,
-        "zero-point energy (kJ/mol)": ZPE
+        "E_vib_molecule (kJ/mol/molecule)": E_vib,
+        "S_vib_molecule (J/K/mol/molecule)": S_vib,
+        "F_vib_molecule (kJ/mol/molecule)": F_vib,
+        "ZPE_molecule (kJ/mol/molecule)": ZPE # note that this is a scalar, not an array
         }
     
 
@@ -225,19 +225,6 @@ def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0):
     else:
         raise ValueError(f"Unknown EOS: {equation_of_state}")
 
-    print("Attempting fit")
-    print("Volumes")
-    print(V, flush=True)
-    print("Energies")
-    print(E, flush=True)
-    print("xdata")
-    print(xdata, flush=True)
-    print("ydata")
-    print(ydata, flush=True)
-    print(f"V0 = {V0}")
-    print(f"E_el_V0={E_el_V0}")
-    print("--- calling scipy.optimize.curve_fit ----")
-    
     popt, pcov = scipy.optimize.curve_fit(
         eos_func,
         xdata,
@@ -616,7 +603,7 @@ def phonon_properties(phonons, temperatures):
         "F_vib_crystal (kJ/mol/unit cell)": F_vib_crystal,
         "S_vib_crystal (J/K/mol/unit cell)": S_vib_crystal,
         "E_vib_crystal (kJ/mol/unit cell)": E_vib_crystal,
-        "ZPE_crystal (kJ/mol/unit cell)": ZPE_crystal,
+        "ZPE_crystal (kJ/mol/unit cell)": ZPE_crystal, # note that this is a scalar, not an array
         "Cv_vib_crystal (J/K/mol/unit cell)": Cv_vib_crystal
     }
 

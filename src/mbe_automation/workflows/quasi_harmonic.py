@@ -125,6 +125,11 @@ def run(config: PropertiesConfig):
         config.calculator,
         config.temperatures
     )
+    E_vib_molecule = molecule_properties["E_vib_molecule (kJ/mol/molecule)"]
+    S_vib_molecule = molecule_properties["S_vib_molecule (J/K/mol/molecule)"]
+    F_vib_molecule = molecule_properties["F_vib_molecule (kJ/mol/molecule)"]
+    ZPE_molecule = molecule_properties["ZPE_molecule (kJ/mol/molecule)"]
+    E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule
     #
     # Equilibrium properties at temperature T interpolated
     # using an analytical form of the equation of state:
@@ -236,7 +241,7 @@ def run(config: PropertiesConfig):
         F_vib_crystal[i] = properties_at_T["F_vib_crystal (kJ/mol/unit cell)"][0]
         S_vib_crystal[i] = properties_at_T["S_vib_crystal (J/K/mol/unit cell)"][0]
         E_vib_crystal[i] = properties_at_T["E_vib_crystal (kJ/mol/unit cell)"][0]
-        ZPE_crystal[i] = properties_at_T["ZPE_crystal (kJ/mol/unit cell)"][0]
+        ZPE_crystal[i] = properties_at_T["ZPE_crystal (kJ/mol/unit cell)"]
         Cv_vib_crystal[i] = properties_at_T["Cv_vib_crystal (J/K/mol/unit cell)"][0]
         E_el_crystal[i] = E_el_crystal_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
         V_actual[i] = unit_cell_T.get_volume() # Å³/unit cell
@@ -245,10 +250,7 @@ def run(config: PropertiesConfig):
     F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
     F_tot_crystal_eos = eos_properties["F_tot_crystal_eos (kJ/mol/unit cell)"]
     F_RMSD_per_atom = np.sqrt(np.mean((F_tot_crystal - F_tot_crystal_eos)**2)) / n_atoms_unit_cell
-    print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom} kJ/mol/atom")
-        
-    E_vib_molecule = molecule_properties["vibrational energy (kJ/mol)"] # kJ/mol/molecule
-    E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule
+    print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom} kJ/mol/atom")        
     #
     # Vibrational energy, lattice energy, and sublimation enthalpy
     # defined as in ref 1. Additional definitions in ref 2.
@@ -299,10 +301,13 @@ def run(config: PropertiesConfig):
         "ZPE_crystal (kJ/mol/unit cell)": ZPE_crystal,
         "Cv_vib_crystal (J/K/mol/unit cell)": Cv_vib_crystal,
         "F_tot_crystal (kJ/mol/unit cell)": F_tot_crystal,
-        "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,
+        "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,        
         "E_el_molecule (kJ/mol/molecule)": E_el_molecule,
-        "space group": space_groups,
-        "all frequencies real": all_freqs_real,
+        "S_vib_molecule (kJ/mol/molecule)": S_vib_molecule,
+        "F_vib_molecule (kJ/mol/molecule)": F_vib_molecule,
+        "ZPE_molecule (kJ/mol/molecule)": ZPE_molecule,
+        "space_group": space_groups,
+        "all_freqs_real_crystal": all_freqs_real,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "n_atoms_molecule": n_atoms_molecule
     }
