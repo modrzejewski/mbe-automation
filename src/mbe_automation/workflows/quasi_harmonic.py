@@ -11,16 +11,12 @@ import os.path
 import ase.units
 import numpy as np
 import pandas as pd
-import h5py
 import mbe_automation.hdf5
 
 
 def run(config: PropertiesConfig):
 
-    if config.theory_level == "quasi-harmonic":
-        mbe_automation.display.framed("Quasi-harmonic approximation")
-    elif config.theory_level == "harmonic":
-        mbe_automation.display.framed("Harmonic approximation")
+    mbe_automation.display.framed("Quasi-harmonic approximation")
     
     os.makedirs(config.properties_dir, exist_ok=True)
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
@@ -94,7 +90,6 @@ def run(config: PropertiesConfig):
         automatic_primitive_cell=config.automatic_primitive_cell,
         system_label=label
     )
-
     has_imaginary_modes_V0 = mbe_automation.vibrations.harmonic.band_structure(
         phonons,
         imaginary_mode_threshold=config.imaginary_mode_threshold,
@@ -112,12 +107,7 @@ def run(config: PropertiesConfig):
     harmonic_properties = mbe_automation.vibrations.harmonic.phonon_properties(
         phonons,
         config.temperatures
-    )
-    
-    harmonic_df = pd.DataFrame(harmonic_properties)
-    harmonic_df["V (Å³/unit cell)"] = V0
-    harmonic_df["space group"] = space_group_V0
-    harmonic_df["all frequencies real"] = all_freqs_real_V0
+    )    
     #
     # Vibrational contributions to E, S, F of the isolated molecule
     #
@@ -126,11 +116,53 @@ def run(config: PropertiesConfig):
         config.calculator,
         config.temperatures
     )
+    n_atoms_molecule = len(molecule)
+    E_vib_crystal = harmonic_properties["E_vib_crystal (kJ/mol/unit cell)"]
+    F_vib_crystal = harmonic_properties["F_vib_crystal (kJ/mol/unit cell)"]
     E_vib_molecule = molecule_properties["E_vib_molecule (kJ/mol/molecule)"]
     S_vib_molecule = molecule_properties["S_vib_molecule (J/K/mol/molecule)"]
     F_vib_molecule = molecule_properties["F_vib_molecule (kJ/mol/molecule)"]
     ZPE_molecule = molecule_properties["ZPE_molecule (kJ/mol/molecule)"]
-    E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule
+    E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule    
+    E_el_crystal = unit_cell_V0.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+    F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
+    E_trans_molecule = molecule_properties["E_trans_molecule (kJ/mol/molecule)"]
+    E_rot_molecule = molecule_properties["E_rot_molecule (kJ/mol/molecule)"]
+    pV_molecule = molecule_properties["pV_molecule (kJ/mol/molecule)"]
+
+    beta = n_atoms_molecule / n_atoms_unit_cell
+    E_latt = E_el_crystal * beta - E_el_molecule # kJ/mol/molecule
+    ΔE_vib = E_vib_molecule - E_vib_crystal * beta # kJ/mol/molecule
+    ΔH_sub = -E_latt + ΔE_vib + E_trans_molecule + E_rot_molecule + pV_molecule # kJ/mol/molecule
+
+    df1 = pd.DataFrame(harmonic_properties)
+    df2 = pd.DataFrame({
+        "E_latt (kJ/mol/molecule)": E_latt,
+        "ΔEvib (kJ/mol/molecule)": ΔE_vib,
+        "ΔHsub (kJ/mol/molecule)": ΔH_sub,
+        "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
+        "F_tot_crystal (kJ/mol/unit cell)": F_tot_crystal,
+        "V (Å³/unit cell)": V0,
+        "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,        
+        "E_el_molecule (kJ/mol/molecule)": E_el_molecule,
+        "S_vib_molecule (J/K/mol/molecule)": S_vib_molecule,
+        "F_vib_molecule (kJ/mol/molecule)": F_vib_molecule,
+        "ZPE_molecule (kJ/mol/molecule)": ZPE_molecule,
+        "E_rot_molecule (kJ/mol/molecule)": E_rot_molecule,
+        "E_trans_molecule (kJ/mol/molecule)": E_trans_molecule,
+        "pV_molecule (kJ/mol/molecule)": pV_molecule,
+        "space group": space_group_V0,
+        "all_freqs_real_crystal": all_freqs_real_V0,
+        "n_atoms_unit_cell": n_atoms_unit_cell,
+        "n_atoms_molecule": n_atoms_molecule
+    })
+    df_harmonic = pd.concat([df1, df2], axis=1)
+    mbe_automation.hdf5.save_dataframe(
+        df_harmonic,
+        config.hdf5_dataset,
+        group_path="quasi_harmonic/no_volume_expansion"
+    )
+    df_harmonic.to_csv(os.path.join(config.properties_dir, "no_volume_expansion.csv"))
     #
     # Equilibrium properties at temperature T interpolated
     # using an analytical form of the equation of state:
@@ -247,11 +279,11 @@ def run(config: PropertiesConfig):
         E_el_crystal[i] = E_el_crystal_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
         V_actual[i] = unit_cell_T.get_volume() # Å³/unit cell
 
-    all_freqs_real = np.logical_not(has_imaginary_modes)
+    all_freqs_real_crystal = np.logical_not(has_imaginary_modes)
     F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
     F_tot_crystal_eos = eos_properties["F_tot_crystal_eos (kJ/mol/unit cell)"]
     F_RMSD_per_atom = np.sqrt(np.mean((F_tot_crystal - F_tot_crystal_eos)**2)) / n_atoms_unit_cell
-    print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom} kJ/mol/atom")        
+    print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom:.5f} kJ/mol/atom")        
     #
     # Vibrational energy, lattice energy, and sublimation enthalpy
     # defined as in ref 1. Additional definitions in ref 2.
@@ -271,25 +303,13 @@ def run(config: PropertiesConfig):
     #    set of molecular crystals,
     #    Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
     #
-    n_atoms_molecule = len(molecule)
     beta = n_atoms_molecule / n_atoms_unit_cell
+    E_latt = E_el_crystal * beta - E_el_molecule # kJ/mol/molecule
     ΔE_vib = E_vib_molecule - E_vib_crystal * beta # kJ/mol/molecule
-    ΔH_sub = np.zeros(n_temperatures)
-    rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
-    for i, T in enumerate(temperatures):
-        E_latt[i] = E_el_crystal[i] * beta - E_el_molecule # kJ/mol/molecule
-        kbT = ase.units.kB * T * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
-        if rotor_type == "nonlinear":
-            # 3/2 kT (translation) + 3/2 kT (rotation) + kT (PV work)
-            ΔH_sub[i] = -E_latt[i] + ΔE_vib[i] + (3/2+3/2+1) * kbT
-        elif rotor_type == "linear":
-            # 3/2 kT (translation) + kT (rotation) + kT (PV work)
-            ΔH_sub[i] = -E_latt[i] + ΔE_vib[i] + (3/2+1+1) * kbT
-        elif rotor_type == "monatomic":
-            # 3/2 kT (translation) + kT (PV work)
-            ΔH_sub[i] = -E_latt[i] + ΔE_vib[i] + (3/2+1) * kbT    
+    ΔH_sub = -E_latt + ΔE_vib + E_trans_molecule + E_rot_molecule + pV_molecule # kJ/mol/molecule
 
-    relaxed_properties = {
+    df1 = pd.DataFrame(eos_properties)
+    df2 = pd.DataFrame({
         "V (Å³/unit cell)": V_actual,
         "V/V₀": V_actual / V0,
         "E_latt (kJ/mol/molecule)": E_latt,
@@ -304,32 +324,25 @@ def run(config: PropertiesConfig):
         "F_tot_crystal (kJ/mol/unit cell)": F_tot_crystal,
         "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,        
         "E_el_molecule (kJ/mol/molecule)": E_el_molecule,
-        "S_vib_molecule (kJ/mol/molecule)": S_vib_molecule,
+        "S_vib_molecule (J/K/mol/molecule)": S_vib_molecule,
         "F_vib_molecule (kJ/mol/molecule)": F_vib_molecule,
         "ZPE_molecule (kJ/mol/molecule)": ZPE_molecule,
+        "E_rot_molecule (kJ/mol/molecule)": E_rot_molecule,
+        "E_trans_molecule (kJ/mol/molecule)": E_trans_molecule,
+        "pV_molecule (kJ/mol/molecule)": pV_molecule,
         "space_group": space_groups,
-        "all_freqs_real_crystal": all_freqs_real,
+        "all_freqs_real_crystal": all_freqs_real_crystal,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "n_atoms_molecule": n_atoms_molecule
-    }
-
-    df1 = pd.DataFrame(eos_properties)
-    df2 = pd.DataFrame(relaxed_properties)
-    quasi_harmonic_df = pd.concat([df1, df2], axis=1)
+    })
+    df_quasi_harmonic = pd.concat([df1, df2], axis=1)
 
     mbe_automation.hdf5.save_dataframe(
-        quasi_harmonic_df,
+        df_quasi_harmonic,
         config.hdf5_dataset,
-        group_path="quasi_harmonic/quasi_harmonic_equilibrium_properties"
+        group_path="quasi_harmonic/volume_expansion"
     )
-    quasi_harmonic_df.round(3).to_csv(os.path.join(config.properties_dir, "quasi_harmonic_equilibrium_properties.csv"))
-    
-    mbe_automation.hdf5.save_dataframe(
-        harmonic_df,
-        config.hdf5_dataset,
-        group_path="quasi_harmonic/harmonic_properties"
-    )
-    harmonic_df.round(3).to_csv(os.path.join(config.properties_dir, "harmonic_properties.csv"))
-    
+    df_quasi_harmonic.to_csv(os.path.join(config.properties_dir, "volume_expansion.csv"))
+        
     print(f"Quasi-harmonic calculations completed")
 

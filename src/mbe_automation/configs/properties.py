@@ -138,7 +138,7 @@ class PropertiesConfig:
                                    # Equation of state used to fit energy
                                    # as a function of volume
                                    #
-    equation_of_state: Literal["birch_murnaghan", "vinet"] = "birch_murnaghan"
+    equation_of_state: Literal["birch_murnaghan", "vinet"] = "vinet"
                                    #
                                    # Algorithm used to generate points on
                                    # the equilibrium curve:

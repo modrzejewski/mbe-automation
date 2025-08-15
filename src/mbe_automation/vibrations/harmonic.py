@@ -68,12 +68,25 @@ def isolated_molecule(
         F_vib[i] = thermo.get_helmholtz_energy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol
         S_vib[i] = thermo.get_entropy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol*1000
         E_vib[i] = thermo.get_internal_energy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol
+
+    kbT = ase.units.kB * temperatures * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
+    E_trans = 3/2 * kbT
+    pV = kbT
+    if rotor_type == "nonlinear":
+        E_rot = 3/2 * kbT
+    elif rotor_type == "linear":
+        E_rot = kbT
+    elif rotor_type == "monatomic":
+        E_rot = np.zeros_like(temperatures)
         
     return {
         "E_vib_molecule (kJ/mol/molecule)": E_vib,
         "S_vib_molecule (J/K/mol/molecule)": S_vib,
-        "F_vib_molecule (kJ/mol/molecule)": F_vib,
-        "ZPE_molecule (kJ/mol/molecule)": ZPE # note that this is a scalar, not an array
+        "F_vib_molecule (kJ/mol/molecule)": F_vib,        
+        "ZPE_molecule (kJ/mol/molecule)": ZPE, # note that this is a scalar, not an array
+        "E_trans_molecule (kJ/mol/molecule)": E_trans,
+        "E_rot_molecule (kJ/mol/molecule)": E_rot,
+        "pV_molecule (kJ/mol/molecule)": pV
         }
     
 
