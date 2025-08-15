@@ -73,7 +73,11 @@ def atoms_and_cell(unit_cell,
         )
 
     with warnings.catch_warnings():
-        warnings.filterwarnings("once")
+        warnings.filterwarnings(
+            "ignore",
+            message=r"logm result may be inaccurate.*",
+            category=UserWarning
+        )
         optimizer.run(
             fmax=max_force_on_atom,
             steps=max_steps
