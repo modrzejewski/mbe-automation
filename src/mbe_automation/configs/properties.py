@@ -11,12 +11,18 @@ class PropertiesConfig:
     molecule: Atoms
     calculator: Any
                                    #
-                                   # Level of theory
+                                   # Account for thermal expansion of the cell
+                                   # volume by a numerical fit to the equation
+                                   # of state.
                                    #
-    theory_level: Literal["harmonic", "quasi-harmonic"] = "quasi-harmonic"
+    thermal_expansion: bool = True
                                    #
                                    # Fourier interpolation mesh used to
-                                   # perform integration over the Brillouin zone
+                                   # perform integration over the Brillouin zone.
+                                   # (1) three-component array with the explicit number
+                                   # of grid points in the a, b, and c directions
+                                   # (2) distance (in Angs) which defines
+                                   # the supercell
                                    #
     fourier_interpolation_mesh: npt.NDArray[np.float64] | float | np.floating = 200.0
                                    #

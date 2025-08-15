@@ -73,6 +73,10 @@ def atoms_and_cell(unit_cell,
         )
 
     with warnings.catch_warnings():
+        #
+        # FrechetCellFilter sometimes floods the output with warnings
+        # about slightly inaccurate matrix exponential
+        #
         warnings.filterwarnings(
             "ignore",
             message=r"logm result may be inaccurate.*",
