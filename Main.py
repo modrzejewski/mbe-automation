@@ -24,10 +24,13 @@ ProjectDirectory    = "./Projects/01_1,4-cyclohexanedione"
                                                 #
 Methods = ["RPA", "LNO-CCSD(T)", "MACE(PBC)", "DFTB(PBC)", "UMA(PBC)"]
                                                 #
-                                                # Parameters of the machine-learning
-                                                # interatomic potential
+                                                # Parameters for pre-trained machine-learning
+                                                # interatomic potentials
                                                 #
-ModelDirectory    = "~/models/michaelides_2025/01_cyclohexanedione/MACE_model_swa.model"
+mlip_parameters = {
+    "MACE": "~/models/mace/MACE-OFF24_medium.model",
+    "UMA": "~/models/uma/checkpoints/uma-m-1p1.pt"
+    }
                                                 #
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
@@ -125,11 +128,11 @@ InputTemplates = {
         "molecule": "./templates/inputs/HF(PBC)/pyscf/molecule.py"
     },
     "MACE(PBC)": {
-        "training": "./templates/inputs/mace(pbc)/training.py",
-        "properties": "./templates/inputs/mace(pbc)/properties.py"
+        "training_dataset": "./templates/inputs/mace(pbc)/training_dataset.py",
+        "quasi_harmonic": "./templates/inputs/mace(pbc)/quasi_harmonic.py"
         },
     "UMA(PBC)": {
-        "workflow": "./templates/inputs/UMA(PBC)/workflow.py"
+        "quasi_harmonic": "./templates/inputs/uma(pbc)/quasi_harmonic.py"
         },
     "DFTB(PBC)": {
         "solid": "./templates/inputs/DFTB(PBC)/solid.py"
@@ -169,8 +172,8 @@ QueueScriptTemplates = {
         "cpu": "./templates/queue-scripts/Poznań/mace-cpu.py"
     },
     "UMA(PBC)":     {
-        "GPU": "./templates/queue-scripts/Poznań/UMA-GPU.py",
-        "CPU": "./templates/queue-scripts/Poznań/UMA-CPU.py"
+        "gpu": "./templates/queue-scripts/Poznań/uma-gpu.py",
+        "cpu": "./templates/queue-scripts/Poznań/uma-cpu.py"
     },
     "DFTB(PBC)":     "./templates/queue-scripts/Poznań/DFTB.py"
     }
@@ -209,7 +212,7 @@ ClusterComparisonAlgorithm = "RMSD"
 
 
 mbe_automation.single_point.prepare_inputs(ProjectDirectory,
-                                           ModelDirectory,
+                                           mlip_parameters,
                                            UnitCellFile,
                                            SystemTypes,
                                            Cutoffs,

@@ -9,6 +9,8 @@ import ase.units
 import mbe_automation.structure.crystal
 import mbe_automation.display
 import numpy as np
+import warnings
+
 
 def atoms_and_cell(unit_cell,
                    calculator,
@@ -69,11 +71,21 @@ def atoms_and_cell(unit_cell,
             precon=Exp(),
             logfile=log
         )
-        
-    optimizer.run(
-        fmax=max_force_on_atom,
-        steps=max_steps
-    )        
+
+    with warnings.catch_warnings():
+        #
+        # FrechetCellFilter sometimes floods the output with warnings
+        # about slightly inaccurate matrix exponential
+        #
+        warnings.filterwarnings(
+            "ignore",
+            message=r"logm result may be inaccurate.*",
+            category=UserWarning
+        )
+        optimizer.run(
+            fmax=max_force_on_atom,
+            steps=max_steps
+        )
         
     if symmetrize_final_structure:
         print("Post-relaxation symmetry refinement")
@@ -143,10 +155,13 @@ def isolated_molecule(molecule,
         relaxed_molecule,
         logfile=log
     )
-    optimizer.run(
-        fmax=max_force_on_atom,
-        steps=max_steps
-    )
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("once")
+        optimizer.run(
+            fmax=max_force_on_atom,
+            steps=max_steps
+        )
 
     print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_molecule.get_forces()).max()

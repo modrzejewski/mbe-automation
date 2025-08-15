@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
 import mbe_automation.display
-from pymatgen.analysis.eos import EOS
+import mbe_automation.hdf5
 import os
 import os.path
 import numpy.polynomial.polynomial as P
@@ -25,7 +25,6 @@ from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 import sys
 import pandas as pd
 import scipy.optimize
-from pymatgen.phonon.dos import PhononDos
 
 def isolated_molecule(
         molecule,
@@ -69,12 +68,25 @@ def isolated_molecule(
         F_vib[i] = thermo.get_helmholtz_energy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol
         S_vib[i] = thermo.get_entropy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol*1000
         E_vib[i] = thermo.get_internal_energy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol
+
+    kbT = ase.units.kB * temperatures * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
+    E_trans = 3/2 * kbT
+    pV = kbT
+    if rotor_type == "nonlinear":
+        E_rot = 3/2 * kbT
+    elif rotor_type == "linear":
+        E_rot = kbT
+    elif rotor_type == "monatomic":
+        E_rot = np.zeros_like(temperatures)
         
     return {
-        "vibrational energy (kJ/mol)": E_vib,
-        "vibrational entropy (J/K/mol)": S_vib,
-        "vibrational Helmholtz free energy (kJ/mol)": F_vib,
-        "zero-point energy (kJ/mol)": ZPE
+        "E_vib_molecule (kJ/mol/molecule)": E_vib,
+        "S_vib_molecule (J/K/mol/molecule)": S_vib,
+        "F_vib_molecule (kJ/mol/molecule)": F_vib,        
+        "ZPE_molecule (kJ/mol/molecule)": ZPE, # note that this is a scalar, not an array
+        "E_trans_molecule (kJ/mol/molecule)": E_trans,
+        "E_rot_molecule (kJ/mol/molecule)": E_rot,
+        "pV_molecule (kJ/mol/molecule)": pV
         }
     
 
@@ -94,7 +106,6 @@ def phonons(
         unit_cell,
         calculator,
         supercell_matrix,
-        temperatures,
         supercell_displacement,
         interp_mesh=100.0,
         automatic_primitive_cell=True,
@@ -189,27 +200,10 @@ def phonons(
         fc_calculator_log_level=1
     )
     print(f"Force constants completed", flush=True)
+    
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
-    phonons.run_thermal_properties(temperatures=temperatures)
-    phonons.run_total_dos()
     
     return phonons
-
-
-def phonon_density_of_states(p):
-
-    p.run_total_dos(
-        use_tetrahedron_method=True
-    )
-    dos = PhononDos(
-        frequencies=p.total_dos.frequency_points,
-        densities=p.total_dos.dos
-        )
-
-    norm = np.trapezoid(p.total_dos.dos, p.total_dos.frequency_points)
-    print(f"Norm of DOS: {norm}")
-    
-    return dos
 
 
 def birch_murnaghan(volume, e0, v0, b0, b1):
@@ -245,19 +239,6 @@ def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0):
     else:
         raise ValueError(f"Unknown EOS: {equation_of_state}")
 
-    print("Attempting fit")
-    print("Volumes")
-    print(V, flush=True)
-    print("Energies")
-    print(E, flush=True)
-    print("xdata")
-    print(xdata, flush=True)
-    print("ydata")
-    print(ydata, flush=True)
-    print(f"V0 = {V0}")
-    print(f"E_el_V0={E_el_V0}")
-    print("--- calling scipy.optimize.curve_fit ----")
-    
     popt, pcov = scipy.optimize.curve_fit(
         eos_func,
         xdata,
@@ -275,66 +256,6 @@ def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0):
 
     return E_min, δE_min, V_min, δV_min, B_min, δB_min
     
-
-def eos_fit_with_uncertainty(
-        V,
-        E,
-        equation_of_state,
-        mask,
-        estimate_uncertainty=True
-):
-    """
-    Fit energy/free energy/Gibbs enthalpy using a specified
-    analytic formula for E(V).
-
-    Estimate the uncertainty of the fitted parameters
-    by removing a single data point from the fitting
-    set as in
-
-    Flaviano Della Pia et al. Accurate and efficient machine learning
-    interatomic potentials for finite temperature
-    modelling of molecular crystals, Chem. Sci. 16, 11419 (2025);
-    doi: 10.1039/d5sc01325a
-    """
-    
-    min_n_eos = 4
-    n_eos = len(V[mask])
-    if n_eos < min_n_eos:
-        raise ValueError(f"Cannot perform EOS fit: not enough points available (need {min_n_eos}, got {n_eos})")
-    
-    eos = EOS(eos_name=equation_of_state)
-    eos_fit = eos.fit(V[mask], E[mask])
-    E_min = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
-    V_min = eos_fit.v0 # Å³/unit cell
-    B = eos_fit.b0_GPa # GPa
-    print(f"mask = {mask}")
-    
-    if n_eos > min_n_eos and estimate_uncertainty:
-        idx = np.where(mask)[0]
-        E_min_perturbed = np.zeros(n_eos)
-        V_min_perturbed = np.zeros(n_eos)
-        B_perturbed = np.zeros(n_eos)        
-        for k in range(n_eos):
-            mask_2 = mask.copy()
-            mask_2[idx[k]] = False
-            print(f"mask_2 = {mask_2}")
-            eos_fit = eos.fit(V[mask_2], E[mask_2])
-            E_min_perturbed[k] = eos_fit.e0 * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
-            V_min_perturbed[k] = eos_fit.v0 # Å³/unit cell
-            B_perturbed[k] = eos_fit.b0_GPa # GPa
-
-        δE_min = np.abs(E_min_perturbed - E_min).max()
-        δV_min = np.abs(V_min_perturbed - V_min).max()
-        δB = np.abs(B_perturbed - B).max()
-        
-    else:
-
-        δE_min = np.nan
-        δV_min = np.nan
-        δB = np.nan
-
-    return E_min, δE_min, V_min, δV_min, B, δB
-
 
 def equilibrium_curve(
         unit_cell_V0,
@@ -438,13 +359,11 @@ def equilibrium_curve(
             unit_cell_V,
             calculator,
             supercell_matrix,            
-            temperatures,
             supercell_displacement,
             interp_mesh=interp_mesh,
             automatic_primitive_cell=automatic_primitive_cell,
             system_label=label
         )
-        dos = phonon_density_of_states(p)
         has_imaginary_modes = band_structure(
             p,
             imaginary_mode_threshold=imaginary_mode_threshold,
@@ -452,21 +371,11 @@ def equilibrium_curve(
             hdf5_dataset=hdf5_dataset,
             system_label=label
         )
-        real_freqs[i] = (not has_imaginary_modes)
-        n_atoms_primitive_cell = len(p.primitive)
-        alpha = n_atoms_unit_cell / n_atoms_primitive_cell
-        thermal_props = p.get_thermal_properties_dict()
-        F_vib_V_T[i, :] = thermal_props['free_energy'] * alpha # kJ/mol/unit cell
-        # print(f"F_vib_V_T old = {F_vib_V_T[i, :]}")
-        # for j, T in enumerate(temperatures):
-        #     F_vib_V_T[i, j] = dos.helmholtz_free_energy(temp=T) / 1000        
-        # print(f"F_vib_V_T new = {F_vib_V_T[i, :]}", flush=True)
+        real_freqs[i] = (not has_imaginary_modes)        
+        F_vib_V_T[i, :] = phonon_properties(p, temperatures)["F_vib_crystal (kJ/mol/unit cell)"]
         E_el_V[i] = unit_cell_V.get_potential_energy()*ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
 
-        print(f"Vibrational energy per unit cell {F_vib_V_T}")
-
     preserved_symmetry = space_groups == reference_space_group
-        
     mask = np.ones(n_volumes, dtype=bool)
     if skip_structures_with_imaginary_modes:
         mask = mask & real_freqs
@@ -483,14 +392,8 @@ def equilibrium_curve(
               f"{'Yes' if preserved_symmetry[i] else 'No':<20} "
               f"{space_groups[i]:<15} "
               f"{'Yes' if mask[i] else 'No':<25}")
-    print("")
-            
-    # _, _, _, _, B0, δB0 = eos_fit_with_uncertainty(
-    #     V_sampled,
-    #     E_el_V,
-    #     equation_of_state,
-    #     mask
-    # )
+    print("", flush=True)
+
     fit_params = eos_curve_fit(
         V_sampled[mask],
         E_el_V[mask],
@@ -503,13 +406,6 @@ def equilibrium_curve(
     
     for i, T in enumerate(temperatures):
         F_tot_V = F_vib_V_T[:, i] + E_el_V[:] # kJ/mol/unit cell
-        # F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = eos_fit_with_uncertainty(
-        #     V_sampled,
-        #     F_tot_V,
-        #     equation_of_state,
-        #     mask,
-        #     estimate_uncertainty=False
-        # )
         fit_params = eos_curve_fit(
             V_sampled[mask],
             F_tot_V[mask],
@@ -696,6 +592,36 @@ def band_structure(
     has_imaginary_modes = (min_freq < imaginary_mode_threshold)
             
     return has_imaginary_modes
+
+
+def phonon_properties(phonons, temperatures):
+    """
+    Physical properties derived from the harmonic model
+    of crystal vibrations.
+    """
+    n_atoms_unit_cell = len(phonons.unitcell)
+    n_atoms_primitive_cell = len(phonons.primitive)
+    alpha = n_atoms_unit_cell/n_atoms_primitive_cell
+    
+    phonons.run_thermal_properties(temperatures=temperatures)
+    _, F_vib_crystal, S_vib_crystal, Cv_vib_crystal = phonons.thermal_properties.thermal_properties
+    
+    ZPE_crystal = phonons.thermal_properties.zero_point_energy * alpha # kJ/mol/unit cell
+    F_vib_crystal *= alpha # kJ/mol/unit cell
+    S_vib_crystal *= alpha # J/K/mol/unit cell
+    Cv_vib_crystal *= alpha # J/K/mol/unit cell
+    E_vib_crystal = F_vib_crystal + temperatures * S_vib_crystal / 1000 # kJ/mol/unit cell
+
+    properties = {
+        "T (K)": temperatures,
+        "F_vib_crystal (kJ/mol/unit cell)": F_vib_crystal,
+        "S_vib_crystal (J/K/mol/unit cell)": S_vib_crystal,
+        "E_vib_crystal (kJ/mol/unit cell)": E_vib_crystal,
+        "ZPE_crystal (kJ/mol/unit cell)": ZPE_crystal, # note that this is a scalar, not an array
+        "Cv_vib_crystal (J/K/mol/unit cell)": Cv_vib_crystal
+    }
+
+    return properties
     
     
 def my_plot_band_structure_first_segment_only(phonons, output_path):

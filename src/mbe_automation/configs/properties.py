@@ -11,12 +11,18 @@ class PropertiesConfig:
     molecule: Atoms
     calculator: Any
                                    #
-                                   # Level of theory
+                                   # Account for thermal expansion of the cell
+                                   # volume by a numerical fit to the equation
+                                   # of state.
                                    #
-    theory_level: Literal["harmonic", "quasi-harmonic"] = "quasi-harmonic"
+    thermal_expansion: bool = True
                                    #
                                    # Fourier interpolation mesh used to
-                                   # perform integration over the Brillouin zone
+                                   # perform integration over the Brillouin zone.
+                                   # (1) three-component array with the explicit number
+                                   # of grid points in the a, b, and c directions
+                                   # (2) distance (in Angs) which defines
+                                   # the supercell
                                    #
     fourier_interpolation_mesh: npt.NDArray[np.float64] | float | np.floating = 200.0
                                    #
@@ -138,7 +144,7 @@ class PropertiesConfig:
                                    # Equation of state used to fit energy
                                    # as a function of volume
                                    #
-    equation_of_state: Literal["birch_murnaghan", "vinet"] = "birch_murnaghan"
+    equation_of_state: Literal["birch_murnaghan", "vinet"] = "vinet"
                                    #
                                    # Algorithm used to generate points on
                                    # the equilibrium curve:
@@ -171,4 +177,4 @@ class PropertiesConfig:
                                    # if the space group is different from
                                    # that of the fully relaxed cell at T=0.
                                    #
-    skip_structures_with_broken_symmetry: bool = False
+    skip_structures_with_broken_symmetry: bool = True
