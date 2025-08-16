@@ -1,0 +1,46 @@
+<simulation>
+  <output prefix="sim">
+    <properties stride="{sampling_stride}" start="{equilibration_steps}">
+      [step,time{{ps}},temperature{{K}},potential{{eV}},kinetic_cv{{eV}}]
+    </properties>
+    <trajectory stride="{sampling_stride}" start="{equilibration_steps}" format="xyz">
+      positions{{angstrom}}
+    </trajectory>
+    <checkpoint stride="1000"/>
+  </o>
+  
+  <total_steps>{total_steps}</total_steps>
+  
+  <prng>
+    <seed>31415</seed>
+  </prng>
+  
+  <ffsocket mode="unix" name="d" slots="{n_calculators}">
+    <address>ipi_socket</address>
+  </ffsocket>
+  
+  <s>
+    <initialize nbeads="1">
+      <file mode="xyz">init.xyz</file>
+      <velocities mode="thermal" units="kelvin">{temperature_K}</velocities>
+    </initialize>
+    
+    <forces>
+      <force forcefield="d"/>
+    </forces>
+    
+    <ensemble mode="nvt">
+      <temperature units="kelvin">{temperature_K}</temperature>
+    </ensemble>
+    
+    <motion mode="dynamics">
+      <dynamics mode="nvt">
+        <timestep units="femtosecond">{time_step_fs}</timestep>
+        <thermostat mode="{thermostat}">
+          <tau units="femtosecond">{thermostat_tau_fs}</tau>
+        </thermostat>
+      </dynamics>
+    </motion>
+  </s>
+</simulation>
+
