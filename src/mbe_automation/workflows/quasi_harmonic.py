@@ -16,9 +16,11 @@ import mbe_automation.hdf5
 
 def run(config: PropertiesConfig):
 
-    mbe_automation.display.framed("Quasi-harmonic approximation")
-    print(f"Thermal expansion: {config.thermal_expansion}")
-            
+    if config.thermal_expansion:
+        mbe_automation.display.framed("Harmonic properties with thermal expansion")
+    else:
+        mbe_automation.display.framed("Harmonic properties")
+        
     os.makedirs(config.properties_dir, exist_ok=True)
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
     os.makedirs(geom_opt_dir, exist_ok=True)
@@ -165,7 +167,7 @@ def run(config: PropertiesConfig):
     )
     df_harmonic.to_csv(os.path.join(config.properties_dir, "no_thermal_expansion.csv"))
     if not config.thermal_expansion:
-        print("Harmonic calculations without thermal expansion completed")
+        print("Harmonic calculations completed")
         return
     #
     # Thermal expansion

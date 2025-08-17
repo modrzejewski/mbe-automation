@@ -339,10 +339,10 @@ def equilibrium_curve(
     mbe_automation.display.framed("F(V) curve sampling")
     if eos_sampling == "volume":
         print("Volume range (V/V):")
-        print(np.array2string(volume_range, precision=2, suppress=True))
+        print(np.array2string(volume_range, precision=2, suppress_small=True))
     else:
         print(f"Thermal pressure range (GPa):")
-        print(np.array2string(pressure_range, precision=2, suppress=True))
+        print(np.array2string(pressure_range, precision=2, suppress_small=True))
     print(f"EOS fit with a subset of volume points: {select_subset_for_eos_fit}")
 
     for i in range(n_volumes):
