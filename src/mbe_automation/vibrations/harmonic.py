@@ -219,12 +219,42 @@ def vinet(volume, e0, v0, b0, b1):
             2 - (5 + 3 * b1 * (eta - 1.0) - 3 * eta) * np.exp(-3 * (b1 - 1.0) * (eta - 1.0) / 2.0)
         )
 
+
+def eos_select_points(E, min_n_points, delta_E):
+    i_min = np.argmin(E)
+    y_min = E[i_min]
+    d = np.abs(E - y_min)
+    n_points = len(E)
+
+    if n_points <= min_n_points:
+        return np.ones_like(E, dtype=bool)
+
+    i_left = i_min
+    while i_left > 0 and d[i_left] < delta_E:
+        i_left -= 1
+
+    i_right = i_min
+    while i_right < n_points-1 and d[i_right] < delta_E:
+        i_right += 1
+
+    while (i_right - i_left + 1) < min_n_points:
+        d_left = d[i_left-1] if i_left > 0 else np.inf
+        d_right = d[i_right+1] if i_right < n_points-1 else np.inf
+        if d_left < d_right:
+            i_left -= 1
+        else:
+            i_right += 1
+
+    mask = np.zeros_like(E, dtype=bool)
+    mask[i_left:i_right+1] = True
+    return mask
+
+    
 def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0):
     """
     Fit energy/free energy/Gibbs enthalpy using a specified
     analytic formula for E(V).
     """
-    
     xdata = V
     ydata = E - E_el_V0
     E_initial = 0.0
@@ -272,6 +302,7 @@ def equilibrium_curve(
         volume_range,
         equation_of_state,
         eos_sampling,
+        select_subset_for_eos_fit,
         symmetrize_unit_cell,
         imaginary_mode_threshold,
         skip_structures_with_imaginary_modes,
@@ -305,8 +336,14 @@ def equilibrium_curve(
     p_thermal_eos = np.zeros(n_temperatures)
     system_labels = []
     
-    mbe_automation.display.framed("Equation of state")
-    print(f"Volume of the reference unit cell: {V0:.3f} Å³/unit cell")
+    mbe_automation.display.framed("F(V) curve sampling")
+    if eos_sampling == "volume":
+        print("Volume range (V/V):")
+        print(np.array2string(volume_range, precision=2, suppress=True))
+    else:
+        print(f"Thermal pressure range (GPa):")
+        print(np.array2string(pressure_range, precision=2, suppress=True))
+    print(f"EOS fit with a subset of volume points: {select_subset_for_eos_fit}")
 
     for i in range(n_volumes):
         if eos_sampling == "pressure":
@@ -394,9 +431,18 @@ def equilibrium_curve(
               f"{'Yes' if mask[i] else 'No':<25}")
     print("", flush=True)
 
+    if select_subset_for_eos_fit:
+        close_to_minimum = eos_select_points(
+            E_el_V[mask],
+            min_n_points=4,
+            delta_E=0.1*n_atoms_unit_cell
+        )
+    else:
+        close_to_minimum = np.ones_like(E_el_V[mask], dtype=bool)
+    print(np.array2string(close_to_minimum))
     fit_params = eos_curve_fit(
-        V_sampled[mask],
-        E_el_V[mask],
+        V_sampled[mask][close_to_minimum],
+        E_el_V[mask][close_to_minimum],
         equation_of_state,
         V0,
         E_el_V0
@@ -406,9 +452,18 @@ def equilibrium_curve(
     
     for i, T in enumerate(temperatures):
         F_tot_V = F_vib_V_T[:, i] + E_el_V[:] # kJ/mol/unit cell
+        if select_subset_for_eos_fit:
+            close_to_minimum = eos_select_points(
+                F_tot_V[mask],
+                min_n_points=4,
+                delta_E=0.1*n_atoms_unit_cell
+            )
+        else:
+            close_to_minimum = np.ones_like(F_tot_V[mask], dtype=bool)
+        print(np.array2string(close_to_minimum))
         fit_params = eos_curve_fit(
-            V_sampled[mask],
-            F_tot_V[mask],
+            V_sampled[mask][close_to_minimum],
+            F_tot_V[mask][close_to_minimum],
             equation_of_state,
             V0,
             E_el_V0

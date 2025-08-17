@@ -17,7 +17,8 @@ import mbe_automation.hdf5
 def run(config: PropertiesConfig):
 
     mbe_automation.display.framed("Quasi-harmonic approximation")
-    
+    print(f"Thermal expansion: {config.thermal_expansion}")
+            
     os.makedirs(config.properties_dir, exist_ok=True)
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
     os.makedirs(geom_opt_dir, exist_ok=True)
@@ -107,7 +108,7 @@ def run(config: PropertiesConfig):
     harmonic_properties = mbe_automation.vibrations.harmonic.phonon_properties(
         phonons,
         config.temperatures
-    )    
+    )
     #
     # Vibrational contributions to E, S, F of the isolated molecule
     #
@@ -160,9 +161,14 @@ def run(config: PropertiesConfig):
     mbe_automation.hdf5.save_dataframe(
         df_harmonic,
         config.hdf5_dataset,
-        group_path="quasi_harmonic/no_volume_expansion"
+        group_path="quasi_harmonic/no_thermal_expansion"
     )
-    df_harmonic.to_csv(os.path.join(config.properties_dir, "no_volume_expansion.csv"))
+    df_harmonic.to_csv(os.path.join(config.properties_dir, "no_thermal_expansion.csv"))
+    if not config.thermal_expansion:
+        print("Harmonic calculations without thermal expansion completed")
+        return
+    #
+    # Thermal expansion
     #
     # Equilibrium properties at temperature T interpolated
     # using an analytical form of the equation of state:
@@ -188,6 +194,7 @@ def run(config: PropertiesConfig):
         config.volume_range,
         config.equation_of_state,
         config.eos_sampling,
+        config.select_subset_for_eos_fit,
         config.symmetrize_unit_cell,
         config.imaginary_mode_threshold,
         config.skip_structures_with_imaginary_modes,
@@ -195,8 +202,8 @@ def run(config: PropertiesConfig):
         config.hdf5_dataset
     )
     #
-    # Quasi-harmonic properties for temperature-dependent
-    # structures
+    # Harmonic properties for unit cells with temperature-dependent
+    # equilibrium volumes V(T)
     #
     temperatures = config.temperatures
     n_temperatures = len(temperatures)
@@ -340,9 +347,9 @@ def run(config: PropertiesConfig):
     mbe_automation.hdf5.save_dataframe(
         df_quasi_harmonic,
         config.hdf5_dataset,
-        group_path="quasi_harmonic/volume_expansion"
+        group_path="quasi_harmonic/thermal_expansion"
     )
-    df_quasi_harmonic.to_csv(os.path.join(config.properties_dir, "volume_expansion.csv"))
+    df_quasi_harmonic.to_csv(os.path.join(config.properties_dir, "thermal_expansion.csv"))
         
     print(f"Quasi-harmonic calculations completed")
 

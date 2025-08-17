@@ -11,9 +11,17 @@ class PropertiesConfig:
     molecule: Atoms
     calculator: Any
                                    #
-                                   # Account for thermal expansion of the cell
-                                   # volume by a numerical fit to the equation
-                                   # of state.
+                                   # Volumetric thermal expansion
+                                   #
+                                   # (1) sample volumes/pressures to determine
+                                   # points on the F(V) curve.
+                                   # (2) perform fit of an analytic formula for
+                                   # F(V)
+                                   # (3) minimize F(V;T) w.r.t. V at each temperature
+                                   # to determine the equilibrium V(T)
+                                   #
+                                   # If thermal_expansion==False, phonon calculations
+                                   # are performed only on a single relaxed structure.
                                    #
     thermal_expansion: bool = True
                                    #
@@ -24,16 +32,20 @@ class PropertiesConfig:
                                    # (2) distance (in Angs) which defines
                                    # the supercell
                                    #
-    fourier_interpolation_mesh: npt.NDArray[np.float64] | float | np.floating = 200.0
+    fourier_interpolation_mesh: npt.NDArray[np.integer] | np.floating = 200.0
                                    #
                                    # Range of temperatures at which phonons
                                    # and thermodynamic properties are computed
                                    #
     temperatures: np.ndarray = field(default_factory=lambda: np.arange(0, 301, 10))
                                    #
-                                   # Refine the space group symmetry before
-                                   # computing any properties and before'
-                                   # performing any geometry optimization.
+                                   # Refine the space group symmetry after
+                                   # each geometry relaxation of the unit cell.
+                                   #
+                                   # This works well if the threshold for
+                                   # geometry optimization is tight. Otherwise,
+                                   # symmetrization may introduce significant
+                                   # residual forces on atoms.
                                    #
     symmetrize_unit_cell: bool = True
                                    #
@@ -45,7 +57,11 @@ class PropertiesConfig:
     optimize_lattice_vectors: bool = True
                                    #
                                    # Threshold for maximum resudual force
-                                   # after geometry relaxation (eV/Angs)
+                                   # after geometry relaxation (eV/Angs).
+                                   #
+                                   # Should be extra tight if:
+                                   # (1) symmetrization is enabled
+                                   # (2) supercell_displacement is small
                                    #
     max_force_on_atom = 1.0E-4
                                    #
@@ -80,11 +96,11 @@ class PropertiesConfig:
                                    #
     supercell_radius: float = 25.0
                                    #
-                                   # Diagonal supercell transformation:
+                                   # (1) Diagonal supercell transformation:
                                    # the unit cell vectors are repated along
                                    # each direction without lattice vector mixing.
                                    #
-                                   # Nondiagonal supercell transformation:
+                                   # (2) Nondiagonal supercell transformation:
                                    # lattice vectors of the supercell can be linear
                                    # combinations of the unit cell vectors. Nondiagonal
                                    # supercells can achieve the required point-image
@@ -93,8 +109,15 @@ class PropertiesConfig:
     supercell_diagonal: bool = False
                                    #
                                    # Displacement length applied in Phonopy
-                                   # to compute numerical derivatives (Angstrom)
-                                   #    
+                                   # to compute numerical derivatives (Angstrom).
+                                   #
+                                   # Note the following relation between numerical
+                                   # thresholds:
+                                   #
+                                   # Tight relaxation threshold -> small residual
+                                   # forces -> small displacements can be used
+                                   # -> accurate force constants
+                                   #
     supercell_displacement: float = 0.01
                                    #
                                    # Enable automatic primitive cell determination
@@ -104,10 +127,9 @@ class PropertiesConfig:
     automatic_primitive_cell = False
                                    #
                                    # Scaling factors used to sample volumes around
-                                   # V0 in quasi-harmonic calculations, where V0 is the
-                                   # reference volume at T=0K.
+                                   # the reference volume at T=0K.
                                    #
-                                   # Recommendations:
+                                   # Recommendations from the literature:
                                    #
                                    # 1. +/- 5% of the initial unit cell volume
                                    # Dolgonos, Hoja, Boese, Revised values for the X23 benchmark
@@ -117,8 +139,14 @@ class PropertiesConfig:
                                    # 2. V/V0=0.97 up to V/V0=1.06 according to the manual
                                    # of CRYSTAL
                                    #
+                                   # A fail-proof choice is to specify a wide range of volumes, e.g.,
+                                   # 0.96...1.12 V/V0, and to enable automatic selection of volumes
+                                   # in the immediate vicinity of the minimum at each temperature
+                                   # (see select_subset_for_eos_fit=True).
+                                   #
+                                   #
     volume_range: list[float] = field(default_factory=lambda:
-                                      [0.94, 0.96, 0.98, 1.00, 1.02, 1.04, 1.06])
+                                      [0.96, 0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10, 1.12])
                                    #
                                    # Range of external isotropic pressures applied
                                    # to sample different cell volumes and fit
@@ -127,7 +155,7 @@ class PropertiesConfig:
                                    # The corresponding F_tot(V(p)) are used to establish
                                    # to fit F_tot(V) and p_effective(V).
                                    #
-                                   # Recommendation:
+                                   # Recommendation from the literature:
                                    #
                                    # -0.4 kbar ... +0.4 kbar
                                    #
@@ -138,11 +166,17 @@ class PropertiesConfig:
                                    # molecular crystals, Chem. Sci., 2025, 16, 11419;
                                    # doi: 10.1039/d5sc01325a
                                    #
-    pressure_range: list[float] = field(default_factory=lambda:
-                                        [0.4, 0.3, 0.2, 0.1, 0.0, -0.1, -0.2, -0.3, -0.4])
+                                   # I have found that 
                                    #
-                                   # Equation of state used to fit energy
-                                   # as a function of volume
+    pressure_range: list[float] = field(default_factory=lambda:
+                                        [0.2, 0.0, -0.2, -0.3, -0.4, -0.5, -0.6])
+                                   #
+                                   # Equation of state used to fit energy/free energy
+                                   # as a function of volume.
+                                   #
+                                   # In benzene at T=279K, the Vinet fit
+                                   # performs well in some cases where the optimizer
+                                   # cannot find optimal parameters for Birch-Murnaghan.
                                    #
     equation_of_state: Literal["birch_murnaghan", "vinet"] = "vinet"
                                    #
@@ -157,6 +191,15 @@ class PropertiesConfig:
                                    #    volume constraint.
                                    #
     eos_sampling: Literal["pressure", "volume"] = "volume"
+                                   #
+                                   # Use all computed data points on the F(V, T) curve to approximately
+                                   # locate the minimum, but perform the numerical fit to an analytic
+                                   # form of F using only a subset near the minimum.
+                                   #
+                                   # This setting allows performing a scan over a wide range of V's
+                                   # without accuracy deterioration due to the outliers.
+                                   #
+    select_subset_for_eos_fit: bool = True
                                    #
                                    # Threshold for detecting imaginary phonon
                                    # frequencies (in THz). A phonon with negative
