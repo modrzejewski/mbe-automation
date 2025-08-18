@@ -45,7 +45,7 @@ def run(config: PropertiesConfig):
         molecule,
         config.calculator,
         max_force_on_atom=config.max_force_on_atom,
-        log=os.path.join(geom_opt_dir, f"{label}.txt"),
+        log=os.path.join(geom_opt_dir, f"{label_molecule}.txt"),
         system_label=label_molecule
     )
     #
