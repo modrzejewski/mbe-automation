@@ -166,19 +166,13 @@ class PropertiesConfig:
                                    # molecular crystals, Chem. Sci., 2025, 16, 11419;
                                    # doi: 10.1039/d5sc01325a
                                    #
-                                   # I have found that 
-                                   #
     pressure_range: list[float] = field(default_factory=lambda:
                                         [0.2, 0.0, -0.2, -0.3, -0.4, -0.5, -0.6])
                                    #
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.
                                    #
-                                   # In benzene at T=279K, the Vinet fit
-                                   # performs well in some cases where the optimizer
-                                   # cannot find optimal parameters for Birch-Murnaghan.
-                                   #
-    equation_of_state: Literal["birch_murnaghan", "vinet"] = "vinet"
+    equation_of_state: Literal["birch_murnaghan", "vinet", "third_order_polynomial"] = "vinet"
                                    #
                                    # Algorithm used to generate points on
                                    # the equilibrium curve:

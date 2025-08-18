@@ -20,7 +20,7 @@ import mbe_automation.display
 import mbe_automation.hdf5
 import os
 import os.path
-import numpy.polynomial.polynomial as P
+from numpy.polynomial.polynomial import Polynomial, polyfit
 from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 import sys
 import pandas as pd
@@ -249,42 +249,95 @@ def eos_select_points(E, min_n_points, delta_E):
     mask[i_left:i_right+1] = True
     return mask
 
+
+def eos_polynomial_fit(V_sampled, F_sampled, degree=3):
+    """
+    Fit a polynomial to (V, F), find equilibrium volume and bulk modulus.
+    """
+
+    Vmin, Vmax = np.min(V_sampled), np.max(V_sampled)
+    coeffs = polyfit(V_sampled, F_sampled, degree)
     
-def eos_curve_fit(V, E, equation_of_state, V0, E_el_V0):
+    F_fit = Polynomial(coeffs) # kJ/mol/unit cell
+    dFdV = F_fit.deriv(1) # kJ/mol/Å³/unit cell
+    d2FdV2 = F_fit.deriv(2) # kJ/mol/Å⁶/unit cell
+
+    crit_points = dFdV.roots()
+    crit_points = crit_points[np.isreal(crit_points)].real
+    crit_points = crit_points[(crit_points > Vmin) & (crit_points < Vmax)]
+
+    n_minima = 0
+    V_opt, F_opt, B = np.nan, np.nan, np.nan
+    
+    for V in crit_points:
+        if d2FdV2(V) > 0:
+            n_minima += 1
+            V_opt = V # Å³/unit cell
+
+    if n_minima == 1:
+        F_opt = F_fit(V_opt) # kJ/mol/unit cell
+        B = V_opt * d2FdV2(V_opt) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
+        
+    elif n_minima == 0:
+        raise RuntimeError("No minimum of F(V) inside sampled interval")
+    
+    else:
+        raise RuntimeError("Multiple minima of F(V) inside sampled interval")        
+
+    return F_opt, V_opt, B
+
+
+def eos_curve_fit(V, E, equation_of_state):
     """
     Fit energy/free energy/Gibbs enthalpy using a specified
     analytic formula for E(V).
     """
-    xdata = V
-    ydata = E - E_el_V0
-    E_initial = 0.0
-    V_initial = V0
-    B_initial = 10.0 * ase.units.GPa/(ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)
-    B_prime_initial = 4.0
 
-    if equation_of_state == "vinet":
-        eos_func = vinet
-    elif equation_of_state == "birch_murnaghan":
-        eos_func = birch_murnaghan
-    else:
+    linear_fit = ["third_order_polynomial"]
+    nonlinear_fit = ["vinet", "birch_murnaghan"]
+    
+    if (equation_of_state not in linear_fit and
+        equation_of_state not in nonlinear_fit):
+        
         raise ValueError(f"Unknown EOS: {equation_of_state}")
 
-    popt, pcov = scipy.optimize.curve_fit(
-        eos_func,
-        xdata,
-        ydata,
-        p0=np.array([E_initial, V_initial, B_initial, B_prime_initial])
-    )
-    perr = np.sqrt(np.diag(pcov))
-    
-    E_min = popt[0] + E_el_V0 # kJ/mol/unit cell
-    δE_min = perr[0] # kJ/mol/unit cell    
-    V_min = popt[1] # Å³/unit cell
-    δV_min = perr[1] # Å³/unit cell
-    B_min = popt[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
-    δB_min = perr[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
+    E_min_poly, V_min_poly, B_min_poly = eos_polynomial_fit(V, E)
+    δE_min, δV_min, δB_min = np.nan, np.nan, np.nan
+        
+    if equation_of_state in linear_fit:
+        return E_min_poly, δE_min, V_min_poly, δV_min, B_min_poly, δB_min
 
-    return E_min, δE_min, V_min, δV_min, B_min, δB_min
+    if equation_of_state in nonlinear_fit:
+        xdata = V
+        ydata = E - E_min_poly
+        E_initial = 0.0
+        V_initial = V_min_poly
+        B_initial = B_min_poly * ase.units.GPa/(ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)
+        B_prime_initial = 4.0
+
+        eos_func = vinet if equation_of_state == "vinet" else birch_murnaghan
+
+        try:
+            popt, pcov = scipy.optimize.curve_fit(
+                eos_func,
+                xdata,
+                ydata,
+                p0=np.array([E_initial, V_initial, B_initial, B_prime_initial])
+            )
+            perr = np.sqrt(np.diag(pcov))
+    
+            E_min = popt[0] + E_min_poly # kJ/mol/unit cell
+            δE_min = perr[0] # kJ/mol/unit cell    
+            V_min = popt[1] # Å³/unit cell
+            δV_min = perr[1] # Å³/unit cell
+            B_min = popt[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
+            δB_min = perr[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
+            
+        except RuntimeError as e:
+            print("Nonlinear least squares failed. Falling back to polynomial fit")
+            E_min, V_min, B_min = E_min_poly, V_min_poly, B_min_poly
+
+        return E_min, δE_min, V_min, δV_min, B_min, δB_min
     
 
 def equilibrium_curve(
@@ -337,12 +390,13 @@ def equilibrium_curve(
     system_labels = []
     
     mbe_automation.display.framed("F(V) curve sampling")
+    print(f"Analytic EOS model: {equation_of_state}")
     if eos_sampling == "volume":
         print("Volume range (V/V):")
-        print(np.array2string(volume_range, precision=2, suppress_small=True))
+        print(np.array2string(volume_range, precision=2))
     else:
         print(f"Thermal pressure range (GPa):")
-        print(np.array2string(pressure_range, precision=2, suppress_small=True))
+        print(np.array2string(pressure_range, precision=2))
     print(f"EOS fit with a subset of volume points: {select_subset_for_eos_fit}")
 
     for i in range(n_volumes):
@@ -434,7 +488,7 @@ def equilibrium_curve(
     if select_subset_for_eos_fit:
         close_to_minimum = eos_select_points(
             E_el_V[mask],
-            min_n_points=4,
+            min_n_points=5,
             delta_E=0.1*n_atoms_unit_cell
         )
     else:
@@ -443,19 +497,20 @@ def equilibrium_curve(
     fit_params = eos_curve_fit(
         V_sampled[mask][close_to_minimum],
         E_el_V[mask][close_to_minimum],
-        equation_of_state,
-        V0,
-        E_el_V0
+        equation_of_state
     )
     _, _, _, _, B0, δB0 = fit_params
-    print(f"Bulk modulus computed using E_el_crystal(V): {B0:.1f}±{δB0:.2f} GPa")
+    if not np.isnan(δB0):
+        print(f"Bulk modulus computed using E_el_crystal(V): {B0:.1f}±{δB0:.2f} GPa")
+    else:
+        print(f"Bulk modulus computed using E_el_crystal(V): {B0:.1f} GPa")
     
     for i, T in enumerate(temperatures):
         F_tot_V = F_vib_V_T[:, i] + E_el_V[:] # kJ/mol/unit cell
         if select_subset_for_eos_fit:
             close_to_minimum = eos_select_points(
                 F_tot_V[mask],
-                min_n_points=4,
+                min_n_points=5,
                 delta_E=0.1*n_atoms_unit_cell
             )
         else:
@@ -464,9 +519,7 @@ def equilibrium_curve(
         fit_params = eos_curve_fit(
             V_sampled[mask][close_to_minimum],
             F_tot_V[mask][close_to_minimum],
-            equation_of_state,
-            V0,
-            E_el_V0
+            equation_of_state
         )
         F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = fit_params
         #
@@ -498,8 +551,8 @@ def equilibrium_curve(
         # Quartic polynomial fit to Fvib(V),
         # see fig 2 in Otero-de-la-Roza et al.
         #
-        coeffs = P.polyfit(V_sampled, F_vib_V_T[:, i], 4)
-        F_vib_fit = P.Polynomial(coeffs) # kJ/mol/unit cell
+        coeffs = polyfit(V_sampled, F_vib_V_T[:, i], 4)
+        F_vib_fit = Polynomial(coeffs) # kJ/mol/unit cell
         dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
         p_thermal_eos[i] = dFdV(V_eos[i]) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
 
