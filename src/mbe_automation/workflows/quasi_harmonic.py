@@ -40,13 +40,13 @@ def run(config: PropertiesConfig):
     if isinstance(config.calculator, mace.calculators.MACECalculator):
         mbe_automation.display.mace_summary(config.calculator)
 
-    label = "isolated_molecule"
+    label_molecule = "isolated_molecule"
     molecule = mbe_automation.structure.relax.isolated_molecule(
         molecule,
         config.calculator,
         max_force_on_atom=config.max_force_on_atom,
         log=os.path.join(geom_opt_dir, f"{label}.txt"),
-        system_label=label
+        system_label=label_molecule
     )
     #
     # Compute the reference cell volume (V0), lattice vectors, and atomic
@@ -157,7 +157,9 @@ def run(config: PropertiesConfig):
         "space group": space_group_V0,
         "all_freqs_real_crystal": all_freqs_real_V0,
         "n_atoms_unit_cell": n_atoms_unit_cell,
-        "n_atoms_molecule": n_atoms_molecule
+        "n_atoms_molecule": n_atoms_molecule,
+        "system_label_crystal": label,
+        "system_label_molecule": label_molecule
     })
     df_harmonic = pd.concat([df1, df2], axis=1)
     mbe_automation.hdf5.save_dataframe(
@@ -219,6 +221,7 @@ def run(config: PropertiesConfig):
     V_actual = np.zeros(n_temperatures)
     space_groups = np.zeros(n_temperatures, dtype=int)
     has_imaginary_modes = np.zeros(n_temperatures, dtype=bool)
+    system_label_crystal = []
     for i, V in enumerate(eos_properties["V_eos (Å³/unit cell)"]):
         T =  temperatures[i]
         unit_cell_T = unit_cell_V0.copy()
@@ -259,6 +262,7 @@ def run(config: PropertiesConfig):
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
+        system_label_crystal.append(label)
         phonons = mbe_automation.vibrations.harmonic.phonons(
             unit_cell_T,
             config.calculator,
@@ -342,7 +346,9 @@ def run(config: PropertiesConfig):
         "space_group": space_groups,
         "all_freqs_real_crystal": all_freqs_real_crystal,
         "n_atoms_unit_cell": n_atoms_unit_cell,
-        "n_atoms_molecule": n_atoms_molecule
+        "n_atoms_molecule": n_atoms_molecule,
+        "system_label_crystal": system_label_crystal,
+        "system_label_molecule": label_molecule
     })
     df_quasi_harmonic = pd.concat([df1, df2], axis=1)
 

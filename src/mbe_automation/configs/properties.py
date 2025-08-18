@@ -32,12 +32,12 @@ class PropertiesConfig:
                                    # (2) distance (in Angs) which defines
                                    # the supercell
                                    #
-    fourier_interpolation_mesh: npt.NDArray[np.integer] | np.floating = 200.0
+    fourier_interpolation_mesh: Union[npt.NDArray[np.integer], float] = 200.0
                                    #
                                    # Range of temperatures at which phonons
                                    # and thermodynamic properties are computed
                                    #
-    temperatures: np.ndarray = field(default_factory=lambda: np.arange(0, 301, 10))
+    temperatures: npt.NDArray[np.floating] = field(default_factory=lambda: np.arange(0, 301, 10))
                                    #
                                    # Refine the space group symmetry after
                                    # each geometry relaxation of the unit cell.
@@ -63,7 +63,7 @@ class PropertiesConfig:
                                    # (1) symmetrization is enabled
                                    # (2) supercell_displacement is small
                                    #
-    max_force_on_atom = 1.0E-4
+    max_force_on_atom: float = 1.0E-4
                                    #
                                    # Directory to store processed results: plots,
                                    # tables, etc.
@@ -124,7 +124,7 @@ class PropertiesConfig:
                                    # in Phonopy. If disabled, Phonopy assumes that
                                    # the input unit cell is the primitive cell.
                                    #
-    automatic_primitive_cell = False
+    automatic_primitive_cell: bool = False
                                    #
                                    # Scaling factors used to sample volumes around
                                    # the reference volume at T=0K.
@@ -139,14 +139,13 @@ class PropertiesConfig:
                                    # 2. V/V0=0.97 up to V/V0=1.06 according to the manual
                                    # of CRYSTAL
                                    #
-                                   # A fail-proof choice is to specify a wide range of volumes, e.g.,
+                                   # A robust choice is to specify a wide range of volumes, e.g.,
                                    # 0.96...1.12 V/V0, and to enable automatic selection of volumes
-                                   # in the immediate vicinity of the minimum at each temperature
+                                   # in the neighborhood of the minimum at each temperature
                                    # (see select_subset_for_eos_fit=True).
                                    #
-                                   #
-    volume_range: list[float] = field(default_factory=lambda:
-                                      [0.96, 0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10, 1.12])
+    volume_range: npt.NDArray[np.floating] = field(default_factory=lambda:
+                                                    np.array([0.96, 0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10, 1.12]))
                                    #
                                    # Range of external isotropic pressures applied
                                    # to sample different cell volumes and fit
@@ -166,8 +165,8 @@ class PropertiesConfig:
                                    # molecular crystals, Chem. Sci., 2025, 16, 11419;
                                    # doi: 10.1039/d5sc01325a
                                    #
-    pressure_range: list[float] = field(default_factory=lambda:
-                                        [0.2, 0.0, -0.2, -0.3, -0.4, -0.5, -0.6])
+    pressure_range: npt.NDArray[np.floating] = field(default_factory=lambda:
+                                                     np.array([0.2, 0.0, -0.2, -0.3, -0.4, -0.5, -0.6]))
                                    #
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.

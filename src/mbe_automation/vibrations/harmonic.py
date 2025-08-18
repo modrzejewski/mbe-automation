@@ -467,36 +467,32 @@ def equilibrium_curve(
         E_el_V[i] = unit_cell_V.get_potential_energy()*ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
 
     preserved_symmetry = space_groups == reference_space_group
-    mask = np.ones(n_volumes, dtype=bool)
+    accepted_systems = np.ones(n_volumes, dtype=bool)
     if skip_structures_with_imaginary_modes:
-        mask = mask & real_freqs
+        accepted_systems = accepted_systems & real_freqs
     if skip_structures_with_broken_symmetry:
-        mask = mask & preserved_symmetry
+        accepted_systems = accepted_systems & preserved_symmetry
     #
     # Summary of systems included in the EOS fit
     #
-    print(f"{'system':<30} {'all freqs real':<15} "
-          f"{'preserved symmetry':<20} {'space group':<15} {'included in EOS':<25}")
+    print(f"{'system':<30} {'all freqs real':<15} {'space group':<15}")
     for i in range(n_volumes):
         print(f"{system_labels[i]:<30} "
               f"{'Yes' if real_freqs[i] else 'No':<15} "
-              f"{'Yes' if preserved_symmetry[i] else 'No':<20} "
-              f"{space_groups[i]:<15} "
-              f"{'Yes' if mask[i] else 'No':<25}")
+              f"{space_groups[i]:<15} ")
     print("", flush=True)
 
     if select_subset_for_eos_fit:
         close_to_minimum = eos_select_points(
-            E_el_V[mask],
+            E_el_V[accepted_systems],
             min_n_points=5,
             delta_E=0.1*n_atoms_unit_cell
         )
     else:
-        close_to_minimum = np.ones_like(E_el_V[mask], dtype=bool)
-    print(np.array2string(close_to_minimum))
+        close_to_minimum = np.ones_like(E_el_V[accepted_systems], dtype=bool)
     fit_params = eos_curve_fit(
-        V_sampled[mask][close_to_minimum],
-        E_el_V[mask][close_to_minimum],
+        V_sampled[accepted_systems][close_to_minimum],
+        E_el_V[accepted_systems][close_to_minimum],
         equation_of_state
     )
     _, _, _, _, B0, δB0 = fit_params
@@ -509,16 +505,16 @@ def equilibrium_curve(
         F_tot_V = F_vib_V_T[:, i] + E_el_V[:] # kJ/mol/unit cell
         if select_subset_for_eos_fit:
             close_to_minimum = eos_select_points(
-                F_tot_V[mask],
+                F_tot_V[accepted_systems],
                 min_n_points=5,
                 delta_E=0.1*n_atoms_unit_cell
             )
         else:
-            close_to_minimum = np.ones_like(F_tot_V[mask], dtype=bool)
+            close_to_minimum = np.ones_like(F_tot_V[accepted_systems], dtype=bool)
         print(np.array2string(close_to_minimum))
         fit_params = eos_curve_fit(
-            V_sampled[mask][close_to_minimum],
-            F_tot_V[mask][close_to_minimum],
+            V_sampled[accepted_systems][close_to_minimum],
+            F_tot_V[accepted_systems][close_to_minimum],
             equation_of_state
         )
         F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = fit_params
@@ -548,10 +544,13 @@ def equilibrium_curve(
         # J. Chem. Phys. 137, 054103 (2012);
         # doi: 10.1063/1.4738961
         #
-        # Quartic polynomial fit to Fvib(V),
-        # see fig 2 in Otero-de-la-Roza et al.
+        # See fig 2 in Otero-de-la-Roza et al. for
+        # an example of a polynomial fit.
         #
-        coeffs = polyfit(V_sampled, F_vib_V_T[:, i], 4)
+        coeffs = polyfit(
+            V_sampled[accepted_systems][close_to_minimum],
+            F_vib_V_T[accepted_systems, i][close_to_minimum],
+            3)
         F_vib_fit = Polynomial(coeffs) # kJ/mol/unit cell
         dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
         p_thermal_eos[i] = dFdV(V_eos[i]) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
