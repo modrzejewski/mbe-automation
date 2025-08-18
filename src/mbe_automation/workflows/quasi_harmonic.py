@@ -1,4 +1,4 @@
-import mbe_automation.vibrations.harmonic
+import mbe_automation.dynamics.harmonic
 import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
@@ -16,8 +16,11 @@ import mbe_automation.hdf5
 
 def run(config: PropertiesConfig):
 
-    mbe_automation.display.framed("Quasi-harmonic approximation")
-    
+    if config.thermal_expansion:
+        mbe_automation.display.framed("Harmonic properties with thermal expansion")
+    else:
+        mbe_automation.display.framed("Harmonic properties")
+        
     os.makedirs(config.properties_dir, exist_ok=True)
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
     os.makedirs(geom_opt_dir, exist_ok=True)
@@ -37,13 +40,13 @@ def run(config: PropertiesConfig):
     if isinstance(config.calculator, mace.calculators.MACECalculator):
         mbe_automation.display.mace_summary(config.calculator)
 
-    label = "isolated_molecule"
+    label_molecule = "isolated_molecule"
     molecule = mbe_automation.structure.relax.isolated_molecule(
         molecule,
         config.calculator,
         max_force_on_atom=config.max_force_on_atom,
-        log=os.path.join(geom_opt_dir, f"{label}.txt"),
-        system_label=label
+        log=os.path.join(geom_opt_dir, f"{label_molecule}.txt"),
+        system_label=label_molecule
     )
     #
     # Compute the reference cell volume (V0), lattice vectors, and atomic
@@ -81,7 +84,7 @@ def run(config: PropertiesConfig):
     # Phonon properties of the fully relaxed cell
     # (the harmonic approximation)
     #
-    phonons = mbe_automation.vibrations.harmonic.phonons(
+    phonons = mbe_automation.dynamics.harmonic.phonons(
         unit_cell_V0,
         config.calculator,
         supercell_matrix,
@@ -90,7 +93,7 @@ def run(config: PropertiesConfig):
         automatic_primitive_cell=config.automatic_primitive_cell,
         system_label=label
     )
-    has_imaginary_modes_V0 = mbe_automation.vibrations.harmonic.band_structure(
+    has_imaginary_modes_V0 = mbe_automation.dynamics.harmonic.band_structure(
         phonons,
         imaginary_mode_threshold=config.imaginary_mode_threshold,
         properties_dir=config.properties_dir,
@@ -104,14 +107,14 @@ def run(config: PropertiesConfig):
     print(f"All structures will use the same mesh")
 
     n_atoms_unit_cell = len(unit_cell_V0)
-    harmonic_properties = mbe_automation.vibrations.harmonic.phonon_properties(
+    harmonic_properties = mbe_automation.dynamics.harmonic.phonon_properties(
         phonons,
         config.temperatures
-    )    
+    )
     #
     # Vibrational contributions to E, S, F of the isolated molecule
     #
-    molecule_properties = mbe_automation.vibrations.harmonic.isolated_molecule(
+    molecule_properties = mbe_automation.dynamics.harmonic.isolated_molecule(
         molecule,
         config.calculator,
         config.temperatures
@@ -154,15 +157,22 @@ def run(config: PropertiesConfig):
         "space group": space_group_V0,
         "all_freqs_real_crystal": all_freqs_real_V0,
         "n_atoms_unit_cell": n_atoms_unit_cell,
-        "n_atoms_molecule": n_atoms_molecule
+        "n_atoms_molecule": n_atoms_molecule,
+        "system_label_crystal": label,
+        "system_label_molecule": label_molecule
     })
     df_harmonic = pd.concat([df1, df2], axis=1)
     mbe_automation.hdf5.save_dataframe(
         df_harmonic,
         config.hdf5_dataset,
-        group_path="quasi_harmonic/no_volume_expansion"
+        group_path="quasi_harmonic/no_thermal_expansion"
     )
-    df_harmonic.to_csv(os.path.join(config.properties_dir, "no_volume_expansion.csv"))
+    df_harmonic.to_csv(os.path.join(config.properties_dir, "no_thermal_expansion.csv"))
+    if not config.thermal_expansion:
+        print("Harmonic calculations completed")
+        return
+    #
+    # Thermal expansion
     #
     # Equilibrium properties at temperature T interpolated
     # using an analytical form of the equation of state:
@@ -173,7 +183,7 @@ def run(config: PropertiesConfig):
     #    of ZPE and thermal motion on the cell relaxation
     # 4. bulk moduli B(T)
     #
-    eos_properties = mbe_automation.vibrations.harmonic.equilibrium_curve(
+    eos_properties = mbe_automation.dynamics.harmonic.equilibrium_curve(
         unit_cell_V0,
         space_group_V0,
         config.calculator,
@@ -188,6 +198,7 @@ def run(config: PropertiesConfig):
         config.volume_range,
         config.equation_of_state,
         config.eos_sampling,
+        config.select_subset_for_eos_fit,
         config.symmetrize_unit_cell,
         config.imaginary_mode_threshold,
         config.skip_structures_with_imaginary_modes,
@@ -195,8 +206,8 @@ def run(config: PropertiesConfig):
         config.hdf5_dataset
     )
     #
-    # Quasi-harmonic properties for temperature-dependent
-    # structures
+    # Harmonic properties for unit cells with temperature-dependent
+    # equilibrium volumes V(T)
     #
     temperatures = config.temperatures
     n_temperatures = len(temperatures)
@@ -210,6 +221,7 @@ def run(config: PropertiesConfig):
     V_actual = np.zeros(n_temperatures)
     space_groups = np.zeros(n_temperatures, dtype=int)
     has_imaginary_modes = np.zeros(n_temperatures, dtype=bool)
+    system_label_crystal = []
     for i, V in enumerate(eos_properties["V_eos (Å³/unit cell)"]):
         T =  temperatures[i]
         unit_cell_T = unit_cell_V0.copy()
@@ -250,7 +262,8 @@ def run(config: PropertiesConfig):
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
-        phonons = mbe_automation.vibrations.harmonic.phonons(
+        system_label_crystal.append(label)
+        phonons = mbe_automation.dynamics.harmonic.phonons(
             unit_cell_T,
             config.calculator,
             supercell_matrix,
@@ -259,7 +272,7 @@ def run(config: PropertiesConfig):
             automatic_primitive_cell=config.automatic_primitive_cell,
             system_label=label
         )
-        has_imaginary_modes[i] = mbe_automation.vibrations.harmonic.band_structure(
+        has_imaginary_modes[i] = mbe_automation.dynamics.harmonic.band_structure(
             phonons,
             imaginary_mode_threshold=config.imaginary_mode_threshold,
             properties_dir=config.properties_dir,
@@ -267,7 +280,7 @@ def run(config: PropertiesConfig):
             system_label=label
         )
         E_el_crystal_eV = unit_cell_T.get_potential_energy() # eV/unit cell
-        properties_at_T = mbe_automation.vibrations.harmonic.phonon_properties(
+        properties_at_T = mbe_automation.dynamics.harmonic.phonon_properties(
             phonons,
             np.array([T])
         )
@@ -333,16 +346,18 @@ def run(config: PropertiesConfig):
         "space_group": space_groups,
         "all_freqs_real_crystal": all_freqs_real_crystal,
         "n_atoms_unit_cell": n_atoms_unit_cell,
-        "n_atoms_molecule": n_atoms_molecule
+        "n_atoms_molecule": n_atoms_molecule,
+        "system_label_crystal": system_label_crystal,
+        "system_label_molecule": label_molecule
     })
     df_quasi_harmonic = pd.concat([df1, df2], axis=1)
 
     mbe_automation.hdf5.save_dataframe(
         df_quasi_harmonic,
         config.hdf5_dataset,
-        group_path="quasi_harmonic/volume_expansion"
+        group_path="quasi_harmonic/thermal_expansion"
     )
-    df_quasi_harmonic.to_csv(os.path.join(config.properties_dir, "volume_expansion.csv"))
+    df_quasi_harmonic.to_csv(os.path.join(config.properties_dir, "thermal_expansion.csv"))
         
     print(f"Quasi-harmonic calculations completed")
 

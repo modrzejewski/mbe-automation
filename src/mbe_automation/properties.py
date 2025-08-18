@@ -1,4 +1,4 @@
-import mbe_automation.vibrations.harmonic
+import mbe_automation.dynamics.harmonic
 import mbe_automation.structure.relax
 import mbe_automation.kpoints
 from ase.units import kJ, mol, _hplanck, _c
@@ -27,7 +27,7 @@ def phonons(
 ):
     
     mesh_radius = 100.0
-    thermodynamic_functions, dos, phonons = mbe_automation.vibrations.harmonic.phonopy(
+    thermodynamic_functions, dos, phonons = mbe_automation.dynamics.harmonic.phonopy(
         unit_cell,
         calculator,
         supercell_matrix,
@@ -57,7 +57,7 @@ def phonons(
     #
     # Plot phonon dispersion
     #
-    mbe_automation.vibrations.harmonic.my_plot_band_structure(
+    mbe_automation.dynamics.harmonic.my_plot_band_structure(
         phonons,
         os.path.join(properties_dir, "phonon_dispersion.png"),
         band_connection=True
@@ -207,7 +207,7 @@ def static_lattice_energy(UnitCell, Molecule, calculator, SupercellRadius):
     #      )
          
     #      # Calculate phonons and sigle volume thermodynamic functions at this volume
-    #      _, _, phonons = mbe_automation.vibrations.harmonic.phonopy(
+    #      _, _, phonons = mbe_automation.dynamics.harmonic.phonopy(
     #          scaled_unitcell,
     #          calculator,
     #          supercell_matrix,
