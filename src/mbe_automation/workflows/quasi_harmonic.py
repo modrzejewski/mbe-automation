@@ -1,4 +1,4 @@
-import mbe_automation.vibrations.harmonic
+import mbe_automation.dynamics.harmonic
 import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
@@ -84,7 +84,7 @@ def run(config: PropertiesConfig):
     # Phonon properties of the fully relaxed cell
     # (the harmonic approximation)
     #
-    phonons = mbe_automation.vibrations.harmonic.phonons(
+    phonons = mbe_automation.dynamics.harmonic.phonons(
         unit_cell_V0,
         config.calculator,
         supercell_matrix,
@@ -93,7 +93,7 @@ def run(config: PropertiesConfig):
         automatic_primitive_cell=config.automatic_primitive_cell,
         system_label=label
     )
-    has_imaginary_modes_V0 = mbe_automation.vibrations.harmonic.band_structure(
+    has_imaginary_modes_V0 = mbe_automation.dynamics.harmonic.band_structure(
         phonons,
         imaginary_mode_threshold=config.imaginary_mode_threshold,
         properties_dir=config.properties_dir,
@@ -107,14 +107,14 @@ def run(config: PropertiesConfig):
     print(f"All structures will use the same mesh")
 
     n_atoms_unit_cell = len(unit_cell_V0)
-    harmonic_properties = mbe_automation.vibrations.harmonic.phonon_properties(
+    harmonic_properties = mbe_automation.dynamics.harmonic.phonon_properties(
         phonons,
         config.temperatures
     )
     #
     # Vibrational contributions to E, S, F of the isolated molecule
     #
-    molecule_properties = mbe_automation.vibrations.harmonic.isolated_molecule(
+    molecule_properties = mbe_automation.dynamics.harmonic.isolated_molecule(
         molecule,
         config.calculator,
         config.temperatures
@@ -183,7 +183,7 @@ def run(config: PropertiesConfig):
     #    of ZPE and thermal motion on the cell relaxation
     # 4. bulk moduli B(T)
     #
-    eos_properties = mbe_automation.vibrations.harmonic.equilibrium_curve(
+    eos_properties = mbe_automation.dynamics.harmonic.equilibrium_curve(
         unit_cell_V0,
         space_group_V0,
         config.calculator,
@@ -263,7 +263,7 @@ def run(config: PropertiesConfig):
                 system_label=label
             )
         system_label_crystal.append(label)
-        phonons = mbe_automation.vibrations.harmonic.phonons(
+        phonons = mbe_automation.dynamics.harmonic.phonons(
             unit_cell_T,
             config.calculator,
             supercell_matrix,
@@ -272,7 +272,7 @@ def run(config: PropertiesConfig):
             automatic_primitive_cell=config.automatic_primitive_cell,
             system_label=label
         )
-        has_imaginary_modes[i] = mbe_automation.vibrations.harmonic.band_structure(
+        has_imaginary_modes[i] = mbe_automation.dynamics.harmonic.band_structure(
             phonons,
             imaginary_mode_threshold=config.imaginary_mode_threshold,
             properties_dir=config.properties_dir,
@@ -280,7 +280,7 @@ def run(config: PropertiesConfig):
             system_label=label
         )
         E_el_crystal_eV = unit_cell_T.get_potential_energy() # eV/unit cell
-        properties_at_T = mbe_automation.vibrations.harmonic.phonon_properties(
+        properties_at_T = mbe_automation.dynamics.harmonic.phonon_properties(
             phonons,
             np.array([T])
         )

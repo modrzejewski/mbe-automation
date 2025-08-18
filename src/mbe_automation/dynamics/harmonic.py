@@ -220,7 +220,7 @@ def vinet(volume, e0, v0, b0, b1):
         )
 
 
-def eos_select_points(E, min_n_points, delta_E):
+def eos_select_points(E, min_n_points=5, delta_E=0.0):
     i_min = np.argmin(E)
     y_min = E[i_min]
     d = np.abs(E - y_min)
@@ -484,10 +484,7 @@ def equilibrium_curve(
 
     if select_subset_for_eos_fit:
         close_to_minimum = eos_select_points(
-            E_el_V[accepted_systems],
-            min_n_points=5,
-            delta_E=0.1*n_atoms_unit_cell
-        )
+            E_el_V[accepted_systems])
     else:
         close_to_minimum = np.ones_like(E_el_V[accepted_systems], dtype=bool)
     fit_params = eos_curve_fit(
@@ -505,10 +502,7 @@ def equilibrium_curve(
         F_tot_V = F_vib_V_T[:, i] + E_el_V[:] # kJ/mol/unit cell
         if select_subset_for_eos_fit:
             close_to_minimum = eos_select_points(
-                F_tot_V[accepted_systems],
-                min_n_points=5,
-                delta_E=0.1*n_atoms_unit_cell
-            )
+                F_tot_V[accepted_systems])
         else:
             close_to_minimum = np.ones_like(F_tot_V[accepted_systems], dtype=bool)
         print(np.array2string(close_to_minimum))
