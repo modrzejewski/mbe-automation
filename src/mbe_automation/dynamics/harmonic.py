@@ -6,7 +6,6 @@ import phonopy.qha
 import time
 import numpy as np
 import torch
-import mace.calculators
 import mbe_automation.structure.molecule
 import mbe_automation.display
 import ase.thermochemistry
@@ -112,11 +111,7 @@ def phonons(
         system_label=None        
 ):
 
-    if isinstance(calculator, mace.calculators.MACECalculator):
-        cuda_available = torch.cuda.is_available()
-    else:
-        cuda_available = False
-        
+    cuda_available = torch.cuda.is_available()
     if cuda_available:
         torch.cuda.reset_peak_memory_stats()
 
