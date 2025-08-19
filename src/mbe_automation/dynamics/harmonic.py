@@ -731,79 +731,79 @@ def phonon_properties(phonons, temperatures):
     return properties
     
     
-def my_plot_band_structure_first_segment_only(phonons, output_path):
-    """Alternative approach: Extract and plot only the first segment data."""
-    import matplotlib.pyplot as plt
-    import numpy as np
+# def my_plot_band_structure_first_segment_only(phonons, output_path):
+#     """Alternative approach: Extract and plot only the first segment data."""
+#     import matplotlib.pyplot as plt
+#     import numpy as np
     
-    if phonons._band_structure is None:
-        raise RuntimeError("run_band_structure has to be done.")
+#     if phonons._band_structure is None:
+#         raise RuntimeError("run_band_structure has to be done.")
     
-    # Get band structure data
-    frequencies = phonons._band_structure.frequencies
-    distances = phonons._band_structure.distances
-    path_connections = phonons._band_structure.path_connections
+#     # Get band structure data
+#     frequencies = phonons._band_structure.frequencies
+#     distances = phonons._band_structure.distances
+#     path_connections = phonons._band_structure.path_connections
     
-    # Convert to numpy arrays if they're lists
-    frequencies = np.array(frequencies)
-    distances = np.array(distances)
+#     # Convert to numpy arrays if they're lists
+#     frequencies = np.array(frequencies)
+#     distances = np.array(distances)
     
-    # Find the first segment (before the first connection break)
-    first_break = None
-    for i, connection in enumerate(path_connections):
-        if not connection:  # False means a break in the path
-            first_break = i + 1
-            break
+#     # Find the first segment (before the first connection break)
+#     first_break = None
+#     for i, connection in enumerate(path_connections):
+#         if not connection:  # False means a break in the path
+#             first_break = i + 1
+#             break
     
-    if first_break is None:
-        first_break = len(frequencies)
+#     if first_break is None:
+#         first_break = len(frequencies)
     
-    # Extract first segment data
-    first_segment_frequencies = frequencies[:first_break]
-    first_segment_distances = distances[:first_break]
+#     # Extract first segment data
+#     first_segment_frequencies = frequencies[:first_break]
+#     first_segment_distances = distances[:first_break]
     
-    # Create the plot
-    fig, ax = plt.subplots(1, 1, figsize=(4, 6))
+#     # Create the plot
+#     fig, ax = plt.subplots(1, 1, figsize=(4, 6))
     
-    # Plot each band
-    if len(first_segment_frequencies.shape) == 1:
-        # Handle 1D case (single band)
-        ax.plot(first_segment_distances, first_segment_frequencies, 'r-', linewidth=1.0)
-    else:
-        # Handle 2D case (multiple bands)
-        for band_idx in range(first_segment_frequencies.shape[1]):
-            ax.plot(first_segment_distances, first_segment_frequencies[:, band_idx], 
-                    'r-', linewidth=1.0)
+#     # Plot each band
+#     if len(first_segment_frequencies.shape) == 1:
+#         # Handle 1D case (single band)
+#         ax.plot(first_segment_distances, first_segment_frequencies, 'r-', linewidth=1.0)
+#     else:
+#         # Handle 2D case (multiple bands)
+#         for band_idx in range(first_segment_frequencies.shape[1]):
+#             ax.plot(first_segment_distances, first_segment_frequencies[:, band_idx], 
+#                     'r-', linewidth=1.0)
     
-    # Style the plot
-    ax.set_ylim(0, 7)
-    ax.set_ylabel("Frequency / THz", fontsize=14)
-    ax.set_xlim(first_segment_distances[0], first_segment_distances[-1])
+#     # Style the plot
+#     ax.set_ylim(0, 7)
+#     ax.set_ylabel("Frequency / THz", fontsize=14)
+#     ax.set_xlim(first_segment_distances[0], first_segment_distances[-1])
     
-    # Clean grid
-    ax.grid(True, alpha=0.3, linewidth=0.5)
-    ax.set_axisbelow(True)
+#     # Clean grid
+#     ax.grid(True, alpha=0.3, linewidth=0.5)
+#     ax.set_axisbelow(True)
     
-    # Set tick parameters
-    ax.tick_params(labelsize=12, width=1.2, length=4)
+#     # Set tick parameters
+#     ax.tick_params(labelsize=12, width=1.2, length=4)
     
-    # Style the plot borders
-    for spine in ax.spines.values():
-        spine.set_linewidth(1.2)
-        spine.set_color('black')
+#     # Style the plot borders
+#     for spine in ax.spines.values():
+#         spine.set_linewidth(1.2)
+#         spine.set_color('black')
     
-    ax.set_facecolor('white')
+#     ax.set_facecolor('white')
     
-    # Set x-axis labels for the first segment (typically Γ to X)
-    ax.set_xticks([first_segment_distances[0], first_segment_distances[-1]])
-    ax.set_xticklabels(['Γ', 'X'])  # Adjust these labels based on your actual path
+#     # Set x-axis labels for the first segment (typically Γ to X)
+#     ax.set_xticks([first_segment_distances[0], first_segment_distances[-1]])
+#     ax.set_xticklabels(['Γ', 'X'])  # Adjust these labels based on your actual path
     
-    # Add vertical line at the end point
-    ax.axvline(x=first_segment_distances[-1], color='gray', linewidth=0.8, alpha=0.7)
+#     # Add vertical line at the end point
+#     ax.axvline(x=first_segment_distances[-1], color='gray', linewidth=0.8, alpha=0.7)
     
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight',
-                facecolor='white', edgecolor='none')
-    plt.close()
+#     plt.tight_layout()
+#     plt.savefig(output_path, dpi=300, bbox_inches='tight',
+#                 facecolor='white', edgecolor='none')
+#     plt.close()
 
 
