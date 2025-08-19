@@ -1,6 +1,13 @@
 import sys
-import mace.calculators
 
+try:
+    from mace.calculators import MACECalculator
+    mace_available = True
+except ImportError:
+    MACECalculator = None
+    mace_available = False
+
+    
 class ReplicatedOutput:
     def __init__(self, filename):
         self.file = open(filename, 'w', encoding='utf-8')
@@ -72,7 +79,7 @@ def multiline_framed(lines, padding=10, min_width=30):
     print("└" + horizontal_line + "┘", flush=True)
 
 
-def mace_summary(calculator: mace.calculators.MACECalculator) -> None:
+def mace_summary(calculator: MACECalculator) -> None:
     """
     Print essential MACE model information.
     

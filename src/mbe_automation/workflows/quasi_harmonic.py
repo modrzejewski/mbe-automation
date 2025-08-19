@@ -5,13 +5,19 @@ import mbe_automation.structure.relax
 import mbe_automation.display
 from mbe_automation.configs.training import TrainingConfig
 from mbe_automation.configs.properties import PropertiesConfig
-import mace.calculators
 import os
 import os.path
 import ase.units
 import numpy as np
 import pandas as pd
 import mbe_automation.hdf5
+
+try:
+    from mace.calculators import MACECalculator
+    mace_available = True
+except ImportError:
+    MACECalculator = None
+    mace_available = False
 
 
 def run(config: PropertiesConfig):
@@ -36,9 +42,10 @@ def run(config: PropertiesConfig):
         unit_cell = config.unit_cell.copy()
         
     molecule = config.molecule.copy()
-    
-    if isinstance(config.calculator, mace.calculators.MACECalculator):
-        mbe_automation.display.mace_summary(config.calculator)
+
+    if mace_available:
+        if isinstance(config.calculator, MACECalculator):
+            mbe_automation.display.mace_summary(config.calculator)
 
     label_molecule = "isolated_molecule"
     molecule = mbe_automation.structure.relax.isolated_molecule(
