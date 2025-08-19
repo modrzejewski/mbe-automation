@@ -202,6 +202,7 @@ def phonons(
     print(f"Force constants completed", flush=True)
     
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
+    print(f"Fourier interpolation mesh completed", flush=True)
     
     return phonons
 
@@ -691,6 +692,11 @@ def band_structure(
         min_freq = min(min_freq, np.min(freqs))
         
     has_imaginary_modes = (min_freq < imaginary_mode_threshold)
+    if has_imaginary_modes:
+        print(f"Imaginary frequencies found (threshold: {imaginary_mode_threshold:.2f} THz)", flush=True)
+    else:
+        print(f"No imaginary frequencies found (threshold: {imaginary_mode_threshold:.2f} THz)", flush=True)
+    print(f"Phonon band structure completed", flush=True)
             
     return has_imaginary_modes
 
