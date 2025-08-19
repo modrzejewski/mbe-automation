@@ -1,0 +1,48 @@
+<simulation>
+  <output prefix="sim">
+    <properties stride="{sampling_stride}" start="{equilibration_steps}">
+      [step,time{{ps}},temperature{{K}},potential{{eV}},kinetic_cv{{eV}},kinetic_quantum{{eV}}]
+    </properties>
+    <trajectory stride="{sampling_stride}" start="{equilibration_steps}" format="xyz" bead="centroid">
+      positions{{angstrom}}
+    </trajectory>
+    <checkpoint stride="1000"/>
+  </o>
+  
+  <total_steps>{total_steps}</total_steps>
+  
+  <prng>
+    <seed>31415</seed>
+  </prng>
+  
+  <ffsocket mode="unix" name="d" slots="{n_calculators}">
+    <address>ipi_socket</address>
+    <latency>1e-3</latency>
+  </ffsocket>
+  
+  <s>
+    <initialize nbeads="{n_beads}">
+      <file mode="xyz" bead="-1">init.xyz</file>
+      <velocities mode="thermal" units="kelvin">{temperature_K}</velocities>
+    </initialize>
+    
+    <forces>
+      <force forcefield="d" nbeads="{n_beads}"/>
+    </forces>
+    
+    <ensemble mode="nvt" pimds="true">
+      <temperature units="kelvin">{temperature_K}</temperature>
+    </ensemble>
+    
+    <motion mode="dynamics">
+      <dynamics mode="nvt">
+        <timestep units="femtosecond">{time_step_fs}</timestep>
+        <thermostat mode="{thermostat}">
+          <tau units="femtosecond">{thermostat_tau_fs}</tau>
+          {pile_lambda_block}
+        </thermostat>
+      </dynamics>
+    </motion>
+  </s>
+</simulation>
+

@@ -15,7 +15,7 @@ import stat
 import shutil
 import sys        
 
-def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
+def prepare_inputs(ProjectDirectory, mlip_parameters, UnitCellFile, SystemTypes, Cutoffs,
                    Ordering, InputTemplates, QueueScriptTemplates,
                    Methods, UseExistingXYZ,
                    ExistingXYZDirs=None,
@@ -105,16 +105,20 @@ def prepare_inputs(ProjectDirectory, UnitCellFile, SystemTypes, Cutoffs,
                                             directory_structure.ML_DIRS["MACE(PBC)"],
                                             InputTemplates["MACE(PBC)"],
                                             QueueScriptTemplates["MACE(PBC)"],
-                                            SymmetrizeUnitCell)
+                                            SymmetrizeUnitCell,
+                                            mlip_parameters["MACE"]
+                                            )
         if "UMA" in MethodsPBC:
             mbe_automation.inputs.uma.Make(directory_structure.INP_DIRS,
-                                            directory_structure.XYZ_DIRS,
-                                            directory_structure.CSV_DIRS["UMA(PBC)"],
-                                            directory_structure.PLOT_DIRS["UMA(PBC)"],
-                                            directory_structure.ML_DIRS["UMA(PBC)"],
-                                            InputTemplates["UMA(PBC)"],
-                                            QueueScriptTemplates["UMA(PBC)"],
-                                            SymmetrizeUnitCell)
+                                           directory_structure.XYZ_DIRS,
+                                           directory_structure.CSV_DIRS["UMA(PBC)"],
+                                           directory_structure.PLOT_DIRS["UMA(PBC)"],
+                                           directory_structure.ML_DIRS["UMA(PBC)"],
+                                           InputTemplates["UMA(PBC)"],
+                                           QueueScriptTemplates["UMA(PBC)"],
+                                           SymmetrizeUnitCell,
+                                           mlip_parameters["UMA"]
+                                           )
         if "DFTB" in MethodsPBC:
             mbe_automation.inputs.dftb.Make(directory_structure.INP_DIRS,
                                             directory_structure.XYZ_DIRS,

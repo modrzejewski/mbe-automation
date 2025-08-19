@@ -10,7 +10,7 @@ import mbe_automation.single_point
                                                 # If the path already exists, e.g., it's your previous project,
                                                 # all existing files will be moved to a backup location.
                                                 #
-ProjectDirectory    = "./Projects/piracetam/VI"
+ProjectDirectory    = "./Projects/01_1,4-cyclohexanedione"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -20,17 +20,23 @@ ProjectDirectory    = "./Projects/piracetam/VI"
                                                 # (1) RPA
                                                 # (2) LNO-CCSD(T)
                                                 # (3) HF(PBC)
+                                                # (4) MACE machine lerarning potenctial
                                                 #
-                                                
 Methods = ["RPA", "LNO-CCSD(T)", "MACE(PBC)", "DFTB(PBC)", "UMA(PBC)"]
-
+                                                #
+                                                # Parameters for pre-trained machine-learning
+                                                # interatomic potentials
+                                                #
+mlip_parameters = {
+    "MACE": "~/models/mace/MACE-OFF24_medium.model",
+    "UMA": "~/models/uma/checkpoints/uma-m-1p1.pt"
+    }
+                                                #
                                                 # Unit cell definition. Any format that can be read by
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 #
-                                                
-UnitCellFile        = "./Systems/piracetam/form_VI/POSCAR"
-
+UnitCellFile        = "./Systems/X23/01_1,4-cyclohexanedione/solid.xyz"
                                                 #
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers, bulk.
@@ -59,7 +65,7 @@ SystemTypes         = ["monomers", "dimers", "bulk"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/piracetam/conf_1/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/01_1,4-cyclohexanedione/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
@@ -122,11 +128,11 @@ InputTemplates = {
         "molecule": "./templates/inputs/HF(PBC)/pyscf/molecule.py"
     },
     "MACE(PBC)": {
-        "training": "./templates/inputs/mace(pbc)/training.py",
-        "properties": "./templates/inputs/mace(pbc)/properties.py"
+        "training_dataset": "./templates/inputs/mace(pbc)/training_dataset.py",
+        "quasi_harmonic": "./templates/inputs/mace(pbc)/quasi_harmonic.py"
         },
     "UMA(PBC)": {
-        "workflow": "./templates/inputs/UMA(PBC)/workflow.py"
+        "quasi_harmonic": "./templates/inputs/uma(pbc)/quasi_harmonic.py"
         },
     "DFTB(PBC)": {
         "solid": "./templates/inputs/DFTB(PBC)/solid.py"
@@ -166,8 +172,8 @@ QueueScriptTemplates = {
         "cpu": "./templates/queue-scripts/Poznań/mace-cpu.py"
     },
     "UMA(PBC)":     {
-        "GPU": "./templates/queue-scripts/Poznań/UMA-GPU.py",
-        "CPU": "./templates/queue-scripts/Poznań/UMA-CPU.py"
+        "gpu": "./templates/queue-scripts/Poznań/uma-gpu.py",
+        "cpu": "./templates/queue-scripts/Poznań/uma-cpu.py"
     },
     "DFTB(PBC)":     "./templates/queue-scripts/Poznań/DFTB.py"
     }
@@ -206,6 +212,7 @@ ClusterComparisonAlgorithm = "RMSD"
 
 
 mbe_automation.single_point.prepare_inputs(ProjectDirectory,
+                                           mlip_parameters,
                                            UnitCellFile,
                                            SystemTypes,
                                            Cutoffs,

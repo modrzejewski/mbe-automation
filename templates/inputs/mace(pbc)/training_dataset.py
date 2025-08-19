@@ -2,7 +2,7 @@ import numpy as np
 import os.path
 import mace.calculators
 from mbe_automation.configs.training import TrainingConfig
-import mbe_automation.workflows
+import mbe_automation.workflows.training_dataset
 import mbe_automation.io
 import torch
 
@@ -12,8 +12,7 @@ work_dir = os.path.abspath(os.path.dirname(__file__))
 training_dir = os.path.join(work_dir, "training")
 
 mace_calc = mace.calculators.MACECalculator(
-    model_paths=os.path.expanduser("~/models/mace/MACE-OFF24_medium.model"),
-    compute_atomic_stresses=False,
+    model_paths=os.path.expanduser("{mlip_parameters}"),
     default_dtype="float64",
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )
@@ -33,7 +32,6 @@ training_config = TrainingConfig(
     averaging_window_fs = 5000    
     )
 
-mbe_automation.workflows.create_training_dataset_mace(training_config)
-    
+mbe_automation.workflows.training_dataset.run(training_config)
 
 

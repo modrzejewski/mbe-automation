@@ -39,7 +39,7 @@ def framed(text, padding=10, min_width=30):
     
     print("┌" + horizontal_line + "┐")
     print("│" + " " * left_padding + text + " " * right_padding + "│")
-    print("└" + horizontal_line + "┘")
+    print("└" + horizontal_line + "┘", flush=True)
 
 
 def multiline_framed(lines, padding=10, min_width=30):
@@ -69,7 +69,7 @@ def multiline_framed(lines, padding=10, min_width=30):
         right_padding = total_padding - left_padding
         print("│" + " " * left_padding + line + " " * right_padding + "│")
     
-    print("└" + horizontal_line + "┘")
+    print("└" + horizontal_line + "┘", flush=True)
 
 
 def mace_summary(calculator: mace.calculators.MACECalculator) -> None:
