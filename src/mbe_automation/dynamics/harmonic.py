@@ -222,6 +222,10 @@ def eos_select_points(E, min_n_points=5, delta_E=0.0):
     d = np.abs(E - y_min)
     n_points = len(E)
 
+    if i_min == 0 or i_min == n_points-1:
+        warnings.warn("The minimum of F(V) occurs at the boundary of the sampled interval.", RuntimeWarning)
+        return None
+        
     if n_points <= min_n_points:
         return np.ones_like(E, dtype=bool)
 
@@ -275,6 +279,8 @@ def eos_polynomial_fit(V_sampled, F_sampled, degree=3):
         B = V_opt * d2FdV2(V_opt) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
         
     elif n_minima == 0:
+        print(F_sampled)
+        print(V_sampled)
         raise RuntimeError("No minimum of F(V) inside sampled interval")
     
     else:
@@ -376,14 +382,16 @@ def equilibrium_curve(
     real_freqs = np.zeros(n_volumes, dtype=bool)
     E_el_V = np.zeros(n_volumes)
     F_vib_V_T = np.zeros((n_volumes, n_temperatures))
-    V_eos = np.zeros(n_temperatures)
-    δV_eos = np.zeros(n_temperatures)
-    F_tot_eos = np.zeros(n_temperatures)
-    δF_tot_eos = np.zeros(n_temperatures)
-    B_eos = np.zeros(n_temperatures)
-    δB_eos = np.zeros(n_temperatures)
-    p_thermal_eos = np.zeros(n_temperatures)
     system_labels = []
+
+    V_eos = np.full(n_temperatures, np.nan)
+    δV_eos = np.full(n_temperatures, np.nan)
+    F_tot_eos = np.full(n_temperatures, np.nan)
+    δF_tot_eos = np.full(n_temperatures, np.nan)
+    B_eos = np.full(n_temperatures, np.nan)
+    δB_eos = np.full(n_temperatures, np.nan)
+    p_thermal_eos = np.full(n_temperatures, np.nan)
+
     
     mbe_automation.display.framed("F(V) curve sampling")
     print(f"Analytic EOS model: {equation_of_state}")
@@ -501,7 +509,14 @@ def equilibrium_curve(
                 F_tot_V[accepted_systems])
         else:
             close_to_minimum = np.ones_like(F_tot_V[accepted_systems], dtype=bool)
-        print(np.array2string(close_to_minimum))
+            
+        if close_to_minimum is None:
+            #
+            # Skip to the next temperature. Thermodynamic properties
+            # at the current T will have NaN values.
+            #
+            continue
+            
         fit_params = eos_curve_fit(
             V_sampled[accepted_systems][close_to_minimum],
             F_tot_V[accepted_systems][close_to_minimum],

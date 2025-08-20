@@ -145,6 +145,9 @@ def run(config: PropertiesConfig):
     ΔE_vib = E_vib_molecule - E_vib_crystal * beta # kJ/mol/molecule
     ΔH_sub = -E_latt + ΔE_vib + E_trans_molecule + E_rot_molecule + pV_molecule # kJ/mol/molecule
 
+    molar_volume_V0 = mbe_automation.structure.crystal.molar_volume(unit_cell_V0) * n_atoms_molecule # cm**3/mol/molecule
+    rho_V0 = mbe_automaion.structure.crystal.density(unit_cell_V0) # g/cm**3
+    
     df1 = pd.DataFrame(harmonic_properties)
     df2 = pd.DataFrame({
         "E_latt (kJ/mol/molecule)": E_latt,
@@ -153,6 +156,8 @@ def run(config: PropertiesConfig):
         "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
         "F_tot_crystal (kJ/mol/unit cell)": F_tot_crystal,
         "V (Å³/unit cell)": V0,
+        "V (cm³/mol/molecule)": molar_volume_V0,
+        "ρ (g/cm³)": rho_V0,
         "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,        
         "E_el_molecule (kJ/mol/molecule)": E_el_molecule,
         "S_vib_molecule (J/K/mol/molecule)": S_vib_molecule,
@@ -226,6 +231,8 @@ def run(config: PropertiesConfig):
     E_el_crystal = np.zeros(n_temperatures)
     E_latt = np.zeros(n_temperatures)
     V_actual = np.zeros(n_temperatures)
+    molar_volume = np.zeros(n_temperatures)
+    rho = np.zeros(n_temperatures)
     space_groups = np.zeros(n_temperatures, dtype=int)
     has_imaginary_modes = np.zeros(n_temperatures, dtype=bool)
     system_label_crystal = []
@@ -298,6 +305,8 @@ def run(config: PropertiesConfig):
         Cv_vib_crystal[i] = properties_at_T["Cv_vib_crystal (J/K/mol/unit cell)"][0]
         E_el_crystal[i] = E_el_crystal_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
         V_actual[i] = unit_cell_T.get_volume() # Å³/unit cell
+        molar_volume[i] = mbe_automation.structure.crystal.molar_volume(unit_cell_T) * n_atoms_molecule # cm**3/mol/molecule
+        rho[i] = mbe_automation.structure.crystal.density(unit_cell_T) # g/cm**3
 
     all_freqs_real_crystal = np.logical_not(has_imaginary_modes)
     F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
@@ -332,6 +341,8 @@ def run(config: PropertiesConfig):
     df2 = pd.DataFrame({
         "V (Å³/unit cell)": V_actual,
         "V/V₀": V_actual / V0,
+        "V (cm³/mol/molecule)": molar_volume,
+        "ρ (g/cm³)": rho,
         "E_latt (kJ/mol/molecule)": E_latt,
         "ΔEvib (kJ/mol/molecule)": ΔE_vib,
         "ΔHsub (kJ/mol/molecule)": ΔH_sub,

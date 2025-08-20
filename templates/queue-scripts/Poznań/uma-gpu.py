@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #SBATCH --job-name="UMA"
-#SBATCH -A pl0458-02
+#SBATCH -A pl0415-02
 #SBATCH --partition=tesla
 #SBATCH --nodes 1      
 #SBATCH --ntasks-per-node=1
