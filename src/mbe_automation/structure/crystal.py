@@ -8,6 +8,7 @@ import pymatgen.core.structure
 import pymatgen.core.lattice
 from typing import Literal
 import warnings
+import numpy as np
 
 from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
 try:
