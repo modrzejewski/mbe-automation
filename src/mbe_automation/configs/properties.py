@@ -32,7 +32,7 @@ class PropertiesConfig:
                                    # (2) distance (in Angs) which defines
                                    # the supercell
                                    #
-    fourier_interpolation_mesh: Union[npt.NDArray[np.integer], float] = 200.0
+    fourier_interpolation_mesh: npt.NDArray[np.integer] | float = 150.0
                                    #
                                    # Range of temperatures at which phonons
                                    # and thermodynamic properties are computed
