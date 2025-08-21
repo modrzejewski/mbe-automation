@@ -146,7 +146,7 @@ def run(config: PropertiesConfig):
     ΔH_sub = -E_latt + ΔE_vib + E_trans_molecule + E_rot_molecule + pV_molecule # kJ/mol/molecule
 
     molar_volume_V0 = mbe_automation.structure.crystal.molar_volume(unit_cell_V0) * n_atoms_molecule # cm**3/mol/molecule
-    rho_V0 = mbe_automaion.structure.crystal.density(unit_cell_V0) # g/cm**3
+    rho_V0 = mbe_automation.structure.crystal.density(unit_cell_V0) # g/cm**3
     
     df1 = pd.DataFrame(harmonic_properties)
     df2 = pd.DataFrame({
