@@ -199,8 +199,8 @@ def data_frame_sublimation(df_crystal, df_molecule):
     ) # kJ/mol/molecule
         
     ΔS_sub_vib = (
-        df_molecule["S_vib_molecule"]
-        - df_crystal["S_vib_crystal"] * beta
+        df_molecule["S_vib_molecule (J/K/mol/molecule)"]
+        - df_crystal["S_vib_crystal (J/K/mol/unit cell)"] * beta
     ) # J/K/mol/molecule
 
     df = pd.DataFrame({
