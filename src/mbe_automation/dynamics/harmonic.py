@@ -861,8 +861,9 @@ def band_structure(
         kpoints = phonons.band_structure.qpoints[i] # reduced coordinates of reciprocal space without 2pi
         freqs = phonons.band_structure.frequencies[i]
         for j, omega in enumerate(freqs):
-            if omega < min_freq:
-                min_freq = omega
+            min_freq_j = np.min(omega)
+            if min_freq_j < min_freq:
+                min_freq = min_freq_j
                 min_k = kpoints[j]
         
     has_imaginary_modes = (min_freq < imaginary_mode_threshold)
