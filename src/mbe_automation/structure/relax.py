@@ -10,7 +10,7 @@ import mbe_automation.structure.crystal
 import mbe_automation.display
 import numpy as np
 import warnings
-
+import torch
 
 def atoms_and_cell(unit_cell,
                    calculator,
@@ -27,6 +27,10 @@ def atoms_and_cell(unit_cell,
     Optimize atomic positions and lattice vectors simultaneously.
     """
 
+    cuda_available = torch.cuda.is_available()
+    if cuda_available:
+        torch.cuda.reset_peak_memory_stats()
+    
     if system_label:
         mbe_automation.display.multiline_framed([
             "Relaxation",
@@ -42,6 +46,7 @@ def atoms_and_cell(unit_cell,
     pressure_eV_A3 = pressure_GPa * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
     relaxed_system = unit_cell.copy()
     relaxed_system.calc = calculator
+    wolfe_conditions = True
     
     if optimize_lattice_vectors:
         print("Applying Frechet cell filter")
@@ -63,12 +68,14 @@ def atoms_and_cell(unit_cell,
         optimizer = PreconLBFGS(
             atoms=atoms_and_lattice,
             precon=Exp(),
+            use_armijo=(not wolfe_conditions),
             logfile=log
         )
     else:
         optimizer = PreconLBFGS(
             atoms=relaxed_system,
             precon=Exp(),
+            use_armijo=(not wolfe_conditions),
             logfile=log
         )
 
@@ -89,17 +96,20 @@ def atoms_and_cell(unit_cell,
         
     if symmetrize_final_structure:
         print("Post-relaxation symmetry refinement")
-        relaxed_cell, space_group = mbe_automation.structure.crystal.symmetrize(
+        relaxed_system, space_group = mbe_automation.structure.crystal.symmetrize(
             relaxed_system
-            )
+        )
         relaxed_system.calc = calculator
     else:
-        space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_cell)
+        space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
 
     print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_system.get_forces()).max()
     print(f"Max residual force component: {max_force:.6f} eV/Å", flush=True)
-
+    if cuda_available:
+        peak_gpu = torch.cuda.max_memory_allocated()
+        print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
+    
     return relaxed_system, space_group
 
 
@@ -146,13 +156,15 @@ def isolated_molecule(molecule,
             system_label])
     else:
         mbe_automation.display.framed("Relaxation")
-        
     print(f"Max force threshold           {max_force_on_atom:.1e} eV/Å")
     
     relaxed_molecule = molecule.copy()
     relaxed_molecule.calc = calculator
+    wolfe_conditions = True
+    
     optimizer = PreconLBFGS(
         relaxed_molecule,
+        use_armijo=(not wolfe_conditions),
         logfile=log
     )
 

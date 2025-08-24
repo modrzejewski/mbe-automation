@@ -4,6 +4,3 @@
 [submodule "src/mbdf"]
 	path = src/mbdf
 	url = https://github.com/dkhan42/cMBDF.git
-[submodule "src/doped"]
-	path = src/doped
-	url = https://github.com/SMTG-Bham/doped.git

@@ -2,11 +2,9 @@ from ase.io import read
 from ase.atoms import Atoms
 from phonopy import Phonopy
 from phonopy.structure.atoms import PhonopyAtoms
-import phonopy.qha
 import time
 import numpy as np
 import torch
-import mace.calculators
 import mbe_automation.structure.molecule
 import mbe_automation.display
 import ase.thermochemistry
@@ -25,24 +23,27 @@ from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 import sys
 import pandas as pd
 import scipy.optimize
+import warnings
+from collections import namedtuple
 
-def isolated_molecule(
+EOSFitResults = namedtuple('EOSFitResults', 
+                           ['F_min', 
+                            'V_min', 
+                            'B', 
+                            'min_found', 
+                            'min_extrapolated',
+                            'curve_type'])
+
+def data_frame_molecule(
         molecule,
-        calculator,
-        temperatures
+        vibrations,
+        temperatures,
+        system_label
 ):
     """
     Compute vibrational thermodynamic functions for a molecule.
-
-    Parameters:
-        molecule: ASE Atoms object
-        calculator: ASE-compatible calculator
-        temperatures: in K
     """
-    molecule.calc = calculator
-    vib = ase.vibrations.Vibrations(molecule)
-    vib.run()
-    vib_energies = vib.get_energies()  # in eV
+    vib_energies = vibrations.get_energies()  # eV
     n_atoms = len(molecule)
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
     print(f"rotor type: {rotor_type}")
@@ -56,6 +57,10 @@ def isolated_molecule(
         raise ValueError(f"Unsupported geometry: {rotor_type}")
     
     thermo = ase.thermochemistry.HarmonicThermo(vib_energies, ignore_imag_modes=True)
+    if thermo.n_imag == 0:
+        all_freqs_real = True
+    else:
+        all_freqs_real = False
     print(f"Number of imaginary modes: {thermo.n_imag}")
 
     n_temperatures = len(temperatures)
@@ -78,19 +83,152 @@ def isolated_molecule(
         E_rot = kbT
     elif rotor_type == "monatomic":
         E_rot = np.zeros_like(temperatures)
+
+    E_el = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule
         
-    return {
+    df = pd.DataFrame({
+        "T (K)": temperatures,
+        "E_el_molecule (kJ/mol/molecule)": E_el,
         "E_vib_molecule (kJ/mol/molecule)": E_vib,
         "S_vib_molecule (J/K/mol/molecule)": S_vib,
         "F_vib_molecule (kJ/mol/molecule)": F_vib,        
-        "ZPE_molecule (kJ/mol/molecule)": ZPE, # note that this is a scalar, not an array
+        "ZPE_molecule (kJ/mol/molecule)": ZPE,
         "E_trans_molecule (kJ/mol/molecule)": E_trans,
         "E_rot_molecule (kJ/mol/molecule)": E_rot,
-        "pV_molecule (kJ/mol/molecule)": pV
-        }
-    
+        "pV_molecule (kJ/mol/molecule)": pV,
+        "all_freqs_real_molecule": all_freqs_real,
+        "n_atoms_molecule": n_atoms,
+        "system_label_molecule": system_label
+        })
+    return df
 
-def calculate_forces(supercell, calculator):
+
+def data_frame_crystal(
+        unit_cell,
+        phonons,
+        temperatures,
+        all_freqs_real,
+        space_group,
+        system_label
+):
+    """
+    Physical properties derived from the harmonic model
+    of crystal vibrations.
+    """
+    n_atoms_unit_cell = len(phonons.unitcell)
+    n_atoms_primitive_cell = len(phonons.primitive)
+    alpha = n_atoms_unit_cell/n_atoms_primitive_cell
+    
+    phonons.run_thermal_properties(temperatures=temperatures)
+    _, F_vib_crystal, S_vib_crystal, Cv_vib_crystal = phonons.thermal_properties.thermal_properties
+    
+    ZPE_crystal = phonons.thermal_properties.zero_point_energy * alpha # kJ/mol/unit cell
+    F_vib_crystal *= alpha # kJ/mol/unit cell
+    S_vib_crystal *= alpha # J/K/mol/unit cell
+    Cv_vib_crystal *= alpha # J/K/mol/unit cell
+    E_vib_crystal = F_vib_crystal + temperatures * S_vib_crystal / 1000 # kJ/mol/unit cell
+    E_el_crystal = unit_cell.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+    F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
+
+    V = unit_cell.get_volume() # Å³/unit cell
+    rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
+    
+    df = pd.DataFrame({
+        "T (K)": temperatures,
+        "F_vib_crystal (kJ/mol/unit cell)": F_vib_crystal,
+        "S_vib_crystal (J/K/mol/unit cell)": S_vib_crystal,
+        "E_vib_crystal (kJ/mol/unit cell)": E_vib_crystal,
+        "ZPE_crystal (kJ/mol/unit cell)": ZPE_crystal,
+        "Cv_vib_crystal (J/K/mol/unit cell)": Cv_vib_crystal,
+        "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
+        "F_tot_crystal (kJ/mol/unit cell)": F_tot_crystal,
+        "V (Å³/unit cell)": V,
+        "ρ (g/cm³)": rho,
+        "n_atoms_unit_cell": n_atoms_unit_cell,
+        "space_group": space_group,
+        "all_freqs_real_crystal": all_freqs_real,
+        "system_label_crystal": system_label
+    })
+    return df
+
+
+def data_frame_sublimation(df_crystal, df_molecule):
+    """    
+    Vibrational energy, lattice energy, and sublimation enthalpy
+    defined as in ref 1. Additional definitions in ref 2.
+    
+    Approximations used in the sublimation enthalpy:
+    
+    - harmonic approximation of crystal and molecular vibrations
+    - noninteracting particle in a box approximation
+      for the translations of the isolated molecule
+    - rigid rotor/asymmetric top approximation for the rotations
+      of the isolated molecule
+    
+    1. Della Pia, Zen, Alfe, Michaelides, How Accurate are Simulations
+       and Experiments for the Lattice Energies of Molecular Crystals?
+       Phys. Rev. Lett. 133, 046401 (2024); doi: 10.1103/PhysRevLett.133.046401
+    2. Dolgonos, Hoja, Boese, Revised values for the X23 benchmark
+       set of molecular crystals,
+       Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
+    """
+    
+    n_atoms_molecule = df_molecule["n_atoms_molecule"]
+    n_atoms_unit_cell = df_crystal["n_atoms_unit_cell"]
+    beta = n_atoms_molecule / n_atoms_unit_cell
+    
+    V_Ang3 = df_crystal["V (Å³/unit cell)"]
+    V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm**3/mol/molecule
+
+    E_latt = (
+        df_crystal["E_el_crystal (kJ/mol/unit cell)"] * beta
+        - df_molecule["E_el_molecule (kJ/mol/molecule)"]
+    ) # kJ/mol/molecule
+        
+    ΔE_vib = (
+        df_molecule["E_vib_molecule (kJ/mol/molecule)"]
+        - df_crystal["E_vib_crystal (kJ/mol/unit cell)"] * beta
+        ) # kJ/mol/molecule
+        
+    ΔH_sub = (
+        -E_latt
+        + ΔE_vib
+        + df_molecule["E_trans_molecule (kJ/mol/molecule)"]
+        + df_molecule["E_rot_molecule (kJ/mol/molecule)"]
+        + df_molecule["pV_molecule (kJ/mol/molecule)"]
+    ) # kJ/mol/molecule
+        
+    ΔS_sub_vib = (
+        df_molecule["S_vib_molecule (J/K/mol/molecule)"]
+        - df_crystal["S_vib_crystal (J/K/mol/unit cell)"] * beta
+    ) # J/K/mol/molecule
+
+    df = pd.DataFrame({
+        "T (K)": df_crystal["T (K)"],
+        "E_latt (kJ/mol/molecule)": E_latt,
+        "ΔE_vib (kJ/mol/molecule)": ΔE_vib,
+        "ΔH_sub (kJ/mol/molecule)": ΔH_sub,
+        "ΔS_sub_vib (J/K/mol/molecule)": ΔS_sub_vib,
+        "V (cm³/mol/molecule)": V_molar
+    })
+    return df
+
+
+def molecular_vibrations(
+        molecule,
+        calculator
+):
+    """
+    Compute molecular vibrations of a molecule using
+    finite differences.
+    """
+    molecule.calc = calculator
+    vib = ase.vibrations.Vibrations(molecule)
+    vib.run()
+    return vib
+
+
+def forces_in_displaced_supercell(supercell, calculator):
     s_ase = Atoms(
         symbols=supercell.symbols,
         scaled_positions=supercell.scaled_positions,
@@ -112,11 +250,7 @@ def phonons(
         system_label=None        
 ):
 
-    if isinstance(calculator, mace.calculators.MACECalculator):
-        cuda_available = torch.cuda.is_available()
-    else:
-        cuda_available = False
-        
+    cuda_available = torch.cuda.is_available()
     if cuda_available:
         torch.cuda.reset_peak_memory_stats()
 
@@ -180,7 +314,7 @@ def phonons(
     next_print = 10
     
     for i, s in enumerate(supercells, 1):
-        forces = calculate_forces(s, calculator)
+        forces = forces_in_displaced_supercell(s, calculator)
         force_set.append(forces)
         progress = i * 100 // n_supercells
         if progress >= next_print:
@@ -221,80 +355,91 @@ def vinet(volume, e0, v0, b0, b1):
         )
 
 
-def eos_select_points(E, min_n_points=5, delta_E=0.0):
-    i_min = np.argmin(E)
-    y_min = E[i_min]
-    d = np.abs(E - y_min)
-    n_points = len(E)
-
-    if n_points <= min_n_points:
-        return np.ones_like(E, dtype=bool)
-
-    i_left = i_min
-    while i_left > 0 and d[i_left] < delta_E:
-        i_left -= 1
-
-    i_right = i_min
-    while i_right < n_points-1 and d[i_right] < delta_E:
-        i_right += 1
-
-    while (i_right - i_left + 1) < min_n_points:
-        d_left = d[i_left-1] if i_left > 0 else np.inf
-        d_right = d[i_right+1] if i_right < n_points-1 else np.inf
-        if d_left < d_right:
-            i_left -= 1
-        else:
-            i_right += 1
-
-    mask = np.zeros_like(E, dtype=bool)
-    mask[i_left:i_right+1] = True
-    return mask
+def proximity_weights(V, F, V_min):
+    #    
+    # Proximity weights for function fitting based
+    # on the distance from the minimum point V_min.
+    #
+    # Gaussian weighting function:
+    #
+    # w(V) = exp(-(V-V_min)**2/(2*sigma**2))
+    #
+    # Sigma is defined by 
+    #
+    # w(V_min*(1+h)) = wh
+    # 
+    # where
+    #
+    # |(V-V_min)|/V_min = h
+    #
+    h = 0.04
+    wh = 0.5
+    sigma = V_min * h / np.sqrt(2.0 * np.log(1.0/wh))
+    weights = np.exp(-0.5 * ((V - V_min)/sigma)**2)
+    return weights
 
 
-def eos_polynomial_fit(V_sampled, F_sampled, degree=3):
+def eos_polynomial_fit(V, F, degree=2):
     """
     Fit a polynomial to (V, F), find equilibrium volume and bulk modulus.
     """
 
-    Vmin, Vmax = np.min(V_sampled), np.max(V_sampled)
-    coeffs = polyfit(V_sampled, F_sampled, degree)
-    
-    F_fit = Polynomial(coeffs) # kJ/mol/unit cell
+    if len(V) <= degree:
+        #
+        # Not enough points to perform a fit of the requested degree
+        #
+        return EOSFitResults(
+            F_min=np.nan,
+            V_min=np.nan,
+            B=np.nan,
+            min_found=False,
+            min_extrapolated=False,
+            curve_type="polynomial"
+            )
+
+    weights = proximity_weights(
+        V,
+        F,
+        V_min=V[np.argmin(F)] # guess value for the minimum
+    )
+    F_fit = Polynomial.fit(V, F, deg=degree, w=weights) # kJ/mol/unit cell
     dFdV = F_fit.deriv(1) # kJ/mol/Å³/unit cell
     d2FdV2 = F_fit.deriv(2) # kJ/mol/Å⁶/unit cell
 
     crit_points = dFdV.roots()
     crit_points = crit_points[np.isreal(crit_points)].real
-    crit_points = crit_points[(crit_points > Vmin) & (crit_points < Vmax)]
+    crit_points = crit_points[d2FdV2(crit_points) > 0]
 
-    n_minima = 0
-    V_opt, F_opt, B = np.nan, np.nan, np.nan
-    
-    for V in crit_points:
-        if d2FdV2(V) > 0:
-            n_minima += 1
-            V_opt = V # Å³/unit cell
-
-    if n_minima == 1:
-        F_opt = F_fit(V_opt) # kJ/mol/unit cell
-        B = V_opt * d2FdV2(V_opt) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
-        
-    elif n_minima == 0:
-        raise RuntimeError("No minimum of F(V) inside sampled interval")
+    if len(crit_points) > 0:
+        i_min = np.argmin(F_fit(crit_points))
+        V_min = crit_points[i_min] # Å³/unit cell
+        return EOSFitResults(
+            F_min=F_fit(V_min), # kJ/mol/unit cell
+            V_min=V_min,
+            B=V_min * d2FdV2(V_min) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa, # GPa
+            min_found = True,
+            min_extrapolated=(V_min < np.min(V) or V_min > np.max(V)),
+            curve_type="polynomial"
+        )
     
     else:
-        raise RuntimeError("Multiple minima of F(V) inside sampled interval")        
+        return EOSFitResults(
+            F_min=np.nan,
+            V_min=np.nan,
+            B=np.nan,
+            min_found = False,
+            min_extrapolated = False,
+            curve_type="polynomial"
+        )
 
-    return F_opt, V_opt, B
-
-
-def eos_curve_fit(V, E, equation_of_state):
+    
+def eos_curve_fit(V, F, equation_of_state):
     """
     Fit energy/free energy/Gibbs enthalpy using a specified
-    analytic formula for E(V).
+    analytic formula for F(V).
     """
 
-    linear_fit = ["third_order_polynomial"]
+    linear_fit = ["polynomial"]
     nonlinear_fit = ["vinet", "birch_murnaghan"]
     
     if (equation_of_state not in linear_fit and
@@ -302,20 +447,18 @@ def eos_curve_fit(V, E, equation_of_state):
         
         raise ValueError(f"Unknown EOS: {equation_of_state}")
 
-    E_min_poly, V_min_poly, B_min_poly = eos_polynomial_fit(V, E)
-    δE_min, δV_min, δB_min = np.nan, np.nan, np.nan
+    poly_fit = eos_polynomial_fit(V, F)
         
     if equation_of_state in linear_fit:
-        return E_min_poly, δE_min, V_min_poly, δV_min, B_min_poly, δB_min
+        return poly_fit
 
     if equation_of_state in nonlinear_fit:
         xdata = V
-        ydata = E - E_min_poly
-        E_initial = 0.0
-        V_initial = V_min_poly
-        B_initial = B_min_poly * ase.units.GPa/(ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)
+        ydata = F - poly_fit.F_min
+        F_initial = 0.0
+        V_initial = poly_fit.V_min
+        B_initial = poly_fit.B * ase.units.GPa/(ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)
         B_prime_initial = 4.0
-
         eos_func = vinet if equation_of_state == "vinet" else birch_murnaghan
 
         try:
@@ -323,22 +466,26 @@ def eos_curve_fit(V, E, equation_of_state):
                 eos_func,
                 xdata,
                 ydata,
-                p0=np.array([E_initial, V_initial, B_initial, B_prime_initial])
+                p0=np.array([F_initial, V_initial, B_initial, B_prime_initial])
             )
             perr = np.sqrt(np.diag(pcov))
     
-            E_min = popt[0] + E_min_poly # kJ/mol/unit cell
-            δE_min = perr[0] # kJ/mol/unit cell    
+            F_min = popt[0] + poly_fit.F_min # kJ/mol/unit cell
             V_min = popt[1] # Å³/unit cell
-            δV_min = perr[1] # Å³/unit cell
-            B_min = popt[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
-            δB_min = perr[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
+            B = popt[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
+
+            nonlinear_fit = EOSFitResults(
+                F_min=F_min,
+                V_min=V_min,
+                B=B,
+                min_found=True,
+                min_extrapolated=(V_min<np.min(V) or V_min>np.max(V)),
+                curve_type=equation_of_state)
+            
+            return nonlinear_fit
             
         except RuntimeError as e:
-            print("Nonlinear least squares failed. Falling back to polynomial fit")
-            E_min, V_min, B_min = E_min_poly, V_min_poly, B_min_poly
-
-        return E_min, δE_min, V_min, δV_min, B_min, δB_min
+            return poly_fit
     
 
 def equilibrium_curve(
@@ -356,7 +503,6 @@ def equilibrium_curve(
         volume_range,
         equation_of_state,
         eos_sampling,
-        select_subset_for_eos_fit,
         symmetrize_unit_cell,
         imaginary_mode_threshold,
         skip_structures_with_imaginary_modes,
@@ -368,38 +514,31 @@ def equilibrium_curve(
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     V0 = unit_cell_V0.get_volume()
-    E_el_V0 = unit_cell_V0.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
     
     if eos_sampling == "pressure":
         n_volumes = len(pressure_range)
-    elif eos_sampling == "volume":
+    elif eos_sampling == "volume":        
         n_volumes = len(volume_range)
-    n_atoms_unit_cell = len(unit_cell_V0)
+        
     n_temperatures = len(temperatures)
     V_sampled = np.zeros(n_volumes)
     space_groups = np.zeros(n_volumes, dtype=int)
-    real_freqs = np.zeros(n_volumes, dtype=bool)
+    real_freqs = np.zeros(n_volumes, dtype=bool)    
     E_el_V = np.zeros(n_volumes)
+    F_tot_V_T = np.zeros((n_volumes, n_temperatures))
     F_vib_V_T = np.zeros((n_volumes, n_temperatures))
-    V_eos = np.zeros(n_temperatures)
-    δV_eos = np.zeros(n_temperatures)
-    F_tot_eos = np.zeros(n_temperatures)
-    δF_tot_eos = np.zeros(n_temperatures)
-    B_eos = np.zeros(n_temperatures)
-    δB_eos = np.zeros(n_temperatures)
-    p_thermal_eos = np.zeros(n_temperatures)
     system_labels = []
+    df_eos_points = []
     
     mbe_automation.display.framed("F(V) curve sampling")
     print(f"Analytic EOS model: {equation_of_state}")
     if eos_sampling == "volume":
-        print("Volume range (V/V):")
+        print("Volume range (V/V₀):")
         print(np.array2string(volume_range, precision=2))
     else:
         print(f"Thermal pressure range (GPa):")
         print(np.array2string(pressure_range, precision=2))
-    print(f"EOS fit with a subset of volume points: {select_subset_for_eos_fit}")
-
+    
     for i in range(n_volumes):
         if eos_sampling == "pressure":
             #
@@ -409,7 +548,7 @@ def equilibrium_curve(
             #
             thermal_pressure = pressure_range[i]
             label = f"unit_cell_eos_p_thermal_{thermal_pressure:.4f}_GPa"
-            unit_cell_V, space_groups[i] = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_V, space_group_V = mbe_automation.structure.relax.atoms_and_cell(
                 unit_cell_V0,
                 calculator,
                 pressure_GPa=thermal_pressure,
@@ -433,7 +572,7 @@ def equilibrium_curve(
                 scale_atoms=True
             )
             label = f"unit_cell_eos_V_{V/V0:.4f}"
-            unit_cell_V, space_groups[i] = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_V, space_group_V = mbe_automation.structure.relax.atoms_and_cell(
                 unit_cell_V,
                 calculator,                
                 pressure_GPa=0.0,
@@ -444,13 +583,13 @@ def equilibrium_curve(
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
-            
+        space_groups[i] = space_group_V
         system_labels.append(label)
         V_sampled[i] = unit_cell_V.get_volume() # Å³/unit cell
         p = phonons(
             unit_cell_V,
             calculator,
-            supercell_matrix,            
+            supercell_matrix,
             supercell_displacement,
             interp_mesh=interp_mesh,
             automatic_primitive_cell=automatic_primitive_cell,
@@ -463,9 +602,19 @@ def equilibrium_curve(
             hdf5_dataset=hdf5_dataset,
             system_label=label
         )
-        real_freqs[i] = (not has_imaginary_modes)        
-        F_vib_V_T[i, :] = phonon_properties(p, temperatures)["F_vib_crystal (kJ/mol/unit cell)"]
-        E_el_V[i] = unit_cell_V.get_potential_energy()*ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+        real_freqs[i] = (not has_imaginary_modes)
+        df_crystal_V = data_frame_crystal(
+            unit_cell_V,
+            p,
+            temperatures,
+            all_freqs_real=(not has_imaginary_modes),
+            space_group=space_group_V,
+            system_label=label
+        )
+        F_tot_V_T[i, :] = df_crystal_V["F_tot_crystal (kJ/mol/unit cell)"]
+        F_vib_V_T[i, :] = df_crystal_V["F_vib_crystal (kJ/mol/unit cell)"]
+        E_el_V[i] = df_crystal_V["E_el_crystal (kJ/mol/unit cell)"].iloc[0]
+        df_eos_points.append(df_crystal_V)
 
     preserved_symmetry = space_groups == reference_space_group
     accepted_systems = np.ones(n_volumes, dtype=bool)
@@ -483,36 +632,40 @@ def equilibrium_curve(
               f"{space_groups[i]:<15} ")
     print("", flush=True)
 
-    if select_subset_for_eos_fit:
-        close_to_minimum = eos_select_points(
-            E_el_V[accepted_systems])
-    else:
-        close_to_minimum = np.ones_like(E_el_V[accepted_systems], dtype=bool)
-    fit_params = eos_curve_fit(
-        V_sampled[accepted_systems][close_to_minimum],
-        E_el_V[accepted_systems][close_to_minimum],
+    if accepted_systems.sum() == 0:
+        raise RuntimeError("No data points left after applying filtering criteria")
+
+    fit = eos_curve_fit(
+        V_sampled[accepted_systems],
+        E_el_V[accepted_systems],
         equation_of_state
     )
-    _, _, _, _, B0, δB0 = fit_params
-    if not np.isnan(δB0):
-        print(f"Bulk modulus computed using E_el_crystal(V): {B0:.1f}±{δB0:.2f} GPa")
+    if fit.min_found:
+        print(f"Bulk modulus computed using E_el_crystal(V): {fit.B:.1f} GPa")
     else:
-        print(f"Bulk modulus computed using E_el_crystal(V): {B0:.1f} GPa")
-    
+        warnings.warn("Minimum of E_el_crystal(V) not found")
+
+    V_eos = np.full(n_temperatures, np.nan)
+    F_tot_eos = np.full(n_temperatures, np.nan)
+    B_eos = np.full(n_temperatures, np.nan)
+    p_thermal_eos = np.full(n_temperatures, np.nan)
+    min_found = np.zeros(n_temperatures, dtype=bool)
+    min_extrapolated = np.zeros(n_temperatures, dtype=bool)
+    curve_type = []
+        
     for i, T in enumerate(temperatures):
-        F_tot_V = F_vib_V_T[:, i] + E_el_V[:] # kJ/mol/unit cell
-        if select_subset_for_eos_fit:
-            close_to_minimum = eos_select_points(
-                F_tot_V[accepted_systems])
-        else:
-            close_to_minimum = np.ones_like(F_tot_V[accepted_systems], dtype=bool)
-        print(np.array2string(close_to_minimum))
-        fit_params = eos_curve_fit(
-            V_sampled[accepted_systems][close_to_minimum],
-            F_tot_V[accepted_systems][close_to_minimum],
+        F_tot_V = F_tot_V_T[:, i] # kJ/mol/unit cell
+        fit = eos_curve_fit(
+            V_sampled[accepted_systems],
+            F_tot_V[accepted_systems],
             equation_of_state
         )
-        F_tot_eos[i], δF_tot_eos[i], V_eos[i], δV_eos[i], B_eos[i], δB_eos[i] = fit_params
+        F_tot_eos[i] = fit.F_min
+        V_eos[i] = fit.V_min
+        B_eos[i] = fit.B
+        min_found[i] = fit.min_found
+        min_extrapolated[i] = fit.min_extrapolated
+        curve_type.append(fit.curve_type)
         #
         # Effective pressure (thermal pressure) which forces
         # the equilibrum volume of the unit cell at
@@ -542,26 +695,43 @@ def equilibrium_curve(
         # See fig 2 in Otero-de-la-Roza et al. for
         # an example of a polynomial fit.
         #
-        coeffs = polyfit(
-            V_sampled[accepted_systems][close_to_minimum],
-            F_vib_V_T[accepted_systems, i][close_to_minimum],
-            3)
-        F_vib_fit = Polynomial(coeffs) # kJ/mol/unit cell
-        dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
-        p_thermal_eos[i] = dFdV(V_eos[i]) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
+        if fit.min_found:
+            weights = proximity_weights(
+                V=V_sampled[accepted_systems],
+                F=F_vib_V_T[accepted_systems, i],
+                V_min=V_eos[i])
+            F_vib_fit = Polynomial.fit(
+                V_sampled[accepted_systems],
+                F_vib_V_T[accepted_systems, i],
+                deg=2, w=weights) # kJ/mol/unit cell
+            dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
+            kJ_mol_Angs3_to_GPa = (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa
+            p_thermal_eos[i] = dFdV(V_eos[i]) * kJ_mol_Angs3_to_GPa # GPa
 
-    equilibrium_properties = {
+    #
+    # Store all harmonic properties of systems    
+    # used to sample the EOS curve. If EOS fit fails,
+    # one can extract those data to see what went wrong.
+    #
+    df_eos_stacked = pd.concat(df_eos_points, ignore_index=True)
+    mbe_automation.hdf5.save_dataframe(
+        df_eos_stacked,
+        hdf5_dataset,
+        group_path="quasi_harmonic/equation_of_state"
+    )
+    df_eos_stacked.to_csv(os.path.join(properties_dir, "equation_of_state.csv"))
+        
+    df = pd.DataFrame({
         "T (K)": temperatures,
         "V_eos (Å³/unit cell)": V_eos,
-        "δV_eos (Å³/unit cell)": δV_eos,
         "p_thermal (GPa)": p_thermal_eos,
         "F_tot_crystal_eos (kJ/mol/unit cell)": F_tot_eos,
-        "δF_tot_crystal_eos (kJ/mol/unit cell)": δF_tot_eos,
         "B (GPa)": B_eos,
-        "δB (GPa)": δB_eos
-    }
-
-    return equilibrium_properties
+        "curve_type": curve_type,
+        "min_found": min_found,
+        "min_extrapolated": min_extrapolated
+    })
+    return df
            
 
 def my_plot_band_structure(phonons, output_path, band_connection=True):
@@ -685,125 +855,29 @@ def band_structure(
     plt.close()
         
     min_freq = 0.0
+    min_k = np.zeros(3)
     n_paths = len(phonons.band_structure.frequencies)
     for i in range(n_paths):
+        kpoints = phonons.band_structure.qpoints[i] # reduced coordinates of reciprocal space without 2pi
         freqs = phonons.band_structure.frequencies[i]
-        kpoints = phonons.band_structure.qpoints[i]
-        min_freq = min(min_freq, np.min(freqs))
+        for j, omega in enumerate(freqs):
+            min_freq_j = np.min(omega)
+            if min_freq_j < min_freq:
+                min_freq = min_freq_j
+                min_k = kpoints[j]
         
     has_imaginary_modes = (min_freq < imaginary_mode_threshold)
-    if has_imaginary_modes:
-        print(f"Imaginary frequencies found (threshold: {imaginary_mode_threshold:.2f} THz)", flush=True)
+    if min_freq < 0.0:
+        kx, ky, kz = min_k
+        print(f"Imaginary mode threshold: {imaginary_mode_threshold:.2f} THz", flush=True)
+        print(f"Largest imaginary mode:  ω={min_freq:.2f} THz at k=[{kx:.3f} {ky:.3f} {kz:.3f}]", flush=True)
+        if not has_imaginary_modes:
+            print(f"Classified as numerical noise below the threshold")
+        
     else:
-        print(f"No imaginary frequencies found (threshold: {imaginary_mode_threshold:.2f} THz)", flush=True)
+        print(f"All frequencies along the high-symmetry path are real", flush=True)
+        
     print(f"Phonon band structure completed", flush=True)
             
     return has_imaginary_modes
-
-
-def phonon_properties(phonons, temperatures):
-    """
-    Physical properties derived from the harmonic model
-    of crystal vibrations.
-    """
-    n_atoms_unit_cell = len(phonons.unitcell)
-    n_atoms_primitive_cell = len(phonons.primitive)
-    alpha = n_atoms_unit_cell/n_atoms_primitive_cell
     
-    phonons.run_thermal_properties(temperatures=temperatures)
-    _, F_vib_crystal, S_vib_crystal, Cv_vib_crystal = phonons.thermal_properties.thermal_properties
-    
-    ZPE_crystal = phonons.thermal_properties.zero_point_energy * alpha # kJ/mol/unit cell
-    F_vib_crystal *= alpha # kJ/mol/unit cell
-    S_vib_crystal *= alpha # J/K/mol/unit cell
-    Cv_vib_crystal *= alpha # J/K/mol/unit cell
-    E_vib_crystal = F_vib_crystal + temperatures * S_vib_crystal / 1000 # kJ/mol/unit cell
-
-    properties = {
-        "T (K)": temperatures,
-        "F_vib_crystal (kJ/mol/unit cell)": F_vib_crystal,
-        "S_vib_crystal (J/K/mol/unit cell)": S_vib_crystal,
-        "E_vib_crystal (kJ/mol/unit cell)": E_vib_crystal,
-        "ZPE_crystal (kJ/mol/unit cell)": ZPE_crystal, # note that this is a scalar, not an array
-        "Cv_vib_crystal (J/K/mol/unit cell)": Cv_vib_crystal
-    }
-
-    return properties
-    
-    
-def my_plot_band_structure_first_segment_only(phonons, output_path):
-    """Alternative approach: Extract and plot only the first segment data."""
-    import matplotlib.pyplot as plt
-    import numpy as np
-    
-    if phonons._band_structure is None:
-        raise RuntimeError("run_band_structure has to be done.")
-    
-    # Get band structure data
-    frequencies = phonons._band_structure.frequencies
-    distances = phonons._band_structure.distances
-    path_connections = phonons._band_structure.path_connections
-    
-    # Convert to numpy arrays if they're lists
-    frequencies = np.array(frequencies)
-    distances = np.array(distances)
-    
-    # Find the first segment (before the first connection break)
-    first_break = None
-    for i, connection in enumerate(path_connections):
-        if not connection:  # False means a break in the path
-            first_break = i + 1
-            break
-    
-    if first_break is None:
-        first_break = len(frequencies)
-    
-    # Extract first segment data
-    first_segment_frequencies = frequencies[:first_break]
-    first_segment_distances = distances[:first_break]
-    
-    # Create the plot
-    fig, ax = plt.subplots(1, 1, figsize=(4, 6))
-    
-    # Plot each band
-    if len(first_segment_frequencies.shape) == 1:
-        # Handle 1D case (single band)
-        ax.plot(first_segment_distances, first_segment_frequencies, 'r-', linewidth=1.0)
-    else:
-        # Handle 2D case (multiple bands)
-        for band_idx in range(first_segment_frequencies.shape[1]):
-            ax.plot(first_segment_distances, first_segment_frequencies[:, band_idx], 
-                    'r-', linewidth=1.0)
-    
-    # Style the plot
-    ax.set_ylim(0, 7)
-    ax.set_ylabel("Frequency / THz", fontsize=14)
-    ax.set_xlim(first_segment_distances[0], first_segment_distances[-1])
-    
-    # Clean grid
-    ax.grid(True, alpha=0.3, linewidth=0.5)
-    ax.set_axisbelow(True)
-    
-    # Set tick parameters
-    ax.tick_params(labelsize=12, width=1.2, length=4)
-    
-    # Style the plot borders
-    for spine in ax.spines.values():
-        spine.set_linewidth(1.2)
-        spine.set_color('black')
-    
-    ax.set_facecolor('white')
-    
-    # Set x-axis labels for the first segment (typically Γ to X)
-    ax.set_xticks([first_segment_distances[0], first_segment_distances[-1]])
-    ax.set_xticklabels(['Γ', 'X'])  # Adjust these labels based on your actual path
-    
-    # Add vertical line at the end point
-    ax.axvline(x=first_segment_distances[-1], color='gray', linewidth=0.8, alpha=0.7)
-    
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight',
-                facecolor='white', edgecolor='none')
-    plt.close()
-
-

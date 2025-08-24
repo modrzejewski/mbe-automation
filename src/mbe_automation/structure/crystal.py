@@ -3,11 +3,24 @@ import ase.spacegroup.utils
 import os.path
 from ase import Atoms
 import ase.build
-import doped.generation
-import doped.utils.supercells
+import ase.units
 import pymatgen.io.phonopy
 import pymatgen.core.structure
 import pymatgen.core.lattice
+from typing import Literal
+import warnings
+import numpy as np
+
+from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
+try:
+    from doped.generation import get_ideal_supercell_matrix
+    from doped.utils.supercells import get_min_image_distance
+    doped_available = True
+except ImportError:
+    get_ideal_supercell_matrix = None
+    get_min_image_distance = None
+    doped_available = False
+
 
 def PrintUnitCellParams(unit_cell):
     La, Lb, Lc = unit_cell.cell.lengths()
@@ -111,10 +124,11 @@ def DetermineSpaceGroupSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-2
 
 
 def supercell_matrix(
-        unit_cell,
-        r_point_image,
-        diagonal=False
-):
+        unit_cell: Atoms,
+        r_point_image: float,
+        diagonal: bool = False,
+        backend: Literal["doped", "pymatgen", "auto"] = "auto"
+) -> np.ndarray:
     """
     Find the transformation of the unit cell vectors
     which generates a super cell with the following
@@ -142,6 +156,14 @@ def supercell_matrix(
        Journal of Open Source Software, 6433, 9 (2024);
        doi: 10.21105/joss.06433
     """
+
+    if backend == "auto":
+        if doped_available:
+            backend = "doped"
+        else:
+            warnings.warn("doped package not available, falling back to CubicSupercellTransformation", RuntimeWarning)
+            backend = "pymatgen"
+    
     print(f"Supercell transformation with minimum point-image radius R={r_point_image:.1f} Å")
     structure = pymatgen.core.structure.Structure(
                 lattice=pymatgen.core.lattice.Lattice(
@@ -152,15 +174,25 @@ def supercell_matrix(
                 coords=unit_cell.get_positions(),
                 coords_are_cartesian=True
     )
-    optimal_matrix = doped.generation.get_ideal_supercell_matrix(
-        structure,
-        min_image_distance=r_point_image,
-        min_atoms=len(unit_cell),
-        force_diagonal=diagonal,
-        ideal_threshold=0.1
-    )
+    
+    if backend == "doped":
+        optimal_matrix = get_ideal_supercell_matrix(
+            structure,
+            min_image_distance=r_point_image,
+            min_atoms=len(unit_cell),
+            force_diagonal=diagonal,
+            ideal_threshold=0 # don't try to find a diagonal expansion
+        )
+    elif backend == "pymatgen":
+        cst = CubicSupercellTransformation(
+            min_atoms=len(unit_cell),
+            min_length=r_point_image,
+            force_diagonal=diagonal,
+        )
+        cst.apply_transformation(structure)
+        optimal_matrix = cst.transformation_matrix
+
     supercell = structure.make_supercell(optimal_matrix)
-    r = doped.utils.supercells.get_min_image_distance(supercell)
     for i, row in enumerate(optimal_matrix):
         if i == 0:
             print("⎡" + " ".join(f"{num:>3.0f}" for num in row) + " ⎤")
@@ -168,7 +200,9 @@ def supercell_matrix(
             print("⎣" + " ".join(f"{num:>3.0f}" for num in row) + " ⎦")
         else:
             print("⎢" + " ".join(f"{num:>3.0f}" for num in row) + " ⎥")
-    print(f"Actual point-image distance {r:.1f} Å")
+    if backend == "doped":
+        r = get_min_image_distance(supercell)
+        print(f"Actual point-image distance {r:.1f} Å")
     print(f"Number of atoms {len(supercell)}")
     return optimal_matrix
 
@@ -187,3 +221,13 @@ def supercell(
         diagonal
     )
     return ase.build.make_supercell(unit_cell, transf)
+
+
+def density(unit_cell):
+    """
+    Density of a crystal in g/cm**3.
+    """
+    V_cm3 = unit_cell.get_volume() * 1.0E-24
+    M_g = unit_cell.get_masses().sum() / ase.units.kg * 1000
+    rho_g_per_cm3 = M_g / V_cm3
+    return rho_g_per_cm3

@@ -11,11 +11,11 @@ xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
 work_dir = os.path.abspath(os.path.dirname(__file__))
 properties_dir = os.path.join(work_dir, "properties")
-model_from_file = True
+model_from_file = False
 #
 # Meta's Universal Model for Atoms
 #
-if model_from_file:
+if model_from_file: # For some reason loading a model using explicit file path doesn't work
     uma_model = load_predict_unit(
         "{mlip_parameters}",
         device=("cuda" if torch.cuda.is_available() else "cpu")
