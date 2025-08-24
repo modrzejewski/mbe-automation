@@ -46,6 +46,8 @@ def atoms_and_cell(unit_cell,
     pressure_eV_A3 = pressure_GPa * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
     relaxed_system = unit_cell.copy()
     relaxed_system.calc = calculator
+
+    wolfe_conditions = True
     
     if optimize_lattice_vectors:
         print("Applying Frechet cell filter")
@@ -67,12 +69,14 @@ def atoms_and_cell(unit_cell,
         optimizer = PreconLBFGS(
             atoms=atoms_and_lattice,
             precon=Exp(),
+            use_armijo=(not wolfe_conditions),
             logfile=log
         )
     else:
         optimizer = PreconLBFGS(
             atoms=relaxed_system,
             precon=Exp(),
+            use_armijo=(not wolfe_conditions),
             logfile=log
         )
 
@@ -155,11 +159,14 @@ def isolated_molecule(molecule,
         mbe_automation.display.framed("Relaxation")
         
     print(f"Max force threshold           {max_force_on_atom:.1e} eV/Å")
+
+    wolfe_conditions = True
     
     relaxed_molecule = molecule.copy()
     relaxed_molecule.calc = calculator
     optimizer = PreconLBFGS(
         relaxed_molecule,
+        use_armijo=(not wolfe_conditions),
         logfile=log
     )
 
