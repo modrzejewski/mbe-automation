@@ -533,7 +533,7 @@ def equilibrium_curve(
     mbe_automation.display.framed("F(V) curve sampling")
     print(f"Analytic EOS model: {equation_of_state}")
     if eos_sampling == "volume":
-        print("Volume range (V/V):")
+        print("Volume range (V/V₀):")
         print(np.array2string(volume_range, precision=2))
     else:
         print(f"Thermal pressure range (GPa):")
@@ -631,6 +631,9 @@ def equilibrium_curve(
               f"{'Yes' if real_freqs[i] else 'No':<15} "
               f"{space_groups[i]:<15} ")
     print("", flush=True)
+
+    if accepted_systems.sum() == 0:
+        raise RuntimeError("No data points left after applying filtering criteria")
 
     fit = eos_curve_fit(
         V_sampled[accepted_systems],
@@ -852,14 +855,21 @@ def band_structure(
     plt.close()
         
     min_freq = 0.0
+    min_k = np.zeros(3)
     n_paths = len(phonons.band_structure.frequencies)
     for i in range(n_paths):
+        kpoints = phonons.band_structure.paths[i]
         freqs = phonons.band_structure.frequencies[i]
-        min_freq = min(min_freq, np.min(freqs))
+        for j, omega in enumerate(freqs):
+            if omega < min_freq:
+                min_freq = omega
+                min_k = kpoints[j]
         
     has_imaginary_modes = (min_freq < imaginary_mode_threshold)
     if has_imaginary_modes:
         print(f"Imaginary frequencies found (threshold: {imaginary_mode_threshold:.2f} THz)", flush=True)
+        kx, ky, kz = min_k
+        print(f"Most negative frequency: ω={min_freq} at k=[{kx:.3f} {ky:.3f} {kz:.3f}]")
     else:
         print(f"No imaginary frequencies found (threshold: {imaginary_mode_threshold:.2f} THz)", flush=True)
     print(f"Phonon band structure completed", flush=True)

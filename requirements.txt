@@ -4,6 +4,7 @@ ase
 dscribe
 mace-torch
 cuequivariance-torch
+openequivariance
 matplotlib
 pymatgen
 pyscf

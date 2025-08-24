@@ -160,27 +160,32 @@ def run(config: PropertiesConfig):
     #    of ZPE and thermal motion on the cell relaxation
     # 4. bulk moduli B(T)
     #
-    df_crystal_eos = mbe_automation.dynamics.harmonic.equilibrium_curve(
-        unit_cell_V0,
-        space_group_V0,
-        config.calculator,
-        config.temperatures,
-        supercell_matrix,
-        interp_mesh,
-        config.max_force_on_atom,
-        config.supercell_displacement,
-        config.automatic_primitive_cell,
-        config.properties_dir,
-        config.pressure_range,
-        config.volume_range,
-        config.equation_of_state,
-        config.eos_sampling,
-        config.symmetrize_unit_cell,
-        config.imaginary_mode_threshold,
-        config.skip_structures_with_imaginary_modes,
-        config.skip_structures_with_broken_symmetry,
-        config.hdf5_dataset
-    )
+    try:
+        df_crystal_eos = mbe_automation.dynamics.harmonic.equilibrium_curve(
+            unit_cell_V0,
+            space_group_V0,
+            config.calculator,
+            config.temperatures,
+            supercell_matrix,
+            interp_mesh,
+            config.max_force_on_atom,
+            config.supercell_displacement,
+            config.automatic_primitive_cell,
+            config.properties_dir,
+            config.pressure_range,
+            config.volume_range,
+            config.equation_of_state,
+            config.eos_sampling,
+            config.symmetrize_unit_cell,
+            config.imaginary_mode_threshold,
+            config.skip_structures_with_imaginary_modes,
+            config.skip_structures_with_broken_symmetry,
+            config.hdf5_dataset
+        )
+    except RuntimeError as e:
+        print(f"An error occurred: {e}")
+        print("Cannot continue thermal expansion calculations")
+        return
     #
     # Harmonic properties for unit cells with temperature-dependent
     # equilibrium volumes V(T). Data points where eos fit failed

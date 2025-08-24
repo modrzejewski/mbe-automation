@@ -10,7 +10,7 @@ import mbe_automation.structure.crystal
 import mbe_automation.display
 import numpy as np
 import warnings
-
+import torch
 
 def atoms_and_cell(unit_cell,
                    calculator,
@@ -27,6 +27,10 @@ def atoms_and_cell(unit_cell,
     Optimize atomic positions and lattice vectors simultaneously.
     """
 
+    cuda_available = torch.cuda.is_available()
+    if cuda_available:
+        torch.cuda.reset_peak_memory_stats()
+    
     if system_label:
         mbe_automation.display.multiline_framed([
             "Relaxation",
@@ -99,7 +103,10 @@ def atoms_and_cell(unit_cell,
     print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_system.get_forces()).max()
     print(f"Max residual force component: {max_force:.6f} eV/Å", flush=True)
-
+    if cuda_available:
+        peak_gpu = torch.cuda.max_memory_allocated()
+        print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
+    
     return relaxed_system, space_group
 
 
