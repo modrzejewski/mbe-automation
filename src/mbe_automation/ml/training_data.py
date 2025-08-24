@@ -1,4 +1,4 @@
-import mbe_automation.structure.dynamics
+import mbe_automation.dynamics.classical_nvt
 import mbe_automation.display
 import mbe_automation.kpoints
 import mbe_automation.ml.descriptors.mace
@@ -211,7 +211,7 @@ def supercell_md(unit_cell,
     print(f"{len(super_cell)} atoms in the {dims[0]}×{dims[1]}×{dims[2]} supercell")
     
     trajectory_file = os.path.join(training_dir, "supercell_md.traj")
-    md_results, equilibrium_stats = mbe_automation.structure.dynamics.sample_NVT(super_cell,
+    md_results, equilibrium_stats = mbe_automation.dynamics.classical_nvt.sample_NVT(super_cell,
                                                  calculator,
                                                  temperature_K,
                                                  time_total_fs,
@@ -255,7 +255,7 @@ def molecule_md(molecule,
     mbe_automation.display.framed("Molecular dynamics (single molecule)")
     print(f"{len(molecule)} atoms in the molecule")
     trajectory_file = os.path.join(training_dir, "molecule_md.traj")
-    md_results, equilibrium_stats = mbe_automation.structure.dynamics.sample_NVT(molecule,
+    md_results, equilibrium_stats = mbe_automation.dynamics.classical_nvt.sample_NVT(molecule,
                                                  calculator,
                                                  temperature_K,
                                                  time_total_fs,

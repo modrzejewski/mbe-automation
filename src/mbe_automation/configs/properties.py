@@ -140,9 +140,10 @@ class PropertiesConfig:
                                    # of CRYSTAL
                                    #
                                    # A robust choice is to specify a wide range of volumes, e.g.,
-                                   # 0.96...1.12 V/V0, and to enable automatic selection of volumes
-                                   # in the neighborhood of the minimum at each temperature
-                                   # (see select_subset_for_eos_fit=True).
+                                   # 0.96...1.12 V/V0. The fitting subroutine will automatically
+                                   # apply proximity weights in such a way that only the points
+                                   # near the minimum at each temperature contribute significantly
+                                   # to the fit.
                                    #
     volume_range: npt.NDArray[np.floating] = field(default_factory=lambda:
                                                     np.array([0.96, 0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10, 1.12]))
@@ -171,7 +172,7 @@ class PropertiesConfig:
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.
                                    #
-    equation_of_state: Literal["birch_murnaghan", "vinet", "third_order_polynomial"] = "vinet"
+    equation_of_state: Literal["birch_murnaghan", "vinet", "polynomial"] = "polynomial"
                                    #
                                    # Algorithm used to generate points on
                                    # the equilibrium curve:
@@ -184,15 +185,6 @@ class PropertiesConfig:
                                    #    volume constraint.
                                    #
     eos_sampling: Literal["pressure", "volume"] = "volume"
-                                   #
-                                   # Use all computed data points on the F(V, T) curve to approximately
-                                   # locate the minimum, but perform the numerical fit to an analytic
-                                   # form of F using only a subset near the minimum.
-                                   #
-                                   # This setting allows performing a scan over a wide range of V's
-                                   # without accuracy deterioration due to the outliers.
-                                   #
-    select_subset_for_eos_fit: bool = True
                                    #
                                    # Threshold for detecting imaginary phonon
                                    # frequencies (in THz). A phonon with negative

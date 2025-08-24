@@ -223,18 +223,6 @@ def supercell(
     return ase.build.make_supercell(unit_cell, transf)
 
 
-def molar_volume(
-        unit_cell
-):
-    """
-    Volume of a molecular crystal in the units of cm**3/mol/atom
-    """
-    n_atoms_unit_cell = len(unit_cell)
-    V_Ang3 = unit_cell.get_volume()
-    V_cm3_mol = V_Ang3 * 1.0E-24 * ase.units.mol / n_atoms_unit_cell
-    return V_cm3_mol
-    
-
 def density(unit_cell):
     """
     Density of a crystal in g/cm**3.

@@ -89,12 +89,12 @@ def atoms_and_cell(unit_cell,
         
     if symmetrize_final_structure:
         print("Post-relaxation symmetry refinement")
-        relaxed_cell, space_group = mbe_automation.structure.crystal.symmetrize(
+        relaxed_system, space_group = mbe_automation.structure.crystal.symmetrize(
             relaxed_system
-            )
+        )
         relaxed_system.calc = calculator
     else:
-        space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_cell)
+        space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
 
     print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_system.get_forces()).max()

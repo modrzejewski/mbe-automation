@@ -55,6 +55,10 @@ def run(config: PropertiesConfig):
         log=os.path.join(geom_opt_dir, f"{label_molecule}.txt"),
         system_label=label_molecule
     )
+    vibrations = mbe_automation.dynamics.harmonic.molecular_vibrations(
+        molecule,
+        config.calculator
+    )
     #
     # Compute the reference cell volume (V0), lattice vectors, and atomic
     # positions by minimization of the electronic
@@ -64,7 +68,7 @@ def run(config: PropertiesConfig):
     # The points on the volume axis will be determined
     # by rescaling of V0.
     #
-    label = "unit_cell_fully_relaxed"
+    label_crystal = "unit_cell_fully_relaxed"
     unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.atoms_and_cell(
         unit_cell,
         config.calculator,
@@ -72,8 +76,8 @@ def run(config: PropertiesConfig):
         optimize_volume=True,
         symmetrize_final_structure=config.symmetrize_unit_cell,
         max_force_on_atom=config.max_force_on_atom,
-        log=os.path.join(geom_opt_dir, f"{label}.txt"),
-        system_label=label
+        log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
+        system_label=label_crystal
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
@@ -98,88 +102,49 @@ def run(config: PropertiesConfig):
         config.supercell_displacement,
         interp_mesh=config.fourier_interpolation_mesh,
         automatic_primitive_cell=config.automatic_primitive_cell,
-        system_label=label
+        system_label=label_crystal
     )
     has_imaginary_modes_V0 = mbe_automation.dynamics.harmonic.band_structure(
         phonons,
         imaginary_mode_threshold=config.imaginary_mode_threshold,
         properties_dir=config.properties_dir,
         hdf5_dataset=config.hdf5_dataset,
-        system_label=label
+        system_label=label_crystal
     )
     all_freqs_real_V0 = (not has_imaginary_modes_V0)
     
     interp_mesh = phonons.mesh.mesh_numbers
     print(f"Fourier interpolation mesh for phonon properties: {interp_mesh[0]}×{interp_mesh[1]}×{interp_mesh[2]}")
-    print(f"All structures will use the same mesh")
+    if config.thermal_expansion:
+        print(f"All structures will use the same mesh")
 
-    n_atoms_unit_cell = len(unit_cell_V0)
-    harmonic_properties = mbe_automation.dynamics.harmonic.phonon_properties(
+    df_crystal = mbe_automation.dynamics.harmonic.data_frame_crystal(
+        unit_cell_V0,
         phonons,
-        config.temperatures
-    )
-    #
-    # Vibrational contributions to E, S, F of the isolated molecule
-    #
-    molecule_properties = mbe_automation.dynamics.harmonic.isolated_molecule(
+        config.temperatures,
+        all_freqs_real=all_freqs_real_V0,
+        space_group=space_group_V0,
+        system_label=label_crystal)
+    df_molecule = mbe_automation.dynamics.harmonic.data_frame_molecule(
         molecule,
-        config.calculator,
-        config.temperatures
+        vibrations,
+        config.temperatures,
+        system_label=label_molecule
     )
-    n_atoms_molecule = len(molecule)
-    E_vib_crystal = harmonic_properties["E_vib_crystal (kJ/mol/unit cell)"]
-    F_vib_crystal = harmonic_properties["F_vib_crystal (kJ/mol/unit cell)"]
-    E_vib_molecule = molecule_properties["E_vib_molecule (kJ/mol/molecule)"]
-    S_vib_molecule = molecule_properties["S_vib_molecule (J/K/mol/molecule)"]
-    F_vib_molecule = molecule_properties["F_vib_molecule (kJ/mol/molecule)"]
-    ZPE_molecule = molecule_properties["ZPE_molecule (kJ/mol/molecule)"]
-    E_el_molecule = molecule.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule    
-    E_el_crystal = unit_cell_V0.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
-    F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
-    E_trans_molecule = molecule_properties["E_trans_molecule (kJ/mol/molecule)"]
-    E_rot_molecule = molecule_properties["E_rot_molecule (kJ/mol/molecule)"]
-    pV_molecule = molecule_properties["pV_molecule (kJ/mol/molecule)"]
-
-    beta = n_atoms_molecule / n_atoms_unit_cell
-    E_latt = E_el_crystal * beta - E_el_molecule # kJ/mol/molecule
-    ΔE_vib = E_vib_molecule - E_vib_crystal * beta # kJ/mol/molecule
-    ΔH_sub = -E_latt + ΔE_vib + E_trans_molecule + E_rot_molecule + pV_molecule # kJ/mol/molecule
-
-    molar_volume_V0 = mbe_automation.structure.crystal.molar_volume(unit_cell_V0) * n_atoms_molecule # cm**3/mol/molecule
-    rho_V0 = mbe_automation.structure.crystal.density(unit_cell_V0) # g/cm**3
-    
-    df1 = pd.DataFrame(harmonic_properties)
-    df2 = pd.DataFrame({
-        "E_latt (kJ/mol/molecule)": E_latt,
-        "ΔEvib (kJ/mol/molecule)": ΔE_vib,
-        "ΔHsub (kJ/mol/molecule)": ΔH_sub,
-        "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
-        "F_tot_crystal (kJ/mol/unit cell)": F_tot_crystal,
-        "V (Å³/unit cell)": V0,
-        "V (cm³/mol/molecule)": molar_volume_V0,
-        "ρ (g/cm³)": rho_V0,
-        "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,        
-        "E_el_molecule (kJ/mol/molecule)": E_el_molecule,
-        "S_vib_molecule (J/K/mol/molecule)": S_vib_molecule,
-        "F_vib_molecule (kJ/mol/molecule)": F_vib_molecule,
-        "ZPE_molecule (kJ/mol/molecule)": ZPE_molecule,
-        "E_rot_molecule (kJ/mol/molecule)": E_rot_molecule,
-        "E_trans_molecule (kJ/mol/molecule)": E_trans_molecule,
-        "pV_molecule (kJ/mol/molecule)": pV_molecule,
-        "space group": space_group_V0,
-        "all_freqs_real_crystal": all_freqs_real_V0,
-        "n_atoms_unit_cell": n_atoms_unit_cell,
-        "n_atoms_molecule": n_atoms_molecule,
-        "system_label_crystal": label,
-        "system_label_molecule": label_molecule
-    })
-    df_harmonic = pd.concat([df1, df2], axis=1)
+    df_sublimation = mbe_automation.dynamics.harmonic.data_frame_sublimation(
+        df_crystal,
+        df_molecule
+    )
+    del df_crystal["T (K)"]
+    del df_molecule["T (K)"]
+    df_harmonic = pd.concat([df_sublimation, df_crystal, df_molecule], axis=1)
     mbe_automation.hdf5.save_dataframe(
         df_harmonic,
         config.hdf5_dataset,
         group_path="quasi_harmonic/no_thermal_expansion"
     )
     df_harmonic.to_csv(os.path.join(config.properties_dir, "no_thermal_expansion.csv"))
+    n_atoms_molecule = len(molecule)
     if not config.thermal_expansion:
         print("Harmonic calculations completed")
         return
@@ -195,7 +160,7 @@ def run(config: PropertiesConfig):
     #    of ZPE and thermal motion on the cell relaxation
     # 4. bulk moduli B(T)
     #
-    eos_properties = mbe_automation.dynamics.harmonic.equilibrium_curve(
+    df_crystal_eos = mbe_automation.dynamics.harmonic.equilibrium_curve(
         unit_cell_V0,
         space_group_V0,
         config.calculator,
@@ -210,7 +175,6 @@ def run(config: PropertiesConfig):
         config.volume_range,
         config.equation_of_state,
         config.eos_sampling,
-        config.select_subset_for_eos_fit,
         config.symmetrize_unit_cell,
         config.imaginary_mode_threshold,
         config.skip_structures_with_imaginary_modes,
@@ -219,53 +183,42 @@ def run(config: PropertiesConfig):
     )
     #
     # Harmonic properties for unit cells with temperature-dependent
-    # equilibrium volumes V(T)
+    # equilibrium volumes V(T). Data points where eos fit failed
+    # are skipped.
     #
-    temperatures = config.temperatures
-    n_temperatures = len(temperatures)
-    F_vib_crystal = np.zeros(n_temperatures)
-    S_vib_crystal = np.zeros(n_temperatures)
-    E_vib_crystal = np.zeros(n_temperatures)
-    ZPE_crystal = np.zeros(n_temperatures)
-    Cv_vib_crystal = np.zeros(n_temperatures)
-    E_el_crystal = np.zeros(n_temperatures)
-    E_latt = np.zeros(n_temperatures)
-    V_actual = np.zeros(n_temperatures)
-    molar_volume = np.zeros(n_temperatures)
-    rho = np.zeros(n_temperatures)
-    space_groups = np.zeros(n_temperatures, dtype=int)
-    has_imaginary_modes = np.zeros(n_temperatures, dtype=bool)
-    system_label_crystal = []
-    for i, V in enumerate(eos_properties["V_eos (Å³/unit cell)"]):
-        T =  temperatures[i]
+    data_frames_at_T = []
+    filtered_df = df_crystal_eos[df_crystal_eos["min_found"]] # consider only the data points where EOS fit succeded
+    for i, row in filtered_df.iterrows():
+        T = row["T (K)"]
+        V = row["V_eos (Å³/unit cell)"]
         unit_cell_T = unit_cell_V0.copy()
         unit_cell_T.set_cell(
             unit_cell_V0.cell * (V/V0)**(1/3),
             scale_atoms=True
         )
-        label = f"unit_cell_T_{T:.4f}"
+        label_crystal = f"unit_cell_T_{T:.4f}"
         if config.eos_sampling == "pressure":
             #
             # Relax geometry with an effective pressure which
             # forces QHA equilibrium value
             #
-            unit_cell_T, space_groups[i] = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_T, space_group_T = mbe_automation.structure.relax.atoms_and_cell(
                 unit_cell_T,
                 config.calculator,
-                pressure_GPa=eos_properties["p_thermal (GPa)"][i],
+                pressure_GPa=row["p_thermal (GPa)"],
                 optimize_lattice_vectors=True,
                 optimize_volume=True,
                 symmetrize_final_structure=config.symmetrize_unit_cell,
                 max_force_on_atom=config.max_force_on_atom,
-                log=os.path.join(geom_opt_dir, f"{label}.txt"),
-                system_label=label
+                log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
+                system_label=label_crystal
             )
         elif config.eos_sampling == "volume":
             #
             # Relax atomic positions and lattice vectors
             # under the constraint of constant volume
             #
-            unit_cell_T, space_groups[i] = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_T, space_group_T = mbe_automation.structure.relax.atoms_and_cell(
                 unit_cell_T,
                 config.calculator,                
                 pressure_GPa=0.0,
@@ -273,10 +226,9 @@ def run(config: PropertiesConfig):
                 optimize_volume=False,
                 symmetrize_final_structure=config.symmetrize_unit_cell,
                 max_force_on_atom=config.max_force_on_atom,
-                log=os.path.join(geom_opt_dir, f"{label}.txt"),
-                system_label=label
+                log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
+                system_label=label_crystal
             )
-        system_label_crystal.append(label)
         phonons = mbe_automation.dynamics.harmonic.phonons(
             unit_cell_T,
             config.calculator,
@@ -284,98 +236,52 @@ def run(config: PropertiesConfig):
             config.supercell_displacement,
             interp_mesh=interp_mesh,
             automatic_primitive_cell=config.automatic_primitive_cell,
-            system_label=label
+            system_label=label_crystal
         )
-        has_imaginary_modes[i] = mbe_automation.dynamics.harmonic.band_structure(
+        has_imaginary_modes_T = mbe_automation.dynamics.harmonic.band_structure(
             phonons,
             imaginary_mode_threshold=config.imaginary_mode_threshold,
             properties_dir=config.properties_dir,
             hdf5_dataset=config.hdf5_dataset,
-            system_label=label
+            system_label=label_crystal
         )
-        E_el_crystal_eV = unit_cell_T.get_potential_energy() # eV/unit cell
-        properties_at_T = mbe_automation.dynamics.harmonic.phonon_properties(
+        df_crystal_T = mbe_automation.dynamics.harmonic.data_frame_crystal(
+            unit_cell_T,
             phonons,
-            np.array([T])
+            temperatures=np.array([T]),
+            all_freqs_real=(not has_imaginary_modes_T),
+            space_group=space_group_T,
+            system_label=label_crystal
         )
-        F_vib_crystal[i] = properties_at_T["F_vib_crystal (kJ/mol/unit cell)"][0]
-        S_vib_crystal[i] = properties_at_T["S_vib_crystal (J/K/mol/unit cell)"][0]
-        E_vib_crystal[i] = properties_at_T["E_vib_crystal (kJ/mol/unit cell)"][0]
-        ZPE_crystal[i] = properties_at_T["ZPE_crystal (kJ/mol/unit cell)"]
-        Cv_vib_crystal[i] = properties_at_T["Cv_vib_crystal (J/K/mol/unit cell)"][0]
-        E_el_crystal[i] = E_el_crystal_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
-        V_actual[i] = unit_cell_T.get_volume() # Å³/unit cell
-        molar_volume[i] = mbe_automation.structure.crystal.molar_volume(unit_cell_T) * n_atoms_molecule # cm**3/mol/molecule
-        rho[i] = mbe_automation.structure.crystal.density(unit_cell_T) # g/cm**3
-
-    all_freqs_real_crystal = np.logical_not(has_imaginary_modes)
-    F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
-    F_tot_crystal_eos = eos_properties["F_tot_crystal_eos (kJ/mol/unit cell)"]
-    F_RMSD_per_atom = np.sqrt(np.mean((F_tot_crystal - F_tot_crystal_eos)**2)) / n_atoms_unit_cell
-    print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom:.5f} kJ/mol/atom")        
+        df_crystal_T.index = [i] # map current dataframe to temperature T
+        data_frames_at_T.append(df_crystal_T)
     #
-    # Vibrational energy, lattice energy, and sublimation enthalpy
-    # defined as in ref 1. Additional definitions in ref 2.
+    # Create a single data frame for the whole temperature range
+    # by stacking data frames at each temperature
     #
-    # Approximations used in the sublimation enthalpy:
-    #
-    # - harmonic approximation of crystal and molecular vibrations
-    # - noninteracting particle in a box approximation
-    #   for the translations of the isolated molecule
-    # - rigid rotor/asymmetric top approximation for the rotations
-    #   of the isolated molecule
-    #
-    # 1. Della Pia, Zen, Alfe, Michaelides, How Accurate are Simulations
-    #    and Experiments for the Lattice Energies of Molecular Crystals?
-    #    Phys. Rev. Lett. 133, 046401 (2024); doi: 10.1103/PhysRevLett.133.046401
-    # 2. Dolgonos, Hoja, Boese, Revised values for the X23 benchmark
-    #    set of molecular crystals,
-    #    Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
-    #
-    beta = n_atoms_molecule / n_atoms_unit_cell
-    E_latt = E_el_crystal * beta - E_el_molecule # kJ/mol/molecule
-    ΔE_vib = E_vib_molecule - E_vib_crystal * beta # kJ/mol/molecule
-    ΔH_sub = -E_latt + ΔE_vib + E_trans_molecule + E_rot_molecule + pV_molecule # kJ/mol/molecule
-
-    df1 = pd.DataFrame(eos_properties)
-    df2 = pd.DataFrame({
-        "V (Å³/unit cell)": V_actual,
-        "V/V₀": V_actual / V0,
-        "V (cm³/mol/molecule)": molar_volume,
-        "ρ (g/cm³)": rho,
-        "E_latt (kJ/mol/molecule)": E_latt,
-        "ΔEvib (kJ/mol/molecule)": ΔE_vib,
-        "ΔHsub (kJ/mol/molecule)": ΔH_sub,
-        "F_vib_crystal (kJ/mol/unit cell)": F_vib_crystal,
-        "S_vib_crystal (J/K/mol/unit cell)": S_vib_crystal,
-        "E_vib_crystal (kJ/mol/unit cell)": E_vib_crystal,
-        "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
-        "ZPE_crystal (kJ/mol/unit cell)": ZPE_crystal,
-        "Cv_vib_crystal (J/K/mol/unit cell)": Cv_vib_crystal,
-        "F_tot_crystal (kJ/mol/unit cell)": F_tot_crystal,
-        "E_vib_molecule (kJ/mol/molecule)": E_vib_molecule,        
-        "E_el_molecule (kJ/mol/molecule)": E_el_molecule,
-        "S_vib_molecule (J/K/mol/molecule)": S_vib_molecule,
-        "F_vib_molecule (kJ/mol/molecule)": F_vib_molecule,
-        "ZPE_molecule (kJ/mol/molecule)": ZPE_molecule,
-        "E_rot_molecule (kJ/mol/molecule)": E_rot_molecule,
-        "E_trans_molecule (kJ/mol/molecule)": E_trans_molecule,
-        "pV_molecule (kJ/mol/molecule)": pV_molecule,
-        "space_group": space_groups,
-        "all_freqs_real_crystal": all_freqs_real_crystal,
-        "n_atoms_unit_cell": n_atoms_unit_cell,
-        "n_atoms_molecule": n_atoms_molecule,
-        "system_label_crystal": system_label_crystal,
-        "system_label_molecule": label_molecule
-    })
-    df_quasi_harmonic = pd.concat([df1, df2], axis=1)
-
+    df_crystal_qha = pd.concat(data_frames_at_T)
+    df_sublimation_qha = mbe_automation.dynamics.harmonic.data_frame_sublimation(
+        df_crystal_qha,
+        df_molecule
+    )
+    del df_crystal_qha["T (K)"]
+    del df_crystal_eos["T (K)"]
+    df_quasi_harmonic = pd.concat([
+        df_sublimation_qha,
+        df_crystal_qha,
+        df_crystal_eos,
+        df_molecule], axis=1)
     mbe_automation.hdf5.save_dataframe(
         df_quasi_harmonic,
         config.hdf5_dataset,
         group_path="quasi_harmonic/thermal_expansion"
     )
     df_quasi_harmonic.to_csv(os.path.join(config.properties_dir, "thermal_expansion.csv"))
+
+    F_tot_diff = (df_crystal_eos["F_tot_crystal_eos (kJ/mol/unit cell)"]
+                  - df_crystal_qha["F_tot_crystal (kJ/mol/unit cell)"])
+    F_RMSD_per_atom = np.sqrt((F_tot_diff**2).mean()) / len(unit_cell_V0)
+    print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom:.5f} kJ/mol/atom")
         
-    print(f"Quasi-harmonic calculations completed")
+    print(f"Properties with thermal expansion completed")
 
