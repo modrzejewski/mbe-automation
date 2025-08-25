@@ -4,6 +4,7 @@ import ase.optimize
 from ase.optimize.fire2 import FIRE2
 from ase.optimize.precon import Exp
 from ase.optimize.precon.lbfgs import PreconLBFGS
+from ase.optimize.precon.fire import PreconFIRE
 import ase.filters
 import ase.units
 import mbe_automation.structure.crystal
@@ -12,17 +13,19 @@ import numpy as np
 import warnings
 import torch
 
-def atoms_and_cell(unit_cell,
-                   calculator,
-                   pressure_GPa=0.0, # gigapascals
-                   optimize_lattice_vectors=True,
-                   optimize_volume=True,
-                   symmetrize_final_structure=True,
-                   max_force_on_atom=1.0E-3, # eV/Angs/atom
-                   max_steps=1000,
-                   log="geometry_opt.txt",
-                   system_label=None
-                   ):
+def crystal(unit_cell,
+            calculator,
+            pressure_GPa=0.0, # gigapascals
+            optimize_lattice_vectors=True,
+            optimize_volume=True,
+            symmetrize_final_structure=True,
+            max_force_on_atom=1.0E-3, # eV/Angs/atom
+            max_steps=1000,
+            algo_primary="PreconLBFGS",
+            algo_fallback="PreconFIRE"
+            log="geometry_opt.txt",
+            system_label=None
+            ):
     """
     Optimize atomic positions and lattice vectors simultaneously.
     """
@@ -46,7 +49,6 @@ def atoms_and_cell(unit_cell,
     pressure_eV_A3 = pressure_GPa * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
     relaxed_system = unit_cell.copy()
     relaxed_system.calc = calculator
-    wolfe_conditions = True
     
     if optimize_lattice_vectors:
         print("Applying Frechet cell filter")
@@ -60,25 +62,32 @@ def atoms_and_cell(unit_cell,
         # ACS Materials Lett. 7, 2105 (2025);
         # doi: 10.1021/acsmaterialslett.5c00093
         #
-        atoms_and_lattice = ase.filters.FrechetCellFilter(
+        system_with_filter = ase.filters.FrechetCellFilter(
             relaxed_system,
             constant_volume=(not optimize_volume),
             scalar_pressure=pressure_eV_A3
         )
+        system_to_optimize = system_with_filter
+    else:
+        system_to_optimize = relaxed_system
+
+    if algo_primary == "PreconLBFGS":
         optimizer = PreconLBFGS(
-            atoms=atoms_and_lattice,
+            atoms=system_to_optimize,
             precon=Exp(),
-            use_armijo=(not wolfe_conditions),
+            use_armijo=False,
+            logfile=log
+        )
+    elif algo_primary == "PreconFIRE":
+        optimizer = PreconFIRE(
+            atoms=system_to_optimize,
+            precon=Exp(),
+            use_armijo=False,
             logfile=log
         )
     else:
-        optimizer = PreconLBFGS(
-            atoms=relaxed_system,
-            precon=Exp(),
-            use_armijo=(not wolfe_conditions),
-            logfile=log
-        )
-
+        raise ValueError("Invalid relaxation algorithm")
+    
     with warnings.catch_warnings():
         #
         # FrechetCellFilter sometimes floods the output with warnings
@@ -113,36 +122,12 @@ def atoms_and_cell(unit_cell,
     return relaxed_system, space_group
 
 
-def atoms(unit_cell,
-          calculator,
-          symmetrize_final_structure=True,
-          max_force_on_atom=1.0E-3, # eV/Angs/atom
-          max_steps=1000,
-          log="geometry_opt.txt",
-          system_label=None
-          ):
-    """
-    Optimize atomic positions within a constant unit cell.
-    """
-    
-    return atoms_and_cell(
-        unit_cell,
-        calculator,
-        pressure_GPa=0.0,
-        optimize_lattice_vectors=False,
-        optimize_volume=False,
-        symmetrize_final_structure=symmetrize_final_structure,
-        max_force_on_atom=max_force_on_atom,
-        max_steps=max_steps,
-        log=log,
-        system_label=system_label
-    )
-
-
 def isolated_molecule(molecule,
                       calculator,
                       max_force_on_atom=1.0E-3, # eV/Angs/atom
                       max_steps=1000,
+                      algo_primary="PreconLBFGS",
+                      algo_fallback="PreconFIRE",
                       log="geometry_opt.txt",
                       system_label=None
                       ):
@@ -160,13 +145,21 @@ def isolated_molecule(molecule,
     
     relaxed_molecule = molecule.copy()
     relaxed_molecule.calc = calculator
-    wolfe_conditions = True
-    
-    optimizer = PreconLBFGS(
-        relaxed_molecule,
-        use_armijo=(not wolfe_conditions),
-        logfile=log
-    )
+
+    if algo_primary == "PreconLBFGS":
+        optimizer = PreconLBFGS(
+            relaxed_molecule,
+            use_armijo=False,
+            logfile=log
+        )
+    elif algo_primary == "PreconFIRE":
+        optimizer = PreconFIRE(
+            relaxed_molecule,
+            use_armijo=False,
+            logfile=log
+        )
+    else:
+        raise ValueError("Invalid relaxation algorithm")
 
     with warnings.catch_warnings():
         warnings.filterwarnings("once")

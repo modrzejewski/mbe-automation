@@ -69,6 +69,12 @@ class QuasiHarmonicConfig:
                                    #
     max_force_on_atom: float = 1.0E-4
                                    #
+                                   # Algorithms applied for structure
+                                   # relaxation
+                                   #
+    relax_algo_primary: Literal["PreconLBFGS", "PreconFIRE"] = "PreconLBFGS"
+    relax_algo_fallback: Literal["PreconLBFGS", "PreconFIRE"] = "PreconFIRE"
+                                   #
                                    # Directory to store processed results: plots,
                                    # tables, etc.
                                    #
@@ -79,20 +85,18 @@ class QuasiHarmonicConfig:
                                    #
     hdf5_dataset: str = "./properties.hdf5"
                                    #
-                                   # Size of the supercell used in the phonon
-                                   # calculation. The unit cell -> supercell matrix
-                                   # is computed according to the the minimum
-                                   # point-image distance in Angstrom.
+                                   # Minimum point-periodic image distance
+                                   # in the supercell used to compute phonons.
                                    #
                                    # Recommendations:
                                    #
-                                   # (1) Point-periodic image distance R=24 Angstrom
+                                   # (1) Point-periodic image distance R=24 Angs
                                    #     defines the large supercell for phonon calculations in
                                    #     Firaha et al., Predicting crystal form stability under
                                    #     real-world conditions, Nature, 623, 324 (2023);
                                    #     doi: 10.1038/s41586-023-06587-3
                                    #
-                                   # (2) R=24 Angstrom provides highly converged results
+                                   # (2) R=24 Angs provides highly converged results
                                    #     in force constants fitting, see Figure 2a in 
                                    #     Zhu et al., A high-throughput framework for
                                    #     lattice dynamics, Nature Materials, 10, 258 (2024);
@@ -104,6 +108,9 @@ class QuasiHarmonicConfig:
                                    # supercell_radius is ignored.
                                    #
     supercell_matrix: npt.NDArray[np.integer] | None = None
+                                   #
+                                   # Type of the supercell transformation
+                                   # matrix.
                                    #
                                    # (1) Diagonal supercell transformation:
                                    # the unit cell vectors are repated along
@@ -118,7 +125,7 @@ class QuasiHarmonicConfig:
     supercell_diagonal: bool = False
                                    #
                                    # Displacement length applied in Phonopy
-                                   # to compute numerical derivatives (Angstrom).
+                                   # to compute numerical derivatives (Angs).
                                    #
                                    # Note the following relation between numerical
                                    # thresholds:
@@ -165,10 +172,13 @@ class QuasiHarmonicConfig:
                                    # 0.96...1.12 V/V0. The fitting subroutine will automatically
                                    # apply proximity weights in such a way that only the points
                                    # near the minimum at each temperature contribute significantly
-                                   # to the fit.
+                                   # to the fitted parameters.
                                    #
     volume_range: npt.NDArray[np.floating] = field(default_factory=lambda:
-                                                    np.array([0.96, 0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10, 1.12]))
+                                                    np.array([
+                                                        0.96, 0.98, 1.00, 1.02, 1.04,
+                                                        1.06, 1.08, 1.10, 1.12
+                                                    ]))
                                    #
                                    # Range of external isotropic pressures applied
                                    # to sample different cell volumes and fit

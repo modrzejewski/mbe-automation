@@ -502,6 +502,8 @@ def equilibrium_curve(
         supercell_matrix,
         interp_mesh,
         max_force_on_atom,
+        relax_algo_primary,
+        relax_algo_fallback,
         supercell_displacement,
         automatic_primitive_cell,
         properties_dir,
@@ -555,7 +557,7 @@ def equilibrium_curve(
             #
             thermal_pressure = pressure_range[i]
             label = f"unit_cell_eos_p_thermal_{thermal_pressure:.4f}_GPa"
-            unit_cell_V, space_group_V = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V0,
                 calculator,
                 pressure_GPa=thermal_pressure,
@@ -563,6 +565,8 @@ def equilibrium_curve(
                 optimize_volume=True,
                 symmetrize_final_structure=symmetrize_unit_cell,
                 max_force_on_atom=max_force_on_atom,
+                algo_primary=relax_algo_primary,
+                algo_fallback=relax_algo_fallback,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
@@ -579,7 +583,7 @@ def equilibrium_curve(
                 scale_atoms=True
             )
             label = f"unit_cell_eos_V_{V/V0:.4f}"
-            unit_cell_V, space_group_V = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V,
                 calculator,                
                 pressure_GPa=0.0,
@@ -587,6 +591,8 @@ def equilibrium_curve(
                 optimize_volume=False,
                 symmetrize_final_structure=symmetrize_unit_cell,
                 max_force_on_atom=max_force_on_atom,
+                algo_primary=relax_algo_primary,
+                algo_fallback=relax_algo_fallback,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )

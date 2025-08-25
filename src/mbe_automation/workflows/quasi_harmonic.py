@@ -56,6 +56,8 @@ def run(config: QuasiHarmonicConfig):
         molecule,
         config.calculator,
         max_force_on_atom=config.max_force_on_atom,
+        algo_primary=config.relax_algo_primary,
+        algo_fallback=config.relax_algo_fallback,
         log=os.path.join(geom_opt_dir, f"{label_molecule}.txt"),
         system_label=label_molecule
     )
@@ -73,19 +75,21 @@ def run(config: QuasiHarmonicConfig):
     # by rescaling of V0.
     #
     label_crystal = "unit_cell_fully_relaxed"
-    unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.atoms_and_cell(
+    unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
         unit_cell,
         config.calculator,
         optimize_lattice_vectors=True,
         optimize_volume=True,
         symmetrize_final_structure=config.symmetrize_unit_cell,
         max_force_on_atom=config.max_force_on_atom,
+        algo_primary=config.relax_algo_primary,
+        algo_fallback=config.relax_algo_fallback,
         log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
         system_label=label_crystal
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
-    mbe_automtion.structure.crystal.display(
+    mbe_automation.structure.crystal.display(
         unit_cell=unit_cell_V0,
         system_label=label_crystal
     )
@@ -181,6 +185,8 @@ def run(config: QuasiHarmonicConfig):
             supercell_matrix,
             interp_mesh,
             config.max_force_on_atom,
+            config.relax_algo_primary,
+            config.relax_algo_fallback,
             config.supercell_displacement,
             config.automatic_primitive_cell,
             config.properties_dir,
@@ -220,7 +226,7 @@ def run(config: QuasiHarmonicConfig):
             # Relax geometry with an effective pressure which
             # forces QHA equilibrium value
             #
-            unit_cell_T, space_group_T = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell_T,
                 config.calculator,
                 pressure_GPa=row["p_thermal (GPa)"],
@@ -236,7 +242,7 @@ def run(config: QuasiHarmonicConfig):
             # Relax atomic positions and lattice vectors
             # under the constraint of constant volume
             #
-            unit_cell_T, space_group_T = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell_T,
                 config.calculator,                
                 pressure_GPa=0.0,
@@ -254,7 +260,7 @@ def run(config: QuasiHarmonicConfig):
             config.supercell_displacement,
             interp_mesh=interp_mesh,
             automatic_primitive_cell=config.automatic_primitive_cell,
-            symmetize_force_constants=config.symmetrize_force_constants,
+            symmetrize_force_constants=config.symmetrize_force_constants,
             system_label=label_crystal
         )
         has_imaginary_modes_T = mbe_automation.dynamics.harmonic.band_structure(

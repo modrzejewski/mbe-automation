@@ -1,10 +1,9 @@
+torch>=2.8.0
 numpy
 scipy
 ase
 dscribe
 mace-torch
-cuequivariance-torch
-openequivariance
 matplotlib
 pymatgen
 pyscf
