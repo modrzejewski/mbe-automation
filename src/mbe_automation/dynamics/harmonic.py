@@ -337,9 +337,8 @@ def phonons(
     print(f"Force constants completed", flush=True)
 
     if symmetrize_force_constants:
-        phonons.symmetrize_force_constants(
-            use_symfc_projector=True
-            )
+        phonons.symmetrize_force_constants()
+        phonons.symmetrize_force_constants_by_space_group()
         print(f"Symmetrization of force constants completed", flush=True)
     
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
