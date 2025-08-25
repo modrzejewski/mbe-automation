@@ -10,6 +10,7 @@ import pymatgen.core.lattice
 from typing import Literal
 import warnings
 import numpy as np
+import mbe_automation.display
 
 from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
 try:
@@ -22,22 +23,32 @@ except ImportError:
     doped_available = False
 
 
-def PrintUnitCellParams(unit_cell):
+def display(unit_cell: Atoms, system_label: str | None=None) -> None:
+    """
+    Display parameters of the unit cell.
+    """
+    
+    if system_label:
+        mbe_automation.display.multiline_framed([
+            "Cell parameters",
+            system_label])
+    else:
+        mbe_automation.display.framed("Cell parameters")
+        
     La, Lb, Lc = unit_cell.cell.lengths()
     alpha, beta, gamma = unit_cell.cell.angles()
     volume = unit_cell.cell.volume
-    print("Cell parameters")
-    print(f"a = {La:.4f} Å")
-    print(f"b = {Lb:.4f} Å")
-    print(f"c = {Lc:.4f} Å")
-    print(f"α = {alpha:.3f}°")
-    print(f"β = {beta:.3f}°")
-    print(f"γ = {gamma:.3f}°")
-    print(f"V = {volume:.4f} Å³")
+    print(f"a = {La:.2f} Å")
+    print(f"b = {Lb:.2f} Å")
+    print(f"c = {Lc:.2f} Å")
+    print(f"α = {alpha:.1f}°")
+    print(f"β = {beta:.1f}°")
+    print(f"γ = {gamma:.1f}°")
+    print(f"V = {volume:.1f} Å³")
     print(f"Number of atoms {len(unit_cell)}")
-    tight_symmetry_thresh = 1.0E-6
+    tight_symmetry_thresh = 1.0E-5 # symmetry tolerance used in Phonopy
     spgdata = ase.spacegroup.symmetrize.check_symmetry(unit_cell, symprec=tight_symmetry_thresh)
-    print(f"Space group {spgdata.number} {spgdata.international}")
+    print(f"Space group: [{spgdata.international}][{spgdata.number}]")
 
 
 def check_symmetry(
@@ -223,7 +234,7 @@ def supercell(
     return ase.build.make_supercell(unit_cell, transf)
 
 
-def density(unit_cell):
+def density(unit_cell: Atoms):
     """
     Density of a crystal in g/cm**3.
     """

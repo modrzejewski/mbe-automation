@@ -57,7 +57,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
         UnitCell = SymmetrizedUnitCell
     else:
         print("Molecular clusters will be generated using input unit cell")    
-    crystal.PrintUnitCellParams(UnitCell)    
+    crystal.display(UnitCell)    
     #
     # Determine the supercell size consistent
     # with the requested cutoff radii for clusters.

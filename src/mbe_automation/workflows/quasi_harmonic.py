@@ -31,6 +31,11 @@ def run(config: PropertiesConfig):
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
+    label = "input_unit_cell"
+    mbe_automtion.structure.crystal.display(
+        unit_cell=config.unit_cell,
+        system_label=label
+    )
     if config.symmetrize_unit_cell:
         unit_cell, input_space_group = mbe_automation.structure.crystal.symmetrize(
             config.unit_cell

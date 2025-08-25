@@ -23,59 +23,39 @@ class ReplicatedOutput:
         self.file.flush()
 
         
-def framed(text, padding=10, min_width=30):
+def framed(text: str | list[str], padding: int = 10, min_width: int = 30) -> None:
     """
-    Prints text surrounded by a box frame.
+    Prints one or more lines of text surrounded by a box frame.
+    
+    This single function handles both single string and list-of-strings input.
     
     Args:
-        text (str): The text to be framed
-        padding (int): Number of spaces around the text (default: 10)
-        min_width (int): Minimum internal width of the box (default: 20)
+        text (str or list[str]): The text to be framed.
+        padding (int): Spaces around the longest line of text.
+        min_width (int): Minimum internal width of the box.
     """
-    # Calculate the internal width needed
-    text_length = len(text)
-    internal_width = max(text_length + (padding * 2), min_width)
-    
-    # Calculate centering
-    total_padding = internal_width - text_length
-    left_padding = total_padding // 2
-    right_padding = total_padding - left_padding
-    
-    # Create the frame
-    horizontal_line = "─" * internal_width
-    
-    print("┌" + horizontal_line + "┐")
-    print("│" + " " * left_padding + text + " " * right_padding + "│")
-    print("└" + horizontal_line + "┘", flush=True)
 
-
-def multiline_framed(lines, padding=10, min_width=30):
-    """
-    Prints multiple lines of text surrounded by a box frame.
+    if isinstance(text, str):
+        lines = [text]
+    else:
+        lines = text
     
-    Args:
-        lines (list): List of text lines to be framed
-        padding (int): Number of spaces around the text (default: 10)
-        min_width (int): Minimum internal width of the box (default: 20)
-    """
-    if isinstance(lines, str):
-        lines = [lines]
+    # Determine internal width from the longest line
+    max_len = max(len(line) for line in lines) if lines else 0
+    internal_width = max(max_len + (padding * 2), min_width)
     
-    # Find the longest line
-    max_text_length = max(len(line) for line in lines) if lines else 0
-    internal_width = max(max_text_length + (padding * 2), min_width)
-    
-    # Create the frame
+    # Print top border
     horizontal_line = "─" * internal_width
-    
     print("┌" + horizontal_line + "┐")
     
+    # Print content lines
     for line in lines:
         total_padding = internal_width - len(line)
-        left_padding = total_padding // 2
-        right_padding = total_padding - left_padding
-        print("│" + " " * left_padding + line + " " * right_padding + "│")
+        left_pad = total_padding // 2
+        right_pad = total_padding - left_pad
+        print(f"│{' ' * left_pad}{line}{' ' * right_pad}│")
     
+    # Print bottom border
     print("└" + horizontal_line + "┘", flush=True)
 
 
@@ -94,13 +74,12 @@ def mace_summary(calculator: MACECalculator) -> None:
     num_interactions = getattr(model, 'num_interactions', 'N/A')
     device = str(next(model.parameters()).device)
 
-    print("MACE Model Summary:")
-    print("-" * 30)
+    framed([
+        "Machine-Learning Interatomic Potential",
+        "MACE"
+    ])
     print(f"Device:               {device}")
     print(f"Total parameters:     {total_params:,}")
     print(f"Data type:            {dtype}")
     print(f"r_max:                {r_max}")
     print(f"num_interactions:     {num_interactions}")
-    
-
-    

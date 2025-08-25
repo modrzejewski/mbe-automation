@@ -32,7 +32,7 @@ def atoms_and_cell(unit_cell,
         torch.cuda.reset_peak_memory_stats()
     
     if system_label:
-        mbe_automation.display.multiline_framed([
+        mbe_automation.display.framed([
             "Relaxation",
             system_label])
     else:
@@ -151,7 +151,7 @@ def isolated_molecule(molecule,
     """
 
     if system_label:
-        mbe_automation.display.multiline_framed([
+        mbe_automation.display.framed([
             "Relaxation",
             system_label])
     else:

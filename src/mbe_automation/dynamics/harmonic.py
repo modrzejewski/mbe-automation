@@ -256,7 +256,7 @@ def phonons(
         torch.cuda.reset_peak_memory_stats()
 
     if system_label:
-        mbe_automation.display.multiline_framed([
+        mbe_automation.display.framed([
             "Phonons",
             system_label])
     else:
