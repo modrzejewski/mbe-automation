@@ -245,8 +245,9 @@ def phonons(
         calculator,
         supercell_matrix,
         supercell_displacement,
-        interp_mesh=100.0,
+        interp_mesh=150.0,
         automatic_primitive_cell=True,
+        symmetrize_force_constants=False,
         system_label=None        
 ):
 
@@ -334,6 +335,12 @@ def phonons(
         fc_calculator_log_level=1
     )
     print(f"Force constants completed", flush=True)
+
+    if symmetrize_force_constants:
+        phonons.symmetrize_force_constants(
+            use_symfc_projector=True
+            )
+        print(f"Symmetrization of force constants completed", flush=True)
     
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
     print(f"Fourier interpolation mesh completed", flush=True)
@@ -504,6 +511,7 @@ def equilibrium_curve(
         equation_of_state,
         eos_sampling,
         symmetrize_unit_cell,
+        symmetrize_force_constants,
         imaginary_mode_threshold,
         skip_structures_with_imaginary_modes,
         skip_structures_with_broken_symmetry,
@@ -593,6 +601,7 @@ def equilibrium_curve(
             supercell_displacement,
             interp_mesh=interp_mesh,
             automatic_primitive_cell=automatic_primitive_cell,
+            symmetrize_force_constants=symmetrize_force_constants,
             system_label=label
         )
         has_imaginary_modes = band_structure(

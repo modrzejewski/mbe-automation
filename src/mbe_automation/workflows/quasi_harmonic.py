@@ -102,6 +102,7 @@ def run(config: PropertiesConfig):
         config.supercell_displacement,
         interp_mesh=config.fourier_interpolation_mesh,
         automatic_primitive_cell=config.automatic_primitive_cell,
+        symmetrize_force_constants=config.symmetrize_force_constants,
         system_label=label_crystal
     )
     has_imaginary_modes_V0 = mbe_automation.dynamics.harmonic.band_structure(
@@ -177,6 +178,7 @@ def run(config: PropertiesConfig):
             config.equation_of_state,
             config.eos_sampling,
             config.symmetrize_unit_cell,
+            config.symmetrize_force_constants,
             config.imaginary_mode_threshold,
             config.skip_structures_with_imaginary_modes,
             config.skip_structures_with_broken_symmetry,
@@ -241,6 +243,7 @@ def run(config: PropertiesConfig):
             config.supercell_displacement,
             interp_mesh=interp_mesh,
             automatic_primitive_cell=config.automatic_primitive_cell,
+            symmetize_force_constants=config.symmetrize_force_constants,
             system_label=label_crystal
         )
         has_imaginary_modes_T = mbe_automation.dynamics.harmonic.band_structure(

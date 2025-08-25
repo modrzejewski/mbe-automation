@@ -125,6 +125,7 @@ class PropertiesConfig:
                                    # the input unit cell is the primitive cell.
                                    #
     automatic_primitive_cell: bool = False
+    symmetrize_force_constants: bool = False
                                    #
                                    # Scaling factors used to sample volumes around
                                    # the reference volume at T=0K.
