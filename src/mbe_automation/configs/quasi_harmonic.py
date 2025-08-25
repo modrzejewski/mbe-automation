@@ -127,6 +127,14 @@ class QuasiHarmonicConfig:
                                    # forces -> small displacements can be used
                                    # -> accurate force constants
                                    #
+                                   # Recommendation from literature:
+                                   #
+                                   # (1) Hoja, Reilly, Tkatchenko, WIREs Comput Mol Sci 2016;
+                                   #     doi: 10.1002/wcms.1294 
+                                   #     Displacements between 0.001 and 0.01 Angs give
+                                   #     stable results; applied with force threshold 10**(-4) eV/Angs.
+                                   #     Displacement=0.005 Angs used for all results in this work.
+                                   #
     supercell_displacement: float = 0.01
                                    #
                                    # Enable automatic primitive cell determination

@@ -3,8 +3,7 @@ import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.display
-from mbe_automation.configs.training import TrainingConfig
-from mbe_automation.configs.properties import PropertiesConfig
+from mbe_automation.configs.quasi_harmonic import QuasiHarmonicConfig
 import os
 import os.path
 import ase.units
@@ -20,7 +19,7 @@ except ImportError:
     mace_available = False
 
 
-def run(config: PropertiesConfig):
+def run(config: QuasiHarmonicConfig):
 
     if config.thermal_expansion:
         mbe_automation.display.framed("Harmonic properties with thermal expansion")
@@ -31,10 +30,10 @@ def run(config: PropertiesConfig):
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
-    label = "input_unit_cell"
+    label_crystal = "unit_cell_input"
     mbe_automtion.structure.crystal.display(
         unit_cell=config.unit_cell,
-        system_label=label
+        system_label=label_crystal
     )
     if config.symmetrize_unit_cell:
         unit_cell, input_space_group = mbe_automation.structure.crystal.symmetrize(
@@ -86,7 +85,10 @@ def run(config: PropertiesConfig):
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
-    print(f"Volume after full relaxation V₀ = {V0:.2f} Å³/unit cell")
+    mbe_automtion.structure.crystal.display(
+        unit_cell=unit_cell_V0,
+        system_label=label_crystal
+    )
     #
     # The supercell transformation is computed once and kept
     # fixed for the remaining structures
@@ -274,7 +276,8 @@ def run(config: PropertiesConfig):
         data_frames_at_T.append(df_crystal_T)
     #
     # Create a single data frame for the whole temperature range
-    # by stacking data frames at each temperature
+    # by vertically stacking data frames computed for individual
+    # temeprature points
     #
     df_crystal_qha = pd.concat(data_frames_at_T)
     df_sublimation_qha = mbe_automation.dynamics.harmonic.data_frame_sublimation(
