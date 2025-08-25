@@ -29,7 +29,7 @@ def display(unit_cell: Atoms, system_label: str | None=None) -> None:
     """
     
     if system_label:
-        mbe_automation.display.multiline_framed([
+        mbe_automation.display.framed([
             "Cell parameters",
             system_label])
     else:
