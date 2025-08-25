@@ -31,7 +31,7 @@ def run(config: QuasiHarmonicConfig):
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     label_crystal = "unit_cell_input"
-    mbe_automtion.structure.crystal.display(
+    mbe_automation.structure.crystal.display(
         unit_cell=config.unit_cell,
         system_label=label_crystal
     )
