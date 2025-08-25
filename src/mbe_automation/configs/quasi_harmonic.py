@@ -5,8 +5,10 @@ import numpy as np
 import numpy.typing as npt
 
 @dataclass
-class PropertiesConfig:
-    """Configuration for thermodynamic property calculations."""
+class QuasiHarmonicConfig:
+    """
+    Parameters for thermodynamic property calculations in the quasi-harmonic approximation.
+    """
     unit_cell: Atoms
     molecule: Atoms
     calculator: Any
@@ -22,6 +24,8 @@ class PropertiesConfig:
                                    #
                                    # If thermal_expansion==False, phonon calculations
                                    # are performed only on a single relaxed structure.
+                                   # This approach is referred to as the harmonic
+                                   # approximation.
                                    #
     thermal_expansion: bool = True
                                    #
@@ -96,6 +100,11 @@ class PropertiesConfig:
                                    #
     supercell_radius: float = 25.0
                                    #
+                                   # Supercell transformation matrix. If specified,
+                                   # supercell_radius is ignored.
+                                   #
+    supercell_matrix: npt.NDArray[np.integer] | None = None
+                                   #
                                    # (1) Diagonal supercell transformation:
                                    # the unit cell vectors are repated along
                                    # each direction without lattice vector mixing.
@@ -125,6 +134,10 @@ class PropertiesConfig:
                                    # the input unit cell is the primitive cell.
                                    #
     automatic_primitive_cell: bool = False
+                                   #
+                                   # Restore translational and permutational symmetry
+                                   # of force constants produced from finite differences
+                                   #
     symmetrize_force_constants: bool = False
                                    #
                                    # Scaling factors used to sample volumes around
@@ -193,17 +206,19 @@ class PropertiesConfig:
                                    #
                                    # u < imaginary_mode_threshold
                                    #
+                                   # Affects how the EOS fit is performed
+                                   # (see: skip_structures_with_imaginary_modes).
+                                   #
     imaginary_mode_threshold: float = -0.1
                                    #
-                                   # Remove from the equation of state
-                                   # the structures with imaginary frequencies
-                                   # anywhere in the Brillouin zone
+                                   # Perform EOS fit without the structures
+                                   # where imaginary modes were detected anywhere
+                                   # in the first Brillouin zone.
                                    #
     skip_structures_with_imaginary_modes: bool = True
                                    #
-                                   # Remove from the equation of state
-                                   # the structures with expanded volume
-                                   # if the space group is different from
-                                   # that of the fully relaxed cell at T=0.
+                                   # Perform EOS fit without the structures
+                                   # where space group symmetry differs from
+                                   # the reference space group number.
                                    #
     skip_structures_with_broken_symmetry: bool = True

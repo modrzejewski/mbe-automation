@@ -86,11 +86,15 @@ def run(config: PropertiesConfig):
     # The supercell transformation is computed once and kept
     # fixed for the remaining structures
     #
-    supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(
-        unit_cell_V0,
-        config.supercell_radius,
-        config.supercell_diagonal
-    )
+    if config.supercell_matrix is None:
+        supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(
+            unit_cell_V0,
+            config.supercell_radius,
+            config.supercell_diagonal
+        )
+    else:
+        print("Using supercell matrix provided in QuasiHarmonicConfig", flush=True)
+        supercell_matrix = config.supercell_matrix
     #
     # Phonon properties of the fully relaxed cell
     # (the harmonic approximation)

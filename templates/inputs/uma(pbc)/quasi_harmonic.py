@@ -1,6 +1,6 @@
 import numpy as np
 import os.path
-from mbe_automation.configs.properties import PropertiesConfig
+from mbe_automation.configs.quasi_harmonic import QuasiHarmonicConfig
 import mbe_automation.workflows.quasi_harmonic
 import mbe_automation.io
 import torch
@@ -35,7 +35,7 @@ else:
 #    
 uma_calc = FAIRChemCalculator(uma_model, task_name="omc")
 
-properties_config = PropertiesConfig(
+properties_config = QuasiHarmonicConfig(
     unit_cell = mbe_automation.io.read(os.path.join(work_dir, xyz_solid)),
     molecule = mbe_automation.io.read(os.path.join(work_dir, xyz_molecule)),
     temperatures = np.array([5.0, 200.0, 300.0]),
