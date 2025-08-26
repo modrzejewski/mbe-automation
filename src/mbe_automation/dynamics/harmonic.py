@@ -866,31 +866,56 @@ def band_structure(
     os.makedirs(plots_dir, exist_ok=True)
     plt.savefig(os.path.join(plots_dir, f"{system_label}.png"))
     plt.close()
+    #
+    # Detect dynamic instabilities along the high-symmetry k-path
+    #
+    freq_min = 0.0
+    k_min = np.zeros(3)
+    bands_with_any_neg_freq = set()
+    bands_below_threshold = set()
+    
+    for segment_idx in range(len(phonons.band_structure.frequencies)): # loop over segments of a full path
+        kpoints = phonons.band_structure.qpoints[segment_idx]
+        frequencies_on_path = phonons.band_structure.frequencies[segment_idx]
         
-    min_freq = 0.0
-    min_k = np.zeros(3)
-    n_paths = len(phonons.band_structure.frequencies)
-    for i in range(n_paths):
-        kpoints = phonons.band_structure.qpoints[i] # reduced coordinates of reciprocal space without 2pi
-        freqs = phonons.band_structure.frequencies[i]
-        for j, omega in enumerate(freqs):
-            min_freq_j = np.min(omega)
-            if min_freq_j < min_freq:
-                min_freq = min_freq_j
-                min_k = kpoints[j]
+        for k_idx, freqs_at_k in enumerate(frequencies_on_path): # loop over k-points in a segment
+            for band_idx, freq in enumerate(freqs_at_k): # loop over phonon bands
+                
+                if freq < freq_min:
+                    freq_min = freq
+                    k_min = kpoints[k_idx]
+
+                if freq < 0.0:
+                    bands_with_any_neg_freq.add(band_idx)
+
+                if freq < imaginary_mode_threshold:
+                    bands_below_threshold.add(band_idx)
         
-    has_imaginary_modes = (min_freq < imaginary_mode_threshold)
-    if min_freq < 0.0:
-        kx, ky, kz = min_k
+    has_imaginary_modes = (freq_min < imaginary_mode_threshold)
+    
+    if freq_min < 0.0:
+        kx, ky, kz = k_min
         print(f"Imaginary mode threshold: {imaginary_mode_threshold:.2f} THz", flush=True)
-        print(f"Largest imaginary mode:  ω={min_freq:.2f} THz at k=[{kx:.3f} {ky:.3f} {kz:.3f}]", flush=True)
+        print(f"Largest imaginary mode:  ω={freq_min:.2f} THz at k=[{kx:.3f} {ky:.3f} {kz:.3f}]",
+              flush=True)
+
+        if bands_with_any_neg_freq:
+            sorted_bands_any_neg = sorted([b + 1 for b in bands_with_any_neg_freq])
+            print(f"Bands with any negative frequency (ω < 0.0 THz):")
+            print(f"{sorted_bands_any_neg}", flush=True)
+        
+        if bands_below_threshold:
+            sorted_bands_thresh = sorted([b + 1 for b in bands_below_threshold])
+            print(f"Bands with frequencies below threshold (ω < {imaginary_mode_threshold:.2f} THz):")
+            print(f"{sorted_bands_thresh}", flush=True)
+        
         if not has_imaginary_modes:
-            print(f"Classified as numerical noise below the threshold")
+            print("Negative frequencies classified as numerical noise (below threshold).",
+                  flush=True)
         
     else:
-        print(f"All frequencies along the high-symmetry path are real", flush=True)
+        print("All frequencies along the high-symmetry path are real.", flush=True)
         
     print(f"Phonon band structure completed", flush=True)
-            
     return has_imaginary_modes
     
