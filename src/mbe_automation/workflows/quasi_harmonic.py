@@ -217,7 +217,7 @@ def run(config: QuasiHarmonicConfig):
     # are skipped.
     #
     data_frames_at_T = []
-    if config.skip_systems_with_extrapolated_minimum:
+    if config.skip_structures_with_extrapolated_minimum:
         filtered_df = df_crystal_eos[df_crystal_eos["min_found"] & (df_crystal_eos["min_extrapolated"] == False)]
     else:
         filtered_df = df_crystal_eos[df_crystal_eos["min_found"]]

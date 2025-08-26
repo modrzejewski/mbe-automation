@@ -53,13 +53,6 @@ class QuasiHarmonicConfig:
                                    #
     symmetrize_unit_cell: bool = True
                                    #
-                                   # Change lattice vectors during geometry
-                                   # optimization of the unit cell. Can be
-                                   # done with or without change of the cell
-                                   # volume.
-                                   #
-    optimize_lattice_vectors: bool = True
-                                   #
                                    # Threshold for maximum resudual force
                                    # after geometry relaxation (eV/Angs).
                                    #
