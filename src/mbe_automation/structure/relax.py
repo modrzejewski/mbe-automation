@@ -22,7 +22,7 @@ def crystal(unit_cell,
             max_force_on_atom=1.0E-3, # eV/Angs/atom
             max_steps=1000,
             algo_primary="PreconLBFGS",
-            algo_fallback="PreconFIRE"
+            algo_fallback="PreconFIRE",
             log="geometry_opt.txt",
             system_label=None
             ):
