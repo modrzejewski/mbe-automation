@@ -712,7 +712,6 @@ def equilibrium_curve(
         if fit.min_found:
             weights = proximity_weights(
                 V=V_sampled[accepted_systems],
-                F=F_vib_V_T[accepted_systems, i],
                 V_min=V_eos[i])
             F_vib_fit = Polynomial.fit(
                 V_sampled[accepted_systems],
