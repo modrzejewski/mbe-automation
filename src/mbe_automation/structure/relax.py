@@ -1,5 +1,4 @@
 import os.path
-from ase.constraints import FixSymmetry
 import ase.optimize
 from ase.optimize.fire2 import FIRE2
 from ase.optimize.precon import Exp
@@ -15,7 +14,7 @@ import torch
 
 def crystal(unit_cell,
             calculator,
-            pressure_GPa=0.0, # gigapascals
+            pressure_GPa=0.0, # external isotropic pressure in gigapascals
             optimize_lattice_vectors=True,
             optimize_volume=True,
             symmetrize_final_structure=True,
@@ -54,7 +53,7 @@ def crystal(unit_cell,
         print("Applying Frechet cell filter")
         #
         # Cell filter is required for simultaneous
-        # optimization of atomic positions and cell vectors
+        # optimization of atomic positions and cell vectors.
         #
         # Frechet cell filter gives good convergence
         # for cell relaxation when used with macine-learning
@@ -71,38 +70,48 @@ def crystal(unit_cell,
     else:
         system_to_optimize = relaxed_system
 
-    if algo_primary == "PreconLBFGS":
-        optimizer = PreconLBFGS(
-            atoms=system_to_optimize,
-            precon=Exp(),
-            use_armijo=False,
-            logfile=log
-        )
-    elif algo_primary == "PreconFIRE":
-        optimizer = PreconFIRE(
-            atoms=system_to_optimize,
-            precon=Exp(),
-            use_armijo=False,
-            logfile=log
-        )
+    for algo in [algo_primary, algo_fallback]:
+        try:
+            print(f"Geometry relaxation with {algo}...", flush=True)            
+            if algo == "PreconLBFGS":
+                optimizer = PreconLBFGS(
+                    atoms=system_to_optimize,
+                    precon=Exp(),
+                    use_armijo=False,
+                    logfile=log
+                )
+            elif algo == "PreconFIRE":
+                optimizer = PreconFIRE(
+                    atoms=system_to_optimize,
+                    precon=Exp(),
+                    use_armijo=False,
+                    logfile=log
+                )
+            else:
+                raise ValueError(f"Invalid relaxation algorithm: {algo}")
+            
+            with warnings.catch_warnings():
+                #
+                # FrechetCellFilter sometimes floods the output with warnings
+                # about slightly inaccurate matrix exponential
+                #
+                warnings.filterwarnings(
+                    "ignore",
+                    message=r"logm result may be inaccurate, approximate err = .*",
+                    category=RuntimeWarning
+                )
+                optimizer.run(
+                    fmax=max_force_on_atom,
+                    steps=max_steps
+                )
+            print("Relaxation completed", flush=True)
+            break
+        except Exception as e:
+            warnings.warn(f"{algo} failed with an error: {e}")
+            warnings.warn("Switching to fallback algorithm")
     else:
-        raise ValueError("Invalid relaxation algorithm")
-    
-    with warnings.catch_warnings():
-        #
-        # FrechetCellFilter sometimes floods the output with warnings
-        # about slightly inaccurate matrix exponential
-        #
-        warnings.filterwarnings(
-            "ignore",
-            message=r"logm result may be inaccurate, approximate err = .*",
-            category=RuntimeWarning
-        )
-        optimizer.run(
-            fmax=max_force_on_atom,
-            steps=max_steps
-        )
-        
+        raise RuntimeError("All optimization algorithms failed")
+
     if symmetrize_final_structure:
         print("Post-relaxation symmetry refinement")
         relaxed_system, space_group = mbe_automation.structure.crystal.symmetrize(
@@ -114,7 +123,7 @@ def crystal(unit_cell,
 
     print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_system.get_forces()).max()
-    print(f"Max residual force component: {max_force:.6f} eV/Å", flush=True)
+    print(f"Max residual force component: {max_force:.1e} eV/Å", flush=True)
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
@@ -145,32 +154,40 @@ def isolated_molecule(molecule,
     
     relaxed_molecule = molecule.copy()
     relaxed_molecule.calc = calculator
+    system_to_optimize = relaxed_molecule
 
-    if algo_primary == "PreconLBFGS":
-        optimizer = PreconLBFGS(
-            relaxed_molecule,
-            use_armijo=False,
-            logfile=log
-        )
-    elif algo_primary == "PreconFIRE":
-        optimizer = PreconFIRE(
-            relaxed_molecule,
-            use_armijo=False,
-            logfile=log
-        )
+    for algo in [algo_primary, algo_fallback]:
+        try:
+            print(f"Geometry relaxation with {algo}...", flush=True)            
+            if algo == "PreconLBFGS":
+                optimizer = PreconLBFGS(
+                    atoms=system_to_optimize,
+                    use_armijo=False,
+                    logfile=log
+                )
+            elif algo == "PreconFIRE":
+                optimizer = PreconFIRE(
+                    atoms=system_to_optimize,
+                    use_armijo=False,
+                    logfile=log
+                )
+            else:
+                raise ValueError(f"Invalid relaxation algorithm: {algo}")
+            
+            optimizer.run(
+                fmax=max_force_on_atom,
+                steps=max_steps
+            )
+            print("Relaxation completed", flush=True)
+            break
+        except Exception as e:
+            warnings.warn(f"{algo} failed with an error: {e}")
+            warnings.warn("Switching to fallback algorithm")
     else:
-        raise ValueError("Invalid relaxation algorithm")
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings("once")
-        optimizer.run(
-            fmax=max_force_on_atom,
-            steps=max_steps
-        )
-
-    print("Relaxation completed", flush=True)
+        raise RuntimeError("All optimization algorithms failed")
+    
     max_force = np.abs(relaxed_molecule.get_forces()).max()
-    print(f"Max residual force component: {max_force:.6f} eV/Å", flush=True)
+    print(f"Max residual force component: {max_force:.1e} eV/Å", flush=True)
     
     return relaxed_molecule
 
