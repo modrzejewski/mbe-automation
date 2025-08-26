@@ -3,14 +3,15 @@ import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.display
-from mbe_automation.configs.training import TrainingConfig
-from mbe_automation.configs.properties import PropertiesConfig
+from mbe_automation.configs.quasi_harmonic import QuasiHarmonicConfig
 import os
 import os.path
 import ase.units
 import numpy as np
 import pandas as pd
 import mbe_automation.hdf5
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 try:
     from mace.calculators import MACECalculator
@@ -20,7 +21,7 @@ except ImportError:
     mace_available = False
 
 
-def run(config: PropertiesConfig):
+def run(config: QuasiHarmonicConfig):
 
     if config.thermal_expansion:
         mbe_automation.display.framed("Harmonic properties with thermal expansion")
@@ -31,6 +32,11 @@ def run(config: PropertiesConfig):
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
+    label_crystal = "unit_cell_input"
+    mbe_automation.structure.crystal.display(
+        unit_cell=config.unit_cell,
+        system_label=label_crystal
+    )
     if config.symmetrize_unit_cell:
         unit_cell, input_space_group = mbe_automation.structure.crystal.symmetrize(
             config.unit_cell
@@ -52,6 +58,8 @@ def run(config: PropertiesConfig):
         molecule,
         config.calculator,
         max_force_on_atom=config.max_force_on_atom,
+        algo_primary=config.relax_algo_primary,
+        algo_fallback=config.relax_algo_fallback,
         log=os.path.join(geom_opt_dir, f"{label_molecule}.txt"),
         system_label=label_molecule
     )
@@ -69,28 +77,37 @@ def run(config: PropertiesConfig):
     # by rescaling of V0.
     #
     label_crystal = "unit_cell_fully_relaxed"
-    unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.atoms_and_cell(
+    unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
         unit_cell,
         config.calculator,
         optimize_lattice_vectors=True,
         optimize_volume=True,
         symmetrize_final_structure=config.symmetrize_unit_cell,
         max_force_on_atom=config.max_force_on_atom,
+        algo_primary=config.relax_algo_primary,
+        algo_fallback=config.relax_algo_fallback,
         log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
         system_label=label_crystal
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
-    print(f"Volume after full relaxation V₀ = {V0:.2f} Å³/unit cell")
+    mbe_automation.structure.crystal.display(
+        unit_cell=unit_cell_V0,
+        system_label=label_crystal
+    )
     #
     # The supercell transformation is computed once and kept
     # fixed for the remaining structures
     #
-    supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(
-        unit_cell_V0,
-        config.supercell_radius,
-        config.supercell_diagonal
-    )
+    if config.supercell_matrix is None:
+        supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(
+            unit_cell_V0,
+            config.supercell_radius,
+            config.supercell_diagonal
+        )
+    else:
+        print("Using supercell matrix provided in QuasiHarmonicConfig", flush=True)
+        supercell_matrix = config.supercell_matrix
     #
     # Phonon properties of the fully relaxed cell
     # (the harmonic approximation)
@@ -102,6 +119,7 @@ def run(config: PropertiesConfig):
         config.supercell_displacement,
         interp_mesh=config.fourier_interpolation_mesh,
         automatic_primitive_cell=config.automatic_primitive_cell,
+        symmetrize_force_constants=config.symmetrize_force_constants,
         system_label=label_crystal
     )
     has_imaginary_modes_V0 = mbe_automation.dynamics.harmonic.band_structure(
@@ -169,6 +187,8 @@ def run(config: PropertiesConfig):
             supercell_matrix,
             interp_mesh,
             config.max_force_on_atom,
+            config.relax_algo_primary,
+            config.relax_algo_fallback,
             config.supercell_displacement,
             config.automatic_primitive_cell,
             config.properties_dir,
@@ -177,6 +197,7 @@ def run(config: PropertiesConfig):
             config.equation_of_state,
             config.eos_sampling,
             config.symmetrize_unit_cell,
+            config.symmetrize_force_constants,
             config.imaginary_mode_threshold,
             config.skip_structures_with_imaginary_modes,
             config.skip_structures_with_broken_symmetry,
@@ -192,7 +213,11 @@ def run(config: PropertiesConfig):
     # are skipped.
     #
     data_frames_at_T = []
-    filtered_df = df_crystal_eos[df_crystal_eos["min_found"]] # consider only the data points where EOS fit succeded
+    if config.skip_systems_with_extrapolated_minimum:
+        filtered_df = df_crystal_eos[df_crystal_eos["min_found"] & (df_crystal_eos["min_extrapolated"] == False)]
+    else:
+        filtered_df = df_crystal_eos[df_crystal_eos["min_found"]]
+        
     for i, row in filtered_df.iterrows():
         T = row["T (K)"]
         V = row["V_eos (Å³/unit cell)"]
@@ -207,7 +232,7 @@ def run(config: PropertiesConfig):
             # Relax geometry with an effective pressure which
             # forces QHA equilibrium value
             #
-            unit_cell_T, space_group_T = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell_T,
                 config.calculator,
                 pressure_GPa=row["p_thermal (GPa)"],
@@ -223,7 +248,7 @@ def run(config: PropertiesConfig):
             # Relax atomic positions and lattice vectors
             # under the constraint of constant volume
             #
-            unit_cell_T, space_group_T = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell_T,
                 config.calculator,                
                 pressure_GPa=0.0,
@@ -241,6 +266,7 @@ def run(config: PropertiesConfig):
             config.supercell_displacement,
             interp_mesh=interp_mesh,
             automatic_primitive_cell=config.automatic_primitive_cell,
+            symmetrize_force_constants=config.symmetrize_force_constants,
             system_label=label_crystal
         )
         has_imaginary_modes_T = mbe_automation.dynamics.harmonic.band_structure(
@@ -262,7 +288,8 @@ def run(config: PropertiesConfig):
         data_frames_at_T.append(df_crystal_T)
     #
     # Create a single data frame for the whole temperature range
-    # by stacking data frames at each temperature
+    # by vertically stacking data frames computed for individual
+    # temeprature points
     #
     df_crystal_qha = pd.concat(data_frames_at_T)
     df_sublimation_qha = mbe_automation.dynamics.harmonic.data_frame_sublimation(

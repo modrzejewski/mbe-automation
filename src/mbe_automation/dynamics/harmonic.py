@@ -245,8 +245,9 @@ def phonons(
         calculator,
         supercell_matrix,
         supercell_displacement,
-        interp_mesh=100.0,
+        interp_mesh=150.0,
         automatic_primitive_cell=True,
+        symmetrize_force_constants=False,
         system_label=None        
 ):
 
@@ -255,7 +256,7 @@ def phonons(
         torch.cuda.reset_peak_memory_stats()
 
     if system_label:
-        mbe_automation.display.multiline_framed([
+        mbe_automation.display.framed([
             "Phonons",
             system_label])
     else:
@@ -334,6 +335,11 @@ def phonons(
         fc_calculator_log_level=1
     )
     print(f"Force constants completed", flush=True)
+
+    if symmetrize_force_constants:
+        phonons.symmetrize_force_constants()
+        phonons.symmetrize_force_constants_by_space_group()
+        print(f"Symmetrization of force constants completed", flush=True)
     
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
     print(f"Fourier interpolation mesh completed", flush=True)
@@ -496,6 +502,8 @@ def equilibrium_curve(
         supercell_matrix,
         interp_mesh,
         max_force_on_atom,
+        relax_algo_primary,
+        relax_algo_fallback,
         supercell_displacement,
         automatic_primitive_cell,
         properties_dir,
@@ -504,6 +512,7 @@ def equilibrium_curve(
         equation_of_state,
         eos_sampling,
         symmetrize_unit_cell,
+        symmetrize_force_constants,
         imaginary_mode_threshold,
         skip_structures_with_imaginary_modes,
         skip_structures_with_broken_symmetry,
@@ -531,12 +540,14 @@ def equilibrium_curve(
     df_eos_points = []
     
     mbe_automation.display.framed("F(V) curve sampling")
-    print(f"Analytic EOS model: {equation_of_state}")
+    print(f"equation of state                      {equation_of_state}")
+    print(f"skip structures with imaginary modes   {skip_structures_with_imaginary_modes}")
+    print(f"skip structures with broken symmetry   {skip_structures_with_broken_symmetry}")
     if eos_sampling == "volume":
-        print("Volume range (V/V₀):")
+        print("volume sampling interval (V/V₀)")
         print(np.array2string(volume_range, precision=2))
     else:
-        print(f"Thermal pressure range (GPa):")
+        print(f"pressure sampling interval (GPa)")
         print(np.array2string(pressure_range, precision=2))
     
     for i in range(n_volumes):
@@ -548,7 +559,7 @@ def equilibrium_curve(
             #
             thermal_pressure = pressure_range[i]
             label = f"unit_cell_eos_p_thermal_{thermal_pressure:.4f}_GPa"
-            unit_cell_V, space_group_V = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V0,
                 calculator,
                 pressure_GPa=thermal_pressure,
@@ -556,6 +567,8 @@ def equilibrium_curve(
                 optimize_volume=True,
                 symmetrize_final_structure=symmetrize_unit_cell,
                 max_force_on_atom=max_force_on_atom,
+                algo_primary=relax_algo_primary,
+                algo_fallback=relax_algo_fallback,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
@@ -572,7 +585,7 @@ def equilibrium_curve(
                 scale_atoms=True
             )
             label = f"unit_cell_eos_V_{V/V0:.4f}"
-            unit_cell_V, space_group_V = mbe_automation.structure.relax.atoms_and_cell(
+            unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V,
                 calculator,                
                 pressure_GPa=0.0,
@@ -580,6 +593,8 @@ def equilibrium_curve(
                 optimize_volume=False,
                 symmetrize_final_structure=symmetrize_unit_cell,
                 max_force_on_atom=max_force_on_atom,
+                algo_primary=relax_algo_primary,
+                algo_fallback=relax_algo_fallback,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
@@ -593,6 +608,7 @@ def equilibrium_curve(
             supercell_displacement,
             interp_mesh=interp_mesh,
             automatic_primitive_cell=automatic_primitive_cell,
+            symmetrize_force_constants=symmetrize_force_constants,
             system_label=label
         )
         has_imaginary_modes = band_structure(
@@ -831,7 +847,7 @@ def band_structure(
     library.
 
     """
-        
+    
     bands, labels, path_connections = get_band_qpoints_by_seekpath(
         phonons.primitive,
         n_points,

@@ -1,7 +1,7 @@
 import numpy as np
 import os.path
 import mace.calculators
-from mbe_automation.configs.properties import PropertiesConfig
+from mbe_automation.configs.quasi_harmonic import QuasiHarmonicConfig
 import mbe_automation.workflows.quasi_harmonic
 import mbe_automation.io
 import torch
@@ -17,7 +17,8 @@ mace_calc = mace.calculators.MACECalculator(
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )
 
-properties_config = PropertiesConfig(
+properties_config = QuasiHarmonicConfig.for_model(
+    model_name = "MACE",
     unit_cell = mbe_automation.io.read(os.path.join(work_dir, xyz_solid)),
     molecule = mbe_automation.io.read(os.path.join(work_dir, xyz_molecule)),
     temperatures = np.array([5.0, 200.0, 300.0]),
