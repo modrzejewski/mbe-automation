@@ -10,6 +10,8 @@ import ase.units
 import numpy as np
 import pandas as pd
 import mbe_automation.hdf5
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 try:
     from mace.calculators import MACECalculator
@@ -211,7 +213,11 @@ def run(config: QuasiHarmonicConfig):
     # are skipped.
     #
     data_frames_at_T = []
-    filtered_df = df_crystal_eos[df_crystal_eos["min_found"]] # consider only the data points where EOS fit succeded
+    if config.skip_systems_with_extrapolated_minimum:
+        filtered_df = df_crystal_eos[df_crystal_eos["min_found"] & (df_crystal_eos["min_extrapolated"] == False)]
+    else:
+        filtered_df = df_crystal_eos[df_crystal_eos["min_found"]]
+        
     for i, row in filtered_df.iterrows():
         T = row["T (K)"]
         V = row["V_eos (Å³/unit cell)"]

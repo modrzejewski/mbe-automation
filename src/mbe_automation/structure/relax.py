@@ -106,7 +106,7 @@ def crystal(unit_cell,
                 )
             max_force = np.abs(system_to_optimize.get_forces()).max()
             if max_force < max_force_on_atom:
-                print("{algo} converged", flush=True)
+                print(f"{algo} converged with max residual force = {max_force:.1e} eV/Å", flush=True)
                 break
             else:
                 warnings.warn(f"{algo} finished but did not converge (max force = {max_force:.1e} eV/Å)")
@@ -183,7 +183,7 @@ def isolated_molecule(molecule,
             
             max_force = np.abs(system_to_optimize.get_forces()).max()
             if max_force < max_force_on_atom:
-                print(f"{algo} converged", flush=True)
+                print(f"{algo} converged with max residual force = {max_force:.1e} eV/Å", flush=True)
                 break
             else:
                 warnings.warn(f"{algo} finished but did not converge (max force = {max_force:.1e} eV/Å)")

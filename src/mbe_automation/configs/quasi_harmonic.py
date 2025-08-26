@@ -145,6 +145,8 @@ class QuasiHarmonicConfig:
                                    # supercells can achieve the required point-image
                                    # radius with a smaller number of atoms in the supercell.
                                    #
+                                   # Ignored if supercell_matrix is provided explicitly.
+                                   #
     supercell_diagonal: bool = False
                                    #
                                    # Displacement length applied in Phonopy
@@ -199,8 +201,9 @@ class QuasiHarmonicConfig:
                                    #
     volume_range: npt.NDArray[np.floating] = field(default_factory=lambda:
                                                     np.array([
-                                                        0.96, 0.98, 1.00, 1.02, 1.04,
-                                                        1.06, 1.08, 1.10, 1.12
+                                                        0.96, 0.97, 0.98, 0.99, 1.00, 1.01, 1.02,
+                                                        1.03, 1.04, 1.05, 1.06, 1.07, 1.08, 1.09,
+                                                        1.10, 1.11, 1.12
                                                     ]))
                                    #
                                    # Range of external isotropic pressures applied
@@ -263,8 +266,13 @@ class QuasiHarmonicConfig:
                                    # the reference space group number.
                                    #
     skip_structures_with_broken_symmetry: bool = True
-
-
+                                   #
+                                   # If EOS fit produces a minimum outside
+                                   # of the volume sampling range, skip
+                                   # the corresponding data point in
+                                   # the subsequent harmonic calculations.
+                                   #
+    skip_structures_with_extrapolated_minimum: bool = True
 
     @classmethod
     def for_model(cls,
@@ -274,7 +282,7 @@ class QuasiHarmonicConfig:
                   calculator: Any,
                   **kwargs):
         """
-        Generate a configuration for a specific MLIP.
+        Generate a set of configuration parameters for a specific MLIP.
 
         Args:
             model_name: The name of the MLIP preset.

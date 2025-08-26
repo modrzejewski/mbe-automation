@@ -540,12 +540,14 @@ def equilibrium_curve(
     df_eos_points = []
     
     mbe_automation.display.framed("F(V) curve sampling")
-    print(f"Analytic EOS model: {equation_of_state}")
+    print(f"equation of state                      {equation_of_state}")
+    print(f"skip structures with imaginary modes   {skip_structures_with_imaginary_modes}")
+    print(f"skip structures with broken symmetry   {skip_structures_with_broken_symmetry}")
     if eos_sampling == "volume":
-        print("Volume range (V/V₀):")
+        print("volume sampling interval (V/V₀)")
         print(np.array2string(volume_range, precision=2))
     else:
-        print(f"Thermal pressure range (GPa):")
+        print(f"pressure sampling interval (GPa)")
         print(np.array2string(pressure_range, precision=2))
     
     for i in range(n_volumes):
@@ -845,7 +847,7 @@ def band_structure(
     library.
 
     """
-        
+    
     bands, labels, path_connections = get_band_qpoints_by_seekpath(
         phonons.primitive,
         n_points,
