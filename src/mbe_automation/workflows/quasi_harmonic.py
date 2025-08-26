@@ -3,7 +3,7 @@ import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.display
-from mbe_automation.configs.quasi_harmonic import QuasiHarmonicBase
+from mbe_automation.configs.quasi_harmonic import QuasiHarmonicConfig
 import os
 import os.path
 import ase.units
@@ -19,7 +19,7 @@ except ImportError:
     mace_available = False
 
 
-def run(config: QuasiHarmonicBase):
+def run(config: QuasiHarmonicConfig):
 
     if config.thermal_expansion:
         mbe_automation.display.framed("Harmonic properties with thermal expansion")

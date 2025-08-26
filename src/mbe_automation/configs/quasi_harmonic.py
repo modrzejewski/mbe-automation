@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 
 @dataclass
-class QuasiHarmonicBase:
+class QuasiHarmonicConfig:
     """
     Default parameters for thermodynamic property calculations in the quasi-harmonic approximation.
     """
@@ -265,19 +265,30 @@ class QuasiHarmonicBase:
     skip_structures_with_broken_symmetry: bool = True
 
 
-@dataclass
-class QuasiHarmonicMACE(QuasiHarmonicBase):
-    """
-    Configuration preset for MACE models.
-    Inherits robust defaults from the base class.
-    """
-    pass
 
+    @classmethod
+    def for_model(cls,
+                  model_name: Literal["default", "MACE", "UMA"],
+                  unit_cell: Atoms,
+                  molecule: Atoms,
+                  calculator: Any,
+                  **kwargs):
+        """
+        Generate a configuration for a specific MLIP.
 
-@dataclass
-class QuasiHarmonicUMA(QuasiHarmonicBase):
-    """
-    Specialized configuration for UMA models, which require looser thresholds.
-    """
-    max_force_on_atom = 5.0E-3
-    skip_structures_with_broken_symmetry = False
+        Args:
+            model_name: The name of the MLIP preset.
+            unit_cell, molecule, calculator: Required arguments for initialization.
+            **kwargs: Additional parameters to override any value in the preset.
+        """
+
+        modified_params = {}
+        if model_name == "UMA":
+            modified_params["max_force_on_atom"] = 5.0E-3
+            modified_params["skip_structures_with_broken_symmetry"] = False
+        modified_params.update(kwargs)
+
+        return cls(unit_cell=unit_cell,
+                   molecule=molecule,
+                   calculator=calculator,
+                   **modified_params)
