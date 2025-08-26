@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 import mbe_automation.hdf5
 import warnings
-warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 try:
     from mace.calculators import MACECalculator
@@ -23,6 +22,11 @@ except ImportError:
 
 def run(config: QuasiHarmonicConfig):
 
+    if config.verbose == 0:
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        warnings.filterwarnings("ignore", category=UserWarning)
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+    
     if config.thermal_expansion:
         mbe_automation.display.framed("Harmonic properties with thermal expansion")
     else:

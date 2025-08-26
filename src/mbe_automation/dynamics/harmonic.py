@@ -361,7 +361,7 @@ def vinet(volume, e0, v0, b0, b1):
         )
 
 
-def proximity_weights(V, F, V_min):
+def proximity_weights(V, V_min):
     #    
     # Proximity weights for function fitting based
     # on the distance from the minimum point V_min.
@@ -405,7 +405,6 @@ def eos_polynomial_fit(V, F, degree=2):
 
     weights = proximity_weights(
         V,
-        F,
         V_min=V[np.argmin(F)] # guess value for the minimum
     )
     F_fit = Polynomial.fit(V, F, deg=degree, w=weights) # kJ/mol/unit cell
@@ -466,20 +465,19 @@ def eos_curve_fit(V, F, equation_of_state):
         B_initial = poly_fit.B * ase.units.GPa/(ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)
         B_prime_initial = 4.0
         eos_func = vinet if equation_of_state == "vinet" else birch_murnaghan
-
         try:
+            weights = proximity_weights(V=xdata, V_min=V_initial)
             popt, pcov = scipy.optimize.curve_fit(
                 eos_func,
                 xdata,
                 ydata,
-                p0=np.array([F_initial, V_initial, B_initial, B_prime_initial])
+                p0=np.array([F_initial, V_initial, B_initial, B_prime_initial]),
+                sigma=1.0/weights,
+                absolute_sigma=True
             )
-            perr = np.sqrt(np.diag(pcov))
-    
             F_min = popt[0] + poly_fit.F_min # kJ/mol/unit cell
             V_min = popt[1] # Å³/unit cell
             B = popt[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
-
             nonlinear_fit = EOSFitResults(
                 F_min=F_min,
                 V_min=V_min,
@@ -487,7 +485,7 @@ def eos_curve_fit(V, F, equation_of_state):
                 min_found=True,
                 min_extrapolated=(V_min<np.min(V) or V_min>np.max(V)),
                 curve_type=equation_of_state)
-            
+
             return nonlinear_fit
             
         except RuntimeError as e:
@@ -748,7 +746,7 @@ def equilibrium_curve(
         "min_extrapolated": min_extrapolated
     })
     return df
-           
+          
 
 def my_plot_band_structure(phonons, output_path, band_connection=True):
     """Plot only the first segment of the band structure.

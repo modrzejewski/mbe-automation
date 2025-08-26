@@ -273,7 +273,12 @@ class QuasiHarmonicConfig:
                                    # the subsequent harmonic calculations.
                                    #
     skip_structures_with_extrapolated_minimum: bool = True
-
+                                   #
+                                   # Verbosity of the program's output.
+                                   # 0 -> suppressed warnings
+                                   #
+    verbose: int = 0
+                                   
     @classmethod
     def for_model(cls,
                   model_name: Literal["default", "MACE", "UMA"],
