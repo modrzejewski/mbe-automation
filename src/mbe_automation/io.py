@@ -8,4 +8,10 @@ def read(file_path: str) -> Atoms:
         system = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
     else:
         system = ase.io.read(file_path)
+        
+    system.info.update({
+        "spin": 1,
+        "charge": 0
+    })
+    
     return system

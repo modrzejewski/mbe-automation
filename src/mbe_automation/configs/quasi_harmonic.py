@@ -5,9 +5,9 @@ import numpy as np
 import numpy.typing as npt
 
 @dataclass
-class QuasiHarmonicConfig:
+class QuasiHarmonicBase:
     """
-    Parameters for thermodynamic property calculations in the quasi-harmonic approximation.
+    Default parameters for thermodynamic property calculations in the quasi-harmonic approximation.
     """
     unit_cell: Atoms
     molecule: Atoms
@@ -66,6 +66,29 @@ class QuasiHarmonicConfig:
                                    # Should be extra tight if:
                                    # (1) symmetrization is enabled
                                    # (2) supercell_displacement is small
+                                   #
+                                   # Recommendations from literature:
+                                   #
+                                   # (1) 5 * 10**(-3) eV/Angs in
+                                   #     Dolgonos, Hoja, Boese, Revised values for the X23 benchmark
+                                   #     set of molecular crystals,
+                                   #     Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
+                                   # (2) 10**(-4) eV/Angs in
+                                   #     Hoja, Reilly, Tkatchenko, WIREs Comput Mol Sci 2016;
+                                   #     doi: 10.1002/wcms.1294 
+                                   # (3) 5 * 10**(-3) eV/Angs for MLIPs in
+                                   #     Loew et al., Universal machine learning interatomic potentials
+                                   #     are ready for phonons, npj Comput Mater 11, 178 (2025);
+                                   #     doi: 10.1038/s41524-025-01650-1
+                                   # (4) 5 * 10**(-3) eV/Angs for MLIPs in
+                                   #     Cameron J. Nickersona and Erin R. Johnson, Assessment of a foundational
+                                   #     machine-learned potential for energy ranking of molecular crystal polymorphs,
+                                   #     Phys. Chem. Chem. Phys. 27, 11930 (2025); doi: 10.1039/d5cp00593k
+                                   # (5) 0.01 eV/Angs for UMA MLIP and 0.001 eV/Angs for DFT in
+                                   #     Gharakhanyan et al.
+                                   #     FastCSP: Accelerated Molecular Crystal Structure
+                                   #     Prediction with Universal Model for Atoms;
+                                   #     arXiv:2508.02641
                                    #
     max_force_on_atom: float = 1.0E-4
                                    #
@@ -240,3 +263,21 @@ class QuasiHarmonicConfig:
                                    # the reference space group number.
                                    #
     skip_structures_with_broken_symmetry: bool = True
+
+
+@dataclass
+class QuasiHarmonicMACE(QuasiHarmonicBase):
+    """
+    Configuration preset for MACE models.
+    Inherits robust defaults from the base class.
+    """
+    pass
+
+
+@dataclass
+class QuasiHarmonicUMA(QuasiHarmonicBase):
+    """
+    Specialized configuration for UMA models, which require looser thresholds.
+    """
+    max_force_on_atom = 5.0E-3
+    skip_structures_with_broken_symmetry = False

@@ -19,7 +19,7 @@ def crystal(unit_cell,
             optimize_volume=True,
             symmetrize_final_structure=True,
             max_force_on_atom=1.0E-3, # eV/Angs/atom
-            max_steps=1000,
+            max_steps=500,
             algo_primary="PreconLBFGS",
             algo_fallback="PreconFIRE",
             log="geometry_opt.txt",
@@ -104,11 +104,14 @@ def crystal(unit_cell,
                     fmax=max_force_on_atom,
                     steps=max_steps
                 )
-            print("Relaxation completed", flush=True)
-            break
+            max_force = np.abs(system_to_optimize.get_forces()).max()
+            if max_force < max_force_on_atom:
+                print("{algo} converged", flush=True)
+                break
+            else:
+                warnings.warn(f"{algo} finished but did not converge (max force = {max_force:.1e} eV/Å)")
         except Exception as e:
             warnings.warn(f"{algo} failed with an error: {e}")
-            warnings.warn("Switching to fallback algorithm")
     else:
         raise RuntimeError("All optimization algorithms failed")
 
@@ -121,9 +124,8 @@ def crystal(unit_cell,
     else:
         space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
 
-    print("Relaxation completed", flush=True)
     max_force = np.abs(relaxed_system.get_forces()).max()
-    print(f"Max residual force component: {max_force:.1e} eV/Å", flush=True)
+    print(f"Relaxation completed with max residual force = {max_force:.1e} eV/Å", flush=True)
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
@@ -134,7 +136,7 @@ def crystal(unit_cell,
 def isolated_molecule(molecule,
                       calculator,
                       max_force_on_atom=1.0E-3, # eV/Angs/atom
-                      max_steps=1000,
+                      max_steps=500,
                       algo_primary="PreconLBFGS",
                       algo_fallback="PreconFIRE",
                       log="geometry_opt.txt",
@@ -178,16 +180,20 @@ def isolated_molecule(molecule,
                 fmax=max_force_on_atom,
                 steps=max_steps
             )
-            print("Relaxation completed", flush=True)
-            break
+            
+            max_force = np.abs(system_to_optimize.get_forces()).max()
+            if max_force < max_force_on_atom:
+                print(f"{algo} converged", flush=True)
+                break
+            else:
+                warnings.warn(f"{algo} finished but did not converge (max force = {max_force:.1e} eV/Å)")
         except Exception as e:
             warnings.warn(f"{algo} failed with an error: {e}")
-            warnings.warn("Switching to fallback algorithm")
     else:
         raise RuntimeError("All optimization algorithms failed")
     
     max_force = np.abs(relaxed_molecule.get_forces()).max()
-    print(f"Max residual force component: {max_force:.1e} eV/Å", flush=True)
+    print(f"Relaxation completed with max residual force = {max_force:.1e} eV/Å", flush=True)
     
     return relaxed_molecule
 
