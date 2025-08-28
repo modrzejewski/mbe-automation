@@ -281,8 +281,6 @@ def phonons(
     else:
         mbe_automation.display.framed("Phonons")
         
-    print(f"Max displacement Δq={supercell_displacement:.3f} Å")
-    
     phonopy_struct = PhonopyAtoms(
         symbols=unit_cell.symbols,
         cell=unit_cell.cell.array,
@@ -324,6 +322,7 @@ def phonons(
     print(f"supercell_displacement          {supercell_displacement:.3f} Å")
     print(f"force_constants_cutoff_radius   {force_constants_cutoff_radius:.1f} Å")
     print(f"symmetrize_force_constants      {symmetrize_force_constants}")
+    print("")
     #
     # Compute second-order dynamic matrix (Hessian)
     # by numerical differentiation. The force vectors

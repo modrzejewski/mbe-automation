@@ -21,6 +21,8 @@ except ImportError:
 
 
 def run(config: QuasiHarmonicConfig):
+
+    datetime_start = mbe_automation.display.timestamp_start()
     
     if config.verbose == 0:
         warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -31,8 +33,6 @@ def run(config: QuasiHarmonicConfig):
         mbe_automation.display.framed("Harmonic properties with thermal expansion")
     else:
         mbe_automation.display.framed("Harmonic properties")
-
-    datetime_start = mbe_automation.display.timestamp_start()
         
     os.makedirs(config.properties_dir, exist_ok=True)
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
