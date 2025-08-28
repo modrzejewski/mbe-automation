@@ -1,4 +1,8 @@
 import sys
+import datetime
+from datetime import timezone
+import platform
+import getpass
 
 try:
     from mace.calculators import MACECalculator
@@ -22,6 +26,30 @@ class ReplicatedOutput:
         self.stdout.flush()
         self.file.flush()
 
+
+def timestamp_start():
+    
+    datetime_start = datetime.datetime.now(timezone.utc)
+    dateformat = "%a %b %d %H:%M:%S UTC %Y"
+    datestr = datetime_start.strftime(dateformat)
+    host = platform.node()
+    user = getpass.getuser()
+    print("% Job started at {s}".format(s=datestr))
+    print("% User                     {s}".format(s=user))
+    print("% Node name                {s}".format(s=host))
+
+    return datetime_start
+
+
+def timestamp_finish(datetime_start):
+    datetime_finish = datetime.datetime.now(timezone.utc)
+    dateformat = "%a %b %d %H:%M:%S UTC %Y"
+    td = datetime_finish - datetime_start
+    wallhours = ((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6) / 3600.0
+    datestr_finish = datetime_finish.strftime(dateformat)
+    print("% Job finished at {datestr}".format(datestr=datestr_finish))
+    print("% Total wall clock time [hours]: {WALLHOURS:.3f}".format(WALLHOURS=wallhours))
+    
         
 def framed(text: str | list[str], padding: int = 10, min_width: int = 30) -> None:
     """
@@ -75,11 +103,13 @@ def mace_summary(calculator: MACECalculator) -> None:
     device = str(next(model.parameters()).device)
 
     framed([
-        "Machine-Learning Interatomic Potential",
+        "Machine-learning interatomic potential",
         "MACE"
     ])
-    print(f"Device:               {device}")
-    print(f"Total parameters:     {total_params:,}")
-    print(f"Data type:            {dtype}")
-    print(f"r_max:                {r_max}")
-    print(f"num_interactions:     {num_interactions}")
+    print(f"r_max                 {r_max} Å")
+    print(f"num_interactions      {num_interactions}")
+    if r_max != "N/A" and num_interactions != "N/A":
+        print(f"receptive field       {r_max*num_interactions:.1f} Å")
+    print(f"total parameters      {total_params:,}")
+    print(f"data type             {dtype}")
+    print(f"device                {device}")

@@ -53,13 +53,6 @@ class QuasiHarmonicConfig:
                                    #
     symmetrize_unit_cell: bool = True
                                    #
-                                   # Change lattice vectors during geometry
-                                   # optimization of the unit cell. Can be
-                                   # done with or without change of the cell
-                                   # volume.
-                                   #
-    optimize_lattice_vectors: bool = True
-                                   #
                                    # Threshold for maximum resudual force
                                    # after geometry relaxation (eV/Angs).
                                    #
@@ -180,6 +173,11 @@ class QuasiHarmonicConfig:
                                    #
     symmetrize_force_constants: bool = False
                                    #
+                                   # Interatomic distance beyond which force constants
+                                   # are set to zero.
+                                   #
+    force_constants_cutoff_radius: float | Literal["auto"] | None = None
+                                   #
                                    # Scaling factors used to sample volumes around
                                    # the reference volume at T=0K.
                                    #
@@ -251,29 +249,28 @@ class QuasiHarmonicConfig:
                                    # u < imaginary_mode_threshold
                                    #
                                    # Affects how the EOS fit is performed
-                                   # (see: skip_structures_with_imaginary_modes).
+                                   # (see: filter_out_imaginary_*).
                                    #
     imaginary_mode_threshold: float = -0.1
                                    #
-                                   # Perform EOS fit without the structures
-                                   # where imaginary modes were detected anywhere
-                                   # in the first Brillouin zone.
+                                   # Filters applied before (1,2,3) or after (4)
+                                   # the EOS fit to remove low-quality data points:
                                    #
-    skip_structures_with_imaginary_modes: bool = True
+                                   # (1) imaginary acoustic modes
+                                   # (2) imaginary optical modes
+                                   # (3) space group different from the reference
+                                   # (4) free energy minium beyond the volume sampling interval
                                    #
-                                   # Perform EOS fit without the structures
-                                   # where space group symmetry differs from
-                                   # the reference space group number.
+    filter_out_imaginary_acoustic: bool = False
+    filter_out_imaginary_optical: bool = True
+    filter_out_broken_symmetry: bool = True
+    filter_out_extrapolated_minimum: bool = True
                                    #
-    skip_structures_with_broken_symmetry: bool = True
+                                   # Verbosity of the program's output.
+                                   # 0 -> suppressed warnings
                                    #
-                                   # If EOS fit produces a minimum outside
-                                   # of the volume sampling range, skip
-                                   # the corresponding data point in
-                                   # the subsequent harmonic calculations.
-                                   #
-    skip_structures_with_extrapolated_minimum: bool = True
-
+    verbose: int = 0
+                                   
     @classmethod
     def for_model(cls,
                   model_name: Literal["default", "MACE", "UMA"],
@@ -293,7 +290,7 @@ class QuasiHarmonicConfig:
         modified_params = {}
         if model_name == "UMA":
             modified_params["max_force_on_atom"] = 5.0E-3
-            modified_params["skip_structures_with_broken_symmetry"] = False
+            modified_params["filter_out_broken_symmetry"] = False
         modified_params.update(kwargs)
 
         return cls(unit_cell=unit_cell,

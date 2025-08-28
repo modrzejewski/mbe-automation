@@ -26,13 +26,17 @@ import scipy.optimize
 import warnings
 from collections import namedtuple
 
-EOSFitResults = namedtuple('EOSFitResults', 
-                           ['F_min', 
-                            'V_min', 
-                            'B', 
-                            'min_found', 
-                            'min_extrapolated',
-                            'curve_type'])
+EOSFitResults = namedtuple(
+    "EOSFitResults", 
+    [
+        "F_min", 
+        "V_min", 
+        "B", 
+        "min_found", 
+        "min_extrapolated",
+        "curve_type"
+    ]
+)
 
 def data_frame_molecule(
         molecule,
@@ -43,15 +47,15 @@ def data_frame_molecule(
     """
     Compute vibrational thermodynamic functions for a molecule.
     """
-    vib_energies = vibrations.get_energies()  # eV
+    vib_energies = vibrations.get_energies() # eV
     n_atoms = len(molecule)
     rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(molecule)
     print(f"rotor type: {rotor_type}")
-    if rotor_type == 'nonlinear':
+    if rotor_type == "nonlinear":
         vib_energies = vib_energies[-(3 * n_atoms - 6):]
-    elif rotor_type == 'linear':
+    elif rotor_type == "linear":
         vib_energies = vib_energies[-(3 * n_atoms - 5):]
-    elif rotor_type == 'monatomic':
+    elif rotor_type == "monatomic":
         vib_energies = []
     else:
         raise ValueError(f"Unsupported geometry: {rotor_type}")
@@ -107,7 +111,7 @@ def data_frame_crystal(
         unit_cell,
         phonons,
         temperatures,
-        all_freqs_real,
+        imaginary_mode_threshold,
         space_group,
         system_label
 ):
@@ -132,6 +136,16 @@ def data_frame_crystal(
 
     V = unit_cell.get_volume() # Å³/unit cell
     rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
+
+    generate_fbz_path(phonons)
+    (
+        acoustic_freqs_real,
+        optical_freqs_real,
+        acoustic_freq_min, # THz
+        optical_freq_min # THz
+    ) = detect_imaginary_modes(phonons, imaginary_mode_threshold)
+
+    interp_mesh = phonons.mesh.mesh_numbers
     
     df = pd.DataFrame({
         "T (K)": temperatures,
@@ -146,8 +160,12 @@ def data_frame_crystal(
         "ρ (g/cm³)": rho,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "space_group": space_group,
-        "all_freqs_real_crystal": all_freqs_real,
-        "system_label_crystal": system_label
+        "acoustic_freqs_real_crystal": acoustic_freqs_real,
+        "optical_freqs_real_crystal": optical_freqs_real,
+        "acoustic_freq_min (THz)": acoustic_freq_min,
+        "optical_freq_min (THz)": optical_freq_min,
+        "system_label_crystal": system_label,
+        "Fourier_interp_mesh": f"{interp_mesh[0]}×{interp_mesh[1]}×{interp_mesh[2]}"
     })
     return df
 
@@ -248,6 +266,7 @@ def phonons(
         interp_mesh=150.0,
         automatic_primitive_cell=True,
         symmetrize_force_constants=False,
+        force_constants_cutoff_radius=None,
         system_label=None        
 ):
 
@@ -262,8 +281,6 @@ def phonons(
     else:
         mbe_automation.display.framed("Phonons")
         
-    print(f"Max displacement Δq={supercell_displacement:.3f} Å")
-    
     phonopy_struct = PhonopyAtoms(
         symbols=unit_cell.symbols,
         cell=unit_cell.cell.array,
@@ -300,10 +317,13 @@ def phonons(
     n_atoms_primitive_cell = len(phonons.primitive)
     n_atoms_super_cell = len(supercells[0])
     
-    print(f"{n_supercells} supercells")
-    print(f"{n_atoms_unit_cell} atoms in the unit cell")
-    print(f"{n_atoms_primitive_cell} atoms in the primitive cell")
-    print(f"{n_atoms_super_cell} atoms in the supercell")
+    print(f"n_supercells                    {n_supercells}")
+    print(f"n_atoms_super_cell              {n_atoms_super_cell}")
+    print(f"supercell_displacement          {supercell_displacement:.3f} Å")
+    if force_constants_cutoff_radius:
+        print(f"force_constants_cutoff_radius   {force_constants_cutoff_radius:.1f} Å")
+    print(f"symmetrize_force_constants      {symmetrize_force_constants}")
+    print("")
     #
     # Compute second-order dynamic matrix (Hessian)
     # by numerical differentiation. The force vectors
@@ -334,11 +354,15 @@ def phonons(
         show_drift=True,
         fc_calculator_log_level=1
     )
+    if force_constants_cutoff_radius:
+        phonons.set_force_constants_zero_with_radius(
+            cutoff_radius=force_constants_cutoff_radius
+        )
     print(f"Force constants completed", flush=True)
 
     if symmetrize_force_constants:
         phonons.symmetrize_force_constants()
-        phonons.symmetrize_force_constants_by_space_group()
+        # phonons.symmetrize_force_constants_by_space_group()
         print(f"Symmetrization of force constants completed", flush=True)
     
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
@@ -361,7 +385,7 @@ def vinet(volume, e0, v0, b0, b1):
         )
 
 
-def proximity_weights(V, F, V_min):
+def proximity_weights(V, V_min):
     #    
     # Proximity weights for function fitting based
     # on the distance from the minimum point V_min.
@@ -402,10 +426,8 @@ def eos_polynomial_fit(V, F, degree=2):
             min_extrapolated=False,
             curve_type="polynomial"
             )
-
     weights = proximity_weights(
         V,
-        F,
         V_min=V[np.argmin(F)] # guess value for the minimum
     )
     F_fit = Polynomial.fit(V, F, deg=degree, w=weights) # kJ/mol/unit cell
@@ -466,20 +488,19 @@ def eos_curve_fit(V, F, equation_of_state):
         B_initial = poly_fit.B * ase.units.GPa/(ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)
         B_prime_initial = 4.0
         eos_func = vinet if equation_of_state == "vinet" else birch_murnaghan
-
         try:
+            weights = proximity_weights(V=xdata, V_min=V_initial)
             popt, pcov = scipy.optimize.curve_fit(
                 eos_func,
                 xdata,
                 ydata,
-                p0=np.array([F_initial, V_initial, B_initial, B_prime_initial])
+                p0=np.array([F_initial, V_initial, B_initial, B_prime_initial]),
+                sigma=1.0/weights,
+                absolute_sigma=True
             )
-            perr = np.sqrt(np.diag(pcov))
-    
             F_min = popt[0] + poly_fit.F_min # kJ/mol/unit cell
             V_min = popt[1] # Å³/unit cell
             B = popt[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
-
             nonlinear_fit = EOSFitResults(
                 F_min=F_min,
                 V_min=V_min,
@@ -487,7 +508,7 @@ def eos_curve_fit(V, F, equation_of_state):
                 min_found=True,
                 min_extrapolated=(V_min<np.min(V) or V_min>np.max(V)),
                 curve_type=equation_of_state)
-            
+
             return nonlinear_fit
             
         except RuntimeError as e:
@@ -513,9 +534,11 @@ def equilibrium_curve(
         eos_sampling,
         symmetrize_unit_cell,
         symmetrize_force_constants,
+        force_constants_cutoff_radius,
         imaginary_mode_threshold,
-        skip_structures_with_imaginary_modes,
-        skip_structures_with_broken_symmetry,
+        filter_out_imaginary_acoustic,
+        filter_out_imaginary_optical,
+        filter_out_broken_symmetry,
         hdf5_dataset
 ):
 
@@ -528,21 +551,15 @@ def equilibrium_curve(
         n_volumes = len(pressure_range)
     elif eos_sampling == "volume":        
         n_volumes = len(volume_range)
-        
     n_temperatures = len(temperatures)
-    V_sampled = np.zeros(n_volumes)
-    space_groups = np.zeros(n_volumes, dtype=int)
-    real_freqs = np.zeros(n_volumes, dtype=bool)    
-    E_el_V = np.zeros(n_volumes)
-    F_tot_V_T = np.zeros((n_volumes, n_temperatures))
-    F_vib_V_T = np.zeros((n_volumes, n_temperatures))
-    system_labels = []
+    
     df_eos_points = []
     
     mbe_automation.display.framed("F(V) curve sampling")
-    print(f"equation of state                      {equation_of_state}")
-    print(f"skip structures with imaginary modes   {skip_structures_with_imaginary_modes}")
-    print(f"skip structures with broken symmetry   {skip_structures_with_broken_symmetry}")
+    print(f"equation_of_state               {equation_of_state}")
+    print(f"filter_out_imaginary_acoustic   {filter_out_imaginary_acoustic}")
+    print(f"filter_out_imaginary_optical    {filter_out_imaginary_optical}")
+    print(f"filter_out_broken_symmetry      {filter_out_broken_symmetry}")
     if eos_sampling == "volume":
         print("volume sampling interval (V/V₀)")
         print(np.array2string(volume_range, precision=2))
@@ -558,7 +575,7 @@ def equilibrium_curve(
             # to the pressure.
             #
             thermal_pressure = pressure_range[i]
-            label = f"unit_cell_eos_p_thermal_{thermal_pressure:.4f}_GPa"
+            label = f"crystal_eos_p_thermal_{thermal_pressure:.4f}_GPa"
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V0,
                 calculator,
@@ -584,7 +601,7 @@ def equilibrium_curve(
                 unit_cell_V0.cell * (V/V0)**(1/3),
                 scale_atoms=True
             )
-            label = f"unit_cell_eos_V_{V/V0:.4f}"
+            label = f"crystal_eos_V_{V/V0:.4f}"
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V,
                 calculator,                
@@ -598,9 +615,6 @@ def equilibrium_curve(
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
-        space_groups[i] = space_group_V
-        system_labels.append(label)
-        V_sampled[i] = unit_cell_V.get_volume() # Å³/unit cell
         p = phonons(
             unit_cell_V,
             calculator,
@@ -609,52 +623,69 @@ def equilibrium_curve(
             interp_mesh=interp_mesh,
             automatic_primitive_cell=automatic_primitive_cell,
             symmetrize_force_constants=symmetrize_force_constants,
+            force_constants_cutoff_radius=force_constants_cutoff_radius,
             system_label=label
         )
-        has_imaginary_modes = band_structure(
-            p,
-            imaginary_mode_threshold=imaginary_mode_threshold,
-            properties_dir=properties_dir,
-            hdf5_dataset=hdf5_dataset,
-            system_label=label
-        )
-        real_freqs[i] = (not has_imaginary_modes)
         df_crystal_V = data_frame_crystal(
             unit_cell_V,
             p,
             temperatures,
-            all_freqs_real=(not has_imaginary_modes),
+            imaginary_mode_threshold,
             space_group=space_group_V,
             system_label=label
         )
-        F_tot_V_T[i, :] = df_crystal_V["F_tot_crystal (kJ/mol/unit cell)"]
-        F_vib_V_T[i, :] = df_crystal_V["F_vib_crystal (kJ/mol/unit cell)"]
-        E_el_V[i] = df_crystal_V["E_el_crystal (kJ/mol/unit cell)"].iloc[0]
         df_eos_points.append(df_crystal_V)
 
-    preserved_symmetry = space_groups == reference_space_group
-    accepted_systems = np.ones(n_volumes, dtype=bool)
-    if skip_structures_with_imaginary_modes:
-        accepted_systems = accepted_systems & real_freqs
-    if skip_structures_with_broken_symmetry:
-        accepted_systems = accepted_systems & preserved_symmetry
     #
-    # Summary of systems included in the EOS fit
+    # Store all harmonic properties of systems    
+    # used to sample the EOS curve. If EOS fit fails,
+    # one can extract those data to see what went wrong.
     #
-    print(f"{'system':<30} {'all freqs real':<15} {'space group':<15}")
-    for i in range(n_volumes):
-        print(f"{system_labels[i]:<30} "
-              f"{'Yes' if real_freqs[i] else 'No':<15} "
-              f"{space_groups[i]:<15} ")
-    print("", flush=True)
+    df_eos = pd.concat(df_eos_points, ignore_index=True)
+    mbe_automation.hdf5.save_dataframe(
+        df_eos,
+        hdf5_dataset,
+        group_path="quasi_harmonic/equation_of_state"
+    )
+    df_eos.to_csv(os.path.join(properties_dir, "equation_of_state.csv"))
+    #
+    # Select high-quality data points on the F(V) curve
+    # according to the filtering criteria
+    #
+    conditions = []
+    
+    if filter_out_imaginary_acoustic:
+        conditions.append(df_eos["acoustic_freqs_real_crystal"])
+        
+    if filter_out_imaginary_optical:
+        conditions.append(df_eos["optical_freqs_real_crystal"])
+        
+    if filter_out_broken_symmetry:
+        conditions.append(df_eos["space_group"] == reference_space_group)
 
-    if accepted_systems.sum() == 0:
+    if len(conditions) > 0:
+        good_points = np.logical_and.reduce(conditions)
+    else:
+        good_points = np.ones(len(df_eos), dtype=bool)
+
+    select_T = [df_eos.index % n_temperatures == i for i in range(n_temperatures)]
+
+    print("Summary of data points used in the EOS fit \n")
+    print(df_eos[select_T[0]][[
+        "system_label_crystal",
+        "acoustic_freqs_real_crystal",
+        "optical_freqs_real_crystal",
+        "space_group"
+    ]].to_string(index=False), flush=True)
+    print("")
+    
+    if len(df_eos[good_points]) == 0:
         raise RuntimeError("No data points left after applying filtering criteria")
-
+    
     fit = eos_curve_fit(
-        V_sampled[accepted_systems],
-        E_el_V[accepted_systems],
-        equation_of_state
+        V=df_eos[good_points & select_T[0]]["V (Å³/unit cell)"],
+        F=df_eos[good_points & select_T[0]]["E_el_crystal (kJ/mol/unit cell)"],
+        equation_of_state=equation_of_state
     )
     if fit.min_found:
         print(f"Bulk modulus computed using E_el_crystal(V): {fit.B:.1f} GPa")
@@ -670,11 +701,10 @@ def equilibrium_curve(
     curve_type = []
         
     for i, T in enumerate(temperatures):
-        F_tot_V = F_tot_V_T[:, i] # kJ/mol/unit cell
         fit = eos_curve_fit(
-            V_sampled[accepted_systems],
-            F_tot_V[accepted_systems],
-            equation_of_state
+            V=df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
+            F=df_eos[good_points & select_T[i]]["F_tot_crystal (kJ/mol/unit cell)"].to_numpy(),
+            equation_of_state=equation_of_state
         )
         F_tot_eos[i] = fit.F_min
         V_eos[i] = fit.V_min
@@ -713,29 +743,15 @@ def equilibrium_curve(
         #
         if fit.min_found:
             weights = proximity_weights(
-                V=V_sampled[accepted_systems],
-                F=F_vib_V_T[accepted_systems, i],
+                V=df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
                 V_min=V_eos[i])
             F_vib_fit = Polynomial.fit(
-                V_sampled[accepted_systems],
-                F_vib_V_T[accepted_systems, i],
+                df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
+                df_eos[good_points & select_T[i]]["F_vib_crystal (kJ/mol/unit cell)"].to_numpy(),
                 deg=2, w=weights) # kJ/mol/unit cell
             dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
             kJ_mol_Angs3_to_GPa = (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa
             p_thermal_eos[i] = dFdV(V_eos[i]) * kJ_mol_Angs3_to_GPa # GPa
-
-    #
-    # Store all harmonic properties of systems    
-    # used to sample the EOS curve. If EOS fit fails,
-    # one can extract those data to see what went wrong.
-    #
-    df_eos_stacked = pd.concat(df_eos_points, ignore_index=True)
-    mbe_automation.hdf5.save_dataframe(
-        df_eos_stacked,
-        hdf5_dataset,
-        group_path="quasi_harmonic/equation_of_state"
-    )
-    df_eos_stacked.to_csv(os.path.join(properties_dir, "equation_of_state.csv"))
         
     df = pd.DataFrame({
         "T (K)": temperatures,
@@ -748,7 +764,7 @@ def equilibrium_curve(
         "min_extrapolated": min_extrapolated
     })
     return df
-           
+          
 
 def my_plot_band_structure(phonons, output_path, band_connection=True):
     """Plot only the first segment of the band structure.
@@ -832,14 +848,68 @@ def my_plot_band_structure(phonons, output_path, band_connection=True):
     plt.close()
 
 
-def band_structure(
+def detect_imaginary_modes(
+        phonons,
+        imaginary_mode_threshold
+):
+    """
+    Detect dynamic instabilities along the high-symmetry k-path.
+    """
+
+    print("Searching for imaginary modes along the high-symmetry FBZ path...", flush=True)
+    
+    n_bands = len(phonons.band_structure.frequencies[0][0])
+    min_freqs_FBZ = np.full(
+        shape=n_bands,
+        fill_value=np.finfo(np.float64).max,
+        dtype=np.float64
+    )    
+    for segment_idx in range(len(phonons.band_structure.frequencies)): # loop over segments of a full path
+        freqs = phonons.band_structure.frequencies[segment_idx]
+        min_freqs = np.min(freqs, axis=0) # minimum over all k-points belonging to the current segment
+        min_freqs_FBZ = np.minimum(min_freqs_FBZ, min_freqs) # minimum over the entire FBZ path
+        
+    acoustic_freqs = min_freqs_FBZ[0:3]
+    optical_freqs = min_freqs_FBZ[3:]
+
+    band_start_index = 1
+    small_imaginary_acoustic = np.where(acoustic_freqs < 0.0)[0] + band_start_index
+    large_imaginary_acoustic = np.where(acoustic_freqs < imaginary_mode_threshold)[0] + band_start_index
+    small_imaginary_optical = np.where(optical_freqs < 0.0)[0] + 3 + band_start_index
+    large_imaginary_optical = np.where(optical_freqs < imaginary_mode_threshold)[0] + 3 + band_start_index
+
+    print(f"\n{'threshold (THz)':15}   {'type':15} bands")
+    mode_types = ["acoustic", "acoustic", "optical", "optical"]
+    thresholds = [0.00, imaginary_mode_threshold, 0.00, imaginary_mode_threshold]
+    bands = [
+        small_imaginary_acoustic,
+        large_imaginary_acoustic,
+        small_imaginary_optical,
+        large_imaginary_optical
+    ]
+    for mode, thresh, band_indices in zip(mode_types, thresholds, bands):
+        band_indices_str = np.array2string(band_indices) if len(band_indices) > 0 else "none"
+        thresh_str = f"ω < {thresh:>5.2f}"
+        print(f"{thresh_str:<15}   {mode:15} {band_indices_str}")
+    print("")
+
+    real_acoustic_freqs = (len(large_imaginary_acoustic) == 0)
+    real_optical_freqs = (len(large_imaginary_optical) == 0)
+    min_freq_acoustic_thz = np.min(acoustic_freqs)
+    min_freq_optical_thz = np.min(optical_freqs)
+         
+    return (
+        real_acoustic_freqs,
+        real_optical_freqs,
+        min_freq_acoustic_thz,
+        min_freq_optical_thz
+        )
+
+    
+def generate_fbz_path(
         phonons,
         n_points=101,
-        band_connection=True,
-        imaginary_mode_threshold=-0.01,
-        properties_dir="",
-        hdf5_dataset=None,
-        system_label=""
+        band_connection=True
 ):
     """
     Determine the high-symmetry path through
@@ -863,37 +933,9 @@ def band_structure(
         is_legacy_plot=False,
     )
         
-    plt = phonons.plot_band_structure()
-    plt.ylim(top=10.0)
-    plots_dir = os.path.join(properties_dir, "phonon_band_structure")
-    os.makedirs(plots_dir, exist_ok=True)
-    plt.savefig(os.path.join(plots_dir, f"{system_label}.png"))
-    plt.close()
-        
-    min_freq = 0.0
-    min_k = np.zeros(3)
-    n_paths = len(phonons.band_structure.frequencies)
-    for i in range(n_paths):
-        kpoints = phonons.band_structure.qpoints[i] # reduced coordinates of reciprocal space without 2pi
-        freqs = phonons.band_structure.frequencies[i]
-        for j, omega in enumerate(freqs):
-            min_freq_j = np.min(omega)
-            if min_freq_j < min_freq:
-                min_freq = min_freq_j
-                min_k = kpoints[j]
-        
-    has_imaginary_modes = (min_freq < imaginary_mode_threshold)
-    if min_freq < 0.0:
-        kx, ky, kz = min_k
-        print(f"Imaginary mode threshold: {imaginary_mode_threshold:.2f} THz", flush=True)
-        print(f"Largest imaginary mode:  ω={min_freq:.2f} THz at k=[{kx:.3f} {ky:.3f} {kz:.3f}]", flush=True)
-        if not has_imaginary_modes:
-            print(f"Classified as numerical noise below the threshold")
-        
-    else:
-        print(f"All frequencies along the high-symmetry path are real", flush=True)
-        
-    print(f"Phonon band structure completed", flush=True)
-            
-    return has_imaginary_modes
-    
+    # plt = phonons.plot_band_structure()
+    # plt.ylim(top=10.0)
+    # plots_dir = os.path.join(properties_dir, "phonon_band_structure")
+    # os.makedirs(plots_dir, exist_ok=True)
+    # plt.savefig(os.path.join(plots_dir, f"{system_label}.png"))
+    # plt.close()
