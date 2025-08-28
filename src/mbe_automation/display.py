@@ -75,11 +75,12 @@ def mace_summary(calculator: MACECalculator) -> None:
     device = str(next(model.parameters()).device)
 
     framed([
-        "Machine-Learning Interatomic Potential",
+        "Machine-learning interatomic potential",
         "MACE"
     ])
-    print(f"Device:               {device}")
-    print(f"Total parameters:     {total_params:,}")
-    print(f"Data type:            {dtype}")
-    print(f"r_max:                {r_max}")
-    print(f"num_interactions:     {num_interactions}")
+    print(f"r_max                 {r_max:.1f} Å")
+    print(f"num_interactions      {num_interactions}")
+    print(f"receptive field       {r_max*num_interactions:.1f} Å")
+    print(f"total parameters      {total_params:,}")
+    print(f"data type             {dtype}")
+    print(f"device                {device}")
