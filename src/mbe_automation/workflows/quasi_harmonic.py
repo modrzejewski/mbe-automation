@@ -26,13 +26,13 @@ def run(config: QuasiHarmonicConfig):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         warnings.filterwarnings("ignore", category=UserWarning)
         warnings.filterwarnings("ignore", category=RuntimeWarning)
-
-    datetime_start = mbe_automation.display.timestamp_start()
         
     if config.thermal_expansion:
         mbe_automation.display.framed("Harmonic properties with thermal expansion")
     else:
         mbe_automation.display.framed("Harmonic properties")
+
+    datetime_start = mbe_automation.display.timestamp_start()
         
     os.makedirs(config.properties_dir, exist_ok=True)
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")

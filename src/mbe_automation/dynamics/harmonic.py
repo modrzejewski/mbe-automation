@@ -876,7 +876,7 @@ def detect_imaginary_modes(
     small_imaginary_optical = np.where(optical_freqs < 0.0)[0] + 3 + band_start_index
     large_imaginary_optical = np.where(optical_freqs < imaginary_mode_threshold)[0] + 3 + band_start_index
 
-    print(f"\n{'threshold (THz)':15} {'type':15} bands")
+    print(f"\n{'threshold (THz)':15}   {'type':15} bands")
     mode_types = ["acoustic", "acoustic", "optical", "optical"]
     thresholds = [0.00, imaginary_mode_threshold, 0.00, imaginary_mode_threshold]
     bands = [
@@ -887,8 +887,8 @@ def detect_imaginary_modes(
     ]
     for mode, thresh, band_indices in zip(mode_types, thresholds, bands):
         band_indices_str = np.array2string(band_indices) if len(band_indices) > 0 else "none"
-        thresh_str = f"ω < {thresh:.2f}"
-        print(f"{thresh_str:<15} {mode:15} {band_indices_str}")
+        thresh_str = f"ω < {thresh:>4.2f}"
+        print(f"{thresh_str:>15}   {mode:15} {band_indices_str}")
 
     real_acoustic_freqs = (len(large_imaginary_acoustic) == 0)
     real_optical_freqs = (len(large_imaginary_optical) == 0)
