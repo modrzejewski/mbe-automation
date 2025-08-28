@@ -319,10 +319,11 @@ def phonons(
     n_atoms_primitive_cell = len(phonons.primitive)
     n_atoms_super_cell = len(supercells[0])
     
-    print(f"{n_supercells} supercells")
-    print(f"{n_atoms_unit_cell} atoms in the unit cell")
-    print(f"{n_atoms_primitive_cell} atoms in the primitive cell")
-    print(f"{n_atoms_super_cell} atoms in the supercell")
+    print(f"n_supercells                    {n_supercells}")
+    print(f"n_atoms_super_cell              {n_atoms_super_cell}")
+    print(f"supercell_displacement          {supercell_displacement:.3f} Å")
+    print(f"force_constants_cutoff_radius   {force_constants_cutoff_radius:.1f} Å")
+    print(f"symmetrize_force_constants      {symmetrize_force_constants}")
     #
     # Compute second-order dynamic matrix (Hessian)
     # by numerical differentiation. The force vectors
@@ -361,7 +362,7 @@ def phonons(
 
     if symmetrize_force_constants:
         phonons.symmetrize_force_constants()
-        phonons.symmetrize_force_constants_by_space_group()
+        # phonons.symmetrize_force_constants_by_space_group()
         print(f"Symmetrization of force constants completed", flush=True)
     
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
@@ -676,6 +677,7 @@ def equilibrium_curve(
         "optical_freqs_real_crystal",
         "space_group"
     ]].to_string(index=False), flush=True)
+    print("")
     
     if len(df_eos[good_points]) == 0:
         raise RuntimeError("No data points left after applying filtering criteria")
@@ -887,8 +889,9 @@ def detect_imaginary_modes(
     ]
     for mode, thresh, band_indices in zip(mode_types, thresholds, bands):
         band_indices_str = np.array2string(band_indices) if len(band_indices) > 0 else "none"
-        thresh_str = f"ω < {thresh:>4.2f}"
-        print(f"{thresh_str:>15}   {mode:15} {band_indices_str}")
+        thresh_str = f"ω < {thresh:>5.2f}"
+        print(f"{thresh_str:<15}   {mode:15} {band_indices_str}")
+    print("")
 
     real_acoustic_freqs = (len(large_imaginary_acoustic) == 0)
     real_optical_freqs = (len(large_imaginary_optical) == 0)
