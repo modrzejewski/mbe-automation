@@ -266,6 +266,7 @@ def phonons(
         interp_mesh=150.0,
         automatic_primitive_cell=True,
         symmetrize_force_constants=False,
+        force_constants_cutoff_radius=None,
         system_label=None        
 ):
 
@@ -352,6 +353,10 @@ def phonons(
         show_drift=True,
         fc_calculator_log_level=1
     )
+    if force_constants_cutoff_radius:
+        phonons.set_force_constants_zero_with_radius(
+            cutoff_radius=force_constants_cutoff_radius
+        )
     print(f"Force constants completed", flush=True)
 
     if symmetrize_force_constants:
@@ -420,7 +425,6 @@ def eos_polynomial_fit(V, F, degree=2):
             min_extrapolated=False,
             curve_type="polynomial"
             )
-
     weights = proximity_weights(
         V,
         V_min=V[np.argmin(F)] # guess value for the minimum
@@ -529,6 +533,7 @@ def equilibrium_curve(
         eos_sampling,
         symmetrize_unit_cell,
         symmetrize_force_constants,
+        force_constants_cutoff_radius,
         imaginary_mode_threshold,
         filter_out_imaginary_acoustic,
         filter_out_imaginary_optical,
@@ -617,6 +622,7 @@ def equilibrium_curve(
             interp_mesh=interp_mesh,
             automatic_primitive_cell=automatic_primitive_cell,
             symmetrize_force_constants=symmetrize_force_constants,
+            force_constants_cutoff_radius=force_constants_cutoff_radius,
             system_label=label
         )
         df_crystal_V = data_frame_crystal(
@@ -663,6 +669,7 @@ def equilibrium_curve(
 
     select_T = [df_eos.index % n_temperatures == i for i in range(n_temperatures)]
 
+    print("Summary of data points used in the EOS fit \n")
     print(df_eos[select_T[0]][[
         "system_label_crystal",
         "acoustic_freqs_real_crystal",
@@ -737,8 +744,8 @@ def equilibrium_curve(
                 V=df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
                 V_min=V_eos[i])
             F_vib_fit = Polynomial.fit(
-                V=df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
-                F=df_eos[good_points & select_T[i]]["F_vib_crystal (kJ/mol/unit cell)"].to_numpy(),
+                df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
+                df_eos[good_points & select_T[i]]["F_vib_crystal (kJ/mol/unit cell)"].to_numpy(),
                 deg=2, w=weights) # kJ/mol/unit cell
             dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
             kJ_mol_Angs3_to_GPa = (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa
@@ -894,7 +901,7 @@ def detect_imaginary_modes(
         min_freq_acoustic_thz,
         min_freq_optical_thz
         )
-    
+
     
 def generate_fbz_path(
         phonons,

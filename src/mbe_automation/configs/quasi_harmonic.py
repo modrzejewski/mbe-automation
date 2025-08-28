@@ -173,6 +173,11 @@ class QuasiHarmonicConfig:
                                    #
     symmetrize_force_constants: bool = False
                                    #
+                                   # Interatomic distance beyond which force constants
+                                   # are set to zero.
+                                   #
+    force_constants_cutoff_radius: float | Literal["auto"] | None = None
+                                   #
                                    # Scaling factors used to sample volumes around
                                    # the reference volume at T=0K.
                                    #

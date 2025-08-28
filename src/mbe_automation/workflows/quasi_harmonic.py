@@ -21,12 +21,14 @@ except ImportError:
 
 
 def run(config: QuasiHarmonicConfig):
-
+    
     if config.verbose == 0:
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         warnings.filterwarnings("ignore", category=UserWarning)
         warnings.filterwarnings("ignore", category=RuntimeWarning)
-    
+
+    datetime_start = mbe_automation.display.timestamp_start()
+        
     if config.thermal_expansion:
         mbe_automation.display.framed("Harmonic properties with thermal expansion")
     else:
@@ -112,6 +114,11 @@ def run(config: QuasiHarmonicConfig):
     else:
         print("Using supercell matrix provided in QuasiHarmonicConfig", flush=True)
         supercell_matrix = config.supercell_matrix
+        
+    if config.force_constants_cutoff_radius == "auto":
+        force_constants_cutoff_radius = config.supercell_radius / 2.0
+    else:
+        force_constants_cutoff_radius = config.force_constants_cutoff_radius
     #
     # Phonon properties of the fully relaxed cell
     # (the harmonic approximation)
@@ -124,6 +131,7 @@ def run(config: QuasiHarmonicConfig):
         interp_mesh=config.fourier_interpolation_mesh,
         automatic_primitive_cell=config.automatic_primitive_cell,
         symmetrize_force_constants=config.symmetrize_force_constants,
+        force_constants_cutoff_radius=force_constants_cutoff_radius,
         system_label=label_crystal
     )
     df_crystal = mbe_automation.dynamics.harmonic.data_frame_crystal(
@@ -155,6 +163,7 @@ def run(config: QuasiHarmonicConfig):
     n_atoms_molecule = len(molecule)
     if not config.thermal_expansion:
         print("Harmonic calculations completed")
+        mbe_automation.display.timestamp_finish(datetime_start)
         return
     #
     # Thermal expansion
@@ -189,6 +198,7 @@ def run(config: QuasiHarmonicConfig):
             config.eos_sampling,
             config.symmetrize_unit_cell,
             config.symmetrize_force_constants,
+            force_constants_cutoff_radius,
             config.imaginary_mode_threshold,
             config.filter_out_imaginary_acoustic,
             config.filter_out_imaginary_optical,
@@ -259,6 +269,7 @@ def run(config: QuasiHarmonicConfig):
             interp_mesh=interp_mesh,
             automatic_primitive_cell=config.automatic_primitive_cell,
             symmetrize_force_constants=config.symmetrize_force_constants,
+            force_constants_cutoff_radius=force_constants_cutoff_radius,
             system_label=label_crystal
         )
         df_crystal_T = mbe_automation.dynamics.harmonic.data_frame_crystal(
@@ -301,4 +312,5 @@ def run(config: QuasiHarmonicConfig):
     print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom:.5f} kJ/mol/atom")
         
     print(f"Properties with thermal expansion completed")
+    mbe_automation.display.timestamp_finish(datetime_start)
 
