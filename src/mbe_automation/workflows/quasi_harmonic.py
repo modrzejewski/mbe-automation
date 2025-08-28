@@ -265,7 +265,7 @@ def run(config: QuasiHarmonicConfig):
             unit_cell_T,
             phonons,
             temperatures=np.array([T]),
-            config.imaginary_mode_threshold, 
+            imaginary_mode_threshold=config.imaginary_mode_threshold, 
             space_group=space_group_T,
             system_label=label_crystal
         )
