@@ -676,7 +676,7 @@ def equilibrium_curve(
     fit = eos_curve_fit(
         V=df_eos[good_points & select_T[0]]["V (Å³/unit cell)"],
         F=df_eos[good_points & select_T[0]]["E_el_crystal (kJ/mol/unit cell)"],
-        equation_of_state
+        equation_of_state=equation_of_state
     )
     if fit.min_found:
         print(f"Bulk modulus computed using E_el_crystal(V): {fit.B:.1f} GPa")
@@ -695,7 +695,7 @@ def equilibrium_curve(
         fit = eos_curve_fit(
             V=df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
             F=df_eos[good_points & select_T[i]]["F_tot_crystal (kJ/mol/unit cell)"].to_numpy(),
-            equation_of_state
+            equation_of_state=equation_of_state
         )
         F_tot_eos[i] = fit.F_min
         V_eos[i] = fit.V_min
