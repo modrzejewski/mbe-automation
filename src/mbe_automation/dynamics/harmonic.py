@@ -320,7 +320,8 @@ def phonons(
     print(f"n_supercells                    {n_supercells}")
     print(f"n_atoms_super_cell              {n_atoms_super_cell}")
     print(f"supercell_displacement          {supercell_displacement:.3f} Å")
-    print(f"force_constants_cutoff_radius   {force_constants_cutoff_radius:.1f} Å")
+    if force_constants_cutoff_radius:
+        print(f"force_constants_cutoff_radius   {force_constants_cutoff_radius:.1f} Å")
     print(f"symmetrize_force_constants      {symmetrize_force_constants}")
     print("")
     #
