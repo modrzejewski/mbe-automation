@@ -36,7 +36,7 @@ def run(config: QuasiHarmonicConfig):
     geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
-    label_crystal = "unit_cell_input"
+    label_crystal = "crystal_input"
     mbe_automation.structure.crystal.display(
         unit_cell=config.unit_cell,
         system_label=label_crystal
@@ -57,7 +57,7 @@ def run(config: QuasiHarmonicConfig):
         if isinstance(config.calculator, MACECalculator):
             mbe_automation.display.mace_summary(config.calculator)
 
-    label_molecule = "isolated_molecule"
+    label_molecule = "molecule_relaxed"
     molecule = mbe_automation.structure.relax.isolated_molecule(
         molecule,
         config.calculator,
@@ -80,7 +80,7 @@ def run(config: QuasiHarmonicConfig):
     # The points on the volume axis will be determined
     # by rescaling of V0.
     #
-    label_crystal = "unit_cell_fully_relaxed"
+    label_crystal = "crystal_relaxed"
     unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
         unit_cell,
         config.calculator,
@@ -126,25 +126,11 @@ def run(config: QuasiHarmonicConfig):
         symmetrize_force_constants=config.symmetrize_force_constants,
         system_label=label_crystal
     )
-    has_imaginary_modes_V0 = mbe_automation.dynamics.harmonic.band_structure(
-        phonons,
-        imaginary_mode_threshold=config.imaginary_mode_threshold,
-        properties_dir=config.properties_dir,
-        hdf5_dataset=config.hdf5_dataset,
-        system_label=label_crystal
-    )
-    all_freqs_real_V0 = (not has_imaginary_modes_V0)
-    
-    interp_mesh = phonons.mesh.mesh_numbers
-    print(f"Fourier interpolation mesh for phonon properties: {interp_mesh[0]}×{interp_mesh[1]}×{interp_mesh[2]}")
-    if config.thermal_expansion:
-        print(f"All structures will use the same mesh")
-
     df_crystal = mbe_automation.dynamics.harmonic.data_frame_crystal(
         unit_cell_V0,
         phonons,
         config.temperatures,
-        all_freqs_real=all_freqs_real_V0,
+        config.imaginary_mode_threshold,
         space_group=space_group_V0,
         system_label=label_crystal)
     df_molecule = mbe_automation.dynamics.harmonic.data_frame_molecule(
@@ -182,6 +168,7 @@ def run(config: QuasiHarmonicConfig):
     #    of ZPE and thermal motion on the cell relaxation
     # 4. bulk moduli B(T)
     #
+    interp_mesh = phonons.mesh.mesh_numbers # enforce the same mesh for all systems
     try:
         df_crystal_eos = mbe_automation.dynamics.harmonic.equilibrium_curve(
             unit_cell_V0,
@@ -203,8 +190,9 @@ def run(config: QuasiHarmonicConfig):
             config.symmetrize_unit_cell,
             config.symmetrize_force_constants,
             config.imaginary_mode_threshold,
-            config.skip_structures_with_imaginary_modes,
-            config.skip_structures_with_broken_symmetry,
+            config.filter_out_imaginary_acoustic,
+            config.filter_out_imaginary_optical,
+            config.filter_out_broken_symmetry,
             config.hdf5_dataset
         )
     except RuntimeError as e:
@@ -217,7 +205,7 @@ def run(config: QuasiHarmonicConfig):
     # are skipped.
     #
     data_frames_at_T = []
-    if config.skip_structures_with_extrapolated_minimum:
+    if config.filter_out_extrapolated_minimum:
         filtered_df = df_crystal_eos[df_crystal_eos["min_found"] & (df_crystal_eos["min_extrapolated"] == False)]
     else:
         filtered_df = df_crystal_eos[df_crystal_eos["min_found"]]
@@ -230,7 +218,7 @@ def run(config: QuasiHarmonicConfig):
             unit_cell_V0.cell * (V/V0)**(1/3),
             scale_atoms=True
         )
-        label_crystal = f"unit_cell_T_{T:.4f}"
+        label_crystal = f"crystal_T_{T:.4f}"
         if config.eos_sampling == "pressure":
             #
             # Relax geometry with an effective pressure which
@@ -273,18 +261,11 @@ def run(config: QuasiHarmonicConfig):
             symmetrize_force_constants=config.symmetrize_force_constants,
             system_label=label_crystal
         )
-        has_imaginary_modes_T = mbe_automation.dynamics.harmonic.band_structure(
-            phonons,
-            imaginary_mode_threshold=config.imaginary_mode_threshold,
-            properties_dir=config.properties_dir,
-            hdf5_dataset=config.hdf5_dataset,
-            system_label=label_crystal
-        )
         df_crystal_T = mbe_automation.dynamics.harmonic.data_frame_crystal(
             unit_cell_T,
             phonons,
             temperatures=np.array([T]),
-            all_freqs_real=(not has_imaginary_modes_T),
+            config.imaginary_mode_threshold, 
             space_group=space_group_T,
             system_label=label_crystal
         )
