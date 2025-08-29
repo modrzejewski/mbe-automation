@@ -88,8 +88,8 @@ def run(config: QuasiHarmonicConfig):
     unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
         unit_cell,
         config.calculator,
-        optimize_lattice_vectors=True,
-        optimize_volume=True,
+        optimize_lattice_vectors=(config.relax_input_cell in ["full", "constant_volume"]),
+        optimize_volume=(config.relax_input_cell=="full"),
         symmetrize_final_structure=config.symmetrize_unit_cell,
         max_force_on_atom=config.max_force_on_atom,
         algo_primary=config.relax_algo_primary,

@@ -118,7 +118,6 @@ def phonons(
     if force_constants_cutoff_radius:
         print(f"force_constants_cutoff_radius   {force_constants_cutoff_radius:.1f} Å")
     print(f"symmetrize_force_constants      {symmetrize_force_constants}")
-    print("")
     #
     # Compute second-order dynamic matrix (Hessian)
     # by numerical differentiation. The force vectors
@@ -128,7 +127,8 @@ def phonons(
     start_time = time.time()
     last_time = start_time
     next_print = 10
-    
+
+    print("Computing force dataset...")
     for i, s in enumerate(supercells, 1):
         forces = forces_in_displaced_supercell(s, calculator)
         force_set.append(forces)
@@ -139,7 +139,7 @@ def phonons(
             last_time = now
             next_print += 10
 
-    print("Force set completed", flush=True)
+    print("Force dataset completed", flush=True)
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")

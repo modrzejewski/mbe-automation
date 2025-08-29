@@ -96,7 +96,8 @@ def eos_curves(
 
     For each temperature, this function plots the calculated data points and
     the corresponding fitted equation of state curve, using a color gradient
-    to represent temperature.
+    to represent temperature. It also plots a line connecting the equilibrium
+    points (V_min, F_min) across all temperatures.
 
     Parameters:
     -----------
@@ -137,11 +138,9 @@ def eos_curves(
 
         # Plot the interpolated curve from the EOS fit
         if fit_result.F_interp is not None:
-            # Generate a smooth set of volume points for the curve
             V_min_range = np.min(fit_result.V_sampled)
             V_max_range = np.max(fit_result.V_sampled)
             V_smooth = np.linspace(V_min_range, V_max_range, 200)
-
             F_smooth = fit_result.F_interp(V_smooth)
 
             ax.plot(
@@ -150,6 +149,30 @@ def eos_curves(
                 color=color,
                 linestyle='-'
             )
+            
+    # --- ADDED: Plot the curve connecting equilibrium points ---
+    # 1. Extract equilibrium points (V_min, F_min) where a minimum was found
+    equilibria = np.array([
+        (fit.V_min, fit.F_min) for fit in F_tot_curves if fit.min_found
+    ])
+    
+    # 2. Sort the points by volume to ensure the line is drawn correctly
+    if equilibria.size > 0:
+        equilibria_sorted = equilibria[equilibria[:, 0].argsort()]
+        V_eq = equilibria_sorted[:, 0]
+        F_eq = equilibria_sorted[:, 1]
+    
+        # 3. Plot the connecting line
+        ax.plot(
+            V_eq,
+            F_eq - F_min_global,
+            color='black',
+            linestyle='--',
+            marker='x',
+            label='Equilibrium Path'
+        )
+        ax.legend()
+
 
     # --- Formatting ---
     ax.set_xlabel("Volume (Å³/unit cell)", fontsize=14)
@@ -162,13 +185,13 @@ def eos_curves(
     ax.set_ylim(bottom=0)
 
     # --- Add Color Bar ---
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, ax=ax)
-    cbar.set_label('Temperature (K)', fontsize=14)
+    if len(temperatures) > 5:
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        cbar = fig.colorbar(sm, ax=ax)
+        cbar.set_label('Temperature (K)', fontsize=14)
 
     plt.tight_layout()
     output_path = os.path.join(properties_dir, "eos_curves.png")
     plt.savefig(output_path, dpi=300)
     plt.close(fig)
     print(f"EOS plot saved to: {output_path}")
-
