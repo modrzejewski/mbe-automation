@@ -1,6 +1,6 @@
 import pandas as pd
 
-def save_dataframe(
+def save_data(
         df,
         hdf5_dataset,
         group_path="quasi_harmonic/quasi_harmonic_equilibrium_properties",
@@ -27,7 +27,7 @@ def save_dataframe(
     )
 
 
-def read_dataframe(
+def read_data(
         hdf5_dataset,
         group_path="quasi_harmonic/quasi_harmonic_equilibrium_properties"
 ):

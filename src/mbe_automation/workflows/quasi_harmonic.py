@@ -1,16 +1,18 @@
-import mbe_automation.dynamics.harmonic
-import mbe_automation.structure.crystal
-import mbe_automation.structure.molecule
-import mbe_automation.structure.relax
-import mbe_automation.display
-from mbe_automation.configs.quasi_harmonic import QuasiHarmonicConfig
 import os
 import os.path
 import ase.units
 import numpy as np
 import pandas as pd
-import mbe_automation.hdf5
 import warnings
+
+from mbe_automation.configs.quasi_harmonic import QuasiHarmonicConfig
+import mbe_automation.hdf5
+import mbe_automation.dynamics.harmonic.core
+import mbe_automation.dynamics.harmonic.data
+import mbe_automation.structure.crystal
+import mbe_automation.structure.molecule
+import mbe_automation.structure.relax
+import mbe_automation.display
 
 try:
     from mace.calculators import MACECalculator
@@ -69,7 +71,7 @@ def run(config: QuasiHarmonicConfig):
         log=os.path.join(geom_opt_dir, f"{label_molecule}.txt"),
         system_label=label_molecule
     )
-    vibrations = mbe_automation.dynamics.harmonic.molecular_vibrations(
+    vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
         molecule,
         config.calculator
     )
@@ -123,7 +125,7 @@ def run(config: QuasiHarmonicConfig):
     # Phonon properties of the fully relaxed cell
     # (the harmonic approximation)
     #
-    phonons = mbe_automation.dynamics.harmonic.phonons(
+    phonons = mbe_automation.dynamics.harmonic.core.phonons(
         unit_cell_V0,
         config.calculator,
         supercell_matrix,
@@ -134,27 +136,27 @@ def run(config: QuasiHarmonicConfig):
         force_constants_cutoff_radius=force_constants_cutoff_radius,
         system_label=label_crystal
     )
-    df_crystal = mbe_automation.dynamics.harmonic.data_frame_crystal(
+    df_crystal = mbe_automation.dynamics.harmonic.data.crystal(
         unit_cell_V0,
         phonons,
         config.temperatures,
         config.imaginary_mode_threshold,
         space_group=space_group_V0,
         system_label=label_crystal)
-    df_molecule = mbe_automation.dynamics.harmonic.data_frame_molecule(
+    df_molecule = mbe_automation.dynamics.harmonic.data.molecule(
         molecule,
         vibrations,
         config.temperatures,
         system_label=label_molecule
     )
-    df_sublimation = mbe_automation.dynamics.harmonic.data_frame_sublimation(
+    df_sublimation = mbe_automation.dynamics.harmonic.data.sublimation(
         df_crystal,
         df_molecule
     )
     del df_crystal["T (K)"]
     del df_molecule["T (K)"]
     df_harmonic = pd.concat([df_sublimation, df_crystal, df_molecule], axis=1)
-    mbe_automation.hdf5.save_dataframe(
+    mbe_automation.hdf5.save_data(
         df_harmonic,
         config.hdf5_dataset,
         group_path="quasi_harmonic/no_thermal_expansion"
@@ -179,7 +181,7 @@ def run(config: QuasiHarmonicConfig):
     #
     interp_mesh = phonons.mesh.mesh_numbers # enforce the same mesh for all systems
     try:
-        df_crystal_eos = mbe_automation.dynamics.harmonic.equilibrium_curve(
+        df_crystal_eos = mbe_automation.dynamics.harmonic.core.equilibrium_curve(
             unit_cell_V0,
             space_group_V0,
             config.calculator,
@@ -261,7 +263,7 @@ def run(config: QuasiHarmonicConfig):
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
                 system_label=label_crystal
             )
-        phonons = mbe_automation.dynamics.harmonic.phonons(
+        phonons = mbe_automation.dynamics.harmonic.core.phonons(
             unit_cell_T,
             config.calculator,
             supercell_matrix,
@@ -272,7 +274,7 @@ def run(config: QuasiHarmonicConfig):
             force_constants_cutoff_radius=force_constants_cutoff_radius,
             system_label=label_crystal
         )
-        df_crystal_T = mbe_automation.dynamics.harmonic.data_frame_crystal(
+        df_crystal_T = mbe_automation.dynamics.harmonic.data.crystal(
             unit_cell_T,
             phonons,
             temperatures=np.array([T]),
@@ -288,7 +290,7 @@ def run(config: QuasiHarmonicConfig):
     # temeprature points
     #
     df_crystal_qha = pd.concat(data_frames_at_T)
-    df_sublimation_qha = mbe_automation.dynamics.harmonic.data_frame_sublimation(
+    df_sublimation_qha = mbe_automation.dynamics.harmonic.data.sublimation(
         df_crystal_qha,
         df_molecule
     )
@@ -299,7 +301,7 @@ def run(config: QuasiHarmonicConfig):
         df_crystal_qha,
         df_crystal_eos,
         df_molecule], axis=1)
-    mbe_automation.hdf5.save_dataframe(
+    mbe_automation.hdf5.save_data(
         df_quasi_harmonic,
         config.hdf5_dataset,
         group_path="quasi_harmonic/thermal_expansion"
