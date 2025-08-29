@@ -191,7 +191,7 @@ def crystal(
     alpha = n_atoms_unit_cell/n_atoms_primitive_cell
     
     phonons.run_thermal_properties(temperatures=temperatures)
-    _, F_vib_crystal, S_vib_crystal, Cv_vib_crystal = phonons.thermal_properties.thermal_properties
+    _, F_vib_crystal, S_vib_crystal, C_v_vib_crystal = phonons.thermal_properties.thermal_properties
     
     ZPE_crystal = phonons.thermal_properties.zero_point_energy * alpha # kJ/mol/unit cell
     F_vib_crystal *= alpha # kJ/mol/unit cell

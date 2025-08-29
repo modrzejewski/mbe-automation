@@ -350,7 +350,7 @@ def equilibrium_curve(
     min_found = np.zeros(n_temperatures, dtype=bool)
     min_extrapolated = np.zeros(n_temperatures, dtype=bool)
     curve_type = []
-    F_tot_V = []
+    F_tot_curves = []
         
     for i, T in enumerate(temperatures):
         fit = mbe_automation.dynamics.harmonic.eos.fit(
@@ -358,7 +358,7 @@ def equilibrium_curve(
             F=df_eos[good_points & select_T[i]]["F_tot_crystal (kJ/mol/unit cell)"].to_numpy(),
             equation_of_state=equation_of_state
         )
-        F_tot_V.append(fit)
+        F_tot_curves.append(fit)
         F_tot_eos[i] = fit.F_min
         V_eos[i] = fit.V_min
         B_eos[i] = fit.B
@@ -407,7 +407,7 @@ def equilibrium_curve(
             p_thermal_eos[i] = dFdV(V_eos[i]) * kJ_mol_Angs3_to_GPa # GPa
 
     mbe_automation.dynamics.harmonic.plots.eos_curves(
-        F_tot_V,
+        F_tot_curves,
         temperatures,
         properties_dir
     )

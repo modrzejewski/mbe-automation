@@ -87,7 +87,7 @@ def my_plot_band_structure(phonons, output_path, band_connection=True):
 
 
 def eos_curves(
-        F_tot_V,
+        F_tot_curves,
         temperatures,
         properties_dir
 ):
@@ -100,11 +100,11 @@ def eos_curves(
 
     Parameters:
     -----------
-    F_tot_V : list
+    F_tot_curves : list
         A list of EOSFitResults namedtuples, where each element corresponds
         to a different temperature.
     temperatures : array-like
-        The list of temperatures corresponding to the fits in F_tot_V.
+        The list of temperatures corresponding to the fits in F_tot_curves.
     properties_dir : str
         The directory where the output plot 'eos_curves.png' will be saved.
     """
@@ -117,9 +117,9 @@ def eos_curves(
     norm = mcolors.Normalize(vmin=min_temp, vmax=max_temp)
 
     # Find the overall minimum free energy to shift all curves for better visualization
-    F_min_global = min(fit.F_min for fit in F_tot_V if fit.min_found)
+    F_min_global = min(fit.F_min for fit in F_tot_curves if fit.min_found)
 
-    for fit_result, T in zip(F_tot_V, temperatures):
+    for fit_result, T in zip(F_tot_curves, temperatures):
         if not fit_result.min_found:
             print(f"Skipping plot for T={T} K as no minimum was found.")
             continue
