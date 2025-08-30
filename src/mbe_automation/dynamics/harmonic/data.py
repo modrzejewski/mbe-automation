@@ -1,3 +1,5 @@
+from collections import namedtuple
+import os
 import ase.thermochemistry
 import ase.units
 import pandas as pd

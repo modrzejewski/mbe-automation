@@ -96,7 +96,7 @@ def save_fbz_path(
         )
         for i in range(n_segments):
             group.create_dataset(
-                name=f"frequencies_{i}",
+                name=f"frequencies_{i} (THz)",
                 data=band_structure.frequencies[i]                
             )
             group.create_dataset(
@@ -127,7 +127,7 @@ def read_fbz_path(
 
         frequencies, distances, kpoints, eigenvectors = [], [], [], []
         for i in range(n_segments):
-            frequencies.append(group[f"frequencies_{i}"][...])
+            frequencies.append(group[f"frequencies_{i} (THz)"][...])
             distances.append(group[f"distances_{i}"][...])
             kpoints.append(group[f"kpoints_{i}"][...])
             eigenvectors.append(group[f"eigenvectors_{i}"][...])
