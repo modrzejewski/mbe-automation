@@ -24,7 +24,7 @@ import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
 import mbe_automation.dynamics.harmonic.eos
 import mbe_automation.dynamics.harmonic.data
-import mbe_automation.dynamics.harmonic.plots
+import mbe_automation.dynamics.harmonic.plot
 
 
 def molecular_vibrations(
@@ -266,7 +266,7 @@ def equilibrium_curve(
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 system_label=label
             )
-        p = phonons(
+        ph = phonons(
             unit_cell_V,
             calculator,
             supercell_matrix,
@@ -279,10 +279,12 @@ def equilibrium_curve(
         )
         df_crystal_V = mbe_automation.dynamics.harmonic.data.crystal(
             unit_cell_V,
-            p,
+            ph,
             temperatures,
             imaginary_mode_threshold,
             space_group=space_group_V,
+            properties_dir=properties_dir,
+            hdf5_dataset=hdf5_dataset,
             system_label=label
         )
         df_eos_points.append(df_crystal_V)
@@ -333,16 +335,6 @@ def equilibrium_curve(
     if len(df_eos[good_points]) == 0:
         raise RuntimeError("No data points left after applying filtering criteria")
     
-    fit = mbe_automation.dynamics.harmonic.eos.fit(
-        V=df_eos[good_points & select_T[0]]["V (Å³/unit cell)"],
-        F=df_eos[good_points & select_T[0]]["E_el_crystal (kJ/mol/unit cell)"],
-        equation_of_state=equation_of_state
-    )
-    if fit.min_found:
-        print(f"Bulk modulus computed using E_el_crystal(V): {fit.B:.1f} GPa")
-    else:
-        warnings.warn("Minimum of E_el_crystal(V) not found")
-
     V_eos = np.full(n_temperatures, np.nan)
     F_tot_eos = np.full(n_temperatures, np.nan)
     B_eos = np.full(n_temperatures, np.nan)
@@ -397,16 +389,18 @@ def equilibrium_curve(
         if fit.min_found:
             weights = mbe_automation.dynamics.harmonic.eos.proximity_weights(
                 V=df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
-                V_min=V_eos[i])
+                V_min=V_eos[i]
+            )
             F_vib_fit = Polynomial.fit(
                 df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
                 df_eos[good_points & select_T[i]]["F_vib_crystal (kJ/mol/unit cell)"].to_numpy(),
-                deg=2, w=weights) # kJ/mol/unit cell
+                deg=2, w=weights
+            ) # kJ/mol/unit cell
             dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
             kJ_mol_Angs3_to_GPa = (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa
             p_thermal_eos[i] = dFdV(V_eos[i]) * kJ_mol_Angs3_to_GPa # GPa
 
-    mbe_automation.dynamics.harmonic.plots.eos_curves(
+    mbe_automation.dynamics.harmonic.plot.eos_curves(
         F_tot_curves,
         temperatures,
         properties_dir

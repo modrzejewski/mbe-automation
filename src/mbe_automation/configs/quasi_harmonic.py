@@ -192,11 +192,10 @@ class QuasiHarmonicConfig:
                                    # 2. V/V0=0.97 up to V/V0=1.06 according to the manual
                                    # of CRYSTAL
                                    #
-                                   # A robust choice is to specify a wide range of volumes, e.g.,
-                                   # 0.96...1.08 V/V0. The fitting subroutine will automatically
-                                   # apply proximity weights in such a way that only the points
-                                   # near the minimum at each temperature contribute significantly
-                                   # to the fitted parameters.
+                                   # A robust but expensive choice is to specify a wide
+                                   # range of volumes and let the fitting subroutine
+                                   # apply proximity weights centered around
+                                   # the equilibrium data point.
                                    #
     volume_range: npt.NDArray[np.floating] = field(default_factory=lambda:
                                                     np.array([

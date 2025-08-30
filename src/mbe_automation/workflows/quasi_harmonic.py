@@ -9,6 +9,7 @@ from mbe_automation.configs.quasi_harmonic import QuasiHarmonicConfig
 import mbe_automation.hdf5
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.data
+import mbe_automation.dynamics.harmonic.plot
 import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
@@ -142,6 +143,8 @@ def run(config: QuasiHarmonicConfig):
         config.temperatures,
         config.imaginary_mode_threshold,
         space_group=space_group_V0,
+        properties_dir=config.properties_dir,
+        hdf5_dataset=config.hdf5_dataset,
         system_label=label_crystal)
     df_molecule = mbe_automation.dynamics.harmonic.data.molecule(
         molecule,
@@ -280,6 +283,8 @@ def run(config: QuasiHarmonicConfig):
             temperatures=np.array([T]),
             imaginary_mode_threshold=config.imaginary_mode_threshold, 
             space_group=space_group_T,
+            properties_dir=config.properties_dir,
+            hdf5_dataset=config.hdf5_dataset,
             system_label=label_crystal
         )
         df_crystal_T.index = [i] # map current dataframe to temperature T

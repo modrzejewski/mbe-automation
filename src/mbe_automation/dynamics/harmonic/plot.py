@@ -2,6 +2,125 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 import os
+from phonopy.api_phonopy import Phonopy
+
+
+def band_structure(
+    phonons: "Phonopy",
+    properties_dir: str,
+    system_label: str,
+    omega_max: float = None,
+    color_map: str = 'plasma'
+):
+    """
+    Generates and saves a phonon band structure plot using modern Matplotlib.
+
+    This function handles discontinuous k-paths by creating proportionally
+    sized, conjoined subplots. Each band is colored individually using a
+    specified colormap. The final plot is saved to a file.
+
+    Parameters:
+    -----------
+    phonons : Phonopy
+        An instance of the Phonopy class, from which the band structure
+        data will be extracted.
+    properties_dir : str
+        The base directory where the properties will be saved.
+    system_label : str
+        A label for the system, used as the filename.
+    omega_max : float, optional
+        The maximum frequency for the y-axis limit. If not provided, it is
+        determined automatically from the data with a 5% padding.
+    color_map : str, optional
+        The Matplotlib colormap to use for coloring the bands.
+    """
+    band_structure = phonons.band_structure
+    frequencies = band_structure.frequencies
+    distances = band_structure.distances
+    path_connections = band_structure.path_connections
+    labels = band_structure.labels
+
+    num_bands = frequencies[0].shape[1]
+    cmap = plt.get_cmap(color_map)
+    norm = mcolors.Normalize(vmin=0, vmax=num_bands - 1)
+    colors = [cmap(norm(i)) for i in range(num_bands)]
+
+    # Determine subplot layout based on path discontinuities
+    breaks = np.where(~np.array(path_connections))[0]
+    num_subplots = len(breaks)
+    segment_lengths = [d[-1] for d in distances]
+    
+    # Calculate width ratios for each major plot segment
+    width_ratios = []
+    start_idx = 0
+    for end_idx in breaks:
+        width_ratios.append(segment_lengths[end_idx] - (segment_lengths[start_idx - 1] if start_idx > 0 else 0))
+        start_idx = end_idx + 1
+
+    fig, axes = plt.subplots(
+        1, num_subplots, sharey=True,
+        gridspec_kw={'width_ratios': width_ratios, 'wspace': 0.05}
+    )
+    if num_subplots == 1:
+        axes = [axes] # Ensure axes is iterable
+
+    # Plotting loop
+    path_idx, label_idx = 0, 0
+    for i, ax in enumerate(axes):
+        # Determine the range of path segments for this subplot
+        start_path_idx = path_idx
+        end_path_idx = breaks[i]
+        
+        # Plot each band with its unique color
+        for k in range(start_path_idx, end_path_idx + 1):
+            for j in range(num_bands):
+                ax.plot(distances[k], frequencies[k][:, j], color=colors[j], lw=1.5)
+
+        # Decoration: ticks, labels, and grid lines
+        tick_pos = [distances[start_path_idx][0]]
+        tick_labels = [labels[label_idx]]
+        
+        for k in range(start_path_idx, end_path_idx + 1):
+            tick_pos.append(distances[k][-1])
+            label_idx += 2 if not path_connections[k] else 1
+            tick_labels.append(labels[label_idx - 1])
+
+        ax.set_xticks(tick_pos)
+        ax.set_xticklabels(tick_labels)
+        ax.set_xlim(tick_pos[0], tick_pos[-1])
+        ax.axhline(0, linestyle='--', color='black', lw=1.0, alpha=0.5)
+        for pos in tick_pos:
+            ax.axvline(pos, color='black', linestyle=':', lw=0.5)
+
+        if i > 0:
+            ax.tick_params(left=False)
+
+        path_idx = end_path_idx + 1
+
+    # Determine y-axis limits dynamically
+    all_freqs = np.concatenate(frequencies)
+    min_freq = all_freqs.min()
+    
+    if omega_max is None:
+        max_freq = all_freqs.max()
+        # Add 5% padding to the top if omega_max is not set
+        omega_max = max_freq + 0.05 * (max_freq - min_freq)
+
+    # Add 5% padding to the bottom
+    padding = 0.05 * (omega_max - min_freq)
+    omega_min = min_freq - padding
+    axes[0].set_ylim(omega_min, omega_max)
+        
+    fig.supylabel("Frequency (THz)", fontsize=12)
+    fig.tight_layout()
+    fig.subplots_adjust(left=0.1) # Adjust for supylabel
+    
+    # Save the figure to the specified file path
+    output_dir = os.path.join(properties_dir, "phonons")
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f"{system_label}.png")
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close(fig)
 
 
 def my_plot_band_structure(phonons, output_path, band_connection=True):

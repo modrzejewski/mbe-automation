@@ -6,6 +6,7 @@ from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 
 import mbe_automation.structure.molecule
 import mbe_automation.structure.crystal
+import mbe_automation.dynamics.harmonic.plot
 
 
 def detect_imaginary_modes(
@@ -180,6 +181,8 @@ def crystal(
         temperatures,
         imaginary_mode_threshold,
         space_group,
+        properties_dir,
+        hdf5_dataset,
         system_label
 ):
     """
@@ -205,12 +208,20 @@ def crystal(
     rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
 
     generate_fbz_path(phonons)
+    
     (
         acoustic_freqs_real,
         optical_freqs_real,
         acoustic_freq_min, # THz
         optical_freq_min # THz
     ) = detect_imaginary_modes(phonons, imaginary_mode_threshold)
+
+    mbe_automation.dynamics.harmonic.plot.band_structure(
+        phonons,
+        properties_dir,
+        system_label,
+        omega_max=10.0 # THz
+    )
 
     interp_mesh = phonons.mesh.mesh_numbers
     
