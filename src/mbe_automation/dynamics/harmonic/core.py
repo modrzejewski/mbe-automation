@@ -18,7 +18,7 @@ import warnings
 from numpy.polynomial.polynomial import Polynomial
 
 import mbe_automation.display
-import mbe_automation.hdf5
+import mbe_automation.storage
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
@@ -190,10 +190,10 @@ def equilibrium_curve(
         filter_out_imaginary_acoustic,
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
-        hdf5_dataset
+        dataset
 ):
 
-    geom_opt_dir = os.path.join(properties_dir, "geometry_optimization")
+    geom_opt_dir = os.path.join(properties_dir, "relaxation")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     V0 = unit_cell_V0.get_volume()
@@ -284,7 +284,7 @@ def equilibrium_curve(
             imaginary_mode_threshold,
             space_group=space_group_V,
             properties_dir=properties_dir,
-            hdf5_dataset=hdf5_dataset,
+            dataset=dataset,
             system_label=label
         )
         df_eos_points.append(df_crystal_V)
@@ -295,10 +295,10 @@ def equilibrium_curve(
     # one can extract those data to see what went wrong.
     #
     df_eos = pd.concat(df_eos_points, ignore_index=True)
-    mbe_automation.hdf5.save_data(
+    mbe_automation.storage.save_data(
         df_eos,
-        hdf5_dataset,
-        group_path="quasi_harmonic/equation_of_state"
+        dataset,
+        key="quasi_harmonic/equation_of_state"
     )
     df_eos.to_csv(os.path.join(properties_dir, "equation_of_state.csv"))
     #

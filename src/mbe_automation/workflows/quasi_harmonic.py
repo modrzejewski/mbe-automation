@@ -6,7 +6,7 @@ import pandas as pd
 import warnings
 
 from mbe_automation.configs.quasi_harmonic import QuasiHarmonicConfig
-import mbe_automation.hdf5
+import mbe_automation.storage
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.data
 import mbe_automation.dynamics.harmonic.plot
@@ -38,7 +38,7 @@ def run(config: QuasiHarmonicConfig):
         mbe_automation.display.framed("Harmonic properties")
         
     os.makedirs(config.properties_dir, exist_ok=True)
-    geom_opt_dir = os.path.join(config.properties_dir, "geometry_optimization")
+    geom_opt_dir = os.path.join(config.properties_dir, "relaxation")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     label_crystal = "crystal_input"
@@ -144,7 +144,7 @@ def run(config: QuasiHarmonicConfig):
         config.imaginary_mode_threshold,
         space_group=space_group_V0,
         properties_dir=config.properties_dir,
-        hdf5_dataset=config.hdf5_dataset,
+        dataset=config.dataset,
         system_label=label_crystal)
     df_molecule = mbe_automation.dynamics.harmonic.data.molecule(
         molecule,
@@ -159,10 +159,10 @@ def run(config: QuasiHarmonicConfig):
     del df_crystal["T (K)"]
     del df_molecule["T (K)"]
     df_harmonic = pd.concat([df_sublimation, df_crystal, df_molecule], axis=1)
-    mbe_automation.hdf5.save_data(
+    mbe_automation.storage.save_data(
         df_harmonic,
-        config.hdf5_dataset,
-        group_path="quasi_harmonic/no_thermal_expansion"
+        config.dataset,
+        key="quasi_harmonic/no_thermal_expansion"
     )
     df_harmonic.to_csv(os.path.join(config.properties_dir, "no_thermal_expansion.csv"))
     n_atoms_molecule = len(molecule)
@@ -208,7 +208,7 @@ def run(config: QuasiHarmonicConfig):
             config.filter_out_imaginary_acoustic,
             config.filter_out_imaginary_optical,
             config.filter_out_broken_symmetry,
-            config.hdf5_dataset
+            config.dataset
         )
     except RuntimeError as e:
         print(f"An error occurred: {e}")
@@ -284,7 +284,7 @@ def run(config: QuasiHarmonicConfig):
             imaginary_mode_threshold=config.imaginary_mode_threshold, 
             space_group=space_group_T,
             properties_dir=config.properties_dir,
-            hdf5_dataset=config.hdf5_dataset,
+            dataset=config.dataset,
             system_label=label_crystal
         )
         df_crystal_T.index = [i] # map current dataframe to temperature T
@@ -306,10 +306,10 @@ def run(config: QuasiHarmonicConfig):
         df_crystal_qha,
         df_crystal_eos,
         df_molecule], axis=1)
-    mbe_automation.hdf5.save_data(
+    mbe_automation.storage.save_data(
         df_quasi_harmonic,
-        config.hdf5_dataset,
-        group_path="quasi_harmonic/thermal_expansion"
+        config.dataset,
+        key="quasi_harmonic/thermal_expansion"
     )
     df_quasi_harmonic.to_csv(os.path.join(config.properties_dir, "thermal_expansion.csv"))
 

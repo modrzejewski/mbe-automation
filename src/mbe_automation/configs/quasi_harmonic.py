@@ -86,7 +86,8 @@ class QuasiHarmonicConfig:
     max_force_on_atom: float = 1.0E-4
                                    #
                                    # Algorithms applied for structure
-                                   # relaxation
+                                   # relaxation. If relax_algo_primary
+                                   # fails, relax_algo_fallback is used.
                                    #
     relax_algo_primary: Literal["PreconLBFGS", "PreconFIRE"] = "PreconLBFGS"
     relax_algo_fallback: Literal["PreconLBFGS", "PreconFIRE"] = "PreconFIRE"
@@ -99,7 +100,7 @@ class QuasiHarmonicConfig:
                                    # HDF5 dataset with outputs of property
                                    # calculation
                                    #
-    hdf5_dataset: str = "./properties.hdf5"
+    dataset: str = "./properties.hdf5"
                                    #
                                    # Minimum point-periodic image distance
                                    # in the supercell used to compute phonons.
@@ -269,7 +270,7 @@ class QuasiHarmonicConfig:
                                    # (3) space group different from the reference
                                    # (4) free energy minium beyond the volume sampling interval
                                    #
-    filter_out_imaginary_acoustic: bool = True
+    filter_out_imaginary_acoustic: bool = False
     filter_out_imaginary_optical: bool = True
     filter_out_broken_symmetry: bool = True
     filter_out_extrapolated_minimum: bool = True

@@ -2,39 +2,20 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 import os
+import os.path
 from phonopy.api_phonopy import Phonopy
 
+import mbe_automation.storage
 
 def band_structure(
-    phonons: "Phonopy",
-    properties_dir: str,
-    system_label: str,
-    omega_max: float = None,
-    color_map: str = 'plasma'
+        dataset: str,
+        key: str,
+        save_path: str | None = None,
+        omega_max: float = None,
+        color_map: str = 'plasma'
 ):
-    """
-    Generates and saves a phonon band structure plot using modern Matplotlib.
 
-    This function handles discontinuous k-paths by creating proportionally
-    sized, conjoined subplots. Each band is colored individually using a
-    specified colormap. The final plot is saved to a file.
-
-    Parameters:
-    -----------
-    phonons : Phonopy
-        An instance of the Phonopy class, from which the band structure
-        data will be extracted.
-    properties_dir : str
-        The base directory where the properties will be saved.
-    system_label : str
-        A label for the system, used as the filename.
-    omega_max : float, optional
-        The maximum frequency for the y-axis limit. If not provided, it is
-        determined automatically from the data with a 5% padding.
-    color_map : str, optional
-        The Matplotlib colormap to use for coloring the bands.
-    """
-    band_structure = phonons.band_structure
+    band_structure = mbe_automation.storage.read_fbz_path(dataset, key)
     frequencies = band_structure.frequencies
     distances = band_structure.distances
     path_connections = band_structure.path_connections
@@ -114,16 +95,17 @@ def band_structure(
     fig.supylabel("Frequency (THz)", fontsize=12)
     fig.tight_layout()
     fig.subplots_adjust(left=0.1) # Adjust for supylabel
-    
-    # Save the figure to the specified file path
-    output_dir = os.path.join(properties_dir, "phonons")
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, f"{system_label}.png")
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close(fig)
+
+    if save_path:
+        output_dir = os.path.dirname(save_path)
+        os.makedirs(output_dir, exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+    else:
+        return fig
 
 
-def my_plot_band_structure(phonons, output_path, band_connection=True):
+def band_structure_krysia(phonons, output_path, band_connection=True):
     """Plot only the first segment of the band structure.
     
     Parameters:
@@ -304,7 +286,7 @@ def eos_curves(
     ax.set_ylim(bottom=0)
 
     # --- Add Color Bar ---
-    if len(temperatures) > 5:
+    if len(temperatures) > 1:
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         cbar = fig.colorbar(sm, ax=ax)
         cbar.set_label('Temperature (K)', fontsize=14)
@@ -313,4 +295,4 @@ def eos_curves(
     output_path = os.path.join(properties_dir, "eos_curves.png")
     plt.savefig(output_path, dpi=300)
     plt.close(fig)
-    print(f"EOS plot saved to: {output_path}")
+

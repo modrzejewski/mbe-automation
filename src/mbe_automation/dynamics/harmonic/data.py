@@ -7,7 +7,17 @@ from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 import mbe_automation.structure.molecule
 import mbe_automation.structure.crystal
 import mbe_automation.dynamics.harmonic.plot
+import mbe_automation.storage
 
+FBZAnalysis = namedtuple(
+    "FBZAnalysis", 
+    [
+        "acoustic_freqs_real",
+        "optical_freqs_real",
+        "acoustic_freq_min_thz",
+        "optical_freq_min_thz"
+    ]
+)
 
 def detect_imaginary_modes(
         phonons,
@@ -58,17 +68,17 @@ def detect_imaginary_modes(
         print(f"{thresh_str:<15}   {mode:15} {band_indices_str}")
     print(line)
 
-    real_acoustic_freqs = (len(significant_imaginary_acoustic) == 0)
-    real_optical_freqs = (len(significant_imaginary_optical) == 0)
-    min_freq_acoustic_thz = np.min(acoustic_freqs)
-    min_freq_optical_thz = np.min(optical_freqs)
+    acoustic_freqs_real = (len(significant_imaginary_acoustic) == 0)
+    optical_freqs_real = (len(significant_imaginary_optical) == 0)
+    acoustic_freq_min_thz = np.min(acoustic_freqs)
+    optical_freq_min_thz = np.min(optical_freqs)
          
-    return (
-        real_acoustic_freqs,
-        real_optical_freqs,
-        min_freq_acoustic_thz,
-        min_freq_optical_thz
-        )
+    return FBZAnalysis(
+        acoustic_freqs_real,
+        optical_freqs_real,
+        acoustic_freq_min_thz,
+        optical_freq_min_thz
+    )
 
     
 def generate_fbz_path(
@@ -98,13 +108,6 @@ def generate_fbz_path(
         is_legacy_plot=False,
     )
         
-    # plt = phonons.plot_band_structure()
-    # plt.ylim(top=10.0)
-    # plots_dir = os.path.join(properties_dir, "phonon_band_structure")
-    # os.makedirs(plots_dir, exist_ok=True)
-    # plt.savefig(os.path.join(plots_dir, f"{system_label}.png"))
-    # plt.close()
-
 
 def molecule(
         system,
@@ -182,7 +185,7 @@ def crystal(
         imaginary_mode_threshold,
         space_group,
         properties_dir,
-        hdf5_dataset,
+        dataset,
         system_label
 ):
     """
@@ -208,18 +211,19 @@ def crystal(
     rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
 
     generate_fbz_path(phonons)
-    
-    (
-        acoustic_freqs_real,
-        optical_freqs_real,
-        acoustic_freq_min, # THz
-        optical_freq_min # THz
-    ) = detect_imaginary_modes(phonons, imaginary_mode_threshold)
-
-    mbe_automation.dynamics.harmonic.plot.band_structure(
+    fbz_analysis = detect_imaginary_modes(
         phonons,
-        properties_dir,
-        system_label,
+        imaginary_mode_threshold
+    )
+    mbe_automation.storage.save_fbz_path(
+        phonons,
+        dataset,
+        key=f"quasi_harmonic/phonons/fbz_path/{system_label}"
+    )
+    mbe_automation.dynamics.harmonic.plot.band_structure(
+        dataset=dataset,
+        key=f"quasi_harmonic/phonons/fbz_path/{system_label}",
+        save_path=os.path.join(properties_dir, "phonons", "fbz_path", f"{system_label}.png"),
         omega_max=10.0 # THz
     )
 
@@ -238,10 +242,10 @@ def crystal(
         "ρ (g/cm³)": rho,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "space_group": space_group,
-        "acoustic_freqs_real_crystal": acoustic_freqs_real,
-        "optical_freqs_real_crystal": optical_freqs_real,
-        "acoustic_freq_min (THz)": acoustic_freq_min,
-        "optical_freq_min (THz)": optical_freq_min,
+        "acoustic_freqs_real_crystal": fbz_analysis.acoustic_freqs_real,
+        "optical_freqs_real_crystal": fbz_analysis.optical_freqs_real,
+        "acoustic_freq_min (THz)": fbz_analysis.acoustic_freq_min_thz,
+        "optical_freq_min (THz)": fbz_analysis.optical_freq_min_thz,
         "system_label_crystal": system_label,
         "Fourier_interp_mesh": f"{interp_mesh[0]}×{interp_mesh[1]}×{interp_mesh[2]}"
     })
