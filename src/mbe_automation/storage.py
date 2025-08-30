@@ -3,7 +3,7 @@ from phonopy import Phonopy
 import h5py
 import numpy as np
 from collections import namedtuple
-
+import os
 
 FBZPath = namedtuple(
     "FBZPath", 
