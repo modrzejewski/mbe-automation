@@ -17,6 +17,19 @@ FBZPath = namedtuple(
     ]
 )
 
+EOSCurves = namedtuple(
+    "EOSCurves",
+    [
+        "temperatures",
+        "V_sampled",
+        "F_sampled",
+        "V_interp",
+        "F_interp",
+        "V_min",
+        "F_min"
+    ]
+)
+
 def save_data(
         df,
         dataset,
@@ -208,110 +221,93 @@ def display(dataset):
         print(f"Error reading HDF5 file: {e}")
 
 
-# def save_eos_curves(
-#         F_tot_curves,
-#         temperatures
-# ):
-#     """
-#     Save Helmholtz free energy vs. volume data for multiple temperatures.
-#     """
+def save_eos_curves(
+        F_tot_curves,
+        temperatures,
+        dataset,
+        key
+):
+    """
+    Save Helmholtz free energy vs. volume data for multiple temperatures.
+    """
 
-#     n_temperatures = len(temperatures)
-#     n_volumes = len(F_tot_curves[0].V_sampled)
-#     n_interp = 200
+    n_temperatures = len(temperatures)
+    n_volumes = len(F_tot_curves[0].V_sampled)
+    n_interp = 200
 
-#     F_min_global = min(np.min(fit.F_exact) for fit in F_tot_curves)
-#     for fit in F_tot_curves:
-#         if fit.min_found:
-#             F_min_global = min(F_min_global, fit.F_min)
+    V_sampled = np.zeros((n_temperatures, n_volumes))
+    F_sampled = np.zeros((n_temperatures, n_volumes))
+    V_min = np.zeros(n_temperatures) 
+    F_min = np.zeros(n_temperatures)
+    for i, fit in enumerate(F_tot_curves):
+        V_sampled[i, :] = fit.V_sampled[:]
+        F_sampled[i, :] = fit.F_sampled[:]
+        if fit.min_found:
+            V_min[i] = fit.V_min
+            F_min[i] = fit.F_min
+        else:
+            V_min[i] = np.nan
+            F_min[i] = np.nan
 
-#     V_sampled = np.zeros((n_temperatures, n_volumes))
-#     F_exact = np.zeros((n_temperatures, n_volumes))
-#     F_interp = np.zeros((n_temperatures, n_interp))
-#     V_interp = np.linspace(np.min(V_sampled), np.max(V_sampled), 200)
-#     V_min = np.zeros(n_temperatures) 
-#     F_min = np.zeros(n_temperatures)
-#     for i, fit in enumerate(F_tot_curves):
-#         V_sampled[i, :] = fit.V_sampled[:]
-#         F_exact[i, :] = fit.F_exact[:]
-#         F_interp[i, :] = fit.F_interp(V_interp)
-#         if fit.min_found:
-#             V_min[i] = fit.V_min
-#             F_min[i] = fit.F_min
-#         else:
-#             V_min[i] = np.nan
-#             F_min[i] = np.nan
-    
-    
-#     fig, ax = plt.subplots(figsize=(8, 6))
-
-#     cmap = plt.get_cmap('plasma')
-#     min_temp = np.min(temperatures)
-#     max_temp = np.max(temperatures)
-#     norm = mcolors.Normalize(vmin=min_temp, vmax=max_temp)
-
-
-
-#     for fit_result, T in zip(F_tot_curves, temperatures):
-#         if not fit_result.min_found:
-#             print(f"Skipping plot for T={T} K as no minimum was found.")
-#             continue
-
-#         color = cmap(norm(T))
-
-#         ax.scatter(
-#             fit_result.V_sampled,
-#             fit_result.F_exact - F_min_global,
-#             color=color,
-#             marker='o',
-#             facecolors='none' 
-#         )
-
-#         if fit_result.F_interp is not None:
-#             V_min_range = np.min(fit_result.V_sampled)
-#             V_max_range = np.max(fit_result.V_sampled)
-#             V_smooth = np.linspace(V_min_range, V_max_range, 200)
-#             F_smooth = fit_result.F_interp(V_smooth)
-
-#             ax.plot(
-#                 V_smooth,
-#                 F_smooth - F_min_global,
-#                 color=color,
-#                 linestyle='-'
-#             )
-
+    F_interp = np.zeros((n_temperatures, n_interp))
+    V_interp = np.linspace(np.min(V_sampled), np.max(V_sampled), 200)
+    for i, fit in enumerate(F_tot_curves):
+        F_interp[i, :] = fit.F_interp(V_interp)
+        
+    with h5py.File(dataset, "a") as f:
+        if key in f:
+            del f[key]
             
-#     equilibria = np.array([
-#         (fit.V_min, fit.F_min) for fit in F_tot_curves if fit.min_found
-#     ])
-#     if equilibria.size > 0:
-#         V_eq = equilibria[:, 0]
-#         F_eq = equilibria[:, 1]
-    
-#         ax.plot(
-#             V_eq,
-#             F_eq - F_min_global,
-#             color='black',
-#             linestyle='--',
-#             marker='x',
-#             label='Equilibrium Path'
-#         )
-#         ax.legend()
+        group = f.create_group(key)
+        group.attrs["n_temperatures"] = n_temperatures
+        group.attrs["n_volumes"] = n_volumes
+        group.attrs["n_interp"] = n_interp
 
+        group.create_dataset(
+            name="T (K)",
+            data=temperatures
+        )
+        group.create_dataset(
+            name="V_sampled (Å³/unit cell)",
+            data=V_sampled
+        )
+        group.create_dataset(
+            name="F_sampled (kJ/mol/unit cell)",
+            data=F_sampled
+        )
+        group.create_dataset(
+            name="V_interp (Å³/unit cell)",
+            data=V_interp
+        )
+        group.create_dataset(
+            name="F_interp (kJ/mol/unit cell)",
+            data=F_interp
+        )
+        group.create_dataset(
+            name="V_min (Å³/unit cell)",
+            data=V_min
+        )
+        group.create_dataset(
+            name="F_min (kJ/mol/unit cell)",
+            data=F_min
+        )
 
-#     ax.set_xlabel("Volume (Å³/unit cell)", fontsize=14)
-#     ax.set_ylabel("$F_{tot} - F_{min}$ (kJ/mol/unit cell)", fontsize=14)
-#     ax.set_title("Equation of State Curves", fontsize=16)
-#     ax.grid(True, linestyle='--', alpha=0.6)
-#     ax.tick_params(labelsize=12)
-#     ax.set_ylim(bottom=0)
+        
+def read_eos_curves(
+        dataset,
+        key
+):
 
-#     if len(temperatures) > 1:
-#         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-#         cbar = fig.colorbar(sm, ax=ax)
-#         cbar.set_label('Temperature (K)', fontsize=14)
+    with h5py.File(dataset, "r") as f:
+        group = f[key]
+        eos_curves = EOSCurves(
+            temperatures=group["T (K)"][...],
+            V_sampled=group["V_sampled (Å³/unit cell)"][...],
+            F_sampled=group["F_sampled (kJ/mol/unit cell)"][...],
+            V_interp=group["V_interp (Å³/unit cell)"][...],
+            F_interp=group["F_interp (kJ/mol/unit cell)"][...],
+            V_min=group["V_min (Å³/unit cell)"][...],
+            F_min=group["F_min (kJ/mol/unit cell)"][...]
+        )
 
-#     plt.tight_layout()
-#     output_path = os.path.join(work_dir, "eos_curves.png")
-#     plt.savefig(output_path, dpi=300)
-#     plt.close(fig)
+    return eos_curves

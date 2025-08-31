@@ -16,7 +16,7 @@ EOSFitResults = namedtuple(
         "curve_type",
         "F_interp",
         "V_sampled",
-        "F_exact"
+        "F_sampled"
     ]
 )
 
@@ -75,7 +75,7 @@ def polynomial_fit(V, F, degree=2):
             min_extrapolated=False,
             curve_type="polynomial",
             F_interp=None,
-            F_exact=F.copy(),
+            F_sampled=F.copy(),
             V_sampled=V.copy()
             )
     weights = proximity_weights(
@@ -101,7 +101,7 @@ def polynomial_fit(V, F, degree=2):
             min_extrapolated=(V_min < np.min(V) or V_min > np.max(V)),
             curve_type="polynomial",
             F_interp=F_fit,
-            F_exact=F.copy(),
+            F_sampled=F.copy(),
             V_sampled=V.copy()
         )
     
@@ -113,8 +113,8 @@ def polynomial_fit(V, F, degree=2):
             min_found = False,
             min_extrapolated = False,
             curve_type="polynomial",
-            F_interp=None,
-            F_exact=F.copy(),
+            F_interp=F_fit,
+            F_sampled=F.copy(),
             V_sampled=V.copy()
         )
 
@@ -171,7 +171,7 @@ def fit(V, F, equation_of_state):
                     b0=popt[2],
                     b1=popt[3]
                 ),
-                F_exact=F.copy(),
+                F_sampled=F.copy(),
                 V_sampled=V.copy()
             )
             return nonlinear_fit

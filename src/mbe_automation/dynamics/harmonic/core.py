@@ -298,9 +298,9 @@ def equilibrium_curve(
     mbe_automation.storage.save_data(
         df_eos,
         dataset,
-        key="quasi_harmonic/equation_of_state"
+        key="quasi_harmonic/eos_sampled"
     )
-    df_eos.to_csv(os.path.join(work_dir, "equation_of_state.csv"))
+    df_eos.to_csv(os.path.join(work_dir, "eos_sampled.csv"))
     #
     # Select high-quality data points on the F(V) curve
     # according to the filtering criteria
@@ -400,10 +400,16 @@ def equilibrium_curve(
             kJ_mol_Angs3_to_GPa = (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa
             p_thermal_eos[i] = dFdV(V_eos[i]) * kJ_mol_Angs3_to_GPa # GPa
 
+    mbe_automation.storage.save_eos_curves(
+        F_tot_curves=F_tot_curves,
+        temperatures=temperatures,
+        dataset=dataset,
+        key="quasi_harmonic/eos_interpolated"
+    )
     mbe_automation.dynamics.harmonic.plot.eos_curves(
-        F_tot_curves,
-        temperatures,
-        work_dir
+        dataset=dataset,
+        key="quasi_harmonic/eos_interpolated",
+        save_path=os.path.join(work_dir, "eos_curves.png")
     )
         
     df = pd.DataFrame({
