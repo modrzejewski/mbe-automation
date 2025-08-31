@@ -92,7 +92,7 @@ def save_fbz_path(
         )
         group.create_dataset(
             name="labels",
-            data=np.array([s.encode("utf-8") for s in band_structure.labels])
+            data=np.array([s.encode("utf-8") for s in band_structure.labels]),
             dtype=h5py.string_dtype(encoding="utf-8")
         )
         for i in range(n_segments):
@@ -227,19 +227,21 @@ def display(dataset):
 
 #     V_sampled = np.zeros((n_temperatures, n_volumes))
 #     F_exact = np.zeros((n_temperatures, n_volumes))
-#     F_interp = 
+#     F_interp = np.zeros((n_temperatures, n_interp))
+#     V_interp = np.linspace(np.min(V_sampled), np.max(V_sampled), 200)
+#     V_min = np.zeros(n_temperatures) 
+#     F_min = np.zeros(n_temperatures)
 #     for i, fit in enumerate(F_tot_curves):
-#         V_sampled[i] = fit.V_sampled
-#         F_exact[i] = fit.F_exact
-        
-
-#     V_min = np.min(V_sampled)
-#     V_max = np.max(V_sampled)
-
-#     V_smooth = np.linspace(V_min_range, V_max_range, 200)
-#     F_smooth = fit_result.F_interp(V_smooth)
+#         V_sampled[i, :] = fit.V_sampled[:]
+#         F_exact[i, :] = fit.F_exact[:]
+#         F_interp[i, :] = fit.F_interp(V_interp)
+#         if fit.min_found:
+#             V_min[i] = fit.V_min
+#             F_min[i] = fit.F_min
+#         else:
+#             V_min[i] = np.nan
+#             F_min[i] = np.nan
     
-
     
 #     fig, ax = plt.subplots(figsize=(8, 6))
 
@@ -277,6 +279,7 @@ def display(dataset):
 #                 color=color,
 #                 linestyle='-'
 #             )
+
             
 #     equilibria = np.array([
 #         (fit.V_min, fit.F_min) for fit in F_tot_curves if fit.min_found
