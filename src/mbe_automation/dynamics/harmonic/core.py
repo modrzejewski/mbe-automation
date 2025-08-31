@@ -178,7 +178,7 @@ def equilibrium_curve(
         relax_algo_fallback,
         supercell_displacement,
         automatic_primitive_cell,
-        properties_dir,
+        work_dir,
         pressure_range,
         volume_range,
         equation_of_state,
@@ -193,7 +193,7 @@ def equilibrium_curve(
         dataset
 ):
 
-    geom_opt_dir = os.path.join(properties_dir, "relaxation")
+    geom_opt_dir = os.path.join(work_dir, "relaxation")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     V0 = unit_cell_V0.get_volume()
@@ -283,7 +283,7 @@ def equilibrium_curve(
             temperatures,
             imaginary_mode_threshold,
             space_group=space_group_V,
-            properties_dir=properties_dir,
+            work_dir=work_dir,
             dataset=dataset,
             system_label=label
         )
@@ -300,7 +300,7 @@ def equilibrium_curve(
         dataset,
         key="quasi_harmonic/equation_of_state"
     )
-    df_eos.to_csv(os.path.join(properties_dir, "equation_of_state.csv"))
+    df_eos.to_csv(os.path.join(work_dir, "equation_of_state.csv"))
     #
     # Select high-quality data points on the F(V) curve
     # according to the filtering criteria
@@ -403,7 +403,7 @@ def equilibrium_curve(
     mbe_automation.dynamics.harmonic.plot.eos_curves(
         F_tot_curves,
         temperatures,
-        properties_dir
+        work_dir
     )
         
     df = pd.DataFrame({

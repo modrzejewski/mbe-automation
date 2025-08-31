@@ -2,7 +2,8 @@ import os
 import os.path
 import stat
 import math
-from . import directory_structure
+
+from mbe_automation import directory_structure
 
 def Make(QueueDirs, QueueMainScript, ClusterTypes, MonomerRelaxation,
          TemplateFile, InpDirs, LogDirs, Method):

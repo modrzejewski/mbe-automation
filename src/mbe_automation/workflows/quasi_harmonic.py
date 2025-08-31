@@ -37,8 +37,8 @@ def run(config: QuasiHarmonicConfig):
     else:
         mbe_automation.display.framed("Harmonic properties")
         
-    os.makedirs(config.properties_dir, exist_ok=True)
-    geom_opt_dir = os.path.join(config.properties_dir, "relaxation")
+    os.makedirs(config.work_dir, exist_ok=True)
+    geom_opt_dir = os.path.join(config.work_dir, "relaxation")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     label_crystal = "crystal_input"
@@ -143,7 +143,7 @@ def run(config: QuasiHarmonicConfig):
         config.temperatures,
         config.imaginary_mode_threshold,
         space_group=space_group_V0,
-        properties_dir=config.properties_dir,
+        work_dir=config.work_dir,
         dataset=config.dataset,
         system_label=label_crystal)
     df_molecule = mbe_automation.dynamics.harmonic.data.molecule(
@@ -164,7 +164,7 @@ def run(config: QuasiHarmonicConfig):
         config.dataset,
         key="quasi_harmonic/no_thermal_expansion"
     )
-    df_harmonic.to_csv(os.path.join(config.properties_dir, "no_thermal_expansion.csv"))
+    df_harmonic.to_csv(os.path.join(config.work_dir, "no_thermal_expansion.csv"))
     n_atoms_molecule = len(molecule)
     if not config.thermal_expansion:
         print("Harmonic calculations completed")
@@ -196,7 +196,7 @@ def run(config: QuasiHarmonicConfig):
             config.relax_algo_fallback,
             config.supercell_displacement,
             config.automatic_primitive_cell,
-            config.properties_dir,
+            config.work_dir,
             config.pressure_range,
             config.volume_range,
             config.equation_of_state,
@@ -283,7 +283,7 @@ def run(config: QuasiHarmonicConfig):
             temperatures=np.array([T]),
             imaginary_mode_threshold=config.imaginary_mode_threshold, 
             space_group=space_group_T,
-            properties_dir=config.properties_dir,
+            work_dir=config.work_dir,
             dataset=config.dataset,
             system_label=label_crystal
         )
@@ -311,7 +311,7 @@ def run(config: QuasiHarmonicConfig):
         config.dataset,
         key="quasi_harmonic/thermal_expansion"
     )
-    df_quasi_harmonic.to_csv(os.path.join(config.properties_dir, "thermal_expansion.csv"))
+    df_quasi_harmonic.to_csv(os.path.join(config.work_dir, "thermal_expansion.csv"))
 
     F_tot_diff = (df_crystal_eos["F_tot_crystal_eos (kJ/mol/unit cell)"]
                   - df_crystal_qha["F_tot_crystal (kJ/mol/unit cell)"])

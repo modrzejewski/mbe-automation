@@ -92,13 +92,14 @@ class QuasiHarmonicConfig:
     relax_algo_primary: Literal["PreconLBFGS", "PreconFIRE"] = "PreconLBFGS"
     relax_algo_fallback: Literal["PreconLBFGS", "PreconFIRE"] = "PreconFIRE"
                                    #
-                                   # Directory to store processed results: plots,
-                                   # tables, etc.
+                                   # Directory where files are stored
+                                   # at runtime
                                    #
-    properties_dir: str = "./"
+    work_dir: str = "./"
                                    #
-                                   # HDF5 dataset with outputs of property
-                                   # calculation
+                                   # The main result of the calculations:
+                                   # a single HDF5 file with all data computed
+                                   # for the physical system
                                    #
     dataset: str = "./properties.hdf5"
                                    #
@@ -281,7 +282,7 @@ class QuasiHarmonicConfig:
     verbose: int = 0
                                    
     @classmethod
-    def for_model(cls,
+    def from_template(cls,
                   model_name: Literal["default", "MACE", "UMA"],
                   unit_cell: Atoms,
                   molecule: Atoms,

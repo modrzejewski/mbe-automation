@@ -117,7 +117,7 @@ def band_structure(
 def eos_curves(
         F_tot_curves,
         temperatures,
-        properties_dir
+        work_dir
 ):
     """
     Plots the Helmholtz free energy vs. volume for multiple temperatures.
@@ -134,7 +134,7 @@ def eos_curves(
         to a different temperature.
     temperatures : array-like
         The list of temperatures corresponding to the fits in F_tot_curves.
-    properties_dir : str
+    work_dir : str
         The directory where the output plot 'eos_curves.png' will be saved.
     """
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -208,7 +208,7 @@ def eos_curves(
         cbar.set_label('Temperature (K)', fontsize=14)
 
     plt.tight_layout()
-    output_path = os.path.join(properties_dir, "eos_curves.png")
+    output_path = os.path.join(work_dir, "eos_curves.png")
     plt.savefig(output_path, dpi=300)
     plt.close(fig)
 

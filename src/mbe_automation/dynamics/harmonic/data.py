@@ -186,7 +186,7 @@ def crystal(
         temperatures,
         imaginary_mode_threshold,
         space_group,
-        properties_dir,
+        work_dir,
         dataset,
         system_label
 ):
@@ -225,7 +225,7 @@ def crystal(
     mbe_automation.dynamics.harmonic.plot.band_structure(
         dataset=dataset,
         key=f"quasi_harmonic/phonons/fbz_path/{system_label}",
-        save_path=os.path.join(properties_dir, "phonons", "fbz_path", f"{system_label}.png"),
+        save_path=os.path.join(work_dir, "phonons", "fbz_path", f"{system_label}.png"),
         omega_max=10.0 # THz
     )
 
