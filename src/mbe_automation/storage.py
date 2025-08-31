@@ -2,6 +2,7 @@ import pandas as pd
 from phonopy import Phonopy
 import h5py
 import numpy as np
+import numpy.typing as npt
 from collections import namedtuple
 import os
 
@@ -29,6 +30,20 @@ EOSCurves = namedtuple(
         "F_min"
     ]
 )
+
+Structure = namedtuple(
+    "Structure",
+    [
+        "positions",
+        "atomic_numbers",
+        "masses",
+        "cell",
+        "n_frames",
+        "n_atoms",
+        "periodic"
+    ]
+)
+
 
 def save_data(
         df,
@@ -311,3 +326,69 @@ def read_eos_curves(
         )
 
     return eos_curves
+
+
+def save_structure(
+        dataset: str,
+        key: str,
+        positions: npt.NDArray[np.floating],
+        atomic_numbers: npt.NDArray[np.integer],
+        masses: npt.NDArray[np.floating],
+        cell: npt.NDArray[np.floating] | None=None):
+
+    if positions.ndim == 2:
+        n_frames = 1
+        n_atoms = positions.shape[0]
+    elif positions.ndim == 3:
+        n_frames = positions.shape[0]
+        n_atoms = positions.shape[1]
+    else:
+        raise ValueError(
+            f"positions array must have rank 2 or 3, but has rank {positions.ndim}"
+        )
+
+    with h5py.File(dataset, "a") as f:
+        if key in f:
+            del f[key]
+        group = f.require_group(key)
+
+        group.create_dataset(
+            name="positions (Å)",
+            data=positions
+        )
+        group.create_dataset(
+            name="atomic_numbers",
+            data=atomic_numbers
+        )
+        group.create_dataset(
+            name="masses (u)",
+            data=masses
+        )
+        is_periodic = (cell is not None)
+        if is_periodic:
+            group.create_dataset(
+                name="cell (Å)",
+                data=cell
+            )
+
+        group.attrs["n_frames"] = n_frames
+        group.attrs["n_atoms"] = n_atoms
+        group.attrs["periodic"] = is_periodic
+
+
+def read_structure(dataset, key):
+    
+    with h5py.File(dataset, "r") as f:
+        group = f[key]
+        is_periodic = group.attrs["periodic"]
+        structure = Structure(
+            positions=group["positions (Å)"][...],
+            atomic_numbers=group["atomic_numbers"][...],
+            masses=group["masses (u)"][...],
+            cell=(group["cell (Å)"][...] if is_periodic else None),
+            n_frames=group.attrs["n_frames"],
+            n_atoms=group.attrs["n_atoms"],
+            periodic=is_periodic
+        )
+        
+    return structure

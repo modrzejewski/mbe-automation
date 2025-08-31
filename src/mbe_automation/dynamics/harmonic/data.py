@@ -229,6 +229,15 @@ def crystal(
         freq_max_thz=10.0 # THz
     )
 
+    mbe_automation.storage.save_structure(
+        dataset=dataset,
+        key=f"quasi_harmonic/structures/{system_label}",
+        positions=unit_cell.get_positions(),
+        atomic_numbers=unit_cell.get_atomic_numbers(),
+        masses=unit_cell.get_masses(),
+        cell=unit_cell.get_cell()
+    )
+
     interp_mesh = phonons.mesh.mesh_numbers
     
     df = pd.DataFrame({
