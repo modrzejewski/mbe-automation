@@ -226,7 +226,7 @@ def crystal(
         dataset=dataset,
         key=f"quasi_harmonic/phonons/fbz_path/{system_label}",
         save_path=os.path.join(work_dir, "phonons", "fbz_path", f"{system_label}.png"),
-        omega_max=10.0 # THz
+        freq_max_thz=10.0 # THz
     )
 
     interp_mesh = phonons.mesh.mesh_numbers
