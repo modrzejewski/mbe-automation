@@ -1,4 +1,4 @@
-from collections import namedtuple
+from dataclasses import dataclass
 import os
 import ase.thermochemistry
 import ase.units
@@ -11,15 +11,13 @@ import mbe_automation.structure.crystal
 import mbe_automation.dynamics.harmonic.plot
 import mbe_automation.storage
 
-FBZAnalysis = namedtuple(
-    "FBZAnalysis", 
-    [
-        "acoustic_freqs_real",
-        "optical_freqs_real",
-        "acoustic_freq_min_thz",
-        "optical_freq_min_thz"
-    ]
-)
+@dataclass
+class FBZAnalysis:
+    acoustic_freqs_real: bool
+    optical_freqs_real: bool
+    acoustic_freq_min_thz: float
+    optical_freq_min_thz: float
+
 
 def detect_imaginary_modes(
         phonons,
@@ -70,18 +68,13 @@ def detect_imaginary_modes(
         print(f"{thresh_str:<15}   {mode:15} {band_indices_str}")
     print(line)
 
-    acoustic_freqs_real = (len(significant_imaginary_acoustic) == 0)
-    optical_freqs_real = (len(significant_imaginary_optical) == 0)
-    acoustic_freq_min_thz = np.min(acoustic_freqs)
-    optical_freq_min_thz = np.min(optical_freqs)
-         
     return FBZAnalysis(
-        acoustic_freqs_real,
-        optical_freqs_real,
-        acoustic_freq_min_thz,
-        optical_freq_min_thz
+        acoustic_freqs_real = (len(significant_imaginary_acoustic) == 0),
+        optical_freqs_real = (len(significant_imaginary_optical) == 0),
+        acoustic_freq_min_thz = np.min(acoustic_freqs),
+        optical_freq_min_thz = np.min(optical_freqs)
     )
-
+         
     
 def generate_fbz_path(
         phonons,
