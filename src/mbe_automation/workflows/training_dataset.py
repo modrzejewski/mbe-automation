@@ -1,3 +1,11 @@
+import mace.calculators
+import os
+import os.path
+import ase.units
+import numpy as np
+import pandas as pd
+import h5py
+
 import mbe_automation.ml.descriptors.mace
 import mbe_automation.ml.training_data
 import mbe_automation.ml.data_clustering
@@ -6,14 +14,7 @@ import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.display
 from mbe_automation.configs.training import TrainingConfig
-from mbe_automation.configs.properties import PropertiesConfig
-import mace.calculators
-import os
-import os.path
-import ase.units
-import numpy as np
-import pandas as pd
-import h5py
+import mbe_automation.storage
 
 def run(config: TrainingConfig):
 
@@ -124,6 +125,6 @@ def run(config: TrainingConfig):
     #
     # Print out the structure of the HDF5 file
     #
-    mbe_automation.ml.training_data.visualize_hdf5(
+    mbe_automation.storage.display(
         config.hdf5_dataset
     )

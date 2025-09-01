@@ -86,20 +86,22 @@ class QuasiHarmonicConfig:
     max_force_on_atom: float = 1.0E-4
                                    #
                                    # Algorithms applied for structure
-                                   # relaxation
+                                   # relaxation. If relax_algo_primary
+                                   # fails, relax_algo_fallback is used.
                                    #
     relax_algo_primary: Literal["PreconLBFGS", "PreconFIRE"] = "PreconLBFGS"
     relax_algo_fallback: Literal["PreconLBFGS", "PreconFIRE"] = "PreconFIRE"
                                    #
-                                   # Directory to store processed results: plots,
-                                   # tables, etc.
+                                   # Directory where files are stored
+                                   # at runtime
                                    #
-    properties_dir: str = "./"
+    work_dir: str = "./"
                                    #
-                                   # HDF5 dataset with outputs of property
-                                   # calculation
+                                   # The main result of the calculations:
+                                   # a single HDF5 file with all data computed
+                                   # for the physical system
                                    #
-    hdf5_dataset: str = "./properties.hdf5"
+    dataset: str = "./properties.hdf5"
                                    #
                                    # Minimum point-periodic image distance
                                    # in the supercell used to compute phonons.
@@ -178,8 +180,9 @@ class QuasiHarmonicConfig:
                                    #
     force_constants_cutoff_radius: float | Literal["auto"] | None = None
                                    #
-                                   # Scaling factors used to sample volumes around
-                                   # the reference volume at T=0K.
+                                   # Scaling factors used to sample volumes w.r.t.
+                                   # the reference cell volume V0 obtained by relaxing
+                                   # the input structure (see relax_input_cell).
                                    #
                                    # Recommendations from the literature:
                                    #
@@ -191,17 +194,15 @@ class QuasiHarmonicConfig:
                                    # 2. V/V0=0.97 up to V/V0=1.06 according to the manual
                                    # of CRYSTAL
                                    #
-                                   # A robust choice is to specify a wide range of volumes, e.g.,
-                                   # 0.96...1.12 V/V0. The fitting subroutine will automatically
-                                   # apply proximity weights in such a way that only the points
-                                   # near the minimum at each temperature contribute significantly
-                                   # to the fitted parameters.
+                                   # A robust but expensive choice is to specify a wide
+                                   # range of volumes and let the fitting subroutine
+                                   # apply proximity weights centered around
+                                   # the equilibrium data point.
                                    #
     volume_range: npt.NDArray[np.floating] = field(default_factory=lambda:
                                                     np.array([
                                                         0.96, 0.97, 0.98, 0.99, 1.00, 1.01, 1.02,
-                                                        1.03, 1.04, 1.05, 1.06, 1.07, 1.08, 1.09,
-                                                        1.10, 1.11, 1.12
+                                                        1.03, 1.04, 1.05, 1.06, 1.07, 1.08
                                                     ]))
                                    #
                                    # Range of external isotropic pressures applied
@@ -225,9 +226,18 @@ class QuasiHarmonicConfig:
     pressure_range: npt.NDArray[np.floating] = field(default_factory=lambda:
                                                      np.array([0.2, 0.0, -0.2, -0.3, -0.4, -0.5, -0.6]))
                                    #
+                                   # Relaxation of the input structure
+                                   #
+                                   # (1) for thermal expansion calculations
+                                   #     must be either full or constant_volume.
+                                   # (2) for harmonic calculations without thermal
+                                   #     expansion all three settings are allowed.
+                                   #
+    relax_input_cell: Literal["full", "constant_volume", "only_atoms"] = "constant_volume"
+                                   #
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.
-                                   #
+                                   #                                   
     equation_of_state: Literal["birch_murnaghan", "vinet", "polynomial"] = "polynomial"
                                    #
                                    # Algorithm used to generate points on
@@ -272,7 +282,7 @@ class QuasiHarmonicConfig:
     verbose: int = 0
                                    
     @classmethod
-    def for_model(cls,
+    def from_template(cls,
                   model_name: Literal["default", "MACE", "UMA"],
                   unit_cell: Atoms,
                   molecule: Atoms,
