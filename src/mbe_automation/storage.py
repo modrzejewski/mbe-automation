@@ -1,48 +1,40 @@
+from dataclasses import dataclass
+from typing import List
 import pandas as pd
 from phonopy import Phonopy
 import h5py
 import numpy as np
 import numpy.typing as npt
-from collections import namedtuple
 import os
 
-FBZPath = namedtuple(
-    "FBZPath", 
-    [
-        "kpoints",
-        "frequencies",
-        "eigenvectors",
-        "path_connections",
-        "labels",
-        "distances"
-    ]
-)
+@dataclass
+class FBZPath:
+    kpoints: List[npt.NDArray[np.floating]]
+    frequencies: List[npt.NDArray[np.floating]]
+    eigenvectors: List[npt.NDArray[np.complex_]]
+    path_connections: npt.NDArray[np.bool_]
+    labels: npt.NDArray[np.str_]
+    distances: List[npt.NDArray[np.floating]]
 
-EOSCurves = namedtuple(
-    "EOSCurves",
-    [
-        "temperatures",
-        "V_sampled",
-        "F_sampled",
-        "V_interp",
-        "F_interp",
-        "V_min",
-        "F_min"
-    ]
-)
+@dataclass
+class EOSCurves:
+    temperatures: npt.NDArray[np.floating]
+    V_sampled: npt.NDArray[np.floating]
+    F_sampled: npt.NDArray[np.floating]
+    V_interp: npt.NDArray[np.floating]
+    F_interp: npt.NDArray[np.floating]
+    V_min: npt.NDArray[np.floating]
+    F_min: npt.NDArray[np.floating]
 
-Structure = namedtuple(
-    "Structure",
-    [
-        "positions",
-        "atomic_numbers",
-        "masses",
-        "cell",
-        "n_frames",
-        "n_atoms",
-        "periodic"
-    ]
-)
+@dataclass
+class Structure:
+    positions: npt.NDArray[np.floating]
+    atomic_numbers: npt.NDArray[np.integer]
+    masses: npt.NDArray[np.floating]
+    cell: npt.NDArray[np.floating] | None
+    n_frames: int
+    n_atoms: int
+    periodic: bool
 
 
 def save_data(

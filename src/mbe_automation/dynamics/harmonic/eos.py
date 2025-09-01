@@ -1,27 +1,27 @@
+from dataclasses import dataclass
+from typing import Callable
+import numpy.typing as npt
 from numpy.polynomial.polynomial import Polynomial
 import scipy.optimize
-from collections import namedtuple
 import functools
 import numpy as np
 import ase.units
 
-EOSFitResults = namedtuple(
-    "EOSFitResults", 
-    [
-        "F_min", 
-        "V_min", 
-        "B", 
-        "min_found", 
-        "min_extrapolated",
-        "curve_type",
-        "F_interp",
-        "V_sampled",
-        "F_sampled"
-    ]
-)
+@dataclass
+class EOSFitResults:
+    F_min: float
+    V_min: float
+    B: float
+    min_found: bool
+    min_extrapolated: bool
+    curve_type: str
+    F_interp: Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]] | None
+    V_sampled: npt.NDArray[np.floating]
+    F_sampled: npt.NDArray[np.floating]
+
 
 def birch_murnaghan(volume, e0, v0, b0, b1):
-        """BirchMurnaghan equation from PRB 70, 224107."""
+        """Birch-Murnaghan equation from PRB 70, 224107."""
         eta = (v0 / volume) ** (1 / 3)
         return e0 + 9 * b0 * v0 / 16 * (eta**2 - 1) ** 2 * (6 + b1 * (eta**2 - 1.0) - 4 * eta**2)
 
