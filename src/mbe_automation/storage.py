@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple
 import pandas as pd
 from phonopy import Phonopy
 import h5py
@@ -384,3 +384,26 @@ def read_structure(dataset, key):
         )
         
     return structure
+
+
+def read_gamma_point_eigenvecs(
+        dataset: str,
+        key: str
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex_]]:
+    """
+    Read phonon frequencies and eigenvectors at the Gamma point (k=[0,0,0]).
+    """
+
+    with h5py.File(dataset, "r") as f:
+        group = f[key]
+        n_segments = group.attrs["n_segments"]
+
+        for i in range(n_segments):
+            kpoints = group[f"kpoints_{i}"][...]
+            for j, kpoint in enumerate(kpoints):
+                if np.allclose(kpoint, [0, 0, 0]):
+                    frequencies = group[f"frequencies_{i} (THz)"][j]
+                    eigenvectors = group[f"eigenvectors_{i}"][j]
+                    return frequencies, eigenvectors
+
+        raise ValueError(f"Γ point not found in dataset '{dataset}' at key '{key}'.")

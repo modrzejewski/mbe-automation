@@ -106,7 +106,7 @@ def crystal(unit_cell,
                 )
             max_force = np.abs(system_to_optimize.get_forces()).max()
             if max_force < max_force_on_atom:
-                print(f"{algo} converged with max residual force = {max_force:.1e} eV/Å", flush=True)
+                print(f"Converged with max residual force = {max_force:.1e} eV/Å", flush=True)
                 break
             else:
                 warnings.warn(f"{algo} finished but did not converge (max force = {max_force:.1e} eV/Å)")
@@ -125,7 +125,7 @@ def crystal(unit_cell,
         space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
 
     max_force = np.abs(relaxed_system.get_forces()).max()
-    print(f"Relaxation completed with max residual force = {max_force:.1e} eV/Å", flush=True)
+    print(f"Final max residual force = {max_force:.1e} eV/Å", flush=True)
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
@@ -183,7 +183,7 @@ def isolated_molecule(molecule,
             
             max_force = np.abs(system_to_optimize.get_forces()).max()
             if max_force < max_force_on_atom:
-                print(f"{algo} converged with max residual force = {max_force:.1e} eV/Å", flush=True)
+                print(f"Converged with max residual force = {max_force:.1e} eV/Å", flush=True)
                 break
             else:
                 warnings.warn(f"{algo} finished but did not converge (max force = {max_force:.1e} eV/Å)")
@@ -191,9 +191,6 @@ def isolated_molecule(molecule,
             warnings.warn(f"{algo} failed with an error: {e}")
     else:
         raise RuntimeError("All optimization algorithms failed")
-    
-    max_force = np.abs(relaxed_molecule.get_forces()).max()
-    print(f"Relaxation completed with max residual force = {max_force:.1e} eV/Å", flush=True)
     
     return relaxed_molecule
 
