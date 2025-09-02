@@ -11,8 +11,8 @@ import os
 class FBZPath:
     kpoints: List[npt.NDArray[np.floating]]
     frequencies: List[npt.NDArray[np.floating]]
-    eigenvectors: List[npt.NDArray[np.complex_]]
-    path_connections: npt.NDArray[np.bool_]
+    eigenvectors: List[npt.NDArray[np.complex128]]
+    path_connections: npt.NDArray[np.bool]
     labels: npt.NDArray[np.str_]
     distances: List[npt.NDArray[np.floating]]
 
@@ -31,12 +31,54 @@ class Structure:
     positions: npt.NDArray[np.floating]
     atomic_numbers: npt.NDArray[np.integer]
     masses: npt.NDArray[np.floating]
-    cell: npt.NDArray[np.floating] | None
+    cell_vectors: npt.NDArray[np.floating] | None
     n_frames: int
     n_atoms: int
-    periodic: bool
+    periodic: bool = False
+    def __post_init__(cls):
+        if cls.cell_vectors is None:
+            cls.periodic = False
+        else:
+            cls.periodic = True
 
+@dataclass
+class Trajectory(Structure):
+    ensemble: Literal["NPT", "NVT"]
+    time: npt.NDArray[np.floating]
+    temperature: npt.NDArray[np.floating]
+    pressure: npt.NDArray[np.floating] | None
+    volume: npt.NDArray[np.floating] | None
+    forces: npt.NDArray[np.floating]
+    E_kin: npt.NDArray[np.floating]
+    E_pot: npt.NDArray[np.floating]
 
+    @classmethod
+    def empty(
+            cls,
+            n_atoms: int,
+            n_frames: int,
+            ensemble: Literal["NPT", "NVT"],
+            periodic: bool
+    ):
+        return cls(
+            ensemble=ensemble,
+            n_atoms=n_atoms,
+            n_frames=n_frames,
+            periodic=periodic,
+            positions=np.zeros((n_frames, n_atoms, 3)),
+            forces=np.zeros((n_frames, n_atoms, 3)),
+            atomic_numbers=np.zeros(n_atoms, dtype=np.integer),
+            masses=np.zeros(n_atoms),
+            cell_vectors=(np.zeros((n_frames, 3, 3)) if periodic else None),
+            time=np.zeros(n_frames),
+            temperature=np.zeros(n_frames),
+            pressure=(np.zeros(n_frames) if ensemble=="NPT" else None),
+            volume=(np.zeros(n_frames) if ensemble=="NPT" else None),
+            E_kin=np.zeros(n_frames),
+            E_pot=np.zeros(n_frames)
+        )
+
+        
 def save_data(
         df,
         dataset,
@@ -326,7 +368,7 @@ def save_structure(
         positions: npt.NDArray[np.floating],
         atomic_numbers: npt.NDArray[np.integer],
         masses: npt.NDArray[np.floating],
-        cell: npt.NDArray[np.floating] | None=None):
+        cell_vectors: npt.NDArray[np.floating] | None=None):
 
     if positions.ndim == 2:
         n_frames = 1
@@ -356,11 +398,11 @@ def save_structure(
             name="masses (u)",
             data=masses
         )
-        is_periodic = (cell is not None)
+        is_periodic = (cell_vectors is not None)
         if is_periodic:
             group.create_dataset(
-                name="cell (Å)",
-                data=cell
+                name="cell_vectors (Å)",
+                data=cell_vectors
             )
 
         group.attrs["n_frames"] = n_frames
@@ -377,7 +419,7 @@ def read_structure(dataset, key):
             positions=group["positions (Å)"][...],
             atomic_numbers=group["atomic_numbers"][...],
             masses=group["masses (u)"][...],
-            cell=(group["cell (Å)"][...] if is_periodic else None),
+            cell_vectors=(group["cell_vectors (Å)"][...] if is_periodic else None),
             n_frames=group.attrs["n_frames"],
             n_atoms=group.attrs["n_atoms"],
             periodic=is_periodic
@@ -386,10 +428,101 @@ def read_structure(dataset, key):
     return structure
 
 
+def save_trajectory(
+        dataset: str,
+        key: str,
+        traj: Trajectory
+):
+
+    with h5py.File(dataset, "a") as f:
+        if key in f:
+            del f[key]
+
+        group = f.require_group(key)
+        group.attrs["ensemble"] = traj.ensemble
+        group.attrs["n_frames"] = traj.n_frames
+        group.attrs["n_atoms"] = traj.n_atoms
+        group.attrs["periodic"] = traj.periodic
+
+        group.create_dataset(
+            name="time (fs)",
+            data=traj.time
+        )
+        group.create_dataset(
+            name="T (K)",
+            data=traj.temperature
+        )
+        if traj.ensemble == "NPT":
+            group.create_dataset(
+                name="p (GPa)",
+                data=traj.pressure
+            )
+            group.create_dataset(
+                name="V (Å³/atom)",
+                data=traj.volume
+            )
+        group.create_dataset(
+            name="forces (eV/Å)",
+            data=traj.forces
+        )
+        group.create_dataset(
+            name="E_kin (eV/atom)",
+            data=traj.E_kin
+        )
+        group.create_dataset(
+            name="E_pot (eV/atom)",
+            data=traj.E_pot
+        )
+        group.create_dataset(
+            name="positions (Å)",
+            data=traj.positions
+        )
+        group.create_dataset(
+            name="atomic_numbers",
+            data=traj.atomic_numbers
+        )
+        group.create_dataset(
+            name="masses (u)",
+            data=traj.masses
+        )
+        if traj.periodic:
+            group.create_dataset(
+                name="cell_vectors (Å)",
+                data=traj.cell_vectors
+            )
+
+            
+def read_trajectory(dataset: str, key: str) -> Trajectory:
+    
+    with h5py.File(dataset, "r") as f:
+        group = f[key]
+        is_periodic = group.attrs["periodic"]
+        ensemble = group.attrs["ensemble"]
+        traj = Trajectory(
+            ensemble=ensemble,
+            positions=group["positions (Å)"][...],
+            atomic_numbers=group["atomic_numbers"][...],
+            masses=group["masses (u)"][...],
+            cell_vectors=(group["cell_vectors (Å)"][...] if is_periodic else None),
+            n_frames=group.attrs["n_frames"],
+            n_atoms=group.attrs["n_atoms"],
+            periodic=is_periodic,
+            time=group["time (fs)"][...],
+            temperature=group["T (K)"][...],
+            pressure=(group["p (GPa)"][...] if ensemble=="NPT" else None),
+            volume=(group["V (Å³/atom)"][...] if ensemble=="NPT" else None),
+            forces=group["forces (eV/Å)"][...],
+            E_kin=group["E_kin (eV/atom)"][...],
+            E_pot=group["E_pot (eV/atom)"][...]
+        )
+        
+    return traj
+
+
 def read_gamma_point_eigenvecs(
         dataset: str,
         key: str
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex_]]:
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
     """
     Read phonon frequencies and eigenvectors at the Gamma point (k=[0,0,0]).
     """
