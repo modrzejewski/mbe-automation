@@ -9,7 +9,7 @@ dependencies = [
   "torch>=2.8.0",
   "numpy",
   "scipy",
-  "ase",
+  "ase>=3.26.0",
   "dscribe",
   "mace-torch",
   "matplotlib",

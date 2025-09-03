@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Tuple, Literal
 import pandas as pd
 from phonopy import Phonopy
 import h5py
@@ -35,14 +35,17 @@ class Structure:
     n_frames: int
     n_atoms: int
     periodic: bool = False
-    def __post_init__(cls):
-        if cls.cell_vectors is None:
-            cls.periodic = False
+    def __post_init__(self):
+        if self.cell_vectors is None:
+            self.periodic = False
         else:
-            cls.periodic = True
+            self.periodic = True
 
 @dataclass
 class Trajectory(Structure):
+    time_equilibration: float
+    target_temperature: float
+    terget_pressure: float | None
     ensemble: Literal["NPT", "NVT"]
     time: npt.NDArray[np.floating]
     temperature: npt.NDArray[np.floating]
@@ -59,8 +62,15 @@ class Trajectory(Structure):
             n_frames: int,
             ensemble: Literal["NPT", "NVT"],
             periodic: bool
+            time_equilibration: float
+            target_temperature: float
+            target_pressure: float | None = None
     ):
+        if ensemble == "NPT" and target_pressure is None:
+            raise ValueError("Target pressure must be specified for the NPT ensemble")
+        
         return cls(
+            time_equilibration=time_equilibration,
             ensemble=ensemble,
             n_atoms=n_atoms,
             n_frames=n_frames,
@@ -75,7 +85,9 @@ class Trajectory(Structure):
             pressure=(np.zeros(n_frames) if ensemble=="NPT" else None),
             volume=(np.zeros(n_frames) if ensemble=="NPT" else None),
             E_kin=np.zeros(n_frames),
-            E_pot=np.zeros(n_frames)
+            E_pot=np.zeros(n_frames),
+            target_temperature=target_temperature,
+            target_pressure=target_pressure
         )
 
         
@@ -126,6 +138,60 @@ def read_data(
         key=key
         )
 
+    return df
+
+
+def save_data_frame(
+        dataset: str,
+        key: str,
+        df: pd.DataFrame
+):
+    
+    with h5py.File(dataset, "a") as f:
+        if key in f:
+            del f[key]
+        
+        group = f.create_group(key)
+        
+        for column_label in df.columns:
+            column = df[column_label]
+
+            if pd.api.types.is_string_dtype(column.dtype):
+                encoded_data = column.astype(str).str.encode("utf-8").to_numpy()
+                group.create_dataset(
+                    name=column_label,
+                    data=encoded_data
+                )
+            else:
+                group.create_dataset(
+                    name=column_label,
+                    data=column.to_numpy()
+                )
+
+
+def read_data_frame(
+        dataset: str,
+        key: str,
+        columns: List[str] | Literal["all"] = "all"
+) -> pd.DataFrame:
+    
+    with h5py.File(dataset, "r") as f:
+        group = f[key]
+        
+        if columns == "all":
+            candidate_labels = list(group.keys())
+        else:
+            candidate_labels = columns
+            
+        data = {
+            label: group[label][:] 
+            for label in candidate_labels 
+            if (label in group and 
+                isinstance(group[label], h5py.Dataset) and 
+                group[label].ndim == 1)
+        }
+
+    df = pd.DataFrame(data)
     return df
 
 
@@ -443,6 +509,10 @@ def save_trajectory(
         group.attrs["n_frames"] = traj.n_frames
         group.attrs["n_atoms"] = traj.n_atoms
         group.attrs["periodic"] = traj.periodic
+        group.attrs["target_temperature (K)"] = traj.target_temperature
+        group.attrs["time_equilibratoin (fs)"] = traj.time_equilibration
+        if traj.ensemble == "NPT":
+            group.attrs["target_pressure (GPa)"] = traj.target_pressure
 
         group.create_dataset(
             name="time (fs)",
@@ -513,7 +583,10 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             volume=(group["V (Å³/atom)"][...] if ensemble=="NPT" else None),
             forces=group["forces (eV/Å)"][...],
             E_kin=group["E_kin (eV/atom)"][...],
-            E_pot=group["E_pot (eV/atom)"][...]
+            E_pot=group["E_pot (eV/atom)"][...],
+            target_temperature=group.attrs["target_temperature (K)"],
+            target_pressure=(group.attrs["target_pressure (GPa)"] if ensemble=="NPT" else None),
+            time_equilibration=group.attrs["time_equilibration (fs)"]
         )
         
     return traj

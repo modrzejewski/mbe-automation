@@ -62,7 +62,10 @@ def run(md: ClassicalMD):
         ensemble=md.ensemble,
         n_atoms=n_atoms,
         n_frames=n_samples,
-        periodic=init_conf.pbc
+        periodic=init_conf.pbc,
+        target_temperature=md.target_temperature_K,
+        target_pressure=(md.target_pressure_GPa if md.ensemble=="NPT" else None),
+        time_equilibration=md.time_equilibration_fs
     )
     traj.atomic_numbers = init_conf.get_atomic_numbers()
     traj.masses = init_conf.get_masses()
@@ -87,10 +90,12 @@ def run(md: ClassicalMD):
         traj.E_kin[sample_idx] = E_kin
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
         traj.positions[sample_idx, :, :] = dyn.atoms.get_positions()
-        traj.temperature[sample_idx] = E_kin / (3.0/2.0 * n_atoms * ase.units.kB)
+        traj.temperature[sample_idx] = E_kin / (3.0/2.0 * ase.units.kB)
         traj.time[sample_idx] = dyn.get_time() / ase.units.fs
         if md.ensemble == "NPT":
             traj.volume[sample_idx] = dyn.atoms.get_volume() / n_atoms
+            stress_tensor = dyn.atoms.get_stress(voigt=False)
+            traj.pressure[sample_idx] = -np.trace(stress_tensor) / 3.0 / ase.units.GPa
 
         current_step = dyn.nsteps
         percentage = (current_step / total_steps) * 100
@@ -101,6 +106,8 @@ def run(md: ClassicalMD):
             print(f"{traj.time[sample_idx]:.1E} fs | "
                   f"{int(percentage // display_frequency) * display_frequency:>3}% completed | "
                   f"Δt={Δt/60:.1E} min")
+
+        sample_idx += 1
 
     dyn.attach(sample, interval=n_steps_between_samples)
     t0 = time.time()
