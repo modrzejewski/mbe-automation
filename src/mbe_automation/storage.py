@@ -45,7 +45,7 @@ class Structure:
 class Trajectory(Structure):
     time_equilibration: float
     target_temperature: float
-    terget_pressure: float | None
+    target_pressure: float | None
     ensemble: Literal["NPT", "NVT"]
     time: npt.NDArray[np.floating]
     temperature: npt.NDArray[np.floating]
@@ -61,9 +61,9 @@ class Trajectory(Structure):
             n_atoms: int,
             n_frames: int,
             ensemble: Literal["NPT", "NVT"],
-            periodic: bool
-            time_equilibration: float
-            target_temperature: float
+            periodic: bool,
+            time_equilibration: float,
+            target_temperature: float,
             target_pressure: float | None = None
     ):
         if ensemble == "NPT" and target_pressure is None:
@@ -510,7 +510,7 @@ def save_trajectory(
         group.attrs["n_atoms"] = traj.n_atoms
         group.attrs["periodic"] = traj.periodic
         group.attrs["target_temperature (K)"] = traj.target_temperature
-        group.attrs["time_equilibratoin (fs)"] = traj.time_equilibration
+        group.attrs["time_equilibration (fs)"] = traj.time_equilibration
         if traj.ensemble == "NPT":
             group.attrs["target_pressure (GPa)"] = traj.target_pressure
 
