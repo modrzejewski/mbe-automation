@@ -152,6 +152,10 @@ def save_data_frame(
             del f[key]
         
         group = f.create_group(key)
+
+        if df.attrs:
+            for attr_key, attr_value in df.attrs.items():
+                group.attrs[attr_key] = attr_value
         
         for column_label in df.columns:
             column = df[column_label]
@@ -190,8 +194,10 @@ def read_data_frame(
                 isinstance(group[label], h5py.Dataset) and 
                 group[label].ndim == 1)
         }
-
+        metadata = dict(group.attrs)
+        
     df = pd.DataFrame(data)
+    df.attrs = metadata
     return df
 
 

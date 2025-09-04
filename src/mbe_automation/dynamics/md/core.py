@@ -46,7 +46,7 @@ def run(md: ClassicalMD):
             init_conf,
             timestep=md.time_step_fs * ase.units.fs,
             temperature_K=md.target_temperature_K,
-            pressure_au=md.target_pressure_GPa * ase.units.GPa / (ase.units.eV / ase.units.Angstrom**3), # eV/Å³
+            pressure_au=md.target_pressure_GPa * ase.units.GPa, # ase internal units of pressure: eV/Å³
             tdamp=md.thermostat_time_fs * ase.units.fs,
             pdamp=md.barostat_time_fs * ase.units.fs,
             tchain=md.tchain,
