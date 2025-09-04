@@ -29,7 +29,7 @@ def trajectory(
       path instead of being returned. Defaults to None.
     """
     
-    df = storage.read_data_frame(dataset=dataset, key=key)
+    df = mbe_automation.storage.read_data_frame(dataset=dataset, key=key)
 
     df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
     time_ps = df["time (fs)"] / 1000.0
