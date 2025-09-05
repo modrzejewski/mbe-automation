@@ -131,20 +131,20 @@ class Sublimation:
                                    #
                                    # Initial structure of crystal
                                    #
-    crystal: Atoms,
+    crystal: Atoms
                                    #
                                    # Initial structure of molecule
                                    #
-    molecule: Atoms,
+    molecule: Atoms
                                    #
                                    # Energy and forces calculator
                                    #
-    calculator: ASECalculator,
+    calculator: ASECalculator
                                    #
                                    # Target temperature (K) and pressure (GPa)
                                    #
-    temperature_K: float = 298.15,
-    pressure_GPa: float = 1.0E-4,
+    temperature_K: float = 298.15
+    pressure_GPa: float = 1.0E-4
                                    #
                                    # Directory where files are stored
                                    # at runtime
@@ -159,7 +159,7 @@ class Sublimation:
                                    #
                                    # Parameters of the MD propagation
                                    #
-    md_crystal: ClassicalMD,
+    md_crystal: ClassicalMD
     md_molecule: ClassicalMD
                                    #
                                    # Verbosity of the program's output.
