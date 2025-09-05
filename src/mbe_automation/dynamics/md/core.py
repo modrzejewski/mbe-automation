@@ -1,8 +1,9 @@
-import ase
-from ase.calculators.calculator import Calculator as ASECalculator
 import os
 import numpy as np
+import numpy.typing as npt
 import time
+import ase
+from ase.calculators.calculator import Calculator as ASECalculator
 from ase.md.velocitydistribution import Stationary, ZeroRotation, MaxwellBoltzmannDistribution
 from ase.md.langevin import Langevin
 from ase.md.bussi import Bussi
@@ -16,6 +17,7 @@ import mbe_automation.storage
 
 def run(
         system: ase.Atoms,
+        supercell_matrix: npt.NDArray[np.integer] | None = None,
         calculator: ASECalculator,
         target_temperature_K: float,
         target_pressure_GPa: float | None,
@@ -28,9 +30,17 @@ def run(
         "Molecular dynamics",
         md.ensemble
     ])
+
+    if system.pbc and supercell_matrix is None:
+        raise ValueError("Supercell matrix must be specified for periodic calculations")
     
     np.random.seed(42)
-    init_conf = system.copy()
+    
+    if system.pbc:
+        ase.build.make_supercell(system, supercell_matrix)
+    else:
+        init_conf = system.copy()
+        
     init_conf.calc = calculator
     if md.time_step_fs > 1.0:
         print("Warning: time step > 1 fs may be too large for accurate dynamics")

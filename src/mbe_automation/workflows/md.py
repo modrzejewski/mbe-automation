@@ -7,9 +7,10 @@ import mbe_automation.configs.md
 import mbe_automation.dynamics.md.core
 import mbe_automation.dynamics.md.data
 import mbe_automation.dynamics.md.plot
+import mbe_automation.structure.crystal
 
 def run(config: mbe_automation.configs.md.Sublimation):
-
+    
     label_molecule = f"molecule_T_{config.temperature_K:.2f}"
     mbe_automation.dynamics.md.core.run(
         system=config.molecule,
@@ -29,12 +30,28 @@ def run(config: mbe_automation.configs.md.Sublimation):
         mbe_automation.dynamics.md.plot.trajectory(
             dataset=config.dataset,
             key=f"md/trajectories/{label_molecule}",
-            save_path=os.path.join(config.work_dir, "trajectories", f"{label_molecule}.png")
+            save_path=os.path.join(
+                config.work_dir,
+                "trajectories",
+                f"{label_molecule}.png"
+            )
         )
 
     label_crystal = f"crystal_T_{config.temperature_K:.2f}_p_{config.pressure_GPa:.5f}"
+    
+    if config.supercell_matrix is None:
+        supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(
+            config.crystal,
+            config.supercell_radius,
+            config.supercell_diagonal
+        )
+    else:
+        print("Using user-provided explicit supercell matrix", flush=True)
+        supercell_matrix = config.supercell_matrix
+        
     mbe_automation.dynamics.md.core.run(
         system=config.crystal,
+        supercell_matrix=supercell_matrix,
         calculator=config.calculator,
         target_temperature_K=config.temperature_K,
         target_pressure_GPa=config.pressure_GPa,
@@ -52,7 +69,11 @@ def run(config: mbe_automation.configs.md.Sublimation):
         mbe_automation.dynamics.md.plot.trajectory(
             dataset=config.dataset,
             key=f"md/trajectories/{label_crystal}",
-            save_path=os.path.join(config.work_dir, "trajectories", f"{label_crystal}.png")
+            save_path=os.path.join(
+                config.work_dir,
+                "trajectories",
+                f"{label_crystal}.png"
+            )
         )
     
     df_sublimation = mbe_automation.dynamics.md.data.sublimation(
