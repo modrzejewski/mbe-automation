@@ -39,15 +39,15 @@ def run(config: mbe_automation.configs.md.Sublimation):
 
     label_crystal = f"crystal_T_{config.temperature_K:.2f}_p_{config.pressure_GPa:.5f}"
     
-    if config.supercell_matrix is None:
+    if config.md_crystal.supercell_matrix is None:
         supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(
             config.crystal,
-            config.supercell_radius,
-            config.supercell_diagonal
+            config.md_crystal.supercell_radius,
+            config.md_crystal.supercell_diagonal
         )
     else:
         print("Using user-provided explicit supercell matrix", flush=True)
-        supercell_matrix = config.supercell_matrix
+        supercell_matrix = config.md_crystal.supercell_matrix
         
     mbe_automation.dynamics.md.core.run(
         system=config.crystal,
