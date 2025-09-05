@@ -1,4 +1,5 @@
 import ase
+from ase.calculators.calculator import Calculator as ASECalculator
 import os
 import numpy as np
 import time
@@ -10,10 +11,18 @@ from ase.io.trajectory import Trajectory
 import ase.units
 
 import mbe_automation.display
-import mbe_automation.configs.md
+from  mbe_automation.configs.md import ClassicalMD
 import mbe_automation.storage
 
-def run(md: ClassicalMD):
+def run(
+        system: ase.Atoms,
+        calculator: ASECalculator,
+        target_temperature_K: float,
+        target_pressure_GPa: float | None,
+        md: ClassicalMD,
+        dataset: str,
+        system_label: str
+):
 
     mbe_automation.display.framed([
         "Molecular dynamics",
@@ -21,8 +30,8 @@ def run(md: ClassicalMD):
     ])
     
     np.random.seed(42)
-    init_conf = md.initial_configuration.copy()
-    init_conf.calc = md.calculator
+    init_conf = system.copy()
+    init_conf.calc = calculator
     if md.time_step_fs > 1.0:
         print("Warning: time step > 1 fs may be too large for accurate dynamics")
     if md.sampling_interval_fs < md.time_step_fs:
@@ -38,15 +47,15 @@ def run(md: ClassicalMD):
         dyn = Bussi(
             init_conf,
             timestep=md.time_step_fs * ase.units.fs,
-            temperature_K=md.target_temperature_K,
+            temperature_K=target_temperature_K,
             taut=md.thermostat_time_fs * ase.units.fs
         )
     elif md.ensemble == "NPT":
         dyn = MTKNPT(
             init_conf,
             timestep=md.time_step_fs * ase.units.fs,
-            temperature_K=md.target_temperature_K,
-            pressure_au=md.target_pressure_GPa * ase.units.GPa, # ase internal units of pressure: eV/Å³
+            temperature_K=target_temperature_K,
+            pressure_au=target_pressure_GPa * ase.units.GPa, # ase internal units of pressure: eV/Å³
             tdamp=md.thermostat_time_fs * ase.units.fs,
             pdamp=md.barostat_time_fs * ase.units.fs,
             tchain=md.tchain,
@@ -63,8 +72,8 @@ def run(md: ClassicalMD):
         n_atoms=n_atoms,
         n_frames=n_samples,
         periodic=init_conf.pbc,
-        target_temperature=md.target_temperature_K,
-        target_pressure=(md.target_pressure_GPa if md.ensemble=="NPT" else None),
+        target_temperature=target_temperature_K,
+        target_pressure=(target_pressure_GPa if md.ensemble=="NPT" else None),
         time_equilibration=md.time_equilibration_fs
     )
     traj.atomic_numbers = init_conf.get_atomic_numbers()
@@ -84,8 +93,8 @@ def run(md: ClassicalMD):
     def sample():
         nonlocal sample_idx
 
-        E_kin = dyn.atoms.get_kinetic_energy() / n_atoms
         E_pot = dyn.atoms.get_potential_energy() / n_atoms
+        E_kin = dyn.atoms.get_kinetic_energy() / n_atoms
         traj.E_pot[sample_idx] = E_pot
         traj.E_kin[sample_idx] = E_kin
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
@@ -115,9 +124,9 @@ def run(md: ClassicalMD):
     t1 = time.time()
 
     mbe_automation.storage.save_trajectory(
-        dataset=md.dataset,
-        key=f"md/trajectories/{md.system_name}",
-        traj
+        dataset=dataset,
+        key=f"md/trajectories/{system_label}",
+        traj=traj
     )
     print(f"MD completed in {(t1 - t0) / 60:.2f} minutes")
 

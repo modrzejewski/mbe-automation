@@ -62,7 +62,7 @@ def phonons(
         automatic_primitive_cell=True,
         symmetrize_force_constants=False,
         force_constants_cutoff_radius=None,
-        system_label=None        
+        system_label=None
 ):
 
     cuda_available = torch.cuda.is_available()
