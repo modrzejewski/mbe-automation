@@ -41,7 +41,7 @@ class Structure:
         else:
             self.periodic = True
 
-@dataclass
+@dataclass(kw_only=True)
 class Trajectory(Structure):
     time_equilibration: float
     target_temperature: float
