@@ -28,9 +28,15 @@ def trajectory(
     - save_path (str, optional): If provided, the plot is saved to this
       path instead of being returned. Defaults to None.
     """
-    
-    df = mbe_automation.storage.read_data_frame(dataset=dataset, key=key)
 
+    df = mbe_automation.storage.read_data_frame(
+        dataset=dataset,
+        key=key,
+        columns=[
+            "time (fs)", "T (K)", "E_kin (eV/atom)",
+            "E_pot (eV/atom)", "p (GPa)", "V (Å³/atom)"
+        ]
+    )
     df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
     time_ps = df["time (fs)"] / 1000.0
     
