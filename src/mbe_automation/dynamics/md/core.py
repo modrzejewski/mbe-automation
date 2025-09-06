@@ -17,7 +17,7 @@ import mbe_automation.storage
 
 def run(
         system: ase.Atoms,
-        supercell_matrix: npt.NDArray[np.integer] | None = None,
+        supercell_matrix: npt.NDArray[np.integer] | None,
         calculator: ASECalculator,
         target_temperature_K: float,
         target_pressure_GPa: float | None,
