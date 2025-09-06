@@ -141,6 +141,11 @@ class Sublimation:
                                    #
     calculator: ASECalculator
                                    #
+                                   # Parameters of the MD propagation
+                                   #
+    md_crystal: ClassicalMD
+    md_molecule: ClassicalMD
+                                   #
                                    # Target temperature (K) and pressure (GPa)
                                    #
     temperature_K: float = 298.15
@@ -156,11 +161,6 @@ class Sublimation:
                                    # for the physical system
                                    #
     dataset: str = "./properties.hdf5"
-                                   #
-                                   # Parameters of the MD propagation
-                                   #
-    md_crystal: ClassicalMD
-    md_molecule: ClassicalMD
                                    #
                                    # Verbosity of the program's output.
                                    # 0 -> suppressed warnings
