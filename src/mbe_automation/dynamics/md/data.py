@@ -14,7 +14,11 @@ def crystal(
 
     df = mbe_automation.storage.read_data_frame(
         dataset=dataset,
-        key=key
+        key=key,
+        columns=[
+            "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)",
+            "p (GPa)", "V (Å³/atom)"
+        ]
     )
     if not df.attrs["periodic"]:
         raise ValueError(f"{key} does not correspond to a periodic system")
@@ -59,7 +63,10 @@ def molecule(
 
     df = mbe_automation.storage.read_data_frame(
         dataset=dataset,
-        key=key
+        key=key,
+        columns=[
+        "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)"
+        ]
     )
     if df.attrs["periodic"]:
         raise ValueError(f"{key} corresponds to a periodic system")
