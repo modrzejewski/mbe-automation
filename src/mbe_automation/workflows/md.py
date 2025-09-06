@@ -14,6 +14,7 @@ def run(config: mbe_automation.configs.md.Sublimation):
     label_molecule = f"molecule_T_{config.temperature_K:.2f}"
     mbe_automation.dynamics.md.core.run(
         system=config.molecule,
+        supercell_matrix=None,
         calculator=config.calculator,
         target_temperature_K=config.temperature_K,
         target_pressure_GPa=None,
