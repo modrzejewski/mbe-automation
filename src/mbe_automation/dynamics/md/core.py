@@ -27,7 +27,8 @@ def run(
 ):
 
     mbe_automation.display.framed([
-        f"{md.ensemble} molecular dynamics",
+        "Classical molecular dynamics",
+        f"{md.ensemble} ensemble",
         system_label
     ])
 
@@ -89,7 +90,10 @@ def run(
     )
     traj.atomic_numbers = init_conf.get_atomic_numbers()
     traj.masses = init_conf.get_masses()
-    
+
+    print(f"temperature         {target_temperature_K:.2f} K")
+    if md.ensemble == "NPT":
+        print(f"pressure            {target_pressure_GPa:.5f} GPa")
     print(f"time_total          {md.time_total_fs:.0f} fs")
     print(f"sampling_interval   {md.sampling_interval_fs} fs")
     print(f"time_step           {md.time_step_fs} fs")

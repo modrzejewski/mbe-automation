@@ -29,25 +29,25 @@ def crystal(
     eV_to_kJ_per_mol = ase.units.eV / (ase.units.kJ / ase.units.mol)
     GPa_to_eV_per_Angs3 = ase.units.GPa / (ase.units.eV / ase.units.Angstrom**3)
     
-    df_NVT = pd.DataFrame({
+    df_NVT = pd.DataFrame([{
         "T (K)": df.attrs["target_temperature (K)"],
         "⟨T⟩_crystal (K)": production_df["T (K)"].mean(),
         "⟨E_kin⟩_crystal (kJ/mol/unit cell)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_unit_cell,
         "⟨E_pot⟩_crystal (kJ/mol/unit cell)": production_df["E_pot (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_unit_cell,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "system_label_crystal": system_label
-    })
+    }])
     if df.attrs["ensemble"] == "NPT":
         V_avg = production_df["V (Å³/atom)"].mean() * n_atoms_unit_cell # Å³/unit cell
         p_avg = production_df["p (GPa)"].mean()
         p_target = df.attrs["target_pressure (GPa)"]
         pV = p_target * GPa_to_eV_per_Angs3 * V_avg * eV_to_kJ_per_mol # kJ/mol/unit cell
-        df_NPT = pd.DataFrame({
+        df_NPT = pd.DataFrame([{
             "⟨V⟩_crystal (Å³/unit cell)": V_avg,
             "p_crystal (GPa)": p_target,
             "⟨p⟩_crystal (GPa)": p_avg,
             "p⟨V⟩_crystal (kJ/mol/unit cell)": pV
-        })
+        }])
         df = pd.concat([df_NVT, df_NPT], axis=1)
     else:
         df = df_NVT
@@ -80,7 +80,7 @@ def molecule(
     T_target = df.attrs["target_temperature (K)"]
     kbT = ase.units.kB * T_target / (ase.units.kJ / ase.units.mol) # equals pV in the ideal gas approximation
     
-    df = pd.DataFrame({
+    return pd.DataFrame([{
         "T (K)": T_target,
         "⟨T⟩_molecule (K)": production_df["T (K)"].mean(),
         "⟨E_kin⟩_molecule (kJ/mol/molecule)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
@@ -89,9 +89,7 @@ def molecule(
         "kT (kJ/mol)": kbT, # equals the pV contribution per molecule in the ideal gas approximation
         "n_atoms_molecule": n_atoms_molecule,
         "system_label_molecule": system_label
-    })
-    
-    return df
+    }])
 
 
 def sublimation(df_crystal, df_molecule):
