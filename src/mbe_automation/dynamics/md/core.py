@@ -73,10 +73,11 @@ def run(
         )
 
     n_atoms = len(init_conf)
-    n_total_steps = round(md.time_total_fs/md.time_step_fs)
-    n_steps_between_samples = round(md.sampling_interval_fs / md.time_step_fs)
-    n_samples = n_total_steps // n_steps_between_samples
 
+    n_steps_between_samples = round(md.sampling_interval_fs / md.time_step_fs)
+    n_samples = round(md.time_total_fs / md.sampling_interval_fs) + 1 # adding one because sampling is done at t=0
+    n_total_steps = (n_samples - 1) * n_steps_between_samples
+    
     traj = mbe_automation.storage.Trajectory.empty(
         ensemble=md.ensemble,
         n_atoms=n_atoms,
@@ -93,6 +94,7 @@ def run(
     print(f"sampling_interval   {md.sampling_interval_fs} fs")
     print(f"time_step           {md.time_step_fs} fs")
     print(f"n_total_steps       {n_total_steps}")
+    print(f"n_samples           {n_samples}")
 
     total_steps = round(md.time_total_fs/md.time_step_fs)
     display_frequency = 5
@@ -124,12 +126,13 @@ def run(
             Δt = milestones_time[-1] - milestones_time[-2]
             print(f"{traj.time[sample_idx]:.1E} fs | "
                   f"{int(percentage // display_frequency) * display_frequency:>3}% completed | "
-                  f"Δt={Δt/60:.1E} min")
+                  f"Δt={Δt/60:.1E} min", flush=True)
 
         sample_idx += 1
 
     dyn.attach(sample, interval=n_steps_between_samples)
     t0 = time.time()
+    print("Time propagation...", flush=True)
     dyn.run(steps=n_total_steps)
     t1 = time.time()
 
@@ -138,7 +141,7 @@ def run(
         key=f"md/trajectories/{system_label}",
         traj=traj
     )
-    print(f"MD completed in {(t1 - t0) / 60:.2f} minutes")
+    print(f"MD completed in {(t1 - t0) / 60:.2f} minutes", flush=True)
 
 
 
