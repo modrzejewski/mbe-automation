@@ -135,6 +135,6 @@ def sublimation(df_crystal, df_molecule):
         "ΔH_sub (kJ/mol/molecule)": ΔH_sub,
         "Δ⟨E_pot⟩ (kJ/mol/molecule)": ΔE_pot,
         "Δ⟨E_kin⟩ (kJ/mol/molecule)": ΔE_kin,
-        "p⟨V⟩_crystal (kJ/mol/unit cell)": pV,
+        "p⟨V⟩_crystal (kJ/mol/molecule)": pV,
         "⟨V⟩_crystal (cm³/mol/molecule)": V_molar
     })

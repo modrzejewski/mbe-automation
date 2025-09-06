@@ -27,8 +27,7 @@ def run(
 ):
 
     mbe_automation.display.framed([
-        "Classical molecular dynamics",
-        f"{md.ensemble} ensemble",
+        f"{md.ensemble} molecular dynamics",
         system_label
     ])
 

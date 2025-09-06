@@ -85,7 +85,7 @@ def run(config: mbe_automation.configs.md.Sublimation):
     del df_crystal["T (K)"]
     df_npt_nvt = pd.concat([df_sublimation, df_crystal, df_molecule], axis=1)
 
-    mbe_automation.storage.save_data(
+    mbe_automation.storage.save_data_frame(
         dataset=config.dataset,
         key="md/sublimation",
         df=df_npt_nvt
