@@ -27,17 +27,17 @@ def run(
 ):
 
     mbe_automation.display.framed([
-        "Molecular dynamics",
-        md.ensemble
+        f"{md.ensemble} molecular dynamics",
+        system_label
     ])
 
-    if system.pbc and supercell_matrix is None:
+    if np.any(system.pbc) and supercell_matrix is None:
         raise ValueError("Supercell matrix must be specified for periodic calculations")
     
     np.random.seed(42)
     
-    if system.pbc:
-        ase.build.make_supercell(system, supercell_matrix)
+    if np.any(system.pbc):
+        init_conf = ase.build.make_supercell(system, supercell_matrix)
     else:
         init_conf = system.copy()
         
