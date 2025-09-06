@@ -49,8 +49,9 @@ def run(
 
     MaxwellBoltzmannDistribution(
         init_conf,
-        temperature_K=md.target_temperature_K)
-    Stationary(init_conf)
+        temperature_K=md.target_temperature_K
+    )
+    #Stationary(init_conf)
     #ZeroRotation(init_conf)
 
     if md.ensemble == "NVT":
@@ -121,7 +122,7 @@ def run(
         traj.E_kin[sample_idx] = E_kin
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
         traj.positions[sample_idx, :, :] = dyn.atoms.get_positions()
-        traj.temperature[sample_idx] = E_kin * n_atoms / (3.0/2.0 * (n_atoms - 3) * ase.units.kB)
+        traj.temperature[sample_idx] = E_kin / (3.0/2.0 * ase.units.kB)
         traj.time[sample_idx] = dyn.get_time() / ase.units.fs
         if md.ensemble == "NPT":
             traj.volume[sample_idx] = dyn.atoms.get_volume() / n_atoms
