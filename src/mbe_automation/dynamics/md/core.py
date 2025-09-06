@@ -7,7 +7,7 @@ from ase.calculators.calculator import Calculator as ASECalculator
 from ase.md.velocitydistribution import Stationary, ZeroRotation, MaxwellBoltzmannDistribution
 from ase.md.langevin import Langevin
 from ase.md.bussi import Bussi
-from ase.md.nose_hoover_chain import MTKNPT
+from ase.md.nose_hoover_chain import MTKNPT, NoseHooverChainNVT
 from ase.io.trajectory import Trajectory
 import ase.units
 
@@ -54,12 +54,19 @@ def run(
     ZeroRotation(init_conf)
 
     if md.ensemble == "NVT":
-        dyn = Bussi(
+        dyn = NoseHooverChainNVT(
             init_conf,
             timestep=md.time_step_fs * ase.units.fs,
             temperature_K=target_temperature_K,
-            taut=md.thermostat_time_fs * ase.units.fs
+            tdamp=md.thermostat_time_fs * ase.units.fs,
+            tchain=md.tchain
         )
+        # dyn = Bussi(
+        #     init_conf,
+        #     timestep=md.time_step_fs * ase.units.fs,
+        #     temperature_K=target_temperature_K,
+        #     taut=md.thermostat_time_fs * ase.units.fs
+        # )
     elif md.ensemble == "NPT":
         dyn = MTKNPT(
             init_conf,
@@ -118,7 +125,10 @@ def run(
         traj.time[sample_idx] = dyn.get_time() / ase.units.fs
         if md.ensemble == "NPT":
             traj.volume[sample_idx] = dyn.atoms.get_volume() / n_atoms
-            stress_tensor = dyn.atoms.get_stress(voigt=False)
+            stress_tensor = dyn.atoms.get_stress(
+                voigt=False, # redundant 3x3 matrix representation
+                include_ideal_gas=True # include kinetic energy contribution to stress
+            )
             traj.pressure[sample_idx] = -np.trace(stress_tensor) / 3.0 / ase.units.GPa
 
         current_step = dyn.nsteps

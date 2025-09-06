@@ -92,6 +92,8 @@ def run(config: mbe_automation.configs.md.Sublimation):
     )
     if config.save_csv:
         df_npt_nvt.to_csv(os.path.join(config.work_dir, "sublimation.csv"))
+
+    print("MD workflow completed")
         
 
     
