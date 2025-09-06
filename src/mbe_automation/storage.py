@@ -12,7 +12,7 @@ class FBZPath:
     kpoints: List[npt.NDArray[np.floating]]
     frequencies: List[npt.NDArray[np.floating]]
     eigenvectors: List[npt.NDArray[np.complex128]]
-    path_connections: npt.NDArray[np.bool]
+    path_connections: npt.NDArray[np.bool_]
     labels: npt.NDArray[np.str_]
     distances: List[npt.NDArray[np.floating]]
 
@@ -77,7 +77,7 @@ class Trajectory(Structure):
             periodic=periodic,
             positions=np.zeros((n_frames, n_atoms, 3)),
             forces=np.zeros((n_frames, n_atoms, 3)),
-            atomic_numbers=np.zeros(n_atoms, dtype=np.integer),
+            atomic_numbers=np.zeros(n_atoms, dtype=int),
             masses=np.zeros(n_atoms),
             cell_vectors=(np.zeros((n_frames, 3, 3)) if periodic else None),
             time=np.zeros(n_frames),
