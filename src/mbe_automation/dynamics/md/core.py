@@ -81,7 +81,7 @@ def run(
         ensemble=md.ensemble,
         n_atoms=n_atoms,
         n_frames=n_samples,
-        periodic=init_conf.pbc,
+        periodic=np.any(init_conf.pbc),
         target_temperature=target_temperature_K,
         target_pressure=(target_pressure_GPa if md.ensemble=="NPT" else None),
         time_equilibration=md.time_equilibration_fs

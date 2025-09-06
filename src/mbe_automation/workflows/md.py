@@ -87,11 +87,11 @@ def run(config: mbe_automation.configs.md.Sublimation):
 
     mbe_automation.storage.save_data(
         dataset=config.dataset,
-        key="md/classical_npt_nvt",
+        key="md/sublimation",
         df=df_npt_nvt
     )
     if config.save_csv:
-        df_npt_nvt.to_csv(os.path.join(config.work_dir, "classical_npt_nvt.csv"))
+        df_npt_nvt.to_csv(os.path.join(config.work_dir, "sublimation.csv"))
         
 
     
