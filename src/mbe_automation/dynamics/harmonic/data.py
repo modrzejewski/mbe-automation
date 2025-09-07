@@ -137,16 +137,15 @@ def molecule(
     F_vib = np.zeros(n_temperatures)
     S_vib = np.zeros(n_temperatures)
     E_vib = np.zeros(n_temperatures)
-    ZPE = thermo.get_ZPE_correction() * ase.units.eV/ase.units.kJ*ase.units.mol
+    ZPE = thermo.get_ZPE_correction() / (ase.units.kJ / ase.units.mol) # kJ/mol/molecule
     
     for i, T in enumerate(temperatures):
         F_vib[i] = thermo.get_helmholtz_energy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol
         S_vib[i] = thermo.get_entropy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol*1000
         E_vib[i] = thermo.get_internal_energy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol
 
-    kbT = ase.units.kB * temperatures * ase.units.eV / ase.units.kJ * ase.units.mol # kb*T in kJ/mol
+    kbT = ase.units.kB * temperatures / (ase.units.kJ / ase.units.mol) # kb*T in kJ/mol
     E_trans = 3/2 * kbT
-    pV = kbT
     if rotor_type == "nonlinear":
         E_rot = 3/2 * kbT
     elif rotor_type == "linear":
@@ -154,7 +153,7 @@ def molecule(
     elif rotor_type == "monatomic":
         E_rot = np.zeros_like(temperatures)
 
-    E_el = system.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/molecule
+    E_el = system.get_potential_energy() / (ase.units.kJ / ase.units.mol) # kJ/mol/molecule
         
     df = pd.DataFrame({
         "T (K)": temperatures,
@@ -165,7 +164,7 @@ def molecule(
         "ZPE_molecule (kJ/mol/molecule)": ZPE,
         "E_trans_molecule (kJ/mol/molecule)": E_trans,
         "E_rot_molecule (kJ/mol/molecule)": E_rot,
-        "pV_molecule (kJ/mol/molecule)": pV,
+        "kT (kJ/mol)": kbT, # equals the pV term per molecule in the ideal gas approximation
         "all_freqs_real_molecule": all_freqs_real,
         "n_atoms_molecule": n_atoms,
         "system_label_molecule": system_label
@@ -228,7 +227,7 @@ def crystal(
         positions=unit_cell.get_positions(),
         atomic_numbers=unit_cell.get_atomic_numbers(),
         masses=unit_cell.get_masses(),
-        cell=unit_cell.get_cell()
+        cell_vectors=unit_cell.get_cell()
     )
 
     interp_mesh = phonons.mesh.mesh_numbers
@@ -242,8 +241,8 @@ def crystal(
         "C_v_vib_crystal (J/K/mol/unit cell)": C_v_vib_crystal,
         "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
         "F_tot_crystal (kJ/mol/unit cell)": F_tot_crystal,
-        "V (Å³/unit cell)": V,
-        "ρ (g/cm³)": rho,
+        "V_crystal (Å³/unit cell)": V,
+        "ρ_crystal (g/cm³)": rho,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "space_group": space_group,
         "acoustic_freqs_real_crystal": fbz_analysis.acoustic_freqs_real,
@@ -281,7 +280,7 @@ def sublimation(df_crystal, df_molecule):
     n_atoms_unit_cell = df_crystal["n_atoms_unit_cell"]
     beta = n_atoms_molecule / n_atoms_unit_cell
     
-    V_Ang3 = df_crystal["V (Å³/unit cell)"]
+    V_Ang3 = df_crystal["V_crystal (Å³/unit cell)"]
     V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm**3/mol/molecule
 
     E_latt = (
@@ -299,7 +298,7 @@ def sublimation(df_crystal, df_molecule):
         + ΔE_vib
         + df_molecule["E_trans_molecule (kJ/mol/molecule)"]
         + df_molecule["E_rot_molecule (kJ/mol/molecule)"]
-        + df_molecule["pV_molecule (kJ/mol/molecule)"]
+        + df_molecule["kT (kJ/mol)"] # the pV term per molecule in the ideal gas approximation
     ) # kJ/mol/molecule
         
     ΔS_sub_vib = (
@@ -313,6 +312,6 @@ def sublimation(df_crystal, df_molecule):
         "ΔE_vib (kJ/mol/molecule)": ΔE_vib,
         "ΔH_sub (kJ/mol/molecule)": ΔH_sub,
         "ΔS_sub_vib (J/K/mol/molecule)": ΔS_sub_vib,
-        "V (cm³/mol/molecule)": V_molar
+        "V_crystal (cm³/mol/molecule)": V_molar
     })
     return df

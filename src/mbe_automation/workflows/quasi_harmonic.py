@@ -43,18 +43,18 @@ def run(config: QuasiHarmonicConfig):
 
     label_crystal = "crystal_input"
     mbe_automation.structure.crystal.display(
-        unit_cell=config.unit_cell,
+        unit_cell=config.crystal,
         system_label=label_crystal
     )
     if config.symmetrize_unit_cell:
         unit_cell, input_space_group = mbe_automation.structure.crystal.symmetrize(
-            config.unit_cell
+            config.crystal
         )
     else:
         input_space_group, _ = mbe_automation.structure.crystal.check_symmetry(
-            config.unit_cell
+            config.crystal
         )
-        unit_cell = config.unit_cell.copy()
+        unit_cell = config.crystal.copy()
         
     molecule = config.molecule.copy()
 
@@ -140,7 +140,7 @@ def run(config: QuasiHarmonicConfig):
     df_crystal = mbe_automation.dynamics.harmonic.data.crystal(
         unit_cell_V0,
         phonons,
-        config.temperatures,
+        config.temperatures_K,
         config.imaginary_mode_threshold,
         space_group=space_group_V0,
         work_dir=config.work_dir,
@@ -149,7 +149,7 @@ def run(config: QuasiHarmonicConfig):
     df_molecule = mbe_automation.dynamics.harmonic.data.molecule(
         molecule,
         vibrations,
-        config.temperatures,
+        config.temperatures_K,
         system_label=label_molecule
     )
     df_sublimation = mbe_automation.dynamics.harmonic.data.sublimation(
@@ -188,7 +188,7 @@ def run(config: QuasiHarmonicConfig):
             unit_cell_V0,
             space_group_V0,
             config.calculator,
-            config.temperatures,
+            config.temperatures_K,
             supercell_matrix,
             interp_mesh,
             config.max_force_on_atom,

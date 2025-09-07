@@ -1,3 +1,11 @@
+import os
+import os.path
+import stat
+import shutil
+import sys
+
+import mbe_automation.queue_scripts as queue_scripts
+import mbe_automation.directory_structure as directory_structure
 import mbe_automation.mbe
 import mbe_automation.inputs.rpa
 import mbe_automation.inputs.orca
@@ -7,13 +15,7 @@ import mbe_automation.inputs.mace
 import mbe_automation.inputs.uma
 import mbe_automation.inputs.dftb
 import mbe_automation.display
-from . import queue_scripts
-from . import directory_structure
-import os
-import os.path
-import stat
-import shutil
-import sys        
+
 
 def prepare_inputs(ProjectDirectory, mlip_parameters, UnitCellFile, SystemTypes, Cutoffs,
                    Ordering, InputTemplates, QueueScriptTemplates,

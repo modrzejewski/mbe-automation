@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, List, Literal, Union
 from ase import Atoms
+from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
 import numpy.typing as npt
 
@@ -8,10 +9,16 @@ import numpy.typing as npt
 class QuasiHarmonicConfig:
     """
     Default parameters for thermodynamic property calculations in the quasi-harmonic approximation.
-    """
-    unit_cell: Atoms
+    """                            #
+                                   # Initial, nonrelaxed structures of crystal
+                                   # and isolated molecule
+                                   #
+    crystal: Atoms
     molecule: Atoms
-    calculator: Any
+                                   #
+                                   # Calculator of energies and forces
+                                   #
+    calculator: ASECalculator
                                    #
                                    # Volumetric thermal expansion
                                    #
@@ -38,10 +45,10 @@ class QuasiHarmonicConfig:
                                    #
     fourier_interpolation_mesh: npt.NDArray[np.integer] | float = 150.0
                                    #
-                                   # Range of temperatures at which phonons
+                                   # Range of temperatures (K) at which phonons
                                    # and thermodynamic properties are computed
                                    #
-    temperatures: npt.NDArray[np.floating] = field(default_factory=lambda: np.arange(0, 301, 10))
+    temperatures_K: npt.NDArray[np.floating] = field(default_factory=lambda: np.arange(0, 301, 10))
                                    #
                                    # Refine the space group symmetry after
                                    # each geometry relaxation of the unit cell.

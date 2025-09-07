@@ -1,15 +1,12 @@
 from typing import Any, Literal
 from dataclasses import dataclass
 from ase import Atoms
+from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
 import numpy.typing as npt
 
 @dataclass
 class ClassicalMD:
-
-    system_name: str
-    initial_configuration: Atoms
-    calculator: Any
     ensemble: Literal[
         "NPT", # Martyna-Tobias-Klein J. Chem. Phys. 101, 4177 (1994)
         "NVT"  # Bussi-Donadio-Parrinello J. Chem. Phys. 126, 014101 (2007)
@@ -87,17 +84,6 @@ class ClassicalMD:
     tchain: int = 3
     pchain: int = 3
                                    #
-                                   # Directory where files are stored
-                                   # at runtime
-                                   #
-    work_dir: str = "./"
-                                   #
-                                   # The main result of the calculations:
-                                   # a single HDF5 file with all data computed
-                                   # for the physical system
-                                   #
-    dataset: str = "./properties.hdf5"
-                                   #
                                    # Minimum point-periodic image distance
                                    # in the supercell used to compute phonons.
                                    #
@@ -138,11 +124,47 @@ class ClassicalMD:
                                    # Ignored if supercell_matrix is provided explicitly.
                                    #
     supercell_diagonal: bool = False
+                                   
+
+@dataclass
+class Sublimation:
+                                   #
+                                   # Initial structure of crystal
+                                   #
+    crystal: Atoms
+                                   #
+                                   # Initial structure of molecule
+                                   #
+    molecule: Atoms
+                                   #
+                                   # Energy and forces calculator
+                                   #
+    calculator: ASECalculator
+                                   #
+                                   # Parameters of the MD propagation
+                                   #
+    md_crystal: ClassicalMD
+    md_molecule: ClassicalMD
+                                   #
+                                   # Target temperature (K) and pressure (GPa)
+                                   #
+    temperature_K: float = 298.15
+    pressure_GPa: float = 1.0E-4
+                                   #
+                                   # Directory where files are stored
+                                   # at runtime
+                                   #
+    work_dir: str = "./"
+                                   #
+                                   # The main result of the calculations:
+                                   # a single HDF5 file with all data computed
+                                   # for the physical system
+                                   #
+    dataset: str = "./properties.hdf5"
                                    #
                                    # Verbosity of the program's output.
                                    # 0 -> suppressed warnings
                                    #
     verbose: int = 0
-                                   
-
-
+    save_plots: bool = True
+    save_csv: bool = True

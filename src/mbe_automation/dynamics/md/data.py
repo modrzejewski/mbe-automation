@@ -1,155 +1,230 @@
-
-import matplotlib.pyplot as plt
+from typing import Dict, Any, Tuple
+import ase.units
 import pandas as pd
-import mbe_automation.configs.md
+import numpy as np
+import numpy.typing as npt
+
 import mbe_automation.storage
 
 
-def analyze(md_results, averaging_window_fs=5000, sampling_interval_fs=50.0, 
-            temp_target_K=298.15, time_equilibration_fs=5000, figsize=(10, 8),
-            plot_file="md_analysis.png"):
+def reblocking(
+    interval_between_samples_fs: float,
+    samples: npt.NDArray[np.floating],
+    block_size_increment_fs: float,
+    min_n_blocks: int = 10
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """
-    Analyze molecular dynamics results and generate plots.
-    
+    Perform reblocking analysis on a time series to estimate the
+    standard error of the mean.
+
+    This function implements the iterative blocking method described by
+    Flyvbjerg and Petersen [J. Chem. Phys. 91, 461 (1989)]. It
+    progressively averages data into larger blocks and calculates the
+    standard error for each block size. The block size increases
+    linearly in each iteration. The true standard error is estimated
+    from the plateau in a plot of error versus block size.
+
     Parameters:
-    -----------
-    md_results : dict
-        Results dictionary from dynamics.run()
-    averaging_window_fs : float
-        Time window for running averages (fs)
-    sampling_interval_fs : float
-        Sampling interval used in the simulation (fs)
-    temp_target_K : float
-        Target temperature to show as reference line
-    time_equilibration_fs : float
-        Time needed for reaching equilibrium (fs)
-    figsize : tuple
-        Figure size for plots (width, height)
-    plot_file : str
-        Filename to save the plot (e.g., 'md_analysis.png')
-    
+    - interval_between_samples_fs (float):
+        The time interval between consecutive samples in femtoseconds.
+    - samples (npt.NDArray[np.floating]):
+        A 1D numpy array of time-ordered data points from a simulation.
+    - block_size_increment_fs (float):
+        The amount of time (in fs) to add to the block size in each
+        iteration.
+    - min_n_blocks (int):
+        The minimum number of blocks required to continue the analysis.
+        The procedure stops when the number of blocks falls below this
+        threshold.
+
     Returns:
-    --------
-    stats : Averaged data and statistics
+    - Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        A tuple containing two 1D numpy arrays:
+        1. The block size in femtoseconds (correlation time).
+        2. The estimated standard error of the mean for each
+           corresponding block size.
     """
+    n_observations = samples.shape[0]
     
-    print("Analyzing molecular dynamics results...")
-    
-    # Create DataFrame for easier averaging
-    df = pd.DataFrame({
-        'time': md_results['times'],
-        'temperature': md_results['temperatures'],
-        'total energy': md_results['total energies'],
-        'kinetic energy': md_results['kinetic energies'],
-        'potential energy': md_results['potential energies'],
-    })
-    
-    # Calculate running averages and standard deviations
-    window_points = round(averaging_window_fs / sampling_interval_fs)
-    print(f"Computing running averages with window of {window_points} points ({averaging_window_fs} fs)")
-    
-    df['temp_avg'] = df['temperature'].rolling(window=window_points, center=True).mean()
-    df['total_energy_avg'] = df['total energy'].rolling(window=window_points, center=True).mean()
-    df['kinetic_energy_avg'] = df['kinetic energy'].rolling(window=window_points, center=True).mean()
-    df['potential_energy_avg'] = df['potential energy'].rolling(window=window_points, center=True).mean()
-    df['temp_std'] = df['temperature'].rolling(window=window_points, center=True).std()
+    if n_observations < min_n_blocks:
+        raise ValueError(
+            f"The number of observations ({n_observations}) must be "
+            f"greater than or equal to min_n_blocks ({min_n_blocks})."
+        )
+    if block_size_increment_fs <= 0:
+        raise ValueError("block_size_increment_fs must be a positive value.")
 
-    # Time-based equilibration detection
-    equilibrated_mask = df['time'] >= time_equilibration_fs
-    equilibrated_points = df[equilibrated_mask]
+    block_errors = []
+    correlation_times_fs = []
+    
+    current_block_size_fs = interval_between_samples_fs
 
-    if len(equilibrated_points) > 0:
-        equilibrium_start_idx = equilibrated_points.index[0]
-        equilibrium_start_time = df.loc[equilibrium_start_idx, 'time']
-        equilibrium_indices = df.index[equilibrium_start_idx:].tolist()
-    
-        print(f"Equilibration time reached at t = {equilibrium_start_time:.0f} fs")
-        print(f"Equilibration threshold: {time_equilibration_fs:.0f} fs")
-        print(f"Equilibrium samples: {len(equilibrium_indices)} / {len(df)} total")
-    else:
-        print(f"Warning: Simulation shorter than equilibration time ({time_equilibration_fs:.0f} fs)")
-        # Fall back to second half approach
-        equilibrium_start_idx = len(df) // 2
-        equilibrium_start_time = df.loc[equilibrium_start_idx, 'time']
-        equilibrium_indices = df.index[equilibrium_start_idx:].tolist()
-    
-    max_time = df['time'].max()
-    
-    # Calculate some summary statistics using equilibrium samples
-    eq_temp_avg = df.loc[equilibrium_indices, 'temperature'].mean()
-    eq_temp_std = df.loc[equilibrium_indices, 'temperature'].std()
-    eq_total_energy_avg = df.loc[equilibrium_indices, 'total energy'].mean()
-    eq_total_energy_std = df.loc[equilibrium_indices, 'total energy'].std()
-    eq_kinetic_energy_avg = df.loc[equilibrium_indices, 'kinetic energy'].mean()
-    eq_kinetic_energy_std = df.loc[equilibrium_indices, 'kinetic energy'].std()
-    eq_potential_energy_avg = df.loc[equilibrium_indices, 'potential energy'].mean()
-    eq_potential_energy_std = df.loc[equilibrium_indices, 'potential energy'].std()
-
-    print("Equilibrium averages")
-    print(f"Temperature: {eq_temp_avg:.1f} ± {eq_temp_std:.1f} K (target: {temp_target_K} K)")
-    print(f"Total energy: {eq_total_energy_avg:.4f} ± {eq_total_energy_std:.4f} eV/atom")
-    print(f"Kinetic energy: {eq_kinetic_energy_avg:.4f} ± {eq_kinetic_energy_std:.4f} eV/atom")
-    print(f"Potential energy: {eq_potential_energy_avg:.4f} ± {eq_potential_energy_std:.4f} eV/atom")
-
-    # Create the plots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
-    
-    # Upper panel: Temperature
-    ax1.plot(df['time'], df['temperature'], alpha=0.7, color='lightcoral', 
-             linewidth=0.8, label='Instantaneous')
-    ax1.plot(df['time'], df['temp_avg'], color='darkred', linewidth=2, 
-             label=f'Running avg ({averaging_window_fs} fs)')
-    
-    # Add error bars (±1σ region around running average)
-    ax1.fill_between(df['time'], 
-                     df['temp_avg'] - df['temp_std'], 
-                     df['temp_avg'] + df['temp_std'],
-                     color='darkred', alpha=0.2, 
-                     label='Running avg ±1σ region')
-    
-    ax1.axhline(y=temp_target_K, color='black', linestyle='--', alpha=0.5, 
-                label=f'Target ({temp_target_K} K)')
+    while True:
+        block_size_in_samples = int(round(current_block_size_fs / interval_between_samples_fs))
         
-    ax1.set_ylabel('Temperature (K)')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
+        #
+        # Ensure block size is at least 1 sample
+        #
+        if block_size_in_samples == 0:
+            block_size_in_samples = 1
 
-    # Lower panel: Energies (clean version with only running averages)
-    ax2.plot(df['time'], df['potential_energy_avg'] - eq_potential_energy_avg, 
-             color='darkblue', linewidth=2, label='Potential energy')
-    ax2.plot(df['time'], df['kinetic_energy_avg'] - eq_kinetic_energy_avg, 
-             color='darkred', linewidth=2, label='Kinetic energy')
-    ax2.plot(df['time'], df['total_energy_avg'] - eq_total_energy_avg, 
-             color='black', linewidth=2, linestyle='--', label='Total energy')
+        n_blocks = n_observations // block_size_in_samples
+        
+        if n_blocks < min_n_blocks:
+            break
+        
+        relevant_data = samples[:n_blocks * block_size_in_samples]
+        
+        block_averages = np.mean(
+            relevant_data.reshape(n_blocks, block_size_in_samples),
+            axis=1
+        )
+        
+        block_variance = np.var(block_averages, ddof=1)
+        block_errors.append(np.sqrt(block_variance / n_blocks))
+        
+        actual_correlation_time = block_size_in_samples * interval_between_samples_fs
+        correlation_times_fs.append(actual_correlation_time)
 
-    # Add zero reference line (represents equilibrium values)
-    ax2.axhline(y=0, color='gray', linestyle=':', alpha=0.5)
+        current_block_size_fs += block_size_increment_fs
 
-    ax2.set_xlabel('Time (fs)')
-    ax2.set_ylabel('Running average - Equilibrium average (eV/atom)')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
+    correlation_times_fs = np.array(correlation_times_fs)
+    block_errors = np.array(block_errors)
     
-    # Improve layout
-    plt.tight_layout()    
-    plt.savefig(plot_file, dpi=150, bbox_inches='tight')
-    print(f"Plot saved to {plot_file}")
-    plt.close()
-    
-    # Return computed statistics
-    equilibrium_stats = {
-        'indices': equilibrium_indices,
-        'start time': equilibrium_start_time,
-        'start index': equilibrium_start_idx,
-        'temperature average': eq_temp_avg,
-        'temperature σ': eq_temp_std,
-        'potential energy average': eq_potential_energy_avg,
-        'potential energy σ': eq_potential_energy_std,
-        'kinetic energy average': eq_kinetic_energy_avg,
-        'kinetic energy σ': eq_kinetic_energy_std,
-        'total energy average': eq_total_energy_avg,
-        'total energy σ': eq_total_energy_std
-    }
-    
-    return equilibrium_stats
+    return correlation_times_fs, block_errors
 
+
+def crystal(
+        dataset: str,
+        key: str,
+        n_atoms_unit_cell: int,
+        system_label: str
+) -> pd.DataFrame:
+
+    df = mbe_automation.storage.read_data_frame(
+        dataset=dataset,
+        key=key,
+        columns=[
+            "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)",
+            "p (GPa)", "V (Å³/atom)"
+        ]
+    )
+    if not df.attrs["periodic"]:
+        raise ValueError(f"{key} does not correspond to a periodic system")
+    
+    production_mask = df["time (fs)"] >= df.attrs["time_equilibration (fs)"]
+    production_df = df[production_mask]
+        
+    eV_to_kJ_per_mol = ase.units.eV / (ase.units.kJ / ase.units.mol)
+    GPa_to_eV_per_Angs3 = ase.units.GPa / (ase.units.eV / ase.units.Angstrom**3)
+    
+    df_NVT = pd.DataFrame([{
+        "T (K)": df.attrs["target_temperature (K)"],
+        "⟨T⟩_crystal (K)": production_df["T (K)"].mean(),
+        "⟨E_kin⟩_crystal (kJ/mol/unit cell)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_unit_cell,
+        "⟨E_pot⟩_crystal (kJ/mol/unit cell)": production_df["E_pot (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_unit_cell,
+        "n_atoms_unit_cell": n_atoms_unit_cell,
+        "system_label_crystal": system_label
+    }])
+    if df.attrs["ensemble"] == "NPT":
+        V_avg = production_df["V (Å³/atom)"].mean() * n_atoms_unit_cell # Å³/unit cell
+        p_avg = production_df["p (GPa)"].mean()
+        p_target = df.attrs["target_pressure (GPa)"]
+        pV = p_target * GPa_to_eV_per_Angs3 * V_avg * eV_to_kJ_per_mol # kJ/mol/unit cell
+        df_NPT = pd.DataFrame([{
+            "⟨V⟩_crystal (Å³/unit cell)": V_avg,
+            "p_crystal (GPa)": p_target,
+            "⟨p⟩_crystal (GPa)": p_avg,
+            "p⟨V⟩_crystal (kJ/mol/unit cell)": pV
+        }])
+        df = pd.concat([df_NVT, df_NPT], axis=1)
+    else:
+        df = df_NVT
+
+    return df
+
+
+def molecule(
+        dataset: str,
+        key: str,
+        system_label: str
+) -> pd.DataFrame:
+
+    df = mbe_automation.storage.read_data_frame(
+        dataset=dataset,
+        key=key,
+        columns=[
+        "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)"
+        ]
+    )
+    if df.attrs["periodic"]:
+        raise ValueError(f"{key} corresponds to a periodic system")
+    
+    production_mask = df["time (fs)"] >= df.attrs["time_equilibration (fs)"]
+    production_df = df[production_mask]
+    
+    eV_to_kJ_per_mol = ase.units.eV / (ase.units.kJ / ase.units.mol)
+    n_atoms_molecule = df.attrs["n_atoms"]
+    
+    T_target = df.attrs["target_temperature (K)"]
+    kbT = ase.units.kB * T_target / (ase.units.kJ / ase.units.mol) # equals pV in the ideal gas approximation
+    E_trans = 3.0/2.0 * kbT # kJ/mol/molecule translations of the center of mass
+    
+    return pd.DataFrame([{
+        "T (K)": T_target,
+        "⟨T⟩_molecule (K)": production_df["T (K)"].mean(),
+        "⟨E_kin⟩_molecule (kJ/mol/molecule)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
+        "⟨E_pot⟩_molecule (kJ/mol/molecule)": production_df["E_pot (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
+        "E_trans_molecule (kJ/mol/molecule)": E_trans,
+        "kT (kJ/mol)": kbT, # equals the pV contribution per molecule in the ideal gas approximation
+        "n_atoms_molecule": n_atoms_molecule,
+        "system_label_molecule": system_label
+    }])
+
+
+def sublimation(df_crystal, df_molecule):
+    """
+    Compute sublimation enthalpy from the crystal and molecule
+    averages over the MD trajectory.
+
+    1. Della Pia et al. Accurate and efficient machine learning
+       interatomic potentials for finite temperature
+       modelling of molecular crystals
+       Chem. Sci., 16, 11419 (2025); doi: 10.1039/d5sc01325a
+    
+    """
+    n_atoms_molecule = df_molecule["n_atoms_molecule"]
+    n_atoms_unit_cell = df_crystal["n_atoms_unit_cell"]
+    beta = n_atoms_molecule / n_atoms_unit_cell
+    
+    V_Ang3 = df_crystal["⟨V⟩_crystal (Å³/unit cell)"]
+    V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm**3/mol/molecule
+
+    ΔE_pot = (
+        df_molecule["⟨E_pot⟩_molecule (kJ/mol/molecule)"]
+        - df_crystal["⟨E_pot⟩_crystal (kJ/mol/unit cell)"] * beta
+        ) # kJ/mol/molecule
+    ΔE_kin = (
+        df_molecule["⟨E_kin⟩_molecule (kJ/mol/molecule)"]
+        - df_crystal["⟨E_kin⟩_crystal (kJ/mol/unit cell)"] * beta
+        ) # kJ/mol/molecule
+    pV = df_crystal["p⟨V⟩_crystal (kJ/mol/unit cell)"] * beta # kJ/mol/molecule
+    #
+    # Enthalpy defined in eq 10 of ref 1
+    #
+    ΔH_sub = (
+        ΔE_pot
+        + ΔE_kin
+        + df_molecule["E_trans_molecule (kJ/mol/molecule)"]
+        + df_molecule["kT (kJ/mol)"] # the pV term per molecule in the ideal gas approximation
+        - pV
+    ) # kJ/mol/molecule
+        
+    return pd.DataFrame({
+        "T (K)": df_crystal["T (K)"],
+        "ΔH_sub (kJ/mol/molecule)": ΔH_sub,
+        "Δ⟨E_pot⟩ (kJ/mol/molecule)": ΔE_pot,
+        "Δ⟨E_kin⟩ (kJ/mol/molecule)": ΔE_kin,
+        "p⟨V⟩_crystal (kJ/mol/molecule)": pV,
+        "⟨V⟩_crystal (cm³/mol/molecule)": V_molar
+    })

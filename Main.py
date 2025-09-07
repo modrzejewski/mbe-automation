@@ -129,7 +129,8 @@ InputTemplates = {
     },
     "MACE(PBC)": {
         "training_dataset": "./templates/inputs/mace(pbc)/training_dataset.py",
-        "quasi_harmonic": "./templates/inputs/mace(pbc)/quasi_harmonic.py"
+        "quasi_harmonic": "./templates/inputs/mace(pbc)/quasi_harmonic.py",
+        "md": "./templates/inputs/mace(pbc)/md.py"
         },
     "UMA(PBC)": {
         "quasi_harmonic": "./templates/inputs/uma(pbc)/quasi_harmonic.py"
