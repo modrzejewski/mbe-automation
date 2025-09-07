@@ -154,7 +154,7 @@ def reblocking(
         dataset=dataset,
         key=key,
         columns=["E_kin (eV/atom)", "E_pot (eV/atom)", "time (fs)",
-                 "p (GPa)", "V (Å³/atom)"]
+                 "p (GPa)", "V (Å³/atom)", "T (K)"]
     )
     
     df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
