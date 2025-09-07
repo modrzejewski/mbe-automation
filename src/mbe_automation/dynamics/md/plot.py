@@ -150,7 +150,12 @@ def reblocking(
     - save_path (str, optional): If provided, the plot is saved to this
       path. If None, the figure object is returned.
     """
-    df = mbe_automation.storage.read_data_frame(dataset=dataset, key=key)
+    df = mbe_automation.storage.read_data_frame(
+        dataset=dataset,
+        key=key
+        columns=["E_kin (eV/atom)", "E_pot (eV/atom)", "time (fs)",
+                 "p (GPa)", "V (Å³/atom)"]
+    )
     
     df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
     
