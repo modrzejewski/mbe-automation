@@ -40,18 +40,24 @@ def run(
         init_conf = ase.build.make_supercell(system, supercell_matrix)
     else:
         init_conf = system.copy()
-        
+
+    is_periodic = np.any(init_conf.pbc)
+    fix_COM = not is_periodic
+    
     init_conf.calc = calculator
     if md.time_step_fs > 1.0:
         print("Warning: time step > 1 fs may be too large for accurate dynamics")
     if md.sampling_interval_fs < md.time_step_fs:
         raise ValueError("Sampling interval must be >= time_step_fs")
 
+    if fix_COM:
+        init_conf.set_constraint(ase.constraints.FixCom())
     MaxwellBoltzmannDistribution(
         init_conf,
         temperature_K=md.target_temperature_K
     )
-    #Stationary(init_conf)
+    Stationary(init_conf)
+    
     #ZeroRotation(init_conf)
 
     if md.ensemble == "NVT":
@@ -81,7 +87,6 @@ def run(
         )
 
     n_atoms = len(init_conf)
-
     n_steps_between_samples = round(md.sampling_interval_fs / md.time_step_fs)
     n_samples = round(md.time_total_fs / md.sampling_interval_fs) + 1 # adding one because sampling is done at t=0
     n_total_steps = (n_samples - 1) * n_steps_between_samples
@@ -90,7 +95,7 @@ def run(
         ensemble=md.ensemble,
         n_atoms=n_atoms,
         n_frames=n_samples,
-        periodic=np.any(init_conf.pbc),
+        periodic=is_periodic,
         target_temperature=target_temperature_K,
         target_pressure=(target_pressure_GPa if md.ensemble=="NPT" else None),
         time_equilibration=md.time_equilibration_fs
@@ -106,7 +111,9 @@ def run(
     print(f"time_step           {md.time_step_fs} fs")
     print(f"n_total_steps       {n_total_steps}")
     print(f"n_samples           {n_samples}")
+    print(f"fixed COM           {fix_COM}")
 
+    E_kin_COM = 3.0/2.0 * ase.units.kB * target_temperature_K # eV
     total_steps = round(md.time_total_fs/md.time_step_fs)
     display_frequency = 5
     milestones = [0]
@@ -116,21 +123,22 @@ def run(
     def sample():
         nonlocal sample_idx
 
-        E_pot = dyn.atoms.get_potential_energy() / n_atoms
-        E_kin = dyn.atoms.get_kinetic_energy() / n_atoms
+        E_pot = dyn.atoms.get_potential_energy() / n_atoms # eV/atom
+        E_kin = dyn.atoms.get_kinetic_energy() / n_atoms # eV/atom, E_trans is not included for molecules
+        T_insta = dyn.atoms.get_temperature() # K
         traj.E_pot[sample_idx] = E_pot
         traj.E_kin[sample_idx] = E_kin
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
         traj.positions[sample_idx, :, :] = dyn.atoms.get_positions()
-        traj.temperature[sample_idx] = E_kin / (3.0/2.0 * ase.units.kB)
+        traj.temperature[sample_idx] = T_insta
         traj.time[sample_idx] = dyn.get_time() / ase.units.fs
         if md.ensemble == "NPT":
-            traj.volume[sample_idx] = dyn.atoms.get_volume() / n_atoms
+            traj.volume[sample_idx] = dyn.atoms.get_volume() / n_atoms # Å³/atom
             stress_tensor = dyn.atoms.get_stress(
                 voigt=False, # redundant 3x3 matrix representation
                 include_ideal_gas=True # include kinetic energy contribution to stress
             )
-            traj.pressure[sample_idx] = -np.trace(stress_tensor) / 3.0 / ase.units.GPa
+            traj.pressure[sample_idx] = -np.trace(stress_tensor) / 3.0 / ase.units.GPa # GPa
 
         current_step = dyn.nsteps
         percentage = (current_step / total_steps) * 100
