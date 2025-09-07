@@ -37,6 +37,14 @@ def run(config: mbe_automation.configs.md.Sublimation):
                 f"{label_molecule}.png"
             )
         )
+        mbe_automation.dynamics.md.plot.reblocking(
+            dataset=config.dataset,
+            key=f"md/trajectories/{label_molecule}",
+            save_path=os.path.join(
+                config.work_dir,
+                "reblocking",
+                f"{label_molecule}.png"
+            )
 
     label_crystal = f"crystal_T_{config.temperature_K:.2f}_p_{config.pressure_GPa:.5f}"
     
@@ -76,6 +84,14 @@ def run(config: mbe_automation.configs.md.Sublimation):
                 f"{label_crystal}.png"
             )
         )
+        mbe_automation.dynamics.md.plot.reblocking(
+            dataset=config.dataset,
+            key=f"md/trajectories/{label_crystal}",
+            save_path=os.path.join(
+                config.work_dir,
+                "reblocking",
+                f"{label_crystal}.png"
+            )
     
     df_sublimation = mbe_automation.dynamics.md.data.sublimation(
         df_crystal=df_crystal,

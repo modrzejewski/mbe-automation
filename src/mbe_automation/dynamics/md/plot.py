@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 import mbe_automation.storage
-
+import mbe_automation.dynamics.md.data
 
 def trajectory(
         dataset: str,
@@ -128,3 +128,90 @@ def trajectory(
     else:
         return fig
 
+
+def reblocking(
+    dataset: str,
+    key: str,
+    save_path: str = None
+):
+    """
+    Performs and plots a reblocking analysis for key physical
+    quantities from a molecular dynamics trajectory into a single figure.
+
+    This function reads trajectory data, extracts the production run,
+    and then applies a reblocking analysis to the total energy,
+    temperature, and, if available, pressure and volume. It generates
+    a single figure with subplots for each quantity, showing the
+    standard error as a function of the correlation time (block size).
+
+    Parameters:
+    - dataset (str): Path to the dataset file (HDF5).
+    - key (str): Path to the trajectory group within the HDF5 file.
+    - save_path (str, optional): If provided, the plot is saved to this
+      path. If None, the figure object is returned.
+    """
+    df = mbe_automation.storage.read_data_frame(dataset=dataset, key=key)
+    
+    df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
+    
+    time_equilibration_fs = df.attrs["time_equilibration (fs)"]
+    production_mask = df["time (fs)"] >= time_equilibration_fs
+    production_df = df[production_mask]
+    
+    times_fs = production_df["time (fs)"].to_numpy()
+    interval_fs = times_fs[1] - times_fs[0]
+    
+    quantities_to_plot = {
+        "E_total (eV/atom)": "Total Energy (eV/atom)",
+        "T (K)": "Temperature (K)"
+    }
+    
+    ensemble = df.attrs["ensemble"]
+    if ensemble == "NPT":
+        quantities_to_plot["p (GPa)"] = "Pressure (GPa)"
+        quantities_to_plot["V (Å³/atom)"] = "Volume (Å³/atom)"
+
+    n_plots = len(quantities_to_plot)
+    fig, axes = plt.subplots(
+        nrows=n_plots,
+        ncols=1,
+        figsize=(8, 2.5 * n_plots),
+        sharex=True
+    )
+    
+    fig.suptitle(f"Reblocking Analysis for {key}")
+
+    for i, (column, ylabel) in enumerate(quantities_to_plot.items()):
+        ax = axes[i]
+        samples = production_df[column].to_numpy()
+        
+        correlation_times, block_errors = mbe_automation.dynamics.md.data.reblocking(
+            interval_between_samples_fs=interval_fs,
+            samples=samples,
+            block_size_increment_fs=interval_fs
+        )
+
+        correlation_times_ps = correlation_times / 1000.0
+    
+        ax.plot(
+            correlation_times_ps,
+            block_errors,
+            marker="o",
+            linestyle="-",
+            markersize=4
+        )
+    
+        ax.set_ylabel(f"Std. Error of {ylabel}")
+        ax.grid(True, linestyle=":", alpha=0.7)
+
+    axes[-1].set_xlabel("Correlation Time (ps)")
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    
+    if save_path:
+        output_dir = os.path.dirname(save_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        plt.savefig(save_path, dpi=300)
+        plt.close(fig)
+    else:
+        return fig

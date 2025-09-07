@@ -1,8 +1,97 @@
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 import ase.units
 import pandas as pd
+import numpy as np
+import numpy.typing as npt
 
 import mbe_automation.storage
+
+
+def reblocking(
+    interval_between_samples_fs: float,
+    samples: npt.NDArray[np.floating],
+    block_size_increment_fs: float,
+    min_n_blocks: int = 10
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    """
+    Perform reblocking analysis on a time series to estimate the
+    standard error of the mean.
+
+    This function implements the iterative blocking method described by
+    Flyvbjerg and Petersen [J. Chem. Phys. 91, 461 (1989)]. It
+    progressively averages data into larger blocks and calculates the
+    standard error for each block size. The block size increases
+    linearly in each iteration. The true standard error is estimated
+    from the plateau in a plot of error versus block size.
+
+    Parameters:
+    - interval_between_samples_fs (float):
+        The time interval between consecutive samples in femtoseconds.
+    - samples (npt.NDArray[np.floating]):
+        A 1D numpy array of time-ordered data points from a simulation.
+    - block_size_increment_fs (float):
+        The amount of time (in fs) to add to the block size in each
+        iteration.
+    - min_n_blocks (int):
+        The minimum number of blocks required to continue the analysis.
+        The procedure stops when the number of blocks falls below this
+        threshold.
+
+    Returns:
+    - Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        A tuple containing two 1D numpy arrays:
+        1. The block size in femtoseconds (correlation time).
+        2. The estimated standard error of the mean for each
+           corresponding block size.
+    """
+    n_observations = samples.shape[0]
+    
+    if n_observations < min_n_blocks:
+        raise ValueError(
+            f"The number of observations ({n_observations}) must be "
+            f"greater than or equal to min_n_blocks ({min_n_blocks})."
+        )
+    if block_size_increment_fs <= 0:
+        raise ValueError("block_size_increment_fs must be a positive value.")
+
+    block_errors = []
+    correlation_times_fs = []
+    
+    current_block_size_fs = interval_between_samples_fs
+
+    while True:
+        block_size_in_samples = int(round(current_block_size_fs / interval_between_samples_fs))
+        
+        #
+        # Ensure block size is at least 1 sample
+        #
+        if block_size_in_samples == 0:
+            block_size_in_samples = 1
+
+        n_blocks = n_observations // block_size_in_samples
+        
+        if n_blocks < min_n_blocks:
+            break
+        
+        relevant_data = samples[:n_blocks * block_size_in_samples]
+        
+        block_averages = np.mean(
+            relevant_data.reshape(n_blocks, block_size_in_samples),
+            axis=1
+        )
+        
+        block_variance = np.var(block_averages, ddof=1)
+        block_errors.append(np.sqrt(block_variance / n_blocks))
+        
+        actual_correlation_time = block_size_in_samples * interval_between_samples_fs
+        correlation_times_fs.append(actual_correlation_time)
+
+        current_block_size_fs += block_size_increment_fs
+
+    correlation_times_fs = np.array(correlation_times_fs)
+    block_errors = np.array(block_errors)
+    
+    return correlation_times_fs, block_errors
 
 
 def crystal(

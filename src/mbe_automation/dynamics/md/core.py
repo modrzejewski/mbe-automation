@@ -113,7 +113,6 @@ def run(
     print(f"n_samples           {n_samples}")
     print(f"fixed COM           {fix_COM}")
 
-    E_kin_COM = 3.0/2.0 * ase.units.kB * target_temperature_K # eV
     total_steps = round(md.time_total_fs/md.time_step_fs)
     display_frequency = 5
     milestones = [0]
