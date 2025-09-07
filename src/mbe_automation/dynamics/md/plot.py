@@ -152,7 +152,7 @@ def reblocking(
     """
     df = mbe_automation.storage.read_data_frame(
         dataset=dataset,
-        key=key
+        key=key,
         columns=["E_kin (eV/atom)", "E_pot (eV/atom)", "time (fs)",
                  "p (GPa)", "V (Å³/atom)"]
     )
