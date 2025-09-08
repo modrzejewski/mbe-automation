@@ -7,6 +7,73 @@ import numpy.typing as npt
 import mbe_automation.storage
 
 
+def velocity_autocorrelation(
+    dataset: str,
+    key: str,
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    """
+    Computes the velocity autocorrelation function (VACF) from trajectory data.
+
+    The VACF is calculated for the production part of the trajectory using
+    an efficient algorithm based on the Fast Fourier Transform (FFT). The
+    function reads velocity data, computes the autocorrelation for each
+    atom and Cartesian component, and returns the averaged, normalized VACF.
+
+    Parameters:
+    - dataset (str): Path to the dataset file (HDF5).
+    - key (str): Path to the trajectory group within the HDF5 file.
+
+    Returns:
+    - Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        A tuple containing two 1D numpy arrays:
+        1. time_lag_fs: The time lags in femtoseconds.
+        2. vacf_normalized: The normalized velocity autocorrelation function.
+    """
+    traj = mbe_automation.storage.read_trajectory(dataset=dataset, key=key)
+
+    time_fs = traj.time
+    velocities_A_fs = traj.velocities
+
+    time_equilibration_fs = traj.time_equilibration
+    production_mask = time_fs >= time_equilibration_fs
+    
+    production_velocities = velocities_A_fs[production_mask, :, :]
+    production_time_fs = time_fs[production_mask]
+
+    if len(production_time_fs) < 2:
+        raise ValueError("Not enough production frames to calculate VACF.")
+
+    interval_fs = production_time_fs[1] - production_time_fs[0]
+    n_frames_prod, n_atoms, _ = production_velocities.shape
+
+    # Use FFT to compute the autocorrelation function via the Wiener-Khinchin theorem.
+    # The signal is zero-padded to 2*N-1 to calculate a linear (not circular) correlation.
+    n_fft = 2 * n_frames_prod - 1
+    
+    # FFT along the time axis (axis=0)
+    fft_vel = np.fft.fft(production_velocities, n=n_fft, axis=0)
+    
+    # Compute the power spectral density (magnitude squared of FFT)
+    power_spectrum = np.abs(fft_vel)**2
+    
+    # Inverse FFT of the power spectrum gives the autocorrelation function
+    vacf = np.fft.ifft(power_spectrum, axis=0).real
+    
+    # Sum over Cartesian components (x, y, z) and average over atoms
+    vacf_avg_atoms = np.mean(np.sum(vacf, axis=2), axis=1)
+
+    # The result is the full autocorrelation; we only need the first n_frames_prod points.
+    # The normalization factor for a discrete correlation is 1/N.
+    vacf_final = vacf_avg_atoms[:n_frames_prod] / n_frames_prod
+
+    # Normalize by the value at t=0 so that VACF(0) = 1
+    vacf_normalized = vacf_final / vacf_final[0]
+
+    time_lag_fs = np.arange(n_frames_prod) * interval_fs
+
+    return time_lag_fs, vacf_normalized
+
+
 def reblocking(
     interval_between_samples_fs: float,
     samples: npt.NDArray[np.floating],

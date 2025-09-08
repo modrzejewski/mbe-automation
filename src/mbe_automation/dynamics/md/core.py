@@ -50,14 +50,12 @@ def run(
     if md.sampling_interval_fs < md.time_step_fs:
         raise ValueError("Sampling interval must be >= time_step_fs")
 
-    # if fix_COM:
-    #     init_conf.set_constraint(ase.constraints.FixCom())
     MaxwellBoltzmannDistribution(
         init_conf,
         temperature_K=md.target_temperature_K
     )
-    #Stationary(init_conf)    
-    #ZeroRotation(init_conf)
+    Stationary(init_conf)    
+    ZeroRotation(init_conf)
 
     if md.ensemble == "NVT":
         # dyn = NoseHooverChainNVT(
