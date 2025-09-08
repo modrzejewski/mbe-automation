@@ -53,8 +53,12 @@ def run(
         init_conf,
         temperature_K=md.target_temperature_K
     )
+    masses = init_conf.get_masses()
+    total_mass = np.sum(masses)
+    com_velocity = init_conf.get_momenta().sum(axis=0) / total_mass
+    velocities = init_conf.get_velocities() - com_velocity
+    init_conf.set_velocities(velocities)
     if is_periodic:
-        Stationary(init_conf)    
         ZeroRotation(init_conf)
 
     if md.ensemble == "NVT":
@@ -98,7 +102,7 @@ def run(
         time_equilibration=md.time_equilibration_fs
     )
     traj.atomic_numbers = init_conf.get_atomic_numbers()
-    traj.masses = init_conf.get_masses()
+    traj.masses = masses
 
     print(f"temperature         {target_temperature_K:.2f} K")
     if md.ensemble == "NPT":
@@ -114,8 +118,6 @@ def run(
     milestones = [0]
     milestones_time = [time.time()]
     sample_idx = 0
-    masses = init_conf.get_masses()
-    total_mass = np.sum(masses)
     
     def sample():
         nonlocal sample_idx
