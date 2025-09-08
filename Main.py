@@ -10,7 +10,7 @@ import mbe_automation.single_point
                                                 # If the path already exists, e.g., it's your previous project,
                                                 # all existing files will be moved to a backup location.
                                                 #
-ProjectDirectory    = "./Projects/01_1,4-cyclohexanedione"
+ProjectDirectory    = "./Projects/MD_01_1,4-cyclohexanedione"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -28,7 +28,8 @@ Methods = ["RPA", "LNO-CCSD(T)", "MACE(PBC)", "DFTB(PBC)", "UMA(PBC)"]
                                                 # interatomic potentials
                                                 #
 mlip_parameters = {
-    "MACE": "~/models/mace/MACE-OFF24_medium.model",
+    #"MACE": "~/models/mace/MACE-OFF24_medium.model",
+    "MACE": "~/models/michaelides_2025/01_cyclohexanedione/MACE_model_swa.model",
     "UMA": "~/models/uma/checkpoints/uma-m-1p1.pt"
     }
                                                 #
