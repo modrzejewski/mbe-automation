@@ -168,14 +168,14 @@ def molecule(
     
     T_target = df.attrs["target_temperature (K)"]
     kbT = ase.units.kB * T_target / (ase.units.kJ / ase.units.mol) # equals pV in the ideal gas approximation
-    #E_trans = 3.0/2.0 * kbT # kJ/mol/molecule translations of the center of mass
+    E_trans = 3.0/2.0 * kbT # kJ/mol/molecule, relatred to COM translation
     
     return pd.DataFrame([{
         "T (K)": T_target,
         "⟨T⟩_molecule (K)": production_df["T (K)"].mean(),
         "⟨E_kin⟩_molecule (kJ/mol/molecule)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
         "⟨E_pot⟩_molecule (kJ/mol/molecule)": production_df["E_pot (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
-     #   "E_trans_molecule (kJ/mol/molecule)": E_trans,
+        "E_trans_molecule (kJ/mol/molecule)": E_trans, # COM translation
         "kT (kJ/mol)": kbT, # equals the pV contribution per molecule in the ideal gas approximation
         "n_atoms_molecule": n_atoms_molecule,
         "system_label_molecule": system_label
@@ -207,7 +207,7 @@ def sublimation(df_crystal, df_molecule):
     ΔE_kin = (
         df_molecule["⟨E_kin⟩_molecule (kJ/mol/molecule)"]
         - df_crystal["⟨E_kin⟩_crystal (kJ/mol/unit cell)"] * beta
-        ) # kJ/mol/molecule
+        ) # kJ/mol/molecule, with COM translation removed
     pV = df_crystal["p⟨V⟩_crystal (kJ/mol/unit cell)"] * beta # kJ/mol/molecule
     #
     # Enthalpy defined in eq 10 of ref 1
@@ -215,7 +215,7 @@ def sublimation(df_crystal, df_molecule):
     ΔH_sub = (
         ΔE_pot
         + ΔE_kin
-    #    + df_molecule["E_trans_molecule (kJ/mol/molecule)"]
+        + df_molecule["E_trans_molecule (kJ/mol/molecule)"] # COM translation
         + df_molecule["kT (kJ/mol)"] # the pV term per molecule in the ideal gas approximation
         - pV
     ) # kJ/mol/molecule

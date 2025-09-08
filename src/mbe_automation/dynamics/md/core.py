@@ -117,16 +117,23 @@ def run(
     milestones = [0]
     milestones_time = [time.time()]
     sample_idx = 0
+    masses = init_conf.get_masses()
+    total_mass = np.sum(masses)
     
     def sample():
         nonlocal sample_idx
 
         E_pot = dyn.atoms.get_potential_energy() / n_atoms # eV/atom
-        E_kin = dyn.atoms.get_kinetic_energy() / n_atoms # eV/atom, E_trans is not included for molecules
-        T_insta = dyn.atoms.get_temperature() # K
+        com_velocity = dyn.atoms.get_total_momentum() / total_mass
+        velocities = dyn.atoms.get_velocities() - com_velocity
+        E_kin_system = 0.5 * np.sum(masses[:, np.newaxis] * velocities**2) # eV/system, COM translation removed
+        T_insta = E_kin_system / (3.0/2.0 * (n_atoms - 1) * ase.units.kB) # K
+        E_kin = E_kin_system / n_atoms # eV/atom, COM translation removed
+
         traj.E_pot[sample_idx] = E_pot
         traj.E_kin[sample_idx] = E_kin
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
+        traj.velocities[sample_idx, :, :] = velocities / (ase.units.Angstrom/ase.units.fs) # Å/fs, COM translation removed 
         if fix_COM:
             r_com = dyn.atoms.get_center_of_mass()
             dyn.atoms.translate(-r_com)
