@@ -42,7 +42,6 @@ def run(
         init_conf = system.copy()
 
     is_periodic = np.any(init_conf.pbc)
-    fix_COM = not is_periodic
     
     init_conf.calc = calculator
     if md.time_step_fs > 1.0:
@@ -50,13 +49,12 @@ def run(
     if md.sampling_interval_fs < md.time_step_fs:
         raise ValueError("Sampling interval must be >= time_step_fs")
 
-    init_conf.set_constraint(ase.constraints.FixCom())
     MaxwellBoltzmannDistribution(
         init_conf,
         temperature_K=md.target_temperature_K
     )
     if is_periodic:
-        # Stationary(init_conf)    
+        Stationary(init_conf)    
         ZeroRotation(init_conf)
 
     if md.ensemble == "NVT":
@@ -110,7 +108,6 @@ def run(
     print(f"time_step           {md.time_step_fs} fs")
     print(f"n_total_steps       {n_total_steps}")
     print(f"n_samples           {n_samples}")
-    print(f"fixed COM           {fix_COM}")
 
     total_steps = round(md.time_total_fs/md.time_step_fs)
     display_frequency = 5
@@ -124,8 +121,8 @@ def run(
         nonlocal sample_idx
 
         E_pot = dyn.atoms.get_potential_energy() / n_atoms # eV/atom
-        #com_velocity = dyn.atoms.get_momenta().sum(axis=0) / total_mass
-        velocities = dyn.atoms.get_velocities() #- com_velocity
+        com_velocity = dyn.atoms.get_momenta().sum(axis=0) / total_mass
+        velocities = dyn.atoms.get_velocities() - com_velocity
         E_kin_system = 0.5 * np.sum(masses[:, np.newaxis] * velocities**2) # eV/system, COM translation removed
         if is_periodic:
             T_insta = E_kin_system / (3.0/2.0 * n_atoms * ase.units.kB) # K
@@ -137,9 +134,9 @@ def run(
         traj.E_kin[sample_idx] = E_kin
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
         traj.velocities[sample_idx, :, :] = velocities / (ase.units.Angstrom/ase.units.fs) # Å/fs, COM translation removed 
-        if fix_COM:
-            r_com = dyn.atoms.get_center_of_mass()
-            dyn.atoms.translate(-r_com)
+        # if fix_COM:
+        #     r_com = dyn.atoms.get_center_of_mass()
+        #     dyn.atoms.translate(-r_com)
         traj.positions[sample_idx, :, :] = dyn.atoms.get_positions()
         traj.temperature[sample_idx] = T_insta
         traj.time[sample_idx] = dyn.get_time() / ase.units.fs
