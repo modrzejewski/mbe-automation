@@ -60,19 +60,19 @@ def run(
     #ZeroRotation(init_conf)
 
     if md.ensemble == "NVT":
-        dyn = NoseHooverChainNVT(
-            init_conf,
-            timestep=md.time_step_fs * ase.units.fs,
-            temperature_K=target_temperature_K,
-            tdamp=md.thermostat_time_fs * ase.units.fs,
-            tchain=md.tchain
-        )
-        # dyn = Bussi(
+        # dyn = NoseHooverChainNVT(
         #     init_conf,
         #     timestep=md.time_step_fs * ase.units.fs,
         #     temperature_K=target_temperature_K,
-        #     taut=md.thermostat_time_fs * ase.units.fs
+        #     tdamp=md.thermostat_time_fs * ase.units.fs,
+        #     tchain=md.tchain
         # )
+        dyn = Bussi(
+            init_conf,
+            timestep=md.time_step_fs * ase.units.fs,
+            temperature_K=target_temperature_K,
+            taut=md.thermostat_time_fs * ase.units.fs
+        )
     elif md.ensemble == "NPT":
         dyn = MTKNPT(
             init_conf,
