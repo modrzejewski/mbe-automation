@@ -258,14 +258,6 @@ def velocity_autocorrelation(
     ax.grid(True, linestyle=":", alpha=0.7)
     ax.axhline(0, color='k', linestyle='-', linewidth=0.8)
 
-    # Set a reasonable x-limit, e.g., twice the first zero-crossing time
-    zero_crossing_indices = np.where(np.diff(np.sign(vacf_normalized)))[0]
-    if len(zero_crossing_indices) > 0:
-        first_zero_crossing_ps = time_lag_ps[zero_crossing_indices[0]]
-        ax.set_xlim(0, min(first_zero_crossing_ps * 2.0, time_lag_ps[-1]))
-    else:
-        ax.set_xlim(0, time_lag_ps[-1])
-
     plt.tight_layout()
     
     if save_path:
