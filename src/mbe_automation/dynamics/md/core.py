@@ -50,14 +50,13 @@ def run(
     if md.sampling_interval_fs < md.time_step_fs:
         raise ValueError("Sampling interval must be >= time_step_fs")
 
-    if fix_COM:
-        init_conf.set_constraint(ase.constraints.FixCom())
+    # if fix_COM:
+    #     init_conf.set_constraint(ase.constraints.FixCom())
     MaxwellBoltzmannDistribution(
         init_conf,
         temperature_K=md.target_temperature_K
     )
-    Stationary(init_conf)
-    
+    #Stationary(init_conf)    
     #ZeroRotation(init_conf)
 
     if md.ensemble == "NVT":
@@ -128,6 +127,9 @@ def run(
         traj.E_pot[sample_idx] = E_pot
         traj.E_kin[sample_idx] = E_kin
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
+        if fix_COM:
+            r_com = dyn.atoms.get_center_of_mass()
+            dyn.atoms.translate(-r_com)
         traj.positions[sample_idx, :, :] = dyn.atoms.get_positions()
         traj.temperature[sample_idx] = T_insta
         traj.time[sample_idx] = dyn.get_time() / ase.units.fs
