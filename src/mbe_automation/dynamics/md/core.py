@@ -124,7 +124,7 @@ def run(
         nonlocal sample_idx
 
         E_pot = dyn.atoms.get_potential_energy() / n_atoms # eV/atom
-        com_velocity = dyn.atoms.get_total_momentum() / total_mass
+        com_velocity = dyn.atoms.get_momenta().sum(axis=0) / total_mass
         velocities = dyn.atoms.get_velocities() - com_velocity
         E_kin_system = 0.5 * np.sum(masses[:, np.newaxis] * velocities**2) # eV/system, COM translation removed
         T_insta = E_kin_system / (3.0/2.0 * (n_atoms - 1) * ase.units.kB) # K
