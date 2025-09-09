@@ -8,6 +8,7 @@ from ase.md.velocitydistribution import Stationary, ZeroRotation, MaxwellBoltzma
 from ase.md.langevin import Langevin
 from ase.md.bussi import Bussi
 from ase.md.nose_hoover_chain import MTKNPT, NoseHooverChainNVT
+from ase.md.langevin import Langevin
 from ase.io.trajectory import Trajectory
 import ase.units
 
@@ -53,11 +54,7 @@ def run(
         init_conf,
         temperature_K=md.target_temperature_K
     )
-    masses = init_conf.get_masses()
-    total_mass = np.sum(masses)
-    com_velocity = init_conf.get_momenta().sum(axis=0) / total_mass
-    velocities = init_conf.get_velocities() - com_velocity
-    init_conf.set_velocities(velocities)
+    Stationary(init_conf)
     if is_periodic:
         ZeroRotation(init_conf)
 
@@ -69,11 +66,24 @@ def run(
         #     tdamp=md.thermostat_time_fs * ase.units.fs,
         #     tchain=md.tchain
         # )
-        dyn = Bussi(
+        # dyn = Bussi(
+        #     init_conf,
+        #     timestep=md.time_step_fs * ase.units.fs,
+        #     temperature_K=target_temperature_K,
+        #     taut=md.thermostat_time_fs * ase.units.fs
+        # )
+        dyn = Langevin(
             init_conf,
             timestep=md.time_step_fs * ase.units.fs,
             temperature_K=target_temperature_K,
-            taut=md.thermostat_time_fs * ase.units.fs
+            friction=1.0/(md.thermostat_time_fs * ase.units.fs),
+            #
+            # fixcm=True will keep the center of mass stationary.
+            # This is important because for the molecule we
+            # add E_trans=3/2kbT as a seprate energetic term
+            # (see dynamics.md.data)
+            #
+            fixcm=True 
         )
     elif md.ensemble == "NPT":
         dyn = MTKNPT(
@@ -101,6 +111,8 @@ def run(
         target_pressure=(target_pressure_GPa if md.ensemble=="NPT" else None),
         time_equilibration=md.time_equilibration_fs
     )
+    masses = init_conf.get_masses()
+    total_mass = np.sum(masses)
     traj.atomic_numbers = init_conf.get_atomic_numbers()
     traj.masses = masses
 
