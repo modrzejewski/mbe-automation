@@ -43,7 +43,10 @@ def run(
         init_conf = system.copy()
 
     is_periodic = np.any(init_conf.pbc)
-    
+    if not is_periodic:
+        n_internal_dof = mbe_automation.structure.molecule.n_internal_degrees_of_freedom(init_conf)
+        init_conf.get_number_of_degrees_of_freedom = lambda: n_internal_dof
+        
     init_conf.calc = calculator
     if md.time_step_fs > 1.0:
         print("Warning: time step > 1 fs may be too large for accurate dynamics")
@@ -55,10 +58,8 @@ def run(
         temperature_K=md.target_temperature_K
     )
     Stationary(init_conf)
-    if is_periodic:
-        ZeroRotation(init_conf)
-    if not is_periodic:
-        init_conf.set_constraint(ase.constraints.FixCom())
+    ZeroRotation(init_conf)
+    
     if md.ensemble == "NVT":
         # dyn = NoseHooverChainNVT(
         #     init_conf,
@@ -142,7 +143,7 @@ def run(
         if is_periodic:
             T_insta = E_kin_system / (3.0/2.0 * n_atoms * ase.units.kB) # K
         else:
-            T_insta = E_kin_system / (3.0/2.0 * (n_atoms - 1) * ase.units.kB) # K
+            T_insta = E_kin_system / (1.0/2.0 * n_internal_dof * ase.units.kB) # K
         E_kin = E_kin_system / n_atoms # eV/atom, COM translation removed
 
         traj.E_pot[sample_idx] = E_pot
