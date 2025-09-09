@@ -544,7 +544,7 @@ def save_trajectory(
             data=traj.forces
         )
         group.create_dataset(
-            name="velocities (Å/fs)", # velocities w.r.t. center of mass
+            name="velocities (Å/fs)",
             data=traj.velocities
         )
         group.create_dataset(

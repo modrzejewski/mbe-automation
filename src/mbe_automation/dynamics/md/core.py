@@ -45,8 +45,7 @@ def run(
 
     is_periodic = np.any(init_conf.pbc)
     if not is_periodic:
-        n_internal_dof = mbe_automation.structure.molecule.n_internal_degrees_of_freedom(init_conf)
-        init_conf.get_number_of_degrees_of_freedom = lambda: n_internal_dof
+        n_internal_dof = 3 * len(init_conf) - 3
         
     init_conf.calc = calculator
     if md.time_step_fs > 1.0:
@@ -69,25 +68,19 @@ def run(
         #     tdamp=md.thermostat_time_fs * ase.units.fs,
         #     tchain=md.tchain
         # )
-        dyn = Bussi(
-            init_conf,
-            timestep=md.time_step_fs * ase.units.fs,
-            temperature_K=target_temperature_K,
-            taut=md.thermostat_time_fs * ase.units.fs
-        )
-        # dyn = Langevin(
+        # dyn = Bussi(
         #     init_conf,
         #     timestep=md.time_step_fs * ase.units.fs,
         #     temperature_K=target_temperature_K,
-        #     friction=1.0/(md.thermostat_time_fs * ase.units.fs),
-        #     #
-        #     # fixcm=True will keep the center of mass stationary.
-        #     # This is important because for the molecule we
-        #     # add E_trans=3/2kbT as a seprate energetic term
-        #     # (see dynamics.md.data)
-        #     #
-        #     fixcm=True 
+        #     taut=md.thermostat_time_fs * ase.units.fs
         # )
+        dyn = Langevin(
+            init_conf,
+            timestep=md.time_step_fs * ase.units.fs,
+            temperature_K=target_temperature_K,
+            friction=1.0/(md.thermostat_time_fs * ase.units.fs),
+            fixcm=True
+        )
     elif md.ensemble == "NPT":
         dyn = MTKNPT(
             init_conf,
