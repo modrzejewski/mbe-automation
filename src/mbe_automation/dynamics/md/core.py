@@ -57,7 +57,7 @@ def run(
     Stationary(init_conf)
     if is_periodic:
         ZeroRotation(init_conf)
-    if not is is_periodic:
+    if not is_periodic:
         init_conf.set_constraint(ase.constraints.FixCom())
     if md.ensemble == "NVT":
         # dyn = NoseHooverChainNVT(
