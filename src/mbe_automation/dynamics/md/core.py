@@ -57,7 +57,8 @@ def run(
     Stationary(init_conf)
     if is_periodic:
         ZeroRotation(init_conf)
-
+    if not is is_periodic:
+        init_conf.set_constraint(ase.constraints.FixCom())
     if md.ensemble == "NVT":
         # dyn = NoseHooverChainNVT(
         #     init_conf,
@@ -66,25 +67,25 @@ def run(
         #     tdamp=md.thermostat_time_fs * ase.units.fs,
         #     tchain=md.tchain
         # )
-        # dyn = Bussi(
-        #     init_conf,
-        #     timestep=md.time_step_fs * ase.units.fs,
-        #     temperature_K=target_temperature_K,
-        #     taut=md.thermostat_time_fs * ase.units.fs
-        # )
-        dyn = Langevin(
+        dyn = Bussi(
             init_conf,
             timestep=md.time_step_fs * ase.units.fs,
             temperature_K=target_temperature_K,
-            friction=1.0/(md.thermostat_time_fs * ase.units.fs),
-            #
-            # fixcm=True will keep the center of mass stationary.
-            # This is important because for the molecule we
-            # add E_trans=3/2kbT as a seprate energetic term
-            # (see dynamics.md.data)
-            #
-            fixcm=True 
+            taut=md.thermostat_time_fs * ase.units.fs
         )
+        # dyn = Langevin(
+        #     init_conf,
+        #     timestep=md.time_step_fs * ase.units.fs,
+        #     temperature_K=target_temperature_K,
+        #     friction=1.0/(md.thermostat_time_fs * ase.units.fs),
+        #     #
+        #     # fixcm=True will keep the center of mass stationary.
+        #     # This is important because for the molecule we
+        #     # add E_trans=3/2kbT as a seprate energetic term
+        #     # (see dynamics.md.data)
+        #     #
+        #     fixcm=True 
+        # )
     elif md.ensemble == "NPT":
         dyn = MTKNPT(
             init_conf,
