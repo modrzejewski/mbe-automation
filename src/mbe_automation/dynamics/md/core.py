@@ -15,6 +15,7 @@ import ase.units
 import mbe_automation.display
 from  mbe_automation.configs.md import ClassicalMD
 import mbe_automation.storage
+import mbe_automation.structure.molecule
 
 def run(
         system: ase.Atoms,
