@@ -57,30 +57,31 @@ def run(
         init_conf,
         temperature_K=md.target_temperature_K
     )
-    Stationary(init_conf)
-    ZeroRotation(init_conf)
+    if is_periodic:
+        Stationary(init_conf)
+        ZeroRotation(init_conf)
     
     if md.ensemble == "NVT":
-        # dyn = NoseHooverChainNVT(
-        #     init_conf,
-        #     timestep=md.time_step_fs * ase.units.fs,
-        #     temperature_K=target_temperature_K,
-        #     tdamp=md.thermostat_time_fs * ase.units.fs,
-        #     tchain=md.tchain
-        # )
+        dyn = NoseHooverChainNVT(
+            init_conf,
+            timestep=md.time_step_fs * ase.units.fs,
+            temperature_K=target_temperature_K,
+            tdamp=md.thermostat_time_fs * ase.units.fs,
+            tchain=md.tchain
+        )
         # dyn = Bussi(
         #     init_conf,
         #     timestep=md.time_step_fs * ase.units.fs,
         #     temperature_K=target_temperature_K,
         #     taut=md.thermostat_time_fs * ase.units.fs
         # )
-        dyn = Langevin(
-            init_conf,
-            timestep=md.time_step_fs * ase.units.fs,
-            temperature_K=target_temperature_K,
-            friction=1.0/(md.thermostat_time_fs * ase.units.fs),
-            fixcm=True
-        )
+        # dyn = Langevin(
+        #     init_conf,
+        #     timestep=md.time_step_fs * ase.units.fs,
+        #     temperature_K=target_temperature_K,
+        #     friction=1.0/(md.thermostat_time_fs * ase.units.fs),
+        #     fixcm=True
+        # )
     elif md.ensemble == "NPT":
         dyn = MTKNPT(
             init_conf,
@@ -137,7 +138,7 @@ def run(
         if is_periodic:
             T_insta = E_kin_system / (3.0/2.0 * n_atoms * ase.units.kB) # K
         else:
-            T_insta = E_kin_system / (1.0/2.0 * n_internal_dof * ase.units.kB) # K
+            T_insta = E_kin_system / (3.0/2.0 * (n_atoms - 1) * ase.units.kB) # K
         E_kin = E_kin_system / n_atoms # eV/atom, COM translation removed
 
         traj.E_pot[sample_idx] = E_pot
