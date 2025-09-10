@@ -113,7 +113,7 @@ class ClassicalMD:
                                    #
                                    # Martyna, Tobias, Klein J. Chem. Phys. 101, 4177 (1994)
                                    #
-    nvt_algo: Literal["csvr", "nose_hoover_chain", "langevin", "andersen"] = "andersen"
+    nvt_algo: Literal["csvr", "nose_hoover_chain", "langevin", "andersen"] = "csvr"
     npt_algo: Literal["mtk_isotropic", "mtk_full"] = "mtk_full"
     thermostat_time_fs: float = 100.0
     barostat_time_fs: float = 1000.0

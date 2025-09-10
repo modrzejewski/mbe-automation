@@ -174,6 +174,7 @@ def crystal(
         key=key,
         columns=[
             "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)",
+            "E_trans_drift (eV/atom)", "E_rot_drift (eV/atom)",
             "p (GPa)", "V (Å³/atom)"
         ]
     )
@@ -185,12 +186,22 @@ def crystal(
         
     eV_to_kJ_per_mol = ase.units.eV / (ase.units.kJ / ase.units.mol)
     GPa_to_eV_per_Angs3 = ase.units.GPa / (ase.units.eV / ase.units.Angstrom**3)
+    eV_to_kJ_per_unit_cell = eV_to_kJ_per_mol * n_atoms_unit_cell
+    #
+    # The energies related to the translational/rotational drift of the entire
+    # system should be equal to zero unless there are some numerical problems
+    # with the simulation. Here those quantities are provided as a diagonostic.
+    #
+    E_trans_drift = production_df["E_trans_drift (eV/atom)"].mean() * eV_to_kJ_per_unit_cell
+    E_rot_drift = production_df["E_rot_drift (eV/atom)"].mean() * eV_to_kJ_per_unit_cell
     
     df_NVT = pd.DataFrame([{
         "T (K)": df.attrs["target_temperature (K)"],
         "⟨T⟩_crystal (K)": production_df["T (K)"].mean(),
-        "⟨E_kin⟩_crystal (kJ/mol/unit cell)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_unit_cell,
-        "⟨E_pot⟩_crystal (kJ/mol/unit cell)": production_df["E_pot (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_unit_cell,
+        "⟨E_kin⟩_crystal (kJ/mol/unit cell)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_unit_cell,
+        "⟨E_pot⟩_crystal (kJ/mol/unit cell)": production_df["E_pot (eV/atom)"].mean() * eV_to_kJ_per_unit_cell,
+        "⟨E_trans_drift⟩_crystal (kJ/mol/unit cell)": E_trans_drift,
+        "⟨E_rot_drift⟩_crystal (kJ/mol/unit cell)": E_rot_drift,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "system_label_crystal": system_label
     }])
@@ -222,7 +233,8 @@ def molecule(
         dataset=dataset,
         key=key,
         columns=[
-        "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)"
+            "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)",
+            "E_trans_drift (eV/atom)", "E_rot_drift (eV/atom)"
         ]
     )
     if df.attrs["periodic"]:
@@ -233,17 +245,41 @@ def molecule(
     
     eV_to_kJ_per_mol = ase.units.eV / (ase.units.kJ / ase.units.mol)
     n_atoms_molecule = df.attrs["n_atoms"]
+    #
+    # The energies related to the translational/rotational drift of the entire
+    # system should be equal to zero unless there are some numerical problems
+    # with the simulation. Here those quantities are provided as a diagonostic.
+    #
+    E_trans_drift = production_df["E_trans_drift (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule # kJ/mol/molecule
+    E_rot_drift = production_df["E_rot_drift (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule # kJ/mol/molecule
     
     T_target = df.attrs["target_temperature (K)"]
-    kbT = ase.units.kB * T_target / (ase.units.kJ / ase.units.mol) # equals pV in the ideal gas approximation
-    E_trans = 3.0/2.0 * kbT # kJ/mol/molecule, relatred to COM translation
+    kbT = ase.units.kB * T_target / (ase.units.kJ / ase.units.mol) # equals pV in the ideal gas approximation    
+    #
+    # E_trans and E_rot compensate for the degrees of freedom
+    # which are removed from the MD simulation of a finite system
+    # and not thermalized by contact with the thermostat:
+    #
+    # (1) translation of the entire system (E_trans)
+    # (2) rotation of the entire system (E_rot)
+    #
+    # Note that translations and rotations can only be thermalized through
+    # collisions in a gas of N molecules. Since we were simulating only
+    # a single molecule in vacuum, the thermal averages of those terms
+    # are treated here explicitly.
+    #
+    E_trans = 1.0/2.0 * df.attrs["n_removed_trans_dof"] * kbT # kJ/mol/molecule
+    E_rot = 1.0/2.0 * df.attrs["n_removed_rot_dof"] * kbT # kJ/mol/molecule
     
     return pd.DataFrame([{
         "T (K)": T_target,
         "⟨T⟩_molecule (K)": production_df["T (K)"].mean(),
         "⟨E_kin⟩_molecule (kJ/mol/molecule)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
         "⟨E_pot⟩_molecule (kJ/mol/molecule)": production_df["E_pot (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
-        "E_trans_molecule (kJ/mol/molecule)": E_trans, # COM translation
+        "E_trans_molecule (kJ/mol/molecule)": E_trans, # COM translations (not included in ⟨E_kin⟩)
+        "E_rot_molecule (kJ/mol/molecule)": E_rot, # rotations of the entire molecule (not included in ⟨E_kin⟩)
+        "⟨E_trans_drift⟩_molecule (kJ/mol/molecule)": E_trans_drift, # spurious drift -- should be zero if no numerical issues
+        "⟨E_rot_drift⟩_molecule (kJ/mol/molecule)": E_rot_drift, # spurious drift -- should be zero if no numerical issues
         "kT (kJ/mol)": kbT, # equals the pV contribution per molecule in the ideal gas approximation
         "n_atoms_molecule": n_atoms_molecule,
         "system_label_molecule": system_label
@@ -273,7 +309,7 @@ def sublimation(df_crystal, df_molecule):
         - df_crystal["⟨E_pot⟩_crystal (kJ/mol/unit cell)"] * beta
         ) # kJ/mol/molecule
     ΔE_kin = (
-        df_molecule["⟨E_kin⟩_molecule (kJ/mol/molecule)"]
+        df_molecule["⟨E_kin⟩_molecule (kJ/mol/molecule)"] # excludes translation and rotation of the entire molecule
         - df_crystal["⟨E_kin⟩_crystal (kJ/mol/unit cell)"] * beta
         ) # kJ/mol/molecule, with COM translation removed
     pV = df_crystal["p⟨V⟩_crystal (kJ/mol/unit cell)"] * beta # kJ/mol/molecule
@@ -282,8 +318,9 @@ def sublimation(df_crystal, df_molecule):
     #
     ΔH_sub = (
         ΔE_pot
-        + ΔE_kin
+        + ΔE_kin 
         + df_molecule["E_trans_molecule (kJ/mol/molecule)"] # COM translation
+        + df_molecule["E_rot_molecule (kJ/mol/molecule)"] # rotation of the entire molecule
         + df_molecule["kT (kJ/mol)"] # the pV term per molecule in the ideal gas approximation
         - pV
     ) # kJ/mol/molecule

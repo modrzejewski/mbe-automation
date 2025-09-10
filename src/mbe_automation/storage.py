@@ -55,6 +55,10 @@ class Trajectory(Structure):
     velocities: npt.NDArray[np.floating]
     E_kin: npt.NDArray[np.floating]
     E_pot: npt.NDArray[np.floating]
+    E_trans_drift: npt.NDArray[np.floating]
+    E_rot_drift: npt.NDArray[np.floating]
+    n_removed_trans_dof: int
+    n_removed_rot_dof: int
 
     @classmethod
     def empty(
@@ -65,7 +69,9 @@ class Trajectory(Structure):
             periodic: bool,
             time_equilibration: float,
             target_temperature: float,
-            target_pressure: float | None = None
+            target_pressure: float | None = None,
+            n_removed_trans_dof: int = 0,
+            n_removed_rot_dof: int = 0
     ):
         if ensemble == "NPT" and target_pressure is None:
             raise ValueError("Target pressure must be specified for the NPT ensemble")
@@ -88,8 +94,12 @@ class Trajectory(Structure):
             volume=(np.zeros(n_frames) if ensemble=="NPT" else None),
             E_kin=np.zeros(n_frames),
             E_pot=np.zeros(n_frames),
+            E_trans_drift=np.zeros(n_frames),
+            E_rot_drift=np.zeros(n_frames),
             target_temperature=target_temperature,
-            target_pressure=target_pressure
+            target_pressure=target_pressure,
+            n_removed_trans_dof=n_removed_trans_dof,
+            n_removed_rot_dof=n_removed_rot_dof
         )
 
         
@@ -519,6 +529,8 @@ def save_trajectory(
         group.attrs["periodic"] = traj.periodic
         group.attrs["target_temperature (K)"] = traj.target_temperature
         group.attrs["time_equilibration (fs)"] = traj.time_equilibration
+        group.attrs["n_removed_trans_dof"] = traj.n_removed_trans_dof
+        group.attrs["n_removed_rot_dof"] = traj.n_removed_rot_dof
         if traj.ensemble == "NPT":
             group.attrs["target_pressure (GPa)"] = traj.target_pressure
 
@@ -554,6 +566,14 @@ def save_trajectory(
         group.create_dataset(
             name="E_pot (eV/atom)",
             data=traj.E_pot
+        )
+        group.create_dataset(
+            name="E_trans_drift (eV/atom)",
+            data=traj.E_trans_drift
+        )
+        group.create_dataset(
+            name="E_rot_drift (eV/atom)",
+            data=traj.E_rot_drift
         )
         group.create_dataset(
             name="positions (Å)",
@@ -597,9 +617,13 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             velocities=group["velocities (Å/fs)"][...],
             E_kin=group["E_kin (eV/atom)"][...],
             E_pot=group["E_pot (eV/atom)"][...],
+            E_trans_drift=group["E_trans_drift (eV/atom)"][...],
+            E_rot_drift=group["E_rot_drift (eV/atom)"][...],
             target_temperature=group.attrs["target_temperature (K)"],
             target_pressure=(group.attrs["target_pressure (GPa)"] if ensemble=="NPT" else None),
-            time_equilibration=group.attrs["time_equilibration (fs)"]
+            time_equilibration=group.attrs["time_equilibration (fs)"],
+            n_removed_trans_dof=group.attrs["n_removed_trans_dof"],
+            n_removed_rot_dof=group.attrs["n_removed_rot_dof"]
         )
         
     return traj
