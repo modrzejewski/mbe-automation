@@ -11,7 +11,7 @@ from ase.md.nose_hoover_chain import MTKNPT, NoseHooverChainNVT, IsotropicMTKNPT
 from ase.md.andersen import Andersen
 from ase.md.langevin import Langevin
 from ase.io.trajectory import Trajectory
-import ase.unit
+import ase.units
 from ase.md.fix import FixRotation
 
 import mbe_automation.display
