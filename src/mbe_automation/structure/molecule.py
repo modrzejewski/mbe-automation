@@ -52,14 +52,14 @@ def analyze_geometry(atoms: ase.Atoms) -> Tuple[str, int]:
     return rotor_type, sym_number
 
 
-def n_internal_degrees_of_freedom(molecule):
+def n_rotational_degrees_of_freedom(molecule):
     rotor_type, _ = analyze_geometry(molecule)
     
     if rotor_type == "monatomic":
-        n_dof = 0
+        n_rot_dof = 0
     elif rotor_type == "linear":
-        n_dof = 3 * len(molecule) - 5
-    else:
-        n_dof = 3 * len(molecule) - 6
+        n_rot_dof = 2
+    elif rotor_type == "nonlinear":
+        n_rot_dof = 3
 
-    return n_dof
+    return n_rot_dof
