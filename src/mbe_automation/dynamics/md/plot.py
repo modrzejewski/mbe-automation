@@ -6,6 +6,7 @@ import pandas as pd
 import mbe_automation.storage
 import mbe_automation.dynamics.md.data
 
+
 def trajectory(
         dataset: str,
         key: str,
@@ -211,6 +212,53 @@ def reblocking(
 
     axes[-1].set_xlabel("Correlation Time (ps)")
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    
+    if save_path:
+        output_dir = os.path.dirname(save_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        plt.savefig(save_path, dpi=300)
+        plt.close(fig)
+    else:
+        return fig
+
+
+def velocity_autocorrelation(
+    dataset: str,
+    key: str,
+    save_path: str = None
+):
+    """
+    Calculates and plots the velocity autocorrelation function (VACF).
+
+    This function reads trajectory data, computes the VACF for the
+    production run using data.velocity_autocorrelation, and
+    generates a plot of the normalized VACF as a function of time.
+
+    Parameters:
+    - dataset (str): Path to the dataset.
+    - key (str): Path to the trajectory group within the dataset.
+    - save_path (str, optional): If provided, the plot is saved to this
+      path. If None, the figure object is returned.
+    """
+    time_lag_fs, vacf_normalized = mbe_automation.dynamics.md.data.velocity_autocorrelation(
+        dataset=dataset,
+        key=key
+    )
+    
+    time_lag_ps = time_lag_fs / 1000.0
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    
+    ax.plot(time_lag_ps, vacf_normalized, color="C0")
+    
+    ax.set_xlabel("Time Lag (ps)")
+    ax.set_ylabel("Normalized VACF")
+    ax.set_title(f"Velocity Autocorrelation Function for {key}")
+    ax.grid(True, linestyle=":", alpha=0.7)
+    ax.axhline(0, color='k', linestyle='-', linewidth=0.8)
+
+    plt.tight_layout()
     
     if save_path:
         output_dir = os.path.dirname(save_path)

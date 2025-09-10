@@ -52,6 +52,7 @@ class Trajectory(Structure):
     pressure: npt.NDArray[np.floating] | None
     volume: npt.NDArray[np.floating] | None
     forces: npt.NDArray[np.floating]
+    velocities: npt.NDArray[np.floating]
     E_kin: npt.NDArray[np.floating]
     E_pot: npt.NDArray[np.floating]
 
@@ -60,7 +61,7 @@ class Trajectory(Structure):
             cls,
             n_atoms: int,
             n_frames: int,
-            ensemble: Literal["NPT", "NVT"],
+            ensemble: Literal["NPT", "NVT", "NVE"],
             periodic: bool,
             time_equilibration: float,
             target_temperature: float,
@@ -77,6 +78,7 @@ class Trajectory(Structure):
             periodic=periodic,
             positions=np.zeros((n_frames, n_atoms, 3)),
             forces=np.zeros((n_frames, n_atoms, 3)),
+            velocities=np.zeros((n_frames, n_atoms, 3)),
             atomic_numbers=np.zeros(n_atoms, dtype=int),
             masses=np.zeros(n_atoms),
             cell_vectors=(np.zeros((n_frames, 3, 3)) if periodic else None),
@@ -542,6 +544,10 @@ def save_trajectory(
             data=traj.forces
         )
         group.create_dataset(
+            name="velocities (Å/fs)",
+            data=traj.velocities
+        )
+        group.create_dataset(
             name="E_kin (eV/atom)",
             data=traj.E_kin
         )
@@ -588,6 +594,7 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             pressure=(group["p (GPa)"][...] if ensemble=="NPT" else None),
             volume=(group["V (Å³/atom)"][...] if ensemble=="NPT" else None),
             forces=group["forces (eV/Å)"][...],
+            velocities=group["velocities (Å/fs)"][...],
             E_kin=group["E_kin (eV/atom)"][...],
             E_pot=group["E_pot (eV/atom)"][...],
             target_temperature=group.attrs["target_temperature (K)"],

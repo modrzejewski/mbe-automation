@@ -8,7 +8,7 @@ import numpy.typing as npt
 @dataclass
 class ClassicalMD:
     ensemble: Literal[
-        "NPT", # Martyna-Tobias-Klein J. Chem. Phys. 101, 4177 (1994)
+        "NPT",
         "NVT"  # Bussi-Donadio-Parrinello J. Chem. Phys. 126, 014101 (2007)
     ] = "NVT"
                                    #
@@ -63,11 +63,14 @@ class ClassicalMD:
     time_total_fs: float = 50000.0
     time_step_fs: float = 0.5
     sampling_interval_fs: float = 50.0
-    time_equilibration_fs: float = 5000.0
+    time_equilibration_fs: float = 5000.0    
                                    #
-                                   # Parameters of the thermostat and barostat
+                                   # Thermostats
+                                   # -----------
                                    #
-                                   # (1) NVT|Bussi-Donadio-Parinello 
+                                   # (1) csvr
+                                   #
+                                   # Canonical sampling through velocity rescaling (CSVR)                                
                                    # Bussi et al. J. Chem. Phys. 126, 014101 (2007);
                                    # doi: 10.1063/1.2408420
                                    #
@@ -79,8 +82,42 @@ class ClassicalMD:
                                    # Relaxation time thermostat_time_fs=100.0 fs works well for water
                                    # and ice, see Figure 4.
                                    #
+                                   # The good ergodicity of this thermostat is discussed in
+                                   # Braun et al. J. Chem. Theory Comput. 14, 5262 (2018);
+                                   # doi: 10.1021/acs.jctc.8b00446
+                                   #
+                                   # (2) nose_hoover_chain
+                                   # (3) langevin
+                                   #
+                                   # The friction parameter in the Langevin thermostat
+                                   # is computed as f = 1/thermostat_time_fs
+                                   #
+                                   # (4) andersen
+                                   #
+                                   # Canonical sampling via collisions with bath particles.
+                                   # The system's dynamics, e.g., velocity autocorrelation,
+                                   # do not correspond to the physical system.
+                                   #
+                                   # Andersen, H. C. Molecular Dynamics Simulations at Constant
+                                   # Pressure and/or Temperature. J. Chem. Phys. 72, 2384 (1980)
+                                   # doi: 10.1063/1.439486
+                                   #
+                                   # The collision probability in the Andersen thermostat
+                                   # is computed as prob = time_step_fs / thermostat_time_fs
+                                   #
+                                   # Barostats
+                                   # ---------
+                                   #
+                                   # (1) mtk_isotropic
+                                   # (2) mtk_full
+                                   #
+                                   # Martyna, Tobias, Klein J. Chem. Phys. 101, 4177 (1994)
+                                   #
+    nvt_algo: Literal["csvr", "nose_hoover_chain", "langevin", "andersen"] = "andersen"
+    npt_algo: Literal["mtk_isotropic", "mtk_full"] = "mtk_full"
     thermostat_time_fs: float = 100.0
     barostat_time_fs: float = 1000.0
+    
     tchain: int = 3
     pchain: int = 3
                                    #
