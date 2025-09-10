@@ -21,7 +21,7 @@ import mbe_automation.dynamics.md.bussi
 
 
 def clean_internal_velocities(
-    system: Atoms,
+    system: ase.Atoms,
     remove_drift_translation: bool = True,
     remove_drift_rotation: bool = True,
 ) -> Tuple[float, float, np.ndarray]:
