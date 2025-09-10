@@ -6,7 +6,7 @@ import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 from ase.md.velocitydistribution import Stationary, ZeroRotation, MaxwellBoltzmannDistribution
 from ase.md.langevin import Langevin
-from ase.md.bussi import Bussi
+from mbe_automation.dynamics.md.bussi import Bussi
 from ase.md.nose_hoover_chain import MTKNPT, NoseHooverChainNVT, IsotropicMTKNPT
 from ase.md.andersen import Andersen
 from ase.md.langevin import Langevin
@@ -87,7 +87,9 @@ def run(
                 init_conf,
                 timestep=md.time_step_fs * ase.units.fs,
                 temperature_K=target_temperature_K,
-                taut=md.thermostat_time_fs * ase.units.fs
+                taut=md.thermostat_time_fs * ase.units.fs,
+                n_removed_trans_dof=n_removed_trans_dof,
+                n_removed_rot_dof=n_removed_rot_dof
             )
         elif md.nvt_algo == "langevin":
             dyn = Langevin(
