@@ -44,7 +44,8 @@ def clean_internal_velocities(
     v = system.get_velocities()
 
     # --- 1. Analyze and optionally remove Center-of-Mass (COM) motion ---
-    total_mass = system.get_total_mass()
+    m = system.get_masses()[:, np.newaxis]
+    total_mass = np.sum(m)
     total_momentum = np.sum(system.get_momenta(), axis=0)
     v_com = total_momentum / total_mass
     E_trans = np.max([0.0, 0.5 * total_mass * np.dot(v_com, v_com)])
@@ -59,7 +60,6 @@ def clean_internal_velocities(
     E_rot = 0.0
     if n_atoms > 1:
         r = system.get_positions() - system.get_center_of_mass()
-        m = system.get_masses()[:, np.newaxis]
         p_internal = v_corrected * m
 
         x = r[:, 0]
