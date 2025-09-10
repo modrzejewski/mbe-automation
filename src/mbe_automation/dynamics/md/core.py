@@ -44,9 +44,6 @@ def run(
         init_conf = system.copy()
 
     is_periodic = np.any(init_conf.pbc)
-    if not is_periodic:
-        n_internal_dof = 3 * len(init_conf) - 3
-        
     init_conf.calc = calculator
     if md.time_step_fs > 1.0:
         print("Warning: time step > 1 fs may be too large for accurate dynamics")
@@ -57,18 +54,26 @@ def run(
         init_conf,
         temperature_K=md.target_temperature_K
     )
+    Stationary(init_conf)
     if is_periodic:
-        Stationary(init_conf)
         ZeroRotation(init_conf)
     
     if md.ensemble == "NVT":
-        dyn = NoseHooverChainNVT(
+        dyn = Andersen(
             init_conf,
             timestep=md.time_step_fs * ase.units.fs,
             temperature_K=target_temperature_K,
-            tdamp=md.thermostat_time_fs * ase.units.fs,
-            tchain=md.tchain
+            andersen_prob=0.01,
+            fixcm=True
         )
+
+        # dyn = NoseHooverChainNVT(
+        #     init_conf,
+        #     timestep=md.time_step_fs * ase.units.fs,
+        #     temperature_K=target_temperature_K,
+        #     tdamp=md.thermostat_time_fs * ase.units.fs,
+        #     tchain=md.tchain
+        # )
         # dyn = Bussi(
         #     init_conf,
         #     timestep=md.time_step_fs * ase.units.fs,
