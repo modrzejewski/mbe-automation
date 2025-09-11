@@ -10,6 +10,14 @@ import mbe_automation.dynamics.md.data
 import mbe_automation.dynamics.md.plot
 import mbe_automation.structure.crystal
 
+try:
+    from mace.calculators import MACECalculator
+    mace_available = True
+except ImportError:
+    MACECalculator = None
+    mace_available = False
+
+
 def run(config: mbe_automation.configs.md.Sublimation):
 
     datetime_start = mbe_automation.display.timestamp_start()
