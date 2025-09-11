@@ -65,7 +65,6 @@ def run(config: mbe_automation.configs.md.Sublimation):
             config.md_crystal.supercell_diagonal
         )
     else:
-        print("Using user-provided explicit supercell matrix", flush=True)
         supercell_matrix = config.md_crystal.supercell_matrix
         
     mbe_automation.dynamics.md.core.run(

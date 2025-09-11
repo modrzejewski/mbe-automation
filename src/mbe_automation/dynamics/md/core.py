@@ -237,7 +237,10 @@ def run(
     print(f"n_samples             {n_samples}")
     print(f"n_removed_rot_dof     {n_removed_rot_dof}")
     print(f"n_removed_trans_dof   {n_removed_trans_dof}")
-
+    if is_periodic:
+        print("supercell_matrix")
+        mbe_automation.display.matrix_3x3(supercell_matrix)
+    
     display_frequency = 5
     milestones = [0]
     milestones_time = [time.time()]
