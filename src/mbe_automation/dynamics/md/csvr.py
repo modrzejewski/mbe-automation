@@ -8,7 +8,7 @@ from ase import units
 from ase.md.verlet import VelocityVerlet
 
 
-class FiniteSystemCSVR(VelocityVerlet):
+class CSVR(VelocityVerlet):
     """Bussi stochastic velocity rescaling (NVT) molecular dynamics.
 
     Based on the paper from Bussi et al., J. Chem. Phys. 126, 014101 (2007)

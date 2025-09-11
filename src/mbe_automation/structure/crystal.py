@@ -204,13 +204,7 @@ def supercell_matrix(
         optimal_matrix = cst.transformation_matrix
 
     supercell = structure.make_supercell(optimal_matrix)
-    for i, row in enumerate(optimal_matrix):
-        if i == 0:
-            print("⎡" + " ".join(f"{num:>3.0f}" for num in row) + " ⎤")
-        elif i == len(optimal_matrix) - 1:
-            print("⎣" + " ".join(f"{num:>3.0f}" for num in row) + " ⎦")
-        else:
-            print("⎢" + " ".join(f"{num:>3.0f}" for num in row) + " ⎥")
+    mbe_automation.display.matrix_3x3(optimal_matrix)
     if backend == "doped":
         r = get_min_image_distance(supercell)
         print(f"Actual point-image distance {r:.1f} Å")

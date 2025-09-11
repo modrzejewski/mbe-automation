@@ -4,6 +4,8 @@ from datetime import timezone
 import platform
 import getpass
 
+import numpy as np
+
 try:
     from mace.calculators import MACECalculator
     mace_available = True
@@ -113,3 +115,38 @@ def mace_summary(calculator: MACECalculator) -> None:
     print(f"total parameters      {total_params:,}")
     print(f"data type             {dtype}")
     print(f"device                {device}")
+
+
+def matrix_3x3(matrix: np.ndarray, decimal_places: int = 3) -> None:
+    """Print a 3x3 NumPy array with parentheses and aligned columns.
+
+    The function formats floats to a specified number of decimal places
+    and dynamically calculates column widths to ensure alignment.
+
+    Args:
+        matrix: A 3x3 NumPy array of floats or integers.
+        decimal_places: The number of decimal places to display for floats.
+
+    Raises:
+        ValueError: If the input is not a 3x3 NumPy array.
+    """
+    if not isinstance(matrix, np.ndarray) or matrix.shape != (3, 3):
+        raise ValueError("Input must be a 3x3 NumPy array.")
+
+    is_float_matrix = np.issubdtype(matrix.dtype, np.floating)
+
+    if is_float_matrix:
+        formatted_strings = [[f"{item:.{decimal_places}f}" for item in row] for row in matrix]
+    else:
+        formatted_strings = [[str(item) for item in row] for row in matrix]
+
+    column_width = max(len(element) for row in formatted_strings for element in row)
+
+    rows_to_print = [
+        "  ".join(element.rjust(column_width) for element in row)
+        for row in formatted_strings
+    ]
+
+    print(f"⎛ {rows_to_print[0]} ⎞")
+    print(f"⎜ {rows_to_print[1]} ⎟")
+    print(f"⎝ {rows_to_print[2]} ⎠")
