@@ -17,10 +17,10 @@ import mbe_automation.display
 from  mbe_automation.configs.md import ClassicalMD
 import mbe_automation.storage
 import mbe_automation.structure.molecule
-import mbe_automation.dynamics.md.bussi
+import mbe_automation.dynamics.md.csvr
 
 
-def clean_internal_velocities(
+def get_velocities(
     system: ase.Atoms,
     remove_drift_translation: bool = True,
     remove_drift_rotation: bool = True,
@@ -58,7 +58,7 @@ def clean_internal_velocities(
     # --- 2. Analyze and optionally remove rotational motion ---
     # Rotational energy is zero for a single atom.
     E_rot = 0.0
-    if n_atoms > 1:
+    if n_atoms > 1 and not np.any(system.pbc):
         r = system.get_positions() - system.get_center_of_mass()
         p_internal = v_corrected * m
 
@@ -134,7 +134,8 @@ def run(
         rng=rng
     )
     Stationary(init_conf)
-    ZeroRotation(init_conf)
+    if not is_periodic:
+        ZeroRotation(init_conf)
     
     if md.ensemble == "NVT":
         if md.nvt_algo == "andersen":
@@ -155,7 +156,7 @@ def run(
                 tchain=md.tchain
             )
         elif md.nvt_algo == "csvr":
-            dyn = mbe_automation.dynamics.md.bussi.FiniteSystemCSVR(
+            dyn = mbe_automation.dynamics.md.csvr.FiniteSystemCSVR(
                 init_conf,
                 timestep=md.time_step_fs * ase.units.fs,
                 temperature_K=target_temperature_K,
@@ -209,7 +210,9 @@ def run(
         periodic=is_periodic,
         target_temperature=target_temperature_K,
         target_pressure=(target_pressure_GPa if md.ensemble=="NPT" else None),
-        time_equilibration=md.time_equilibration_fs
+        time_equilibration=md.time_equilibration_fs,
+        n_removed_trans_dof=n_removed_trans_dof,
+        n_removed_rot_dof=n_removed_rot_dof
     )
     masses = init_conf.get_masses()
     total_mass = np.sum(masses)
@@ -245,10 +248,10 @@ def run(
 
         E_pot = dyn.atoms.get_potential_energy() / n_atoms # eV/atom
 
-        E_trans_drift, E_rot_drift, velocities = clean_internal_velocities(
+        E_trans_drift, E_rot_drift, velocities = get_velocities(
             system=dyn.atoms,
             remove_drift_translation=True,
-            remove_drift_rotation=True,
+            remove_drift_rotation=(not is_periodic),
         )
         E_kin_system = 0.5 * np.sum(masses[:, np.newaxis] * velocities**2) # eV/system
         n_dof = 3 * n_atoms - n_removed_trans_dof - n_removed_rot_dof
@@ -257,8 +260,9 @@ def run(
 
         traj.E_pot[sample_idx] = E_pot
         traj.E_kin[sample_idx] = E_kin
-        traj.E_trans_drift[sample_idx] = E_trans_drift
-        traj.E_rot_drift[sample_idx] = E_rot_drift
+        traj.E_trans_drift[sample_idx] = E_trans_drift / n_atoms
+        if not is_periodic:
+            traj.E_rot_drift[sample_idx] = E_rot_drift / n_atoms
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
         traj.velocities[sample_idx, :, :] = velocities / (ase.units.Angstrom/ase.units.fs) # Å/fs, COM translation removed 
         traj.positions[sample_idx, :, :] = dyn.atoms.get_positions()

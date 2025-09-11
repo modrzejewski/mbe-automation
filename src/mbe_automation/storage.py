@@ -56,7 +56,7 @@ class Trajectory(Structure):
     E_kin: npt.NDArray[np.floating]
     E_pot: npt.NDArray[np.floating]
     E_trans_drift: npt.NDArray[np.floating]
-    E_rot_drift: npt.NDArray[np.floating]
+    E_rot_drift: npt.NDArray[np.floating] | None
     n_removed_trans_dof: int
     n_removed_rot_dof: int
 
@@ -95,7 +95,7 @@ class Trajectory(Structure):
             E_kin=np.zeros(n_frames),
             E_pot=np.zeros(n_frames),
             E_trans_drift=np.zeros(n_frames),
-            E_rot_drift=np.zeros(n_frames),
+            E_rot_drift=(np.zeros(n_frames) if not periodic else None),
             target_temperature=target_temperature,
             target_pressure=target_pressure,
             n_removed_trans_dof=n_removed_trans_dof,
@@ -566,15 +566,16 @@ def save_trajectory(
         group.create_dataset(
             name="E_pot (eV/atom)",
             data=traj.E_pot
-        )
+        )        
         group.create_dataset(
             name="E_trans_drift (eV/atom)",
             data=traj.E_trans_drift
         )
-        group.create_dataset(
-            name="E_rot_drift (eV/atom)",
-            data=traj.E_rot_drift
-        )
+        if not traj.periodic:
+            group.create_dataset(
+                name="E_rot_drift (eV/atom)",
+                data=traj.E_rot_drift
+            )
         group.create_dataset(
             name="positions (Å)",
             data=traj.positions
@@ -618,7 +619,7 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             E_kin=group["E_kin (eV/atom)"][...],
             E_pot=group["E_pot (eV/atom)"][...],
             E_trans_drift=group["E_trans_drift (eV/atom)"][...],
-            E_rot_drift=group["E_rot_drift (eV/atom)"][...],
+            E_rot_drift=(group["E_rot_drift (eV/atom)"][...] if not is_periodic else None),
             target_temperature=group.attrs["target_temperature (K)"],
             target_pressure=(group.attrs["target_pressure (GPa)"] if ensemble=="NPT" else None),
             time_equilibration=group.attrs["time_equilibration (fs)"],

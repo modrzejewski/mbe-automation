@@ -174,8 +174,7 @@ def crystal(
         key=key,
         columns=[
             "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)",
-            "E_trans_drift (eV/atom)", "E_rot_drift (eV/atom)",
-            "p (GPa)", "V (Å³/atom)"
+            "E_trans_drift (eV/atom)", "p (GPa)", "V (Å³/atom)"
         ]
     )
     if not df.attrs["periodic"]:
@@ -187,13 +186,8 @@ def crystal(
     eV_to_kJ_per_mol = ase.units.eV / (ase.units.kJ / ase.units.mol)
     GPa_to_eV_per_Angs3 = ase.units.GPa / (ase.units.eV / ase.units.Angstrom**3)
     eV_to_kJ_per_unit_cell = eV_to_kJ_per_mol * n_atoms_unit_cell
-    #
-    # The energies related to the translational/rotational drift of the entire
-    # system should be equal to zero unless there are some numerical problems
-    # with the simulation. Here those quantities are provided as a diagonostic.
-    #
+    
     E_trans_drift = production_df["E_trans_drift (eV/atom)"].mean() * eV_to_kJ_per_unit_cell
-    E_rot_drift = production_df["E_rot_drift (eV/atom)"].mean() * eV_to_kJ_per_unit_cell
     
     df_NVT = pd.DataFrame([{
         "T (K)": df.attrs["target_temperature (K)"],
@@ -201,10 +195,10 @@ def crystal(
         "⟨E_kin⟩_crystal (kJ/mol/unit cell)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_unit_cell,
         "⟨E_pot⟩_crystal (kJ/mol/unit cell)": production_df["E_pot (eV/atom)"].mean() * eV_to_kJ_per_unit_cell,
         "⟨E_trans_drift⟩_crystal (kJ/mol/unit cell)": E_trans_drift,
-        "⟨E_rot_drift⟩_crystal (kJ/mol/unit cell)": E_rot_drift,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "system_label_crystal": system_label
     }])
+    
     if df.attrs["ensemble"] == "NPT":
         V_avg = production_df["V (Å³/atom)"].mean() * n_atoms_unit_cell # Å³/unit cell
         p_avg = production_df["p (GPa)"].mean()
@@ -246,9 +240,11 @@ def molecule(
     eV_to_kJ_per_mol = ase.units.eV / (ase.units.kJ / ase.units.mol)
     n_atoms_molecule = df.attrs["n_atoms"]
     #
-    # The energies related to the translational/rotational drift of the entire
-    # system should be equal to zero unless there are some numerical problems
-    # with the simulation. Here those quantities are provided as a diagonostic.
+    # The energies associated with the translational/rotational drift of the entire
+    # system. Because the total linear and angular momenta of the entire system
+    # are set to zero before the first step of MD, the only reason why E_trans_drift
+    # and E_rot_drift can be nonzero is that the propagator violates
+    # the conservation laws. Here those quantities are provided as a diagonostic.
     #
     E_trans_drift = production_df["E_trans_drift (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule # kJ/mol/molecule
     E_rot_drift = production_df["E_rot_drift (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule # kJ/mol/molecule
@@ -302,7 +298,7 @@ def sublimation(df_crystal, df_molecule):
     beta = n_atoms_molecule / n_atoms_unit_cell
     
     V_Ang3 = df_crystal["⟨V⟩_crystal (Å³/unit cell)"]
-    V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm**3/mol/molecule
+    V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm³/mol/molecule
 
     ΔE_pot = (
         df_molecule["⟨E_pot⟩_molecule (kJ/mol/molecule)"]
@@ -313,6 +309,8 @@ def sublimation(df_crystal, df_molecule):
         - df_crystal["⟨E_kin⟩_crystal (kJ/mol/unit cell)"] * beta
         ) # kJ/mol/molecule, with COM translation removed
     pV = df_crystal["p⟨V⟩_crystal (kJ/mol/unit cell)"] * beta # kJ/mol/molecule
+    E_pot_crystal = df_crystal["⟨E_pot⟩_crystal (kJ/mol/unit cell)"] * beta # kJ/mol/molecule
+    E_kin_crystal = df_crystal["⟨E_kin⟩_crystal (kJ/mol/unit cell)"] * beta # kJ/mol/molecule
     #
     # Enthalpy defined in eq 10 of ref 1
     #
@@ -330,6 +328,8 @@ def sublimation(df_crystal, df_molecule):
         "ΔH_sub (kJ/mol/molecule)": ΔH_sub,
         "Δ⟨E_pot⟩ (kJ/mol/molecule)": ΔE_pot,
         "Δ⟨E_kin⟩ (kJ/mol/molecule)": ΔE_kin,
+        "⟨E_pot⟩_crystal (kJ/mol/molecule)": E_pot_crystal,
+        "⟨E_kin⟩_crystal (kJ/mol/molecule)": E_kin_crystal,
         "p⟨V⟩_crystal (kJ/mol/molecule)": pV,
         "⟨V⟩_crystal (cm³/mol/molecule)": V_molar
     })
