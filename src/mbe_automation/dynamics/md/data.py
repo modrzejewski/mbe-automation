@@ -7,27 +7,62 @@ import numpy.typing as npt
 import mbe_automation.storage
 
 
+def _compute_vacf_from_velocities(
+    velocities: npt.NDArray[np.floating],
+    interval_fs: float
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    """Helper to compute a single VACF from a velocity array."""
+    n_frames, n_atoms, _ = velocities.shape
+    
+    # Use FFT to compute the autocorrelation function.
+    n_fft = 2 * n_frames - 1
+    fft_vel = np.fft.fft(velocities, n=n_fft, axis=0)
+    power_spectrum = np.abs(fft_vel)**2
+    vacf = np.fft.ifft(power_spectrum, axis=0).real
+    
+    # Average over atoms and sum over Cartesian components.
+    vacf_avg_atoms = np.mean(np.sum(vacf, axis=2), axis=1)
+    vacf_final = vacf_avg_atoms[:n_frames] / n_frames
+    
+    # Normalize by the value at t=0.
+    if vacf_final[0] < 1e-9:
+        vacf_normalized = np.zeros_like(vacf_final)
+    else:
+        vacf_normalized = vacf_final / vacf_final[0]
+        
+    time_lag_fs = np.arange(n_frames) * interval_fs
+
+    return vacf_normalized, time_lag_fs
+
+
 def velocity_autocorrelation(
     dataset: str,
     key: str,
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+    block_size_fs: float
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """
-    Computes the velocity autocorrelation function (VACF) from trajectory data.
+    Compute the velocity autocorrelation function (VACF) from trajectory data
+    using block averaging for error estimation.
 
     The VACF is calculated for the production part of the trajectory using
     an efficient algorithm based on the Fast Fourier Transform (FFT). The
-    function reads velocity data, computes the autocorrelation for each
-    atom and Cartesian component, and returns the averaged, normalized VACF.
+    trajectory is split into multiple blocks to estimate the mean and
+    standard deviation of the VACF.
 
     Parameters:
     - dataset (str): Path to the dataset file (HDF5).
     - key (str): Path to the trajectory group within the HDF5 file.
+    - block_size_fs (float):
+        The production trajectory is divided into blocks of this duration
+        in femtoseconds. The VACF is computed for each block, and the final
+        result is the mean and standard deviation across the blocks.
 
     Returns:
-    - Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-        A tuple containing two 1D numpy arrays:
+    - Tuple[npt.NDArray[np.floating], ...]:
+        A tuple containing three 1D numpy arrays:
         1. time_lag_fs: The time lags in femtoseconds.
-        2. vacf_normalized: The normalized velocity autocorrelation function.
+        2. vacf_mean: The mean normalized VACF, averaged over the blocks.
+        3. vacf_std: The standard deviation of the VACF at each time lag.
     """
     traj = mbe_automation.storage.read_trajectory(dataset=dataset, key=key)
 
@@ -44,35 +79,39 @@ def velocity_autocorrelation(
         raise ValueError("Not enough production frames to calculate VACF.")
 
     interval_fs = production_time_fs[1] - production_time_fs[0]
-    n_frames_prod, n_atoms, _ = production_velocities.shape
-
-    # Use FFT to compute the autocorrelation function via the Wiener-Khinchin theorem.
-    # The signal is zero-padded to 2*N-1 to calculate a linear (not circular) correlation.
-    n_fft = 2 * n_frames_prod - 1
     
-    fft_vel = np.fft.fft(production_velocities, n=n_fft, axis=0) # velocity in the frequency domain
-    power_spectrum = np.abs(fft_vel)**2 # absolute square of velocity in the frequency domain
-    #
-    # By the Wiener-Khinchin theorem, transforming |velocity|**2 back
-    # to the time domain gives the autocorrelation function
-    #
-    vacf = np.fft.ifft(power_spectrum, axis=0).real 
-    #
-    # Sum over Cartesian components (x, y, z) and average over atoms
-    #
-    vacf_avg_atoms = np.mean(np.sum(vacf, axis=2), axis=1)
-    #
-    # The result is the full autocorrelation; we only need the first n_frames_prod points.
-    # The normalization factor for a discrete correlation is 1/N.
-    #
-    vacf_final = vacf_avg_atoms[:n_frames_prod] / n_frames_prod
-    #
-    # Normalize by the value at t=0 so that VACF(0) = 1
-    #
-    vacf_normalized = vacf_final / vacf_final[0]
-    time_lag_fs = np.arange(n_frames_prod) * interval_fs
+    n_frames_prod = production_velocities.shape[0]
+    n_frames_per_block = int(round(block_size_fs / interval_fs))
 
-    return time_lag_fs, vacf_normalized
+    if n_frames_per_block <= 1:
+        raise ValueError("block_size_fs is too small, resulting in blocks with <= 1 frame.")
+    if n_frames_per_block > n_frames_prod:
+        raise ValueError("block_size_fs cannot be larger than the total production time.")
+
+    n_blocks = n_frames_prod // n_frames_per_block
+    if n_blocks < 2:
+        raise ValueError(
+            f"Configuration results in {n_blocks} blocks. "
+            "At least 2 are required for error estimation."
+        )
+
+    all_vacfs = []
+    for i in range(n_blocks):
+        start_idx = i * n_frames_per_block
+        end_idx = start_idx + n_frames_per_block
+        block_velocities = production_velocities[start_idx:end_idx, :, :]
+        
+        block_vacf, _ = _compute_vacf_from_velocities(block_velocities, interval_fs)
+        all_vacfs.append(block_vacf)
+
+    # Compute statistics over the blocks
+    all_vacfs_np = np.array(all_vacfs)
+    vacf_mean = np.mean(all_vacfs_np, axis=0)
+    vacf_std = np.std(all_vacfs_np, axis=0, ddof=1)
+    
+    time_lag_fs = np.arange(n_frames_per_block) * interval_fs
+    
+    return time_lag_fs, vacf_mean, vacf_std
 
 
 def reblocking(
