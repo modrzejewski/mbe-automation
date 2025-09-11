@@ -9,14 +9,14 @@ import numpy.typing as npt
 class ClassicalMD:
     ensemble: Literal[
         "NPT",
-        "NVT"  # Bussi-Donadio-Parrinello J. Chem. Phys. 126, 014101 (2007)
+        "NVT"
     ] = "NVT"
                                    #
                                    # Target temperature (K)
                                    # and pressure (GPa)
                                    #
     target_temperature_K: float = 298.15
-    target_pressure_GPa: float = 0.0
+    target_pressure_GPa: float = 1.0E-4
                                    #
                                    # Simulation times
                                    #
@@ -86,24 +86,13 @@ class ClassicalMD:
                                    # Braun et al. J. Chem. Theory Comput. 14, 5262 (2018);
                                    # doi: 10.1021/acs.jctc.8b00446
                                    #
+                                   # CSVR is the only thermostat that can be used
+                                   # for isolated molecules.
+                                   #
                                    # (2) nose_hoover_chain
-                                   # (3) langevin
                                    #
-                                   # The friction parameter in the Langevin thermostat
-                                   # is computed as f = 1/thermostat_time_fs
-                                   #
-                                   # (4) andersen
-                                   #
-                                   # Canonical sampling via collisions with bath particles.
-                                   # The system's dynamics, e.g., velocity autocorrelation,
-                                   # do not correspond to the physical system.
-                                   #
-                                   # Andersen, H. C. Molecular Dynamics Simulations at Constant
-                                   # Pressure and/or Temperature. J. Chem. Phys. 72, 2384 (1980)
-                                   # doi: 10.1063/1.439486
-                                   #
-                                   # The collision probability in the Andersen thermostat
-                                   # is computed as prob = time_step_fs / thermostat_time_fs
+                                   # NVT counterpart of the mtk_isotropic and mtk_full
+                                   # thermostats/barostats in the NPT ensemble simulation.
                                    #
                                    # Barostats
                                    # ---------
@@ -113,7 +102,7 @@ class ClassicalMD:
                                    #
                                    # Martyna, Tobias, Klein J. Chem. Phys. 101, 4177 (1994)
                                    #
-    nvt_algo: Literal["csvr", "nose_hoover_chain", "langevin", "andersen"] = "csvr"
+    nvt_algo: Literal["csvr", "nose_hoover_chain"] = "csvr"
     npt_algo: Literal["mtk_isotropic", "mtk_full"] = "mtk_full"
     thermostat_time_fs: float = 100.0
     barostat_time_fs: float = 1000.0

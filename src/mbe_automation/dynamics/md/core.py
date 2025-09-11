@@ -136,67 +136,74 @@ def run(
     Stationary(init_conf)
     if not is_periodic:
         ZeroRotation(init_conf)
-    
-    if md.ensemble == "NVT":
-        if md.nvt_algo == "andersen":
-            dyn = Andersen(
-                init_conf,
-                timestep=md.time_step_fs * ase.units.fs,
-                temperature_K=target_temperature_K,
-                andersen_prob=md.time_step_fs/md.thermostat_time_fs,
-                fixcm=True,
-                rng=rng
-            )
-        elif md.nvt_algo == "nose_hoover_chain":
-            dyn = NoseHooverChainNVT(
-                init_conf,
-                timestep=md.time_step_fs * ase.units.fs,
-                temperature_K=target_temperature_K,
-                tdamp=md.thermostat_time_fs * ase.units.fs,
-                tchain=md.tchain
-            )
-        elif md.nvt_algo == "csvr":
-            dyn = mbe_automation.dynamics.md.csvr.FiniteSystemCSVR(
-                init_conf,
-                timestep=md.time_step_fs * ase.units.fs,
-                temperature_K=target_temperature_K,
-                taut=md.thermostat_time_fs * ase.units.fs,
-                n_removed_trans_dof=n_removed_trans_dof,
-                n_removed_rot_dof=n_removed_rot_dof,
-                rng=rng
-            )
-        elif md.nvt_algo == "langevin":
-            dyn = Langevin(
-                init_conf,
-                timestep=md.time_step_fs * ase.units.fs,
-                temperature_K=target_temperature_K,
-                friction=1.0/(md.thermostat_time_fs * ase.units.fs),
-                fixcm=True,
-                rng=rng
-            )
-    elif md.ensemble == "NPT":
-        if md.npt_algo == "mtk_full":
-            dyn = MTKNPT(
-                init_conf,
-                timestep=md.time_step_fs * ase.units.fs,
-                temperature_K=target_temperature_K,
-                pressure_au=target_pressure_GPa * ase.units.GPa, # ase internal units of pressure: eV/Å³
-                tdamp=md.thermostat_time_fs * ase.units.fs,
-                pdamp=md.barostat_time_fs * ase.units.fs,
-                tchain=md.tchain,
-                pchain=md.pchain
-            )
-        elif md.npt_algo == "mtk_isotropic":
-            dyn = IsotropicMTKNPT(
-                init_conf,
-                timestep=md.time_step_fs * ase.units.fs,
-                temperature_K=target_temperature_K,
-                pressure_au=target_pressure_GPa * ase.units.GPa, # ase internal units of pressure: eV/Å³
-                tdamp=md.thermostat_time_fs * ase.units.fs,
-                pdamp=md.barostat_time_fs * ase.units.fs,
-                tchain=md.tchain,
-                pchain=md.pchain
-            )
+
+    if not is_periodic: # finite systems
+        if md.ensemble == "NVT":
+            if md.nvt_algo == "csvr":
+                dyn = mbe_automation.dynamics.md.csvr.CSVR(
+                    init_conf,
+                    timestep=md.time_step_fs * ase.units.fs,
+                    temperature_K=target_temperature_K,
+                    taut=md.thermostat_time_fs * ase.units.fs,
+                    n_removed_trans_dof=n_removed_trans_dof,
+                    n_removed_rot_dof=n_removed_rot_dof,
+                    rng=rng
+                )
+            else:
+                raise ValueError(f"Calculations using {md.nvt_algo} thermostat are not supported for finite systems")
+        else:
+            raise ValueError(f"Calculations in {md.ensemble} ensemble are not supported for finite systems")
+        
+    else: # periodic systems
+        if md.ensemble == "NVT":
+            if md.nvt_algo == "nose_hoover_chain":
+                dyn = NoseHooverChainNVT(
+                    init_conf,
+                    timestep=md.time_step_fs * ase.units.fs,
+                    temperature_K=target_temperature_K,
+                    tdamp=md.thermostat_time_fs * ase.units.fs,
+                    tchain=md.tchain
+                )
+            elif md.nvt_algo == "csvr":
+                dyn = mbe_automation.dynamics.md.csvr.CSVR(
+                    init_conf,
+                    timestep=md.time_step_fs * ase.units.fs,
+                    temperature_K=target_temperature_K,
+                    taut=md.thermostat_time_fs * ase.units.fs,
+                    n_removed_trans_dof=n_removed_trans_dof,
+                    n_removed_rot_dof=n_removed_rot_dof,
+                    rng=rng
+                )
+            else:
+                raise ValueError(f"Calculations with {md.nvt_algo} thermostat"
+                                 " are not supported for periodic systems")
+            
+        elif md.ensemble == "NPT":
+            if md.npt_algo == "mtk_full":
+                dyn = MTKNPT(
+                    init_conf,
+                    timestep=md.time_step_fs * ase.units.fs,
+                    temperature_K=target_temperature_K,
+                    pressure_au=target_pressure_GPa * ase.units.GPa, # ASE internal units of pressure: eV/Å³
+                    tdamp=md.thermostat_time_fs * ase.units.fs,
+                    pdamp=md.barostat_time_fs * ase.units.fs,
+                    tchain=md.tchain,
+                    pchain=md.pchain
+                )
+            elif md.npt_algo == "mtk_isotropic":
+                dyn = IsotropicMTKNPT(
+                    init_conf,
+                    timestep=md.time_step_fs * ase.units.fs,
+                    temperature_K=target_temperature_K,
+                    pressure_au=target_pressure_GPa * ase.units.GPa, # ASE internal units of pressure: eV/Å³
+                    tdamp=md.thermostat_time_fs * ase.units.fs,
+                    pdamp=md.barostat_time_fs * ase.units.fs,
+                    tchain=md.tchain,
+                    pchain=md.pchain
+                )
+            else:
+                raise ValueError(f"Calculations with {md.npt_algo} thermostat/barostat"
+                                 " are not supported for periodic systems")
 
     n_atoms = len(init_conf)
     n_steps_between_samples = round(md.sampling_interval_fs / md.time_step_fs)
