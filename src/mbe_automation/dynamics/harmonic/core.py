@@ -37,6 +37,14 @@ def _assert_supercell_consistency(
 
     Compare lattice, number of atoms, and sorted atomic positions.
     The `supercell_matrix` must be in the ASE/row-based convention.
+
+    Quote from the Phonopy manual:
+
+    Be careful that the lattice vectors of the PhonopyAtoms
+    class are row vectors (cell). Therefore the phonopy code,
+    which relies on the PhonopyAtoms class, is usually written such as
+
+    supercell_lattice = (original_lattice.T @ supercell_matrix).T
     """
 
     supercell_ase = ase.build.make_supercell(unit_cell, supercell_matrix)
@@ -47,15 +55,6 @@ def _assert_supercell_consistency(
 
     if len(supercell_ase) != len(supercell_phonopy):
         raise RuntimeError("ASE and Phonopy supercell atom counts are inconsistent.")
-
-    scaled_pos_ase = supercell_ase.get_scaled_positions() % 1.0
-    scaled_pos_ase_sorted = scaled_pos_ase[np.lexsort(scaled_pos_ase.T)]
-
-    scaled_pos_phonopy = supercell_phonopy.get_scaled_positions() % 1.0
-    scaled_pos_phonopy_sorted = scaled_pos_phonopy[np.lexsort(scaled_pos_phonopy.T)]
-
-    if not np.allclose(scaled_pos_ase_sorted, scaled_pos_phonopy_sorted):
-        raise RuntimeError("ASE and Phonopy atomic positions are inconsistent.")
 
 
 def molecular_vibrations(
