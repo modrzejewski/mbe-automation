@@ -375,6 +375,9 @@ def equilibrium_curve(
     
     if len(df_eos[good_points]) == 0:
         raise RuntimeError("No data points left after applying filtering criteria")
+
+    if len(df_eos[good_points]) < 3:
+        raise RuntimeError("Insufficient number of points left after applying filtering criteria")
     
     V_eos = np.full(n_temperatures, np.nan)
     F_tot_eos = np.full(n_temperatures, np.nan)

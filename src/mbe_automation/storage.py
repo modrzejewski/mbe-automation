@@ -382,10 +382,11 @@ def save_eos_curves(
             V_min[i] = np.nan
             F_min[i] = np.nan
 
-    F_interp = np.zeros((n_temperatures, n_interp))
-    V_interp = np.linspace(np.min(V_sampled), np.max(V_sampled), 200)
+    F_interp = np.full((n_temperatures, n_interp), np.nan)
+    V_interp = np.linspace(np.min(V_sampled), np.max(V_sampled), n_interp)
     for i, fit in enumerate(F_tot_curves):
-        F_interp[i, :] = fit.F_interp(V_interp)
+        if fit.F_interp is not None:
+            F_interp[i, :] = fit.F_interp(V_interp)
         
     with h5py.File(dataset, "a") as f:
         if key in f:
