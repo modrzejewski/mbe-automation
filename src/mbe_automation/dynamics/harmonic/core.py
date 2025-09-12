@@ -27,6 +27,36 @@ import mbe_automation.dynamics.harmonic.data
 import mbe_automation.dynamics.harmonic.plot
 
 
+def _assert_supercell_consistency(
+    phonopy_instance: Phonopy,
+    unit_cell: Atoms,
+    supercell_matrix: np.ndarray,
+):
+    """
+    Assert that ASE and Phonopy supercells are identical.
+
+    Compare lattice, number of atoms, and sorted atomic positions.
+    The `supercell_matrix` must be in the ASE/row-based convention.
+
+    Quote from the Phonopy manual:
+
+    Be careful that the lattice vectors of the PhonopyAtoms
+    class are row vectors (cell). Therefore the phonopy code,
+    which relies on the PhonopyAtoms class, is usually written such as
+
+    supercell_lattice = (original_lattice.T @ supercell_matrix).T
+    """
+
+    supercell_ase = ase.build.make_supercell(unit_cell, supercell_matrix)
+    supercell_phonopy = phonopy_instance.supercell
+
+    if not np.allclose(supercell_ase.get_cell(), supercell_phonopy.cell):
+        raise RuntimeError("ASE and Phonopy supercell lattices are inconsistent.")
+
+    if len(supercell_ase) != len(supercell_phonopy):
+        raise RuntimeError("ASE and Phonopy supercell atom counts are inconsistent.")
+
+
 def molecular_vibrations(
         molecule,
         calculator
@@ -100,8 +130,19 @@ def phonons(
     #
     phonons = Phonopy(
         phonopy_struct,
-        supercell_matrix,
+        #
+        # Watch out! Phonopy supercell transformation matrix
+        # is transposed w.r.t. the ASE and pymatgen conventions,
+        # which we use internally. This will affect the cases
+        # where supercell_matrix is nondiagonal.
+        #
+        supercell_matrix=supercell_matrix.T, 
         primitive_matrix=("auto" if automatic_primitive_cell else None)
+    )
+    _assert_supercell_consistency(
+        phonopy_instance=phonons,
+        unit_cell=unit_cell,
+        supercell_matrix=supercell_matrix
     )
     phonons.generate_displacements(distance=supercell_displacement)
 
@@ -346,7 +387,7 @@ def equilibrium_curve(
         
     for i, T in enumerate(temperatures):
         fit = mbe_automation.dynamics.harmonic.eos.fit(
-            V=df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
+            V=df_eos[good_points & select_T[i]]["V_crystal (Å³/unit cell)"].to_numpy(),
             F=df_eos[good_points & select_T[i]]["F_tot_crystal (kJ/mol/unit cell)"].to_numpy(),
             equation_of_state=equation_of_state
         )
@@ -388,15 +429,15 @@ def equilibrium_curve(
         #
         if fit.min_found:
             weights = mbe_automation.dynamics.harmonic.eos.proximity_weights(
-                V=df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
+                V=df_eos[good_points & select_T[i]]["V_crystal (Å³/unit cell)"].to_numpy(),
                 V_min=V_eos[i]
             )
             F_vib_fit = Polynomial.fit(
-                df_eos[good_points & select_T[i]]["V (Å³/unit cell)"].to_numpy(),
+                df_eos[good_points & select_T[i]]["V_crystal (Å³/unit cell)"].to_numpy(),
                 df_eos[good_points & select_T[i]]["F_vib_crystal (kJ/mol/unit cell)"].to_numpy(),
                 deg=2, w=weights
             ) # kJ/mol/unit cell
-            dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
+            dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
             kJ_mol_Angs3_to_GPa = (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa
             p_thermal_eos[i] = dFdV(V_eos[i]) * kJ_mol_Angs3_to_GPa # GPa
 
@@ -414,7 +455,7 @@ def equilibrium_curve(
         
     df = pd.DataFrame({
         "T (K)": temperatures,
-        "V_eos (Å³/unit cell)": V_eos,
+        "V_eos (Å³/unit cell)": V_eos,
         "p_thermal (GPa)": p_thermal_eos,
         "F_tot_crystal_eos (kJ/mol/unit cell)": F_tot_eos,
         "B (GPa)": B_eos,

@@ -180,7 +180,7 @@ def eos_curves(
     )
 
     ax.legend()
-    ax.set_xlabel("Volume (Å³/unit cell)", fontsize=14)
+    ax.set_xlabel("Volume (Å³/unit cell)", fontsize=14)
     ax.set_ylabel(y_label, fontsize=14)
     ax.grid(True, linestyle="--", alpha=0.6)
     ax.tick_params(labelsize=12)

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import ase.spacegroup.symmetrize
 import ase.spacegroup.utils
 import os.path
@@ -10,9 +11,11 @@ import pymatgen.core.lattice
 from typing import Literal
 import warnings
 import numpy as np
+import numpy.typing as npt
+from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
+
 import mbe_automation.display
 
-from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
 try:
     from doped.generation import get_ideal_supercell_matrix
     from doped.utils.supercells import get_min_image_distance
@@ -38,13 +41,13 @@ def display(unit_cell: Atoms, system_label: str | None=None) -> None:
     La, Lb, Lc = unit_cell.cell.lengths()
     alpha, beta, gamma = unit_cell.cell.angles()
     volume = unit_cell.cell.volume
-    print(f"a = {La:.2f} Å")
-    print(f"b = {Lb:.2f} Å")
-    print(f"c = {Lc:.2f} Å")
+    print(f"a = {La:.2f} Å")
+    print(f"b = {Lb:.2f} Å")
+    print(f"c = {Lc:.2f} Å")
     print(f"α = {alpha:.1f}°")
     print(f"β = {beta:.1f}°")
     print(f"γ = {gamma:.1f}°")
-    print(f"V = {volume:.1f} Å³")
+    print(f"V = {volume:.1f} Å³")
     print(f"Number of atoms {len(unit_cell)}")
     tight_symmetry_thresh = 1.0E-5 # symmetry tolerance used in Phonopy
     spgdata = ase.spacegroup.symmetrize.check_symmetry(unit_cell, symprec=tight_symmetry_thresh)
@@ -139,7 +142,7 @@ def supercell_matrix(
         r_point_image: float,
         diagonal: bool = False,
         backend: Literal["doped", "pymatgen", "auto"] = "auto"
-) -> np.ndarray:
+) -> npt.NDArray[np.integer]:
     """
     Find the transformation of the unit cell vectors
     which generates a super cell with the following
@@ -175,7 +178,7 @@ def supercell_matrix(
             warnings.warn("doped package not available, falling back to CubicSupercellTransformation", RuntimeWarning)
             backend = "pymatgen"
     
-    print(f"Supercell transformation with minimum point-image radius R={r_point_image:.1f} Å")
+    print(f"Supercell transformation with minimum point-image radius R={r_point_image:.1f} Å")
     structure = pymatgen.core.structure.Structure(
                 lattice=pymatgen.core.lattice.Lattice(
                     matrix=unit_cell.get_cell(),
@@ -203,12 +206,18 @@ def supercell_matrix(
         cst.apply_transformation(structure)
         optimal_matrix = cst.transformation_matrix
 
+    assert np.allclose(optimal_matrix, np.round(optimal_matrix)), "Supercell matrix contains non-integer values"
+    optimal_matrix = np.round(optimal_matrix).astype(np.int64)
+        
     supercell = structure.make_supercell(optimal_matrix)
     mbe_automation.display.matrix_3x3(optimal_matrix)
     if backend == "doped":
         r = get_min_image_distance(supercell)
-        print(f"Actual point-image distance {r:.1f} Å")
+        print(f"Actual point-image distance {r:.1f} Å")
+        assert r >= r_point_image, "Supercell matrix does not satisfy r >= r_point_image"
+        
     print(f"Number of atoms {len(supercell)}")
+    
     return optimal_matrix
 
 

@@ -18,7 +18,7 @@ mace_calc = mace.calculators.MACECalculator(
 
 properties_config = QuasiHarmonicConfig.from_template(
     model_name = "MACE",
-    unit_cell = mbe_automation.io.read(os.path.join(work_dir, xyz_solid)),
+    crystal = mbe_automation.io.read(os.path.join(work_dir, xyz_solid)),
     molecule = mbe_automation.io.read(os.path.join(work_dir, xyz_molecule)),
     temperatures = np.array([5.0, 200.0, 300.0]),
     calculator = mace_calc,

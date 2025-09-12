@@ -227,7 +227,7 @@ def run(config: QuasiHarmonicConfig):
         
     for i, row in filtered_df.iterrows():
         T = row["T (K)"]
-        V = row["V_eos (Å³/unit cell)"]
+        V = row["V_eos (Å³/unit cell)"]
         unit_cell_T = unit_cell_V0.copy()
         unit_cell_T.set_cell(
             unit_cell_V0.cell * (V/V0)**(1/3),

@@ -184,7 +184,7 @@ def run(
                     init_conf,
                     timestep=md.time_step_fs * ase.units.fs,
                     temperature_K=target_temperature_K,
-                    pressure_au=target_pressure_GPa * ase.units.GPa, # ASE internal units of pressure: eV/Å³
+                    pressure_au=target_pressure_GPa * ase.units.GPa, # ASE internal units of pressure: eV/Å³
                     tdamp=md.thermostat_time_fs * ase.units.fs,
                     pdamp=md.barostat_time_fs * ase.units.fs,
                     tchain=md.tchain,
@@ -195,7 +195,7 @@ def run(
                     init_conf,
                     timestep=md.time_step_fs * ase.units.fs,
                     temperature_K=target_temperature_K,
-                    pressure_au=target_pressure_GPa * ase.units.GPa, # ASE internal units of pressure: eV/Å³
+                    pressure_au=target_pressure_GPa * ase.units.GPa, # ASE internal units of pressure: eV/Å³
                     tdamp=md.thermostat_time_fs * ase.units.fs,
                     pdamp=md.barostat_time_fs * ase.units.fs,
                     tchain=md.tchain,
@@ -274,12 +274,12 @@ def run(
         if not is_periodic:
             traj.E_rot_drift[sample_idx] = E_rot_drift / n_atoms
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
-        traj.velocities[sample_idx, :, :] = velocities / (ase.units.Angstrom/ase.units.fs) # Å/fs, COM translation removed 
+        traj.velocities[sample_idx, :, :] = velocities / (ase.units.Angstrom/ase.units.fs) # Å/fs, COM translation removed 
         traj.positions[sample_idx, :, :] = dyn.atoms.get_positions()
         traj.temperature[sample_idx] = T_insta
         traj.time[sample_idx] = dyn.get_time() / ase.units.fs
         if md.ensemble == "NPT":
-            traj.volume[sample_idx] = dyn.atoms.get_volume() / n_atoms # Å³/atom
+            traj.volume[sample_idx] = dyn.atoms.get_volume() / n_atoms # Å³/atom
             stress_tensor = dyn.atoms.get_stress(
                 voigt=False, # redundant 3x3 matrix representation
                 include_ideal_gas=True # include kinetic energy contribution to stress

@@ -35,7 +35,7 @@ def trajectory(
         key=key,
         columns=[
             "time (fs)", "T (K)", "E_kin (eV/atom)",
-            "E_pot (eV/atom)", "p (GPa)", "V (Å³/atom)"
+            "E_pot (eV/atom)", "p (GPa)", "V (Å³/atom)"
         ]
     )
     df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
@@ -100,7 +100,7 @@ def trajectory(
             axes[2], df["p (GPa)"], "C2", "Pressure (GPa)", ".4f", df.attrs["target_pressure (GPa)"]
         )
         plot_quantity(
-            axes[3], df["V (Å³/atom)"], "C3", "Volume (Å³/atom)", ".2f"
+            axes[3], df["V (Å³/atom)"], "C3", "Volume (Å³/atom)", ".2f"
         )
 
     for ax in axes:
@@ -155,7 +155,7 @@ def reblocking(
         dataset=dataset,
         key=key,
         columns=["E_kin (eV/atom)", "E_pot (eV/atom)", "time (fs)",
-                 "p (GPa)", "V (Å³/atom)", "T (K)"]
+                 "p (GPa)", "V (Å³/atom)", "T (K)"]
     )
     
     df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
@@ -175,7 +175,7 @@ def reblocking(
     ensemble = df.attrs["ensemble"]
     if ensemble == "NPT":
         quantities_to_plot["p (GPa)"] = "Pressure (GPa)"
-        quantities_to_plot["V (Å³/atom)"] = "Volume (Å³/atom)"
+        quantities_to_plot["V (Å³/atom)"] = "Volume (Å³/atom)"
 
     n_plots = len(quantities_to_plot)
     fig, axes = plt.subplots(
@@ -226,37 +226,41 @@ def reblocking(
 def velocity_autocorrelation(
     dataset: str,
     key: str,
+    block_size_fs: float = 2000.0,
     save_path: str = None
 ):
     """
-    Calculates and plots the velocity autocorrelation function (VACF).
+    Calculates and plots the velocity autocorrelation function (VACF)
+    with statistical error bands.
 
-    This function reads trajectory data, computes the VACF for the
-    production run using data.velocity_autocorrelation, and
-    generates a plot of the normalized VACF as a function of time.
-
-    Parameters:
-    - dataset (str): Path to the dataset.
-    - key (str): Path to the trajectory group within the dataset.
-    - save_path (str, optional): If provided, the plot is saved to this
-      path. If None, the figure object is returned.
     """
-    time_lag_fs, vacf_normalized = mbe_automation.dynamics.md.data.velocity_autocorrelation(
+
+    time_lag_fs, vacf_mean, vacf_std = mbe_automation.dynamics.md.data.velocity_autocorrelation(
         dataset=dataset,
-        key=key
+        key=key,
+        block_size_fs=block_size_fs
     )
     
     time_lag_ps = time_lag_fs / 1000.0
 
     fig, ax = plt.subplots(figsize=(8, 5))
     
-    ax.plot(time_lag_ps, vacf_normalized, color="C0")
+    ax.plot(time_lag_ps, vacf_mean, color="C0", label="Mean VACF")
+    ax.fill_between(
+        time_lag_ps,
+        vacf_mean - vacf_std,
+        vacf_mean + vacf_std,
+        color="C0",
+        alpha=0.2,
+        label="Std. Dev."
+    )
     
     ax.set_xlabel("Time Lag (ps)")
     ax.set_ylabel("Normalized VACF")
     ax.set_title(f"Velocity Autocorrelation Function for {key}")
     ax.grid(True, linestyle=":", alpha=0.7)
     ax.axhline(0, color='k', linestyle='-', linewidth=0.8)
+    ax.legend()
 
     plt.tight_layout()
     
@@ -268,3 +272,5 @@ def velocity_autocorrelation(
         plt.close(fig)
     else:
         return fig
+    
+

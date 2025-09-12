@@ -1,4 +1,5 @@
 import os
+import warnings
 import pandas as pd
 
 import mbe_automation.display
@@ -8,6 +9,14 @@ import mbe_automation.dynamics.md.core
 import mbe_automation.dynamics.md.data
 import mbe_automation.dynamics.md.plot
 import mbe_automation.structure.crystal
+
+try:
+    from mace.calculators import MACECalculator
+    mace_available = True
+except ImportError:
+    MACECalculator = None
+    mace_available = False
+
 
 def run(config: mbe_automation.configs.md.Sublimation):
 
