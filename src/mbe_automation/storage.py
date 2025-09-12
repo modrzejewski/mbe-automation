@@ -102,7 +102,6 @@ class Trajectory(Structure):
             n_removed_rot_dof=n_removed_rot_dof
         )
 
-        
 def save_data(
         df,
         dataset,
@@ -426,7 +425,7 @@ def save_eos_curves(
             data=F_min
         )
 
-        
+
 def read_eos_curves(
         dataset,
         key
