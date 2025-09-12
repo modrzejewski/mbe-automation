@@ -213,7 +213,7 @@ def crystal(
         key=key,
         columns=[
             "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)",
-            "E_trans_drift (eV/atom)", "p (GPa)", "V (Å³/atom)"
+            "E_trans_drift (eV/atom)", "p (GPa)", "V (Å³/atom)"
         ]
     )
     if not df.attrs["periodic"]:
@@ -239,12 +239,12 @@ def crystal(
     }])
     
     if df.attrs["ensemble"] == "NPT":
-        V_avg = production_df["V (Å³/atom)"].mean() * n_atoms_unit_cell # Å³/unit cell
+        V_avg = production_df["V (Å³/atom)"].mean() * n_atoms_unit_cell # Å³/unit cell
         p_avg = production_df["p (GPa)"].mean()
         p_target = df.attrs["target_pressure (GPa)"]
         pV = p_target * GPa_to_eV_per_Angs3 * V_avg * eV_to_kJ_per_mol # kJ/mol/unit cell
         df_NPT = pd.DataFrame([{
-            "⟨V⟩_crystal (Å³/unit cell)": V_avg,
+            "⟨V⟩_crystal (Å³/unit cell)": V_avg,
             "p_crystal (GPa)": p_target,
             "⟨p⟩_crystal (GPa)": p_avg,
             "p⟨V⟩_crystal (kJ/mol/unit cell)": pV
@@ -336,7 +336,7 @@ def sublimation(df_crystal, df_molecule):
     n_atoms_unit_cell = df_crystal["n_atoms_unit_cell"]
     beta = n_atoms_molecule / n_atoms_unit_cell
     
-    V_Ang3 = df_crystal["⟨V⟩_crystal (Å³/unit cell)"]
+    V_Ang3 = df_crystal["⟨V⟩_crystal (Å³/unit cell)"]
     V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm³/mol/molecule
 
     ΔE_pot = (

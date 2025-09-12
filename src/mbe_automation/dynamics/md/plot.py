@@ -35,7 +35,7 @@ def trajectory(
         key=key,
         columns=[
             "time (fs)", "T (K)", "E_kin (eV/atom)",
-            "E_pot (eV/atom)", "p (GPa)", "V (Å³/atom)"
+            "E_pot (eV/atom)", "p (GPa)", "V (Å³/atom)"
         ]
     )
     df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
@@ -100,7 +100,7 @@ def trajectory(
             axes[2], df["p (GPa)"], "C2", "Pressure (GPa)", ".4f", df.attrs["target_pressure (GPa)"]
         )
         plot_quantity(
-            axes[3], df["V (Å³/atom)"], "C3", "Volume (Å³/atom)", ".2f"
+            axes[3], df["V (Å³/atom)"], "C3", "Volume (Å³/atom)", ".2f"
         )
 
     for ax in axes:
@@ -155,7 +155,7 @@ def reblocking(
         dataset=dataset,
         key=key,
         columns=["E_kin (eV/atom)", "E_pot (eV/atom)", "time (fs)",
-                 "p (GPa)", "V (Å³/atom)", "T (K)"]
+                 "p (GPa)", "V (Å³/atom)", "T (K)"]
     )
     
     df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
@@ -175,7 +175,7 @@ def reblocking(
     ensemble = df.attrs["ensemble"]
     if ensemble == "NPT":
         quantities_to_plot["p (GPa)"] = "Pressure (GPa)"
-        quantities_to_plot["V (Å³/atom)"] = "Volume (Å³/atom)"
+        quantities_to_plot["V (Å³/atom)"] = "Volume (Å³/atom)"
 
     n_plots = len(quantities_to_plot)
     fig, axes = plt.subplots(

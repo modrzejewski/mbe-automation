@@ -291,7 +291,7 @@ class QuasiHarmonicConfig:
     @classmethod
     def from_template(cls,
                   model_name: Literal["default", "MACE", "UMA"],
-                  unit_cell: Atoms,
+                  crystal: Atoms,
                   molecule: Atoms,
                   calculator: Any,
                   **kwargs):
@@ -300,7 +300,7 @@ class QuasiHarmonicConfig:
 
         Args:
             model_name: The name of the MLIP preset.
-            unit_cell, molecule, calculator: Required arguments for initialization.
+            crystal, molecule, calculator: Required arguments for initialization.
             **kwargs: Additional parameters to override any value in the preset.
         """
 
@@ -310,7 +310,7 @@ class QuasiHarmonicConfig:
             modified_params["filter_out_broken_symmetry"] = False
         modified_params.update(kwargs)
 
-        return cls(unit_cell=unit_cell,
+        return cls(crystal=crystal,
                    molecule=molecule,
                    calculator=calculator,
                    **modified_params)

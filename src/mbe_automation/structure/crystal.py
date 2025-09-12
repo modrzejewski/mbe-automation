@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import ase.spacegroup.symmetrize
 import ase.spacegroup.utils
 import os.path
@@ -10,9 +11,11 @@ import pymatgen.core.lattice
 from typing import Literal
 import warnings
 import numpy as np
+import numpy.typing as npt
+from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
+
 import mbe_automation.display
 
-from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
 try:
     from doped.generation import get_ideal_supercell_matrix
     from doped.utils.supercells import get_min_image_distance

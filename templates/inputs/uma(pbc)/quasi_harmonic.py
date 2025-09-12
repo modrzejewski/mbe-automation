@@ -37,7 +37,7 @@ uma_calc = FAIRChemCalculator(uma_model, task_name="omc")
 
 properties_config = QuasiHarmonicConfig.from_template(
     model_name = "UMA",
-    unit_cell = mbe_automation.io.read(os.path.join(work_dir, xyz_solid)),
+    crystal = mbe_automation.io.read(os.path.join(work_dir, xyz_solid)),
     molecule = mbe_automation.io.read(os.path.join(work_dir, xyz_molecule)),
     temperatures = np.array([5.0, 200.0, 300.0]),
     calculator = uma_calc,

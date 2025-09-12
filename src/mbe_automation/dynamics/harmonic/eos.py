@@ -83,8 +83,8 @@ def polynomial_fit(V, F, degree=2):
         V_min=V[np.argmin(F)] # guess value for the minimum
     )
     F_fit = Polynomial.fit(V, F, deg=degree, w=weights) # kJ/mol/unit cell
-    dFdV = F_fit.deriv(1) # kJ/mol/Å³/unit cell
-    d2FdV2 = F_fit.deriv(2) # kJ/mol/Å⁶/unit cell
+    dFdV = F_fit.deriv(1) # kJ/mol/Å³/unit cell
+    d2FdV2 = F_fit.deriv(2) # kJ/mol/Å⁶/unit cell
 
     crit_points = dFdV.roots()
     crit_points = crit_points[np.isreal(crit_points)].real
@@ -92,7 +92,7 @@ def polynomial_fit(V, F, degree=2):
 
     if len(crit_points) > 0:
         i_min = np.argmin(F_fit(crit_points))
-        V_min = crit_points[i_min] # Å³/unit cell
+        V_min = crit_points[i_min] # Å³/unit cell
         return EOSFitResults(
             F_min=F_fit(V_min), # kJ/mol/unit cell
             V_min=V_min,
@@ -155,7 +155,7 @@ def fit(V, F, equation_of_state):
                 absolute_sigma=True
             )
             F_min = popt[0] # kJ/mol/unit cell
-            V_min = popt[1] # Å³/unit cell
+            V_min = popt[1] # Å³/unit cell
             B = popt[2] * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa # GPa
             nonlinear_fit = EOSFitResults(
                 F_min=F_min,

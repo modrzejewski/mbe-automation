@@ -201,7 +201,7 @@ def crystal(
     E_el_crystal = unit_cell.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
     F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
 
-    V = unit_cell.get_volume() # Å³/unit cell
+    V = unit_cell.get_volume() # Å³/unit cell
     rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
 
     generate_fbz_path(phonons)
@@ -241,7 +241,7 @@ def crystal(
         "C_v_vib_crystal (J/K/mol/unit cell)": C_v_vib_crystal,
         "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
         "F_tot_crystal (kJ/mol/unit cell)": F_tot_crystal,
-        "V_crystal (Å³/unit cell)": V,
+        "V_crystal (Å³/unit cell)": V,
         "ρ_crystal (g/cm³)": rho,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "space_group": space_group,
@@ -280,7 +280,7 @@ def sublimation(df_crystal, df_molecule):
     n_atoms_unit_cell = df_crystal["n_atoms_unit_cell"]
     beta = n_atoms_molecule / n_atoms_unit_cell
     
-    V_Ang3 = df_crystal["V_crystal (Å³/unit cell)"]
+    V_Ang3 = df_crystal["V_crystal (Å³/unit cell)"]
     V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm**3/mol/molecule
 
     E_latt = (
