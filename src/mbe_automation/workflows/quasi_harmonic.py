@@ -227,7 +227,7 @@ def run(config: QuasiHarmonicConfig):
         
     for i, row in filtered_df.iterrows():
         T = row["T (K)"]
-        V = row["V_eos (Å³/unit cell)"]
+        V = row["V_eos (Å³∕unit cell)"]
         unit_cell_T = unit_cell_V0.copy()
         unit_cell_T.set_cell(
             unit_cell_V0.cell * (V/V0)**(1/3),
@@ -313,10 +313,10 @@ def run(config: QuasiHarmonicConfig):
     )
     df_quasi_harmonic.to_csv(os.path.join(config.work_dir, "thermal_expansion.csv"))
 
-    F_tot_diff = (df_crystal_eos["F_tot_crystal_eos (kJ/mol/unit cell)"]
-                  - df_crystal_qha["F_tot_crystal (kJ/mol/unit cell)"])
+    F_tot_diff = (df_crystal_eos["F_tot_crystal_eos (kJ∕mol∕unit cell)"]
+                  - df_crystal_qha["F_tot_crystal (kJ∕mol∕unit cell)"])
     F_RMSD_per_atom = np.sqrt((F_tot_diff**2).mean()) / len(unit_cell_V0)
-    print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom:.5f} kJ/mol/atom")
+    print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom:.5f} kJ∕mol∕atom")
         
     print(f"Properties with thermal expansion completed")
     mbe_automation.display.timestamp_finish(datetime_start)

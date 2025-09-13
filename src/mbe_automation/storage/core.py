@@ -336,27 +336,27 @@ def save_eos_curves(
             data=temperatures
         )
         group.create_dataset(
-            name="V_sampled (Å³/unit cell)",
+            name="V_sampled (Å³∕unit cell)",
             data=V_sampled
         )
         group.create_dataset(
-            name="F_sampled (kJ/mol/unit cell)",
+            name="F_sampled (kJ∕mol∕unit cell)",
             data=F_sampled
         )
         group.create_dataset(
-            name="V_interp (Å³/unit cell)",
+            name="V_interp (Å³∕unit cell)",
             data=V_interp
         )
         group.create_dataset(
-            name="F_interp (kJ/mol/unit cell)",
+            name="F_interp (kJ∕mol∕unit cell)",
             data=F_interp
         )
         group.create_dataset(
-            name="V_min (Å³/unit cell)",
+            name="V_min (Å³∕unit cell)",
             data=V_min
         )
         group.create_dataset(
-            name="F_min (kJ/mol/unit cell)",
+            name="F_min (kJ∕mol∕unit cell)",
             data=F_min
         )
 
@@ -370,12 +370,12 @@ def read_eos_curves(
         group = f[key]
         eos_curves = EOSCurves(
             temperatures=group["T (K)"][...],
-            V_sampled=group["V_sampled (Å³/unit cell)"][...],
-            F_sampled=group["F_sampled (kJ/mol/unit cell)"][...],
-            V_interp=group["V_interp (Å³/unit cell)"][...],
-            F_interp=group["F_interp (kJ/mol/unit cell)"][...],
-            V_min=group["V_min (Å³/unit cell)"][...],
-            F_min=group["F_min (kJ/mol/unit cell)"][...]
+            V_sampled=group["V_sampled (Å³∕unit cell)"][...],
+            F_sampled=group["F_sampled (kJ∕mol∕unit cell)"][...],
+            V_interp=group["V_interp (Å³∕unit cell)"][...],
+            F_interp=group["F_interp (kJ∕mol∕unit cell)"][...],
+            V_min=group["V_min (Å³∕unit cell)"][...],
+            F_min=group["F_min (kJ∕mol∕unit cell)"][...]
         )
 
     return eos_curves
@@ -483,32 +483,32 @@ def save_trajectory(
                 data=traj.pressure
             )
             group.create_dataset(
-                name="V (Å³/atom)",
+                name="V (Å³∕atom)",
                 data=traj.volume
             )
         group.create_dataset(
-            name="forces (eV/Å)",
+            name="forces (eV∕Å)",
             data=traj.forces
         )
         group.create_dataset(
-            name="velocities (Å/fs)",
+            name="velocities (Å∕fs)",
             data=traj.velocities
         )
         group.create_dataset(
-            name="E_kin (eV/atom)",
+            name="E_kin (eV∕atom)",
             data=traj.E_kin
         )
         group.create_dataset(
-            name="E_pot (eV/atom)",
+            name="E_pot (eV∕atom)",
             data=traj.E_pot
         )        
         group.create_dataset(
-            name="E_trans_drift (eV/atom)",
+            name="E_trans_drift (eV∕atom)",
             data=traj.E_trans_drift
         )
         if not traj.periodic:
             group.create_dataset(
-                name="E_rot_drift (eV/atom)",
+                name="E_rot_drift (eV∕atom)",
                 data=traj.E_rot_drift
             )
         group.create_dataset(
@@ -548,13 +548,13 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             time=group["time (fs)"][...],
             temperature=group["T (K)"][...],
             pressure=(group["p (GPa)"][...] if ensemble=="NPT" else None),
-            volume=(group["V (Å³/atom)"][...] if ensemble=="NPT" else None),
-            forces=group["forces (eV/Å)"][...],
-            velocities=group["velocities (Å/fs)"][...],
-            E_kin=group["E_kin (eV/atom)"][...],
-            E_pot=group["E_pot (eV/atom)"][...],
-            E_trans_drift=group["E_trans_drift (eV/atom)"][...],
-            E_rot_drift=(group["E_rot_drift (eV/atom)"][...] if not is_periodic else None),
+            volume=(group["V (Å³∕atom)"][...] if ensemble=="NPT" else None),
+            forces=group["forces (eV∕Å)"][...],
+            velocities=group["velocities (Å∕fs)"][...],
+            E_kin=group["E_kin (eV∕atom)"][...],
+            E_pot=group["E_pot (eV∕atom)"][...],
+            E_trans_drift=group["E_trans_drift (eV∕atom)"][...],
+            E_rot_drift=(group["E_rot_drift (eV∕atom)"][...] if not is_periodic else None),
             target_temperature=group.attrs["target_temperature (K)"],
             target_pressure=(group.attrs["target_pressure (GPa)"] if ensemble=="NPT" else None),
             time_equilibration=group.attrs["time_equilibration (fs)"],

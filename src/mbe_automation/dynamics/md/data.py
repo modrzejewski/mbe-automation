@@ -212,8 +212,8 @@ def crystal(
         dataset=dataset,
         key=key,
         columns=[
-            "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)",
-            "E_trans_drift (eV/atom)", "p (GPa)", "V (Å³/atom)"
+            "time (fs)", "T (K)", "E_kin (eV∕atom)", "E_pot (eV∕atom)",
+            "E_trans_drift (eV∕atom)", "p (GPa)", "V (Å³∕atom)"
         ]
     )
     if not df.attrs["periodic"]:
@@ -226,28 +226,28 @@ def crystal(
     GPa_to_eV_per_Angs3 = ase.units.GPa / (ase.units.eV / ase.units.Angstrom**3)
     eV_to_kJ_per_unit_cell = eV_to_kJ_per_mol * n_atoms_unit_cell
     
-    E_trans_drift = production_df["E_trans_drift (eV/atom)"].mean() * eV_to_kJ_per_unit_cell
+    E_trans_drift = production_df["E_trans_drift (eV∕atom)"].mean() * eV_to_kJ_per_unit_cell
     
     df_NVT = pd.DataFrame([{
         "T (K)": df.attrs["target_temperature (K)"],
         "⟨T⟩_crystal (K)": production_df["T (K)"].mean(),
-        "⟨E_kin⟩_crystal (kJ/mol/unit cell)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_unit_cell,
-        "⟨E_pot⟩_crystal (kJ/mol/unit cell)": production_df["E_pot (eV/atom)"].mean() * eV_to_kJ_per_unit_cell,
-        "⟨E_trans_drift⟩_crystal (kJ/mol/unit cell)": E_trans_drift,
+        "⟨E_kin⟩_crystal (kJ∕mol∕unit cell)": production_df["E_kin (eV∕atom)"].mean() * eV_to_kJ_per_unit_cell,
+        "⟨E_pot⟩_crystal (kJ∕mol∕unit cell)": production_df["E_pot (eV∕atom)"].mean() * eV_to_kJ_per_unit_cell,
+        "⟨E_trans_drift⟩_crystal (kJ∕mol∕unit cell)": E_trans_drift,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "system_label_crystal": system_label
     }])
     
     if df.attrs["ensemble"] == "NPT":
-        V_avg = production_df["V (Å³/atom)"].mean() * n_atoms_unit_cell # Å³/unit cell
+        V_avg = production_df["V (Å³∕atom)"].mean() * n_atoms_unit_cell # Å³/unit cell
         p_avg = production_df["p (GPa)"].mean()
         p_target = df.attrs["target_pressure (GPa)"]
         pV = p_target * GPa_to_eV_per_Angs3 * V_avg * eV_to_kJ_per_mol # kJ/mol/unit cell
         df_NPT = pd.DataFrame([{
-            "⟨V⟩_crystal (Å³/unit cell)": V_avg,
+            "⟨V⟩_crystal (Å³∕unit cell)": V_avg,
             "p_crystal (GPa)": p_target,
             "⟨p⟩_crystal (GPa)": p_avg,
-            "p⟨V⟩_crystal (kJ/mol/unit cell)": pV
+            "p⟨V⟩_crystal (kJ∕mol∕unit cell)": pV
         }])
         df = pd.concat([df_NVT, df_NPT], axis=1)
     else:
@@ -266,8 +266,8 @@ def molecule(
         dataset=dataset,
         key=key,
         columns=[
-            "time (fs)", "T (K)", "E_kin (eV/atom)", "E_pot (eV/atom)",
-            "E_trans_drift (eV/atom)", "E_rot_drift (eV/atom)"
+            "time (fs)", "T (K)", "E_kin (eV∕atom)", "E_pot (eV∕atom)",
+            "E_trans_drift (eV∕atom)", "E_rot_drift (eV∕atom)"
         ]
     )
     if df.attrs["periodic"]:
@@ -285,8 +285,8 @@ def molecule(
     # and E_rot_drift can be nonzero is that the propagator violates
     # the conservation laws. Here those quantities are provided as a diagonostic.
     #
-    E_trans_drift = production_df["E_trans_drift (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule # kJ/mol/molecule
-    E_rot_drift = production_df["E_rot_drift (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule # kJ/mol/molecule
+    E_trans_drift = production_df["E_trans_drift (eV∕atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule # kJ/mol/molecule
+    E_rot_drift = production_df["E_rot_drift (eV∕atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule # kJ/mol/molecule
     
     T_target = df.attrs["target_temperature (K)"]
     kbT = ase.units.kB * T_target / (ase.units.kJ / ase.units.mol) # equals pV in the ideal gas approximation    
@@ -309,13 +309,13 @@ def molecule(
     return pd.DataFrame([{
         "T (K)": T_target,
         "⟨T⟩_molecule (K)": production_df["T (K)"].mean(),
-        "⟨E_kin⟩_molecule (kJ/mol/molecule)": production_df["E_kin (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
-        "⟨E_pot⟩_molecule (kJ/mol/molecule)": production_df["E_pot (eV/atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
-        "E_trans_molecule (kJ/mol/molecule)": E_trans, # COM translations (not included in ⟨E_kin⟩)
-        "E_rot_molecule (kJ/mol/molecule)": E_rot, # rotations of the entire molecule (not included in ⟨E_kin⟩)
-        "⟨E_trans_drift⟩_molecule (kJ/mol/molecule)": E_trans_drift, # spurious drift -- should be zero if no numerical issues
-        "⟨E_rot_drift⟩_molecule (kJ/mol/molecule)": E_rot_drift, # spurious drift -- should be zero if no numerical issues
-        "kT (kJ/mol)": kbT, # equals the pV contribution per molecule in the ideal gas approximation
+        "⟨E_kin⟩_molecule (kJ∕mol∕molecule)": production_df["E_kin (eV∕atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
+        "⟨E_pot⟩_molecule (kJ∕mol∕molecule)": production_df["E_pot (eV∕atom)"].mean() * eV_to_kJ_per_mol * n_atoms_molecule,
+        "E_trans_molecule (kJ∕mol∕molecule)": E_trans, # COM translations (not included in ⟨E_kin⟩)
+        "E_rot_molecule (kJ∕mol∕molecule)": E_rot, # rotations of the entire molecule (not included in ⟨E_kin⟩)
+        "⟨E_trans_drift⟩_molecule (kJ∕mol∕molecule)": E_trans_drift, # spurious drift -- should be zero if no numerical issues
+        "⟨E_rot_drift⟩_molecule (kJ∕mol∕molecule)": E_rot_drift, # spurious drift -- should be zero if no numerical issues
+        "kT (kJ∕mol)": kbT, # equals the pV contribution per molecule in the ideal gas approximation
         "n_atoms_molecule": n_atoms_molecule,
         "system_label_molecule": system_label
     }])
@@ -336,39 +336,39 @@ def sublimation(df_crystal, df_molecule):
     n_atoms_unit_cell = df_crystal["n_atoms_unit_cell"]
     beta = n_atoms_molecule / n_atoms_unit_cell
     
-    V_Ang3 = df_crystal["⟨V⟩_crystal (Å³/unit cell)"]
+    V_Ang3 = df_crystal["⟨V⟩_crystal (Å³∕unit cell)"]
     V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm³/mol/molecule
 
     ΔE_pot = (
-        df_molecule["⟨E_pot⟩_molecule (kJ/mol/molecule)"]
-        - df_crystal["⟨E_pot⟩_crystal (kJ/mol/unit cell)"] * beta
+        df_molecule["⟨E_pot⟩_molecule (kJ∕mol∕molecule)"]
+        - df_crystal["⟨E_pot⟩_crystal (kJ∕mol∕unit cell)"] * beta
         ) # kJ/mol/molecule
     ΔE_kin = (
-        df_molecule["⟨E_kin⟩_molecule (kJ/mol/molecule)"] # excludes translation and rotation of the entire molecule
-        - df_crystal["⟨E_kin⟩_crystal (kJ/mol/unit cell)"] * beta
+        df_molecule["⟨E_kin⟩_molecule (kJ∕mol∕molecule)"] # excludes translation and rotation of the entire molecule
+        - df_crystal["⟨E_kin⟩_crystal (kJ∕mol∕unit cell)"] * beta
         ) # kJ/mol/molecule, with COM translation removed
-    pV = df_crystal["p⟨V⟩_crystal (kJ/mol/unit cell)"] * beta # kJ/mol/molecule
-    E_pot_crystal = df_crystal["⟨E_pot⟩_crystal (kJ/mol/unit cell)"] * beta # kJ/mol/molecule
-    E_kin_crystal = df_crystal["⟨E_kin⟩_crystal (kJ/mol/unit cell)"] * beta # kJ/mol/molecule
+    pV = df_crystal["p⟨V⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
+    E_pot_crystal = df_crystal["⟨E_pot⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
+    E_kin_crystal = df_crystal["⟨E_kin⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
     #
     # Enthalpy defined in eq 10 of ref 1
     #
     ΔH_sub = (
         ΔE_pot
         + ΔE_kin 
-        + df_molecule["E_trans_molecule (kJ/mol/molecule)"] # COM translation
-        + df_molecule["E_rot_molecule (kJ/mol/molecule)"] # rotation of the entire molecule
-        + df_molecule["kT (kJ/mol)"] # the pV term per molecule in the ideal gas approximation
+        + df_molecule["E_trans_molecule (kJ∕mol∕molecule)"] # COM translation
+        + df_molecule["E_rot_molecule (kJ∕mol∕molecule)"] # rotation of the entire molecule
+        + df_molecule["kT (kJ∕mol)"] # the pV term per molecule in the ideal gas approximation
         - pV
     ) # kJ/mol/molecule
         
     return pd.DataFrame({
         "T (K)": df_crystal["T (K)"],
-        "ΔH_sub (kJ/mol/molecule)": ΔH_sub,
-        "Δ⟨E_pot⟩ (kJ/mol/molecule)": ΔE_pot,
-        "Δ⟨E_kin⟩ (kJ/mol/molecule)": ΔE_kin,
-        "⟨E_pot⟩_crystal (kJ/mol/molecule)": E_pot_crystal,
-        "⟨E_kin⟩_crystal (kJ/mol/molecule)": E_kin_crystal,
-        "p⟨V⟩_crystal (kJ/mol/molecule)": pV,
-        "⟨V⟩_crystal (cm³/mol/molecule)": V_molar
+        "ΔH_sub (kJ∕mol∕molecule)": ΔH_sub,
+        "Δ⟨E_pot⟩ (kJ∕mol∕molecule)": ΔE_pot,
+        "Δ⟨E_kin⟩ (kJ∕mol∕molecule)": ΔE_kin,
+        "⟨E_pot⟩_crystal (kJ∕mol∕molecule)": E_pot_crystal,
+        "⟨E_kin⟩_crystal (kJ∕mol∕molecule)": E_kin_crystal,
+        "p⟨V⟩_crystal (kJ∕mol∕molecule)": pV,
+        "⟨V⟩_crystal (cm³∕mol∕molecule)": V_molar
     })

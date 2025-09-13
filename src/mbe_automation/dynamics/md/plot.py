@@ -34,11 +34,11 @@ def trajectory(
         dataset=dataset,
         key=key,
         columns=[
-            "time (fs)", "T (K)", "E_kin (eV/atom)",
-            "E_pot (eV/atom)", "p (GPa)", "V (Å³/atom)"
+            "time (fs)", "T (K)", "E_kin (eV∕atom)",
+            "E_pot (eV∕atom)", "p (GPa)", "V (Å³∕atom)"
         ]
     )
-    df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
+    df["E_total (eV∕atom)"] = df["E_kin (eV∕atom)"] + df["E_pot (eV∕atom)"]
     time_ps = df["time (fs)"] / 1000.0
     
     time_equilibration_fs = df.attrs["time_equilibration (fs)"]
@@ -89,7 +89,7 @@ def trajectory(
         ax.legend(loc="upper right")
 
     plot_quantity(
-        axes[0], df["E_total (eV/atom)"], "C0", "E_total (eV/atom)", ".3f"
+        axes[0], df["E_total (eV∕atom)"], "C0", "E_total (eV∕atom)", ".3f"
     )
     plot_quantity(
         axes[1], df["T (K)"], "C1", "Temperature (K)", ".1f", df.attrs["target_temperature (K)"]
@@ -100,7 +100,7 @@ def trajectory(
             axes[2], df["p (GPa)"], "C2", "Pressure (GPa)", ".4f", df.attrs["target_pressure (GPa)"]
         )
         plot_quantity(
-            axes[3], df["V (Å³/atom)"], "C3", "Volume (Å³/atom)", ".2f"
+            axes[3], df["V (Å³∕atom)"], "C3", "Volume (Å³∕atom)", ".2f"
         )
 
     for ax in axes:
@@ -154,11 +154,11 @@ def reblocking(
     df = mbe_automation.storage.read_data_frame(
         dataset=dataset,
         key=key,
-        columns=["E_kin (eV/atom)", "E_pot (eV/atom)", "time (fs)",
-                 "p (GPa)", "V (Å³/atom)", "T (K)"]
+        columns=["E_kin (eV∕atom)", "E_pot (eV∕atom)", "time (fs)",
+                 "p (GPa)", "V (Å³∕atom)", "T (K)"]
     )
     
-    df["E_total (eV/atom)"] = df["E_kin (eV/atom)"] + df["E_pot (eV/atom)"]
+    df["E_total (eV∕atom)"] = df["E_kin (eV∕atom)"] + df["E_pot (eV∕atom)"]
     
     time_equilibration_fs = df.attrs["time_equilibration (fs)"]
     production_mask = df["time (fs)"] >= time_equilibration_fs
@@ -168,14 +168,14 @@ def reblocking(
     interval_fs = times_fs[1] - times_fs[0]
     
     quantities_to_plot = {
-        "E_total (eV/atom)": "Total Energy (eV/atom)",
+        "E_total (eV∕atom)": "Total Energy (eV∕atom)",
         "T (K)": "Temperature (K)"
     }
     
     ensemble = df.attrs["ensemble"]
     if ensemble == "NPT":
         quantities_to_plot["p (GPa)"] = "Pressure (GPa)"
-        quantities_to_plot["V (Å³/atom)"] = "Volume (Å³/atom)"
+        quantities_to_plot["V (Å³∕atom)"] = "Volume (Å³∕atom)"
 
     n_plots = len(quantities_to_plot)
     fig, axes = plt.subplots(

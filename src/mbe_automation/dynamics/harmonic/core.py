@@ -120,12 +120,12 @@ def phonons(
     # the Phonopy class.
     #
     # variant 1:
-    # units kJ/K/mol/primitive cell, kJ/mol/primitive cell, J/K/mol/primitive cell
+    # units kJ∕K∕mol∕primitive cell, kJ∕mol∕primitive cell, J∕K∕mol∕primitive cell
     # if the primitive cell is specified while constracing Phonopy class
     # (source: https://phonopy.github.io/phonopy/setting-tags.html section Thermal properties related tags)
     #
     # variant 2:
-    # units kJ/K/mol/unit cell, kJ/mol/unit cell, J/K/mol/unit cell
+    # units kJ∕K∕mol∕unit cell, kJ∕mol∕unit cell, J∕K∕mol∕unit cell
     # if the primitive cell matrix is set to None during initialization.
     #
     phonons = Phonopy(
@@ -253,7 +253,7 @@ def equilibrium_curve(
     print(f"filter_out_imaginary_optical    {filter_out_imaginary_optical}")
     print(f"filter_out_broken_symmetry      {filter_out_broken_symmetry}")
     if eos_sampling == "volume":
-        print("volume sampling interval (V/V₀)")
+        print("volume sampling interval (V∕V₀)")
         print(np.array2string(volume_range, precision=2))
     else:
         print(f"pressure sampling interval (GPa)")
@@ -390,8 +390,8 @@ def equilibrium_curve(
         
     for i, T in enumerate(temperatures):
         fit = mbe_automation.dynamics.harmonic.eos.fit(
-            V=df_eos[good_points & select_T[i]]["V_crystal (Å³/unit cell)"].to_numpy(),
-            F=df_eos[good_points & select_T[i]]["F_tot_crystal (kJ/mol/unit cell)"].to_numpy(),
+            V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
+            F=df_eos[good_points & select_T[i]]["F_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
             equation_of_state=equation_of_state
         )
         F_tot_curves.append(fit)
@@ -432,12 +432,12 @@ def equilibrium_curve(
         #
         if fit.min_found:
             weights = mbe_automation.dynamics.harmonic.eos.proximity_weights(
-                V=df_eos[good_points & select_T[i]]["V_crystal (Å³/unit cell)"].to_numpy(),
+                V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
                 V_min=V_eos[i]
             )
             F_vib_fit = Polynomial.fit(
-                df_eos[good_points & select_T[i]]["V_crystal (Å³/unit cell)"].to_numpy(),
-                df_eos[good_points & select_T[i]]["F_vib_crystal (kJ/mol/unit cell)"].to_numpy(),
+                df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
+                df_eos[good_points & select_T[i]]["F_vib_crystal (kJ∕mol∕unit cell)"].to_numpy(),
                 deg=2, w=weights
             ) # kJ/mol/unit cell
             dFdV = F_vib_fit.deriv(1) # kJ/mol/Å³/unit cell
@@ -458,9 +458,9 @@ def equilibrium_curve(
         
     df = pd.DataFrame({
         "T (K)": temperatures,
-        "V_eos (Å³/unit cell)": V_eos,
+        "V_eos (Å³∕unit cell)": V_eos,
         "p_thermal (GPa)": p_thermal_eos,
-        "F_tot_crystal_eos (kJ/mol/unit cell)": F_tot_eos,
+        "F_tot_crystal_eos (kJ∕mol∕unit cell)": F_tot_eos,
         "B (GPa)": B_eos,
         "curve_type": curve_type,
         "min_found": min_found,
