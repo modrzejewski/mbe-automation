@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from mbe_automation.configs.quasi_harmonic import QuasiHarmonicConfig
+from mbe_automation.configs.quasi_harmonic import QuasiHarmonic
 import mbe_automation.storage
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.data
@@ -23,7 +23,7 @@ except ImportError:
     mace_available = False
 
 
-def run(config: QuasiHarmonicConfig):
+def run(config: QuasiHarmonic):
 
     datetime_start = mbe_automation.display.timestamp_start()
     
@@ -159,9 +159,9 @@ def run(config: QuasiHarmonicConfig):
     del df_crystal["T (K)"]
     del df_molecule["T (K)"]
     df_harmonic = pd.concat([df_sublimation, df_crystal, df_molecule], axis=1)
-    mbe_automation.storage.save_data(
-        df_harmonic,
-        config.dataset,
+    mbe_automation.storage.save_data_frame(
+        df=df_harmonic,
+        dataset=config.dataset,
         key="quasi_harmonic/no_thermal_expansion"
     )
     df_harmonic.to_csv(os.path.join(config.work_dir, "no_thermal_expansion.csv"))
@@ -306,9 +306,9 @@ def run(config: QuasiHarmonicConfig):
         df_crystal_qha,
         df_crystal_eos,
         df_molecule], axis=1)
-    mbe_automation.storage.save_data(
-        df_quasi_harmonic,
-        config.dataset,
+    mbe_automation.storage.save_data_frame(
+        df=df_quasi_harmonic,
+        dataset=config.dataset,
         key="quasi_harmonic/thermal_expansion"
     )
     df_quasi_harmonic.to_csv(os.path.join(config.work_dir, "thermal_expansion.csv"))

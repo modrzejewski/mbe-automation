@@ -102,56 +102,6 @@ class Trajectory(Structure):
             n_removed_rot_dof=n_removed_rot_dof
         )
 
-def save_data(
-        df,
-        dataset,
-        key="quasi_harmonic/quasi_harmonic_equilibrium_properties",
-        mode="a"
-):
-    """
-    Save a Pandas DataFrame to an HDF5 file, handling various column data types.
-
-    Parameters:
-    - df (pd.DataFrame): The DataFrame to save.
-    - dataset (str): Path to the HDF5 file.
-    - key (str): Path to the group in the HDF5 file (e.g., "group/subgroup").
-    - mode (str): File mode for h5py.File ('a' for append, 'w' for write/overwrite).
-
-    Returns:
-    - None
-    """
-
-    df.to_hdf(
-        dataset,
-        key=key,
-        mode=mode,
-        format="fixed"
-    )
-
-
-def read_data(
-        dataset,
-        key="quasi_harmonic/quasi_harmonic_equilibrium_properties"
-):
-    """
-    Read a Pandas DataFrame from an HDF5 file.
-
-    Parameters:
-    - dataset (str): Path to the HDF5 file.
-    - key (str): Path to the group in the HDF5 file (e.g., "group/subgroup").
-
-    Returns:
-    - pd.DataFrame: The reconstructed DataFrame.
-    """
-
-    df = pd.read_hdf(
-        dataset,
-        key=key
-        )
-
-    return df
-
-
 def save_data_frame(
         dataset: str,
         key: str,

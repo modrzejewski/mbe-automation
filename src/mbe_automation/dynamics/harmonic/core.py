@@ -336,9 +336,9 @@ def equilibrium_curve(
     # one can extract those data to see what went wrong.
     #
     df_eos = pd.concat(df_eos_points, ignore_index=True)
-    mbe_automation.storage.save_data(
-        df_eos,
-        dataset,
+    mbe_automation.storage.save_data_frame(
+        df=df_eos,
+        dataset=dataset,
         key="quasi_harmonic/eos_sampled"
     )
     df_eos.to_csv(os.path.join(work_dir, "eos_sampled.csv"))

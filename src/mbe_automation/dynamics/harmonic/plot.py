@@ -101,8 +101,13 @@ def band_structure(
     axes[0].set_ylim(omega_min, omega_max)
         
     fig.supylabel(f"Frequency ({unit_label})", fontsize=12)
-    fig.tight_layout()
-    fig.subplots_adjust(left=0.1)
+    fig.subplots_adjust(
+        left=0.08,
+        right=0.98,
+        bottom=0.1,
+        top=0.95,
+        wspace=0.15  # Add horizontal space between panels
+    )
 
     if save_path:
         output_dir = os.path.dirname(save_path)
