@@ -15,9 +15,9 @@ def tree(dataset: str):
         
         if isinstance(obj, h5py.Dataset):
             info = f"shape={obj.shape}, dtype={obj.dtype}"
-            print(f"{indent}{connector}{os.path.basename(name)} [{info}]")
+            print(f"{indent}{connector}{name} [{info}]")
         else:
-            print(f"{indent}{connector}{os.path.basename(name)}/")
+            print(f"{indent}{connector}{name}/")
             
             # Prepare indentation for children
             child_indent = indent + ("    " if is_last else "│   ")
@@ -49,5 +49,4 @@ def tree(dataset: str):
                 print_recursive(name, obj, "", is_last)
     except Exception as e:
         print(f"Error reading dataset file: {e}")
-
 
