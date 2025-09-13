@@ -46,7 +46,7 @@ class Trajectory(Structure):
     time_equilibration: float
     target_temperature: float
     target_pressure: float | None
-    ensemble: Literal["NPT", "NVT"]
+    ensemble: Literal["NPT", "NVT", "NVE"]
     time: npt.NDArray[np.floating]
     temperature: npt.NDArray[np.floating]
     pressure: npt.NDArray[np.floating] | None
