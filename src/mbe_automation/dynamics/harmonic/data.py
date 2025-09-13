@@ -157,14 +157,14 @@ def molecule(
         
     df = pd.DataFrame({
         "T (K)": temperatures,
-        "E_el_molecule (kJ/mol/molecule)": E_el,
-        "E_vib_molecule (kJ/mol/molecule)": E_vib,
-        "S_vib_molecule (J/K/mol/molecule)": S_vib,
-        "F_vib_molecule (kJ/mol/molecule)": F_vib,        
-        "ZPE_molecule (kJ/mol/molecule)": ZPE,
-        "E_trans_molecule (kJ/mol/molecule)": E_trans,
-        "E_rot_molecule (kJ/mol/molecule)": E_rot,
-        "kT (kJ/mol)": kbT, # equals the pV term per molecule in the ideal gas approximation
+        "E_el_molecule (kJ∕mol∕molecule)": E_el,
+        "E_vib_molecule (kJ∕mol∕molecule)": E_vib,
+        "S_vib_molecule (J∕K∕mol∕molecule)": S_vib,
+        "F_vib_molecule (kJ∕mol∕molecule)": F_vib,        
+        "ZPE_molecule (kJ∕mol∕molecule)": ZPE,
+        "E_trans_molecule (kJ∕mol∕molecule)": E_trans,
+        "E_rot_molecule (kJ∕mol∕molecule)": E_rot,
+        "kT (kJ∕mol)": kbT, # equals the pV term per molecule in the ideal gas approximation
         "all_freqs_real_molecule": all_freqs_real,
         "n_atoms_molecule": n_atoms,
         "system_label_molecule": system_label
@@ -234,15 +234,15 @@ def crystal(
     
     df = pd.DataFrame({
         "T (K)": temperatures,
-        "F_vib_crystal (kJ/mol/unit cell)": F_vib_crystal,
-        "S_vib_crystal (J/K/mol/unit cell)": S_vib_crystal,
-        "E_vib_crystal (kJ/mol/unit cell)": E_vib_crystal,
-        "ZPE_crystal (kJ/mol/unit cell)": ZPE_crystal,
-        "C_v_vib_crystal (J/K/mol/unit cell)": C_v_vib_crystal,
-        "E_el_crystal (kJ/mol/unit cell)": E_el_crystal,
-        "F_tot_crystal (kJ/mol/unit cell)": F_tot_crystal,
-        "V_crystal (Å³/unit cell)": V,
-        "ρ_crystal (g/cm³)": rho,
+        "F_vib_crystal (kJ∕mol∕unit cell)": F_vib_crystal,
+        "S_vib_crystal (J∕K∕mol∕unit cell)": S_vib_crystal,
+        "E_vib_crystal (kJ∕mol∕unit cell)": E_vib_crystal,
+        "ZPE_crystal (kJ∕mol∕unit cell)": ZPE_crystal,
+        "C_v_vib_crystal (J∕K∕mol∕unit cell)": C_v_vib_crystal,
+        "E_el_crystal (kJ∕mol∕unit cell)": E_el_crystal,
+        "F_tot_crystal (kJ∕mol∕unit cell)": F_tot_crystal,
+        "V_crystal (Å³∕unit cell)": V,
+        "ρ_crystal (g∕cm³)": rho,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "space_group": space_group,
         "acoustic_freqs_real_crystal": fbz_analysis.acoustic_freqs_real,
@@ -280,38 +280,38 @@ def sublimation(df_crystal, df_molecule):
     n_atoms_unit_cell = df_crystal["n_atoms_unit_cell"]
     beta = n_atoms_molecule / n_atoms_unit_cell
     
-    V_Ang3 = df_crystal["V_crystal (Å³/unit cell)"]
+    V_Ang3 = df_crystal["V_crystal (Å³∕unit cell)"]
     V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm**3/mol/molecule
 
     E_latt = (
-        df_crystal["E_el_crystal (kJ/mol/unit cell)"] * beta
-        - df_molecule["E_el_molecule (kJ/mol/molecule)"]
+        df_crystal["E_el_crystal (kJ∕mol∕unit cell)"] * beta
+        - df_molecule["E_el_molecule (kJ∕mol∕molecule)"]
     ) # kJ/mol/molecule
         
     ΔE_vib = (
-        df_molecule["E_vib_molecule (kJ/mol/molecule)"]
-        - df_crystal["E_vib_crystal (kJ/mol/unit cell)"] * beta
+        df_molecule["E_vib_molecule (kJ∕mol∕molecule)"]
+        - df_crystal["E_vib_crystal (kJ∕mol∕unit cell)"] * beta
         ) # kJ/mol/molecule
         
     ΔH_sub = (
         -E_latt
         + ΔE_vib
-        + df_molecule["E_trans_molecule (kJ/mol/molecule)"]
-        + df_molecule["E_rot_molecule (kJ/mol/molecule)"]
-        + df_molecule["kT (kJ/mol)"] # the pV term per molecule in the ideal gas approximation
+        + df_molecule["E_trans_molecule (kJ∕mol∕molecule)"]
+        + df_molecule["E_rot_molecule (kJ∕mol∕molecule)"]
+        + df_molecule["kT (kJ∕mol)"] # the pV term per molecule in the ideal gas approximation
     ) # kJ/mol/molecule
         
     ΔS_sub_vib = (
-        df_molecule["S_vib_molecule (J/K/mol/molecule)"]
-        - df_crystal["S_vib_crystal (J/K/mol/unit cell)"] * beta
+        df_molecule["S_vib_molecule (J∕K∕mol∕molecule)"]
+        - df_crystal["S_vib_crystal (J∕K∕mol∕unit cell)"] * beta
     ) # J/K/mol/molecule
 
     df = pd.DataFrame({
         "T (K)": df_crystal["T (K)"],
-        "E_latt (kJ/mol/molecule)": E_latt,
-        "ΔE_vib (kJ/mol/molecule)": ΔE_vib,
-        "ΔH_sub (kJ/mol/molecule)": ΔH_sub,
-        "ΔS_sub_vib (J/K/mol/molecule)": ΔS_sub_vib,
-        "V_crystal (cm³/mol/molecule)": V_molar
+        "E_latt (kJ∕mol∕molecule)": E_latt,
+        "ΔE_vib (kJ∕mol∕molecule)": ΔE_vib,
+        "ΔH_sub (kJ∕mol∕molecule)": ΔH_sub,
+        "ΔS_sub_vib (J∕K∕mol∕molecule)": ΔS_sub_vib,
+        "V_crystal (cm³∕mol∕molecule)": V_molar
     })
     return df

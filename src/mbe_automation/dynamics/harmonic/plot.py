@@ -101,8 +101,13 @@ def band_structure(
     axes[0].set_ylim(omega_min, omega_max)
         
     fig.supylabel(f"Frequency ({unit_label})", fontsize=12)
-    fig.tight_layout()
-    fig.subplots_adjust(left=0.1)
+    fig.subplots_adjust(
+        left=0.08,
+        right=0.98,
+        bottom=0.1,
+        top=0.95,
+        wspace=0.15  # Add horizontal space between panels
+    )
 
     if save_path:
         output_dir = os.path.dirname(save_path)
@@ -127,10 +132,10 @@ def eos_curves(
 
     if n_molecules_per_cell:
         scaling_factor = 1.0 / n_molecules_per_cell
-        y_label = "Free energy (kJ/mol/molecule)"
+        y_label = "Free energy (kJ∕mol∕molecule)"
     else:
         scaling_factor = 1.0
-        y_label = "Free energy (kJ/mol/unit cell)"
+        y_label = "Free energy (kJ∕mol∕unit cell)"
 
     F_sampled_scaled = eos.F_sampled * scaling_factor
     F_interp_scaled = eos.F_interp * scaling_factor
@@ -180,7 +185,7 @@ def eos_curves(
     )
 
     ax.legend()
-    ax.set_xlabel("Volume (Å³/unit cell)", fontsize=14)
+    ax.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
     ax.set_ylabel(y_label, fontsize=14)
     ax.grid(True, linestyle="--", alpha=0.6)
     ax.tick_params(labelsize=12)

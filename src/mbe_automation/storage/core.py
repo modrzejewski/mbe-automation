@@ -46,7 +46,7 @@ class Trajectory(Structure):
     time_equilibration: float
     target_temperature: float
     target_pressure: float | None
-    ensemble: Literal["NPT", "NVT"]
+    ensemble: Literal["NPT", "NVT", "NVE"]
     time: npt.NDArray[np.floating]
     temperature: npt.NDArray[np.floating]
     pressure: npt.NDArray[np.floating] | None
@@ -101,57 +101,6 @@ class Trajectory(Structure):
             n_removed_trans_dof=n_removed_trans_dof,
             n_removed_rot_dof=n_removed_rot_dof
         )
-
-        
-def save_data(
-        df,
-        dataset,
-        key="quasi_harmonic/quasi_harmonic_equilibrium_properties",
-        mode="a"
-):
-    """
-    Save a Pandas DataFrame to an HDF5 file, handling various column data types.
-
-    Parameters:
-    - df (pd.DataFrame): The DataFrame to save.
-    - dataset (str): Path to the HDF5 file.
-    - key (str): Path to the group in the HDF5 file (e.g., "group/subgroup").
-    - mode (str): File mode for h5py.File ('a' for append, 'w' for write/overwrite).
-
-    Returns:
-    - None
-    """
-
-    df.to_hdf(
-        dataset,
-        key=key,
-        mode=mode,
-        format="fixed"
-    )
-
-
-def read_data(
-        dataset,
-        key="quasi_harmonic/quasi_harmonic_equilibrium_properties"
-):
-    """
-    Read a Pandas DataFrame from an HDF5 file.
-
-    Parameters:
-    - dataset (str): Path to the HDF5 file.
-    - key (str): Path to the group in the HDF5 file (e.g., "group/subgroup").
-
-    Returns:
-    - pd.DataFrame: The reconstructed DataFrame.
-    """
-
-    df = pd.read_hdf(
-        dataset,
-        key=key
-        )
-
-    return df
-
 
 def save_data_frame(
         dataset: str,
@@ -289,71 +238,6 @@ def read_fbz_path(
     )
 
 
-def display(dataset):
-    """
-    Print ASCII tree visualization of HDF5 dataset structure.
-    
-    Parameters:
-    -----------
-    dataset : str
-        Path to HDF5 file
-    """
-    if not os.path.exists(dataset):
-        print(f"Error: File {dataset} not found")
-        return
-    
-    def print_attrs(obj, indent=""):
-        """Print attributes of HDF5 object"""
-        if obj.attrs:
-            print(f"{indent}└── @attributes:")
-            for i, (key, value) in enumerate(obj.attrs.items()):
-                connector = "├──" if i < len(obj.attrs) - 1 else "└──"
-                print(f"{indent}    {connector} {key}: {value}")
-    
-    def print_tree(name, obj, indent="", is_last=True):
-        """Recursively print HDF5 tree structure"""
-        connector = "└──" if is_last else "├──"
-        
-        if isinstance(obj, h5py.Dataset):
-            # Print dataset with shape
-            print(f"{indent}{connector} {name}{'/':<25} # {obj.shape} - {obj.dtype}")
-        else:
-            # Print group
-            print(f"{indent}{connector} {name}/")
-            
-            # Get all items in this group
-            items = list(obj.items())
-            
-            # Print datasets first, then attributes
-            for i, (key, item) in enumerate(items):
-                is_last_item = (i == len(items) - 1)
-                next_indent = indent + ("    " if is_last else "│   ")
-                print_tree(key, item, next_indent, is_last_item)
-            
-            # Print attributes after datasets
-            if obj.attrs:
-                next_indent = indent + ("    " if is_last else "│   ")
-                print_attrs(obj, next_indent)
-    
-    try:
-        with h5py.File(dataset, 'r') as f:
-            print(f"{os.path.basename(dataset)}")
-            
-            # Get root level items
-            items = list(f.items())
-            
-            for i, (name, obj) in enumerate(items):
-                is_last = (i == len(items) - 1)
-                print_tree(name, obj, "", is_last)
-            
-            # Print root attributes if any
-            if f.attrs:
-                print_attrs(f, "")
-                
-    except Exception as e:
-        print(f"Error reading HDF5 file: {e}")
-
-
 def save_eos_curves(
         F_tot_curves,
         temperatures,
@@ -382,10 +266,11 @@ def save_eos_curves(
             V_min[i] = np.nan
             F_min[i] = np.nan
 
-    F_interp = np.zeros((n_temperatures, n_interp))
-    V_interp = np.linspace(np.min(V_sampled), np.max(V_sampled), 200)
+    F_interp = np.full((n_temperatures, n_interp), np.nan)
+    V_interp = np.linspace(np.min(V_sampled), np.max(V_sampled), n_interp)
     for i, fit in enumerate(F_tot_curves):
-        F_interp[i, :] = fit.F_interp(V_interp)
+        if fit.F_interp is not None:
+            F_interp[i, :] = fit.F_interp(V_interp)
         
     with h5py.File(dataset, "a") as f:
         if key in f:
@@ -401,31 +286,31 @@ def save_eos_curves(
             data=temperatures
         )
         group.create_dataset(
-            name="V_sampled (Å³/unit cell)",
+            name="V_sampled (Å³∕unit cell)",
             data=V_sampled
         )
         group.create_dataset(
-            name="F_sampled (kJ/mol/unit cell)",
+            name="F_sampled (kJ∕mol∕unit cell)",
             data=F_sampled
         )
         group.create_dataset(
-            name="V_interp (Å³/unit cell)",
+            name="V_interp (Å³∕unit cell)",
             data=V_interp
         )
         group.create_dataset(
-            name="F_interp (kJ/mol/unit cell)",
+            name="F_interp (kJ∕mol∕unit cell)",
             data=F_interp
         )
         group.create_dataset(
-            name="V_min (Å³/unit cell)",
+            name="V_min (Å³∕unit cell)",
             data=V_min
         )
         group.create_dataset(
-            name="F_min (kJ/mol/unit cell)",
+            name="F_min (kJ∕mol∕unit cell)",
             data=F_min
         )
 
-        
+
 def read_eos_curves(
         dataset,
         key
@@ -435,12 +320,12 @@ def read_eos_curves(
         group = f[key]
         eos_curves = EOSCurves(
             temperatures=group["T (K)"][...],
-            V_sampled=group["V_sampled (Å³/unit cell)"][...],
-            F_sampled=group["F_sampled (kJ/mol/unit cell)"][...],
-            V_interp=group["V_interp (Å³/unit cell)"][...],
-            F_interp=group["F_interp (kJ/mol/unit cell)"][...],
-            V_min=group["V_min (Å³/unit cell)"][...],
-            F_min=group["F_min (kJ/mol/unit cell)"][...]
+            V_sampled=group["V_sampled (Å³∕unit cell)"][...],
+            F_sampled=group["F_sampled (kJ∕mol∕unit cell)"][...],
+            V_interp=group["V_interp (Å³∕unit cell)"][...],
+            F_interp=group["F_interp (kJ∕mol∕unit cell)"][...],
+            V_min=group["V_min (Å³∕unit cell)"][...],
+            F_min=group["F_min (kJ∕mol∕unit cell)"][...]
         )
 
     return eos_curves
@@ -548,32 +433,32 @@ def save_trajectory(
                 data=traj.pressure
             )
             group.create_dataset(
-                name="V (Å³/atom)",
+                name="V (Å³∕atom)",
                 data=traj.volume
             )
         group.create_dataset(
-            name="forces (eV/Å)",
+            name="forces (eV∕Å)",
             data=traj.forces
         )
         group.create_dataset(
-            name="velocities (Å/fs)",
+            name="velocities (Å∕fs)",
             data=traj.velocities
         )
         group.create_dataset(
-            name="E_kin (eV/atom)",
+            name="E_kin (eV∕atom)",
             data=traj.E_kin
         )
         group.create_dataset(
-            name="E_pot (eV/atom)",
+            name="E_pot (eV∕atom)",
             data=traj.E_pot
         )        
         group.create_dataset(
-            name="E_trans_drift (eV/atom)",
+            name="E_trans_drift (eV∕atom)",
             data=traj.E_trans_drift
         )
         if not traj.periodic:
             group.create_dataset(
-                name="E_rot_drift (eV/atom)",
+                name="E_rot_drift (eV∕atom)",
                 data=traj.E_rot_drift
             )
         group.create_dataset(
@@ -613,13 +498,13 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             time=group["time (fs)"][...],
             temperature=group["T (K)"][...],
             pressure=(group["p (GPa)"][...] if ensemble=="NPT" else None),
-            volume=(group["V (Å³/atom)"][...] if ensemble=="NPT" else None),
-            forces=group["forces (eV/Å)"][...],
-            velocities=group["velocities (Å/fs)"][...],
-            E_kin=group["E_kin (eV/atom)"][...],
-            E_pot=group["E_pot (eV/atom)"][...],
-            E_trans_drift=group["E_trans_drift (eV/atom)"][...],
-            E_rot_drift=(group["E_rot_drift (eV/atom)"][...] if not is_periodic else None),
+            volume=(group["V (Å³∕atom)"][...] if ensemble=="NPT" else None),
+            forces=group["forces (eV∕Å)"][...],
+            velocities=group["velocities (Å∕fs)"][...],
+            E_kin=group["E_kin (eV∕atom)"][...],
+            E_pot=group["E_pot (eV∕atom)"][...],
+            E_trans_drift=group["E_trans_drift (eV∕atom)"][...],
+            E_rot_drift=(group["E_rot_drift (eV∕atom)"][...] if not is_periodic else None),
             target_temperature=group.attrs["target_temperature (K)"],
             target_pressure=(group.attrs["target_pressure (GPa)"] if ensemble=="NPT" else None),
             time_equilibration=group.attrs["time_equilibration (fs)"],
