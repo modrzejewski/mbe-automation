@@ -12,8 +12,6 @@ from mbe_automation.storage.core import (
     Trajectory,
 
     # I/O for pandas DataFrames
-    save_data,
-    read_data,
     save_data_frame,
     read_data_frame,
 
