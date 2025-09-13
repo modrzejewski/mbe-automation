@@ -1,5 +1,6 @@
 import h5py
 import ase
+import ase.io.trajectory
 
 class SlicedTrajectory:
     """
