@@ -209,11 +209,10 @@ def crystal(
         phonons,
         imaginary_mode_threshold
     )
-
     mbe_automation.storage.save_force_constants(
         dataset=dataset,
         key=f"quasi_harmonic/phonons/force_constants/{system_label}",
-        phonons
+        phonons=phonons
     )
     mbe_automation.storage.save_fbz_path(
         phonons,
