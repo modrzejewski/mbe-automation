@@ -209,6 +209,12 @@ def crystal(
         phonons,
         imaginary_mode_threshold
     )
+
+    mbe_automation.storage.save_force_constants(
+        dataset=dataset,
+        key=f"quasi_harmonic/phonons/force_constants/{system_label}",
+        phonons
+    )
     mbe_automation.storage.save_fbz_path(
         phonons,
         dataset,
@@ -220,7 +226,6 @@ def crystal(
         save_path=os.path.join(work_dir, "phonons", "fbz_path", f"{system_label}.png"),
         freq_max_thz=10.0 # THz
     )
-
     mbe_automation.storage.save_structure(
         dataset=dataset,
         key=f"quasi_harmonic/structures/{system_label}",
@@ -229,7 +234,6 @@ def crystal(
         masses=unit_cell.get_masses(),
         cell_vectors=unit_cell.get_cell()
     )
-
     interp_mesh = phonons.mesh.mesh_numbers
     
     df = pd.DataFrame({

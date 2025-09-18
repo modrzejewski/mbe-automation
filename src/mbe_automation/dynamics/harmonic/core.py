@@ -202,8 +202,7 @@ def phonons(
         print(f"Symmetrization of force constants completed", flush=True)
     
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
-    print(f"Fourier interpolation mesh completed", flush=True)
-    
+    print(f"Fourier interpolation mesh completed", flush=True)    
     return phonons
 
 
