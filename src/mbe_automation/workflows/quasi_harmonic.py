@@ -115,7 +115,7 @@ def run(config: QuasiHarmonic):
             config.supercell_diagonal
         )
     else:
-        print("Using supercell matrix provided in QuasiHarmonicConfig", flush=True)
+        print("Using supercell matrix provided in config", flush=True)
         supercell_matrix = config.supercell_matrix
         
     if config.force_constants_cutoff_radius == "auto":

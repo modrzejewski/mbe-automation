@@ -6,6 +6,8 @@ import ase
 import ase.io.trajectory
 import dynasor
 import nglview.adaptor
+import phonopy
+from phonopy.structure.atoms import PhonopyAtoms
 
 import mbe_automation.storage.core
 
@@ -198,6 +200,57 @@ def to_dynasor_mode_projector(
         force_constants=fc.force_constants
     )
     return mp
+
+
+@overload
+def to_phonopy(
+    force_constants: mbe_automation.storage.core.ForceConstants
+) -> phonopy.Phonopy: ...
+
+@overload
+def to_phonopy(*, dataset: str, key: str) -> phonopy.Phonopy: ...
+
+def to_phonopy(
+    force_constants: mbe_automation.storage.core.ForceConstants | None = None,
+    *,
+    dataset: str | None = None,
+    key: str | None = None,
+) -> phonopy.Phonopy:
+    """
+    Create a phonopy instance from stored or in-memory force constants.
+
+    Can be called in two ways:
+    1. By providing a ForceConstants object directly.
+    2. By providing a dataset path and a key to read the data.
+    """
+
+    if force_constants is not None and (dataset is not None or key is not None):
+        raise ValueError(
+            "Provide either a 'force_constants' object or 'dataset'/'key', not both."
+        )
+    if (dataset is not None and key is None) or (dataset is None and key is not None):
+        raise ValueError("Both 'dataset' and 'key' must be provided together.")
+
+    if force_constants is not None:
+        fc_data = force_constants
+    elif dataset is not None and key is not None:
+        fc_data = mbe_automation.storage.core.read_force_constants(dataset, key)
+    else:
+        raise ValueError("Either 'force_constants' or both 'dataset' and 'key' must be provided.")
+
+    primitive_ph = PhonopyAtoms(
+        numbers=fc_data.primitive.atomic_numbers,
+        masses=fc_data.primitive.masses,
+        cell=fc_data.primitive.cell_vectors,
+        positions=fc_data.primitive.positions,
+    )
+    ph = phonopy.Phonopy(
+        unitcell=primitive_ph,
+        supercell_matrix=fc_data.supercell_matrix
+    )
+    ph.force_constants = fc_data.force_constants
+
+    return ph
 
 
 class NGLViewTrajectory(nglview.adaptor.Trajectory, nglview.adaptor.Structure):

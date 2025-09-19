@@ -48,6 +48,7 @@ class ForceConstants:
     primitive: Structure
     supercell: Structure
     force_constants: npt.NDArray[np.floating]
+    supercell_matrix: npt.NDArray[np.integer]
 
 @dataclass(kw_only=True)
 class Trajectory(Structure):
@@ -534,7 +535,14 @@ def save_force_constants(
         if key in f:
             del f[key]
         group = f.create_group(key)
-        group.create_dataset("force_constants (eV∕Å²)", data=phonons.force_constants)
+        group.create_dataset(
+            "force_constants (eV∕Å²)",
+            data=phonons.force_constants
+        )
+        group.create_dataset(
+            "supercell_matrix",
+            data=phonons.supercell_matrix
+        )
 
     primitive = phonons.primitive
     save_structure(
@@ -561,10 +569,12 @@ def read_force_constants(dataset: str, key: str) -> ForceConstants:
     with h5py.File(dataset, "r") as data:
         group = data[key]
         fc = group["force_constants (eV∕Å²)"][...]
+        supercell_matrix = group["supercell_matrix"][...]
     primitive = read_structure(dataset, f"{key}/primitive")
     supercell = read_structure(dataset, f"{key}/supercell")
     return ForceConstants(
         force_constants=fc,
+        supercell_matrix=supercell_matrix,
         primitive=primitive,
         supercell=supercell
     )

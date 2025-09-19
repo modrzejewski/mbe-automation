@@ -43,8 +43,10 @@ from mbe_automation.storage.display import tree
 
 # --- Views for external libraries ---
 from mbe_automation.storage.views import ASETrajectory
+from mbe_automation.storage.views import NGLViewTrajectory
 from mbe_automation.storage.views import to_ase_atoms
 from mbe_automation.storage.views import to_dynasor_mode_projector
+from mbe_automation.storage.views import to_phonopy
 
 # --- Define the public API of the package ---
 __all__ = [
@@ -72,8 +74,10 @@ __all__ = [
     
     # Views
     "ASETrajectory",
+    "NGLViewTrajectory",
     "to_ase_atoms",
-    "to_dynasor_mode_projector"
+    "to_dynasor_mode_projector",
+    "to_phonopy",
 ]
 
 
