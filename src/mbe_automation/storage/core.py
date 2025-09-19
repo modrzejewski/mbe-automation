@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Tuple, Literal
 import pandas as pd
@@ -40,6 +41,14 @@ class Structure:
             self.periodic = False
         else:
             self.periodic = True
+
+@dataclass
+class ForceConstants:
+    """Store harmonic force constants and associated structures."""
+    primitive: Structure
+    supercell: Structure
+    force_constants: npt.NDArray[np.floating]
+    supercell_matrix: npt.NDArray[np.integer]
 
 @dataclass(kw_only=True)
 class Trajectory(Structure):
@@ -513,6 +522,62 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
         )
         
     return traj
+
+
+def save_force_constants(
+    dataset: str,
+    key: str,
+    phonons: Phonopy
+):
+    """Save force constants with their primitive and supercell structures."""
+
+    with h5py.File(dataset, "a") as f:
+        if key in f:
+            del f[key]
+        group = f.create_group(key)
+        group.create_dataset(
+            "force_constants (eV∕Å²)",
+            data=phonons.force_constants
+        )
+        group.create_dataset(
+            "supercell_matrix",
+            data=phonons.supercell_matrix
+        )
+
+    primitive = phonons.primitive
+    save_structure(
+        dataset, f"{key}/primitive",
+        positions=primitive.positions,
+        atomic_numbers=primitive.numbers,
+        masses=primitive.masses,
+        cell_vectors=primitive.cell
+    )
+    
+    supercell = phonons.supercell
+    save_structure(
+        dataset, f"{key}/supercell",
+        positions=supercell.positions,
+        atomic_numbers=supercell.numbers,
+        masses=supercell.masses,
+        cell_vectors=supercell.cell
+    )
+
+        
+def read_force_constants(dataset: str, key: str) -> ForceConstants:
+    """Read force constants and their associated structures."""
+
+    with h5py.File(dataset, "r") as data:
+        group = data[key]
+        fc = group["force_constants (eV∕Å²)"][...]
+        supercell_matrix = group["supercell_matrix"][...]
+    primitive = read_structure(dataset, f"{key}/primitive")
+    supercell = read_structure(dataset, f"{key}/supercell")
+    return ForceConstants(
+        force_constants=fc,
+        supercell_matrix=supercell_matrix,
+        primitive=primitive,
+        supercell=supercell
+    )
 
 
 def read_gamma_point_eigenvecs(
