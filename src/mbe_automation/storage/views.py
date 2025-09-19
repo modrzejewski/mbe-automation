@@ -34,33 +34,52 @@ class SlicedTrajectory:
 
 class ASETrajectory(ase.io.trajectory.TrajectoryReader):
     """
-    Present a trajectory from a dataset file as an ASE-compatible object.
+    Present a trajectory as an ASE-compatible object.
 
-    The object supports indexing to retrieve ase.Atoms objects for each frame
-    by reading data from the file on-demand. It is compatible with trajectories
-    saved by the 'save_trajectory' function.
+    The object can be initialized from a stored trajectory on disk or from an
+    in-memory Structure object. It supports indexing to retrieve ase.Atoms
+    objects for each frame on-demand.
     """
-    def __init__(self, dataset: str, key: str):
-        """
-        Initialize the trajectory by opening the dataset.
+    @overload
+    def __init__(self, structure: mbe_automation.storage.core.Structure): ...
 
-        Args:
-            dataset (str): Path to the dataset.
-            key (str): Key to the trajectory group within the dataset.
-        """
-        self.storage = h5py.File(dataset, "r")
-        group = self.storage[key]
+    @overload
+    def __init__(self, *, dataset: str, key: str): ...
 
-        self.positions = group["positions (Å)"]
-        self.atomic_numbers = group["atomic_numbers"][:]
-        self.masses = group["masses (u)"][:]
-        
-        self.periodic = group.attrs["periodic"]
-        self.n_frames = group.attrs["n_frames"]
-
-        self.cell_dataset = None
-        if self.periodic:
-            self.cell_dataset = group["cell_vectors (Å)"]
+    def __init__(
+        self,
+        structure: mbe_automation.storage.core.Structure | None = None,
+        *,
+        dataset: str | None = None,
+        key: str | None = None
+    ):
+        self._is_file_based = False
+        if structure is not None:
+            # In-memory mode
+            self.positions = structure.positions
+            self.atomic_numbers = structure.atomic_numbers
+            self.masses = structure.masses
+            self.periodic = structure.periodic
+            self.n_frames = structure.n_frames
+            self.cell_vectors = structure.cell_vectors
+            self.storage = None
+        elif dataset is not None and key is not None:
+            # File-based mode
+            self._is_file_based = True
+            self.storage = h5py.File(dataset, "r")
+            group = self.storage[key]
+            self.positions = group["positions (Å)"]
+            self.atomic_numbers = group["atomic_numbers"][:]
+            self.masses = group["masses (u)"][:]
+            self.periodic = group.attrs["periodic"]
+            self.n_frames = group.attrs["n_frames"]
+            self.cell_vectors = None
+            if self.periodic:
+                self.cell_vectors = group["cell_vectors (Å)"]
+        else:
+            raise ValueError(
+                "Provide either a 'structure' object or both 'dataset' and 'key'."
+            )
 
     def __enter__(self):
         return self
@@ -73,17 +92,13 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
         return self.n_frames
 
     def __getitem__(self, i):
-        """
-        Get atoms object or a slice of the trajectory.
-        """
+        """Get atoms object or a slice of the trajectory."""
         if isinstance(i, slice):
             return SlicedTrajectory(self, i)
         return self._get_atoms(i)
 
     def _get_atoms(self, index):
-        """
-        Return a single frame as an ase.Atoms object.
-        """
+        """Return a single frame as an ase.Atoms object."""
         if index < 0:
             index += self.n_frames
         if not 0 <= index < self.n_frames:
@@ -93,23 +108,103 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
         
         cell = None
         if self.periodic:
-            if self.cell_dataset.ndim == 3:
-                cell = self.cell_dataset[index]
+            if self.cell_vectors.ndim == 3:
+                cell = self.cell_vectors[index]
             else:
-                cell = self.cell_dataset[:]
+                cell = self.cell_vectors[:]
 
-        atoms = ase.Atoms(
+        return ase.Atoms(
             numbers=self.atomic_numbers,
             positions=positions,
             cell=cell,
             pbc=self.periodic,
             masses=self.masses
         )
-        return atoms
 
     def close(self):
-        """Close the dataset file."""
-        self.storage.close()
+        """Close the dataset file if it was opened."""
+        if self._is_file_based and self.storage:
+            self.storage.close()
+            
+    
+# class ASETrajectory(ase.io.trajectory.TrajectoryReader):
+#     """
+#     Present a trajectory from a dataset file as an ASE-compatible object.
+
+#     The object supports indexing to retrieve ase.Atoms objects for each frame
+#     by reading data from the file on-demand. It is compatible with trajectories
+#     saved by the 'save_trajectory' function.
+#     """
+#     def __init__(self, dataset: str, key: str):
+#         """
+#         Initialize the trajectory by opening the dataset.
+
+#         Args:
+#             dataset (str): Path to the dataset.
+#             key (str): Key to the trajectory group within the dataset.
+#         """
+#         self.storage = h5py.File(dataset, "r")
+#         group = self.storage[key]
+
+#         self.positions = group["positions (Å)"]
+#         self.atomic_numbers = group["atomic_numbers"][:]
+#         self.masses = group["masses (u)"][:]
+        
+#         self.periodic = group.attrs["periodic"]
+#         self.n_frames = group.attrs["n_frames"]
+
+#         self.cell_dataset = None
+#         if self.periodic:
+#             self.cell_dataset = group["cell_vectors (Å)"]
+
+#     def __enter__(self):
+#         return self
+
+#     def __exit__(self, exc_type, exc_value, tb):
+#         self.close()
+
+#     def __len__(self):
+#         """Return the total number of frames."""
+#         return self.n_frames
+
+#     def __getitem__(self, i):
+#         """
+#         Get atoms object or a slice of the trajectory.
+#         """
+#         if isinstance(i, slice):
+#             return SlicedTrajectory(self, i)
+#         return self._get_atoms(i)
+
+#     def _get_atoms(self, index):
+#         """
+#         Return a single frame as an ase.Atoms object.
+#         """
+#         if index < 0:
+#             index += self.n_frames
+#         if not 0 <= index < self.n_frames:
+#             raise IndexError("Trajectory index out of range")
+
+#         positions = self.positions[index]
+        
+#         cell = None
+#         if self.periodic:
+#             if self.cell_dataset.ndim == 3:
+#                 cell = self.cell_dataset[index]
+#             else:
+#                 cell = self.cell_dataset[:]
+
+#         atoms = ase.Atoms(
+#             numbers=self.atomic_numbers,
+#             positions=positions,
+#             cell=cell,
+#             pbc=self.periodic,
+#             masses=self.masses
+#         )
+#         return atoms
+
+#     def close(self):
+#         """Close the dataset file."""
+#         self.storage.close()
 
 
 @overload
@@ -275,5 +370,5 @@ class NGLViewTrajectory(nglview.adaptor.Trajectory, nglview.adaptor.Structure):
 
         first_frame_ase = to_ase_atoms(self.trajectory_struct, frame_index=0)
         with io.StringIO() as f:
-            first_frame_ase.write(f, format="pdb")
+            first_frame_ase.write(f, format="proteindatabank")
             return f.getvalue()
