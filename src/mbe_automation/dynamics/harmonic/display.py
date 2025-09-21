@@ -68,7 +68,7 @@ def band_structure(
         color_map: str = "plasma",
         freq_units: Literal["THz", "cm-1"] = "THz"
 ):
-    fbz_path = mbe_automation.storage.read_fbz_path(dataset, key)
+    fbz_path = mbe_automation.storage.read_brillouin_zone_path(dataset, key)
     frequencies = fbz_path.frequencies
     distances = fbz_path.distances
     path_connections = fbz_path.path_connections

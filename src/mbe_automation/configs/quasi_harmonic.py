@@ -6,10 +6,10 @@ import numpy as np
 import numpy.typing as npt
 
 @dataclass
-class QuasiHarmonic:
+class FreeEnergy:
     """
-    Default parameters for thermodynamic property
-    calculations in the quasi-harmonic approximation.
+    Default parameters for free energy calculations
+    in the quasi-harmonic approximation.
     """                            #
                                    # Initial, nonrelaxed structures of crystal
                                    # and isolated molecule

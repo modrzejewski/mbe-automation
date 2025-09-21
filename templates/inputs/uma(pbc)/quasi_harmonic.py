@@ -1,11 +1,12 @@
 import numpy as np
 import os.path
-from mbe_automation.configs.quasi_harmonic import QuasiHarmonic
-import mbe_automation.workflows.quasi_harmonic
-import mbe_automation.io
 import torch
 from fairchem.core import pretrained_mlip, FAIRChemCalculator
 from fairchem.core.units.mlip_unit import load_predict_unit
+
+import mbe_automation.configs
+import mbe_automation.workflows
+import mbe_automation.io
 
 xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
@@ -35,7 +36,7 @@ else:
 #    
 uma_calc = FAIRChemCalculator(uma_model, task_name="omc")
 
-properties_config = QuasiHarmonic.from_template(
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.from_template(
     model_name = "UMA",
     crystal = mbe_automation.io.read(os.path.join(work_dir, xyz_solid)),
     molecule = mbe_automation.io.read(os.path.join(work_dir, xyz_molecule)),

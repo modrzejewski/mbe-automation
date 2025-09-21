@@ -9,10 +9,10 @@ import numpy.typing as npt
 import os
 
 @dataclass
-class FBZPath:
+class BrillouinZonePath:
     kpoints: List[npt.NDArray[np.floating]]
     frequencies: List[npt.NDArray[np.floating]]
-    eigenvectors: List[npt.NDArray[np.complex128]]
+    eigenvectors: List[npt.NDArray[np.complex128]] | None
     path_connections: npt.NDArray[np.bool_]
     labels: npt.NDArray[np.str_]
     distances: List[npt.NDArray[np.floating]]
@@ -37,10 +37,7 @@ class Structure:
     n_atoms: int
     periodic: bool = False
     def __post_init__(self):
-        if self.cell_vectors is None:
-            self.periodic = False
-        else:
-            self.periodic = True
+        self.periodic = (self.cell_vectors is not None)
 
 @dataclass
 class ForceConstants:
@@ -171,10 +168,11 @@ def read_data_frame(
     return df
 
 
-def save_fbz_path(
+def save_brillouin_zone_path(
         phonons: Phonopy,
         dataset: str,
-        key: str
+        key: str,
+        save_eigenvectors: bool = False
 ):
 
     band_structure = phonons.band_structure    
@@ -201,27 +199,28 @@ def save_fbz_path(
         )
         for i in range(n_segments):
             group.create_dataset(
-                name=f"frequencies_{i} (THz)",
+                name=f"frequencies_segment_{i} (THz)",
                 data=band_structure.frequencies[i]                
             )
             group.create_dataset(
-                name=f"distances_{i}",
+                name=f"distances_segment_{i}",
                 data=band_structure.distances[i]
             )
             group.create_dataset(
-                name=f"kpoints_{i}",
+                name=f"kpoints_segment_{i}",
                 data=band_structure.qpoints[i]
             )
-            group.create_dataset(
-                name=f"eigenvectors_{i}",
-                data=band_structure.eigenvectors[i]
-            )
+            if save_eigenvectors and band_structure.eigenvectors is not None:
+                group.create_dataset(
+                    name=f"eigenvectors_segment_{i}",
+                    data=band_structure.eigenvectors[i]
+                )
             
 
-def read_fbz_path(
+def read_brillouin_zone_path(
         dataset: str,
         key: str
-):
+) -> BrillouinZonePath:
 
     with h5py.File(dataset, "r") as f:
         group = f[key]
@@ -231,19 +230,23 @@ def read_fbz_path(
         labels = group["labels"][...].astype(str)
 
         frequencies, distances, kpoints, eigenvectors = [], [], [], []
+        eigenvecs_available = True
         for i in range(n_segments):
-            frequencies.append(group[f"frequencies_{i} (THz)"][...])
-            distances.append(group[f"distances_{i}"][...])
-            kpoints.append(group[f"kpoints_{i}"][...])
-            eigenvectors.append(group[f"eigenvectors_{i}"][...])
+            frequencies.append(group[f"frequencies_segment_{i} (THz)"][...])
+            distances.append(group[f"distances_segment_{i}"][...])
+            kpoints.append(group[f"kpoints_segment_{i}"][...])
+            if f"eigenvectors_segment_{i}" in group:
+                eigenvectors.append(group[f"eigenvectors_segment_{i}"][...])
+            else:
+                eigenvecs_available = False
 
-    return FBZPath(
-        kpoints,
-        frequencies,
-        eigenvectors,
-        path_connections,
-        labels,
-        distances
+    return BrillouinZonePath(
+        kpoints=kpoints,
+        frequencies=frequencies,
+        eigenvectors=(eigenvectors if eigenvecs_available else None),
+        path_connections=path_connections,
+        labels=labels,
+        distances=distances
     )
 
 
@@ -583,7 +586,7 @@ def read_force_constants(dataset: str, key: str) -> ForceConstants:
 def read_gamma_point_eigenvecs(
         dataset: str,
         key: str
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128] | None]:
     """
     Read phonon frequencies and eigenvectors at the Gamma point (k=[0,0,0]).
     """
@@ -593,11 +596,14 @@ def read_gamma_point_eigenvecs(
         n_segments = group.attrs["n_segments"]
 
         for i in range(n_segments):
-            kpoints = group[f"kpoints_{i}"][...]
+            kpoints = group[f"kpoints_segment_{i}"][...]
             for j, kpoint in enumerate(kpoints):
                 if np.allclose(kpoint, [0, 0, 0]):
-                    frequencies = group[f"frequencies_{i} (THz)"][j]
-                    eigenvectors = group[f"eigenvectors_{i}"][j]
+                    frequencies = group[f"frequencies_segment_{i} (THz)"][j]
+                    if f"eigenvectors_segment_{i}" in group:
+                        eigenvectors = group[f"eigenvectors_segment_{i}"][j]
+                    else:
+                        eigenvectors = None
                     return frequencies, eigenvectors
 
         raise ValueError(f"Γ point not found in dataset '{dataset}' at key '{key}'.")

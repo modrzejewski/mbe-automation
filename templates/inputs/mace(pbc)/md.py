@@ -1,10 +1,11 @@
 import numpy as np
 import os.path
 import mace.calculators
-from mbe_automation.configs.md import Sublimation, ClassicalMD
-import mbe_automation.workflows.md
-import mbe_automation.io
 import torch
+
+import mbe_automation.configs
+import mbe_automation.workflows
+import mbe_automation.io
 
 xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
@@ -16,7 +17,7 @@ mace_calc = mace.calculators.MACECalculator(
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )
 
-md_config = Sublimation(
+md_config = mbe_automation.configs.md.Enthalpy(
     molecule = mbe_automation.io.read(os.path.join(work_dir, xyz_molecule)),
     crystal = mbe_automation.io.read(os.path.join(work_dir, xyz_solid)),
     calculator = mace_calc,
@@ -25,7 +26,7 @@ md_config = Sublimation(
     work_dir = os.path.join(work_dir, "properties"),
     dataset = os.path.join(work_dir, "properties.hdf5"),
     
-    md_molecule = ClassicalMD(
+    md_molecule = mbe_automation.configs.md.ClassicalMD(
         ensemble = "NVT",
         time_total_fs = 50000.0,
         time_step_fs = 1.0,
@@ -33,7 +34,7 @@ md_config = Sublimation(
         time_equilibration_fs = 5000.0
     ),
     
-    md_crystal = ClassicalMD(
+    md_crystal = mbe_automation.configs.md.ClassicalMD(
         ensemble = "NPT",
         time_total_fs = 50000.0,
         time_step_fs = 1.0,

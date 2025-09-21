@@ -5,11 +5,9 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from mbe_automation.configs.quasi_harmonic import QuasiHarmonic
+import mbe_automation.configs
 import mbe_automation.storage
-import mbe_automation.dynamics.harmonic.core
-import mbe_automation.dynamics.harmonic.data
-import mbe_automation.dynamics.harmonic.plot
+import mbe_automation.dynamics.harmonic
 import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
@@ -23,7 +21,7 @@ except ImportError:
     mace_available = False
 
 
-def run(config: QuasiHarmonic):
+def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
     datetime_start = mbe_automation.display.timestamp_start()
     

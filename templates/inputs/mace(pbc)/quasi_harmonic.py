@@ -1,10 +1,11 @@
 import numpy as np
 import os.path
 import mace.calculators
-from mbe_automation.configs.quasi_harmonic import QuasiHarmonic
-import mbe_automation.workflows.quasi_harmonic
-import mbe_automation.io
 import torch
+
+import mbe_automation.configs
+import mbe_automation.workflows
+import mbe_automation.io
 
 xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
@@ -16,7 +17,7 @@ mace_calc = mace.calculators.MACECalculator(
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )
 
-properties_config = QuasiHarmonic.from_template(
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.from_template(
     model_name = "MACE",
     crystal = mbe_automation.io.read(os.path.join(work_dir, xyz_solid)),
     molecule = mbe_automation.io.read(os.path.join(work_dir, xyz_molecule)),

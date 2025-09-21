@@ -24,7 +24,7 @@ import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
 import mbe_automation.dynamics.harmonic.eos
 import mbe_automation.dynamics.harmonic.data
-import mbe_automation.dynamics.harmonic.plot
+import mbe_automation.dynamics.harmonic.display
 
 
 def _assert_supercell_consistency(
@@ -449,7 +449,7 @@ def equilibrium_curve(
         dataset=dataset,
         key="quasi_harmonic/eos_interpolated"
     )
-    mbe_automation.dynamics.harmonic.plot.eos_curves(
+    mbe_automation.dynamics.harmonic.display.eos_curves(
         dataset=dataset,
         key="quasi_harmonic/eos_interpolated",
         save_path=os.path.join(work_dir, "eos_curves.png")

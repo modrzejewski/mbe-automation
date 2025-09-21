@@ -5,7 +5,6 @@ import h5py
 import ase
 import ase.io.trajectory
 import dynasor
-import nglview.adaptor
 import phonopy
 from phonopy.structure.atoms import PhonopyAtoms
 
@@ -127,86 +126,6 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
             self.storage.close()
             
     
-# class ASETrajectory(ase.io.trajectory.TrajectoryReader):
-#     """
-#     Present a trajectory from a dataset file as an ASE-compatible object.
-
-#     The object supports indexing to retrieve ase.Atoms objects for each frame
-#     by reading data from the file on-demand. It is compatible with trajectories
-#     saved by the 'save_trajectory' function.
-#     """
-#     def __init__(self, dataset: str, key: str):
-#         """
-#         Initialize the trajectory by opening the dataset.
-
-#         Args:
-#             dataset (str): Path to the dataset.
-#             key (str): Key to the trajectory group within the dataset.
-#         """
-#         self.storage = h5py.File(dataset, "r")
-#         group = self.storage[key]
-
-#         self.positions = group["positions (Å)"]
-#         self.atomic_numbers = group["atomic_numbers"][:]
-#         self.masses = group["masses (u)"][:]
-        
-#         self.periodic = group.attrs["periodic"]
-#         self.n_frames = group.attrs["n_frames"]
-
-#         self.cell_dataset = None
-#         if self.periodic:
-#             self.cell_dataset = group["cell_vectors (Å)"]
-
-#     def __enter__(self):
-#         return self
-
-#     def __exit__(self, exc_type, exc_value, tb):
-#         self.close()
-
-#     def __len__(self):
-#         """Return the total number of frames."""
-#         return self.n_frames
-
-#     def __getitem__(self, i):
-#         """
-#         Get atoms object or a slice of the trajectory.
-#         """
-#         if isinstance(i, slice):
-#             return SlicedTrajectory(self, i)
-#         return self._get_atoms(i)
-
-#     def _get_atoms(self, index):
-#         """
-#         Return a single frame as an ase.Atoms object.
-#         """
-#         if index < 0:
-#             index += self.n_frames
-#         if not 0 <= index < self.n_frames:
-#             raise IndexError("Trajectory index out of range")
-
-#         positions = self.positions[index]
-        
-#         cell = None
-#         if self.periodic:
-#             if self.cell_dataset.ndim == 3:
-#                 cell = self.cell_dataset[index]
-#             else:
-#                 cell = self.cell_dataset[:]
-
-#         atoms = ase.Atoms(
-#             numbers=self.atomic_numbers,
-#             positions=positions,
-#             cell=cell,
-#             pbc=self.periodic,
-#             masses=self.masses
-#         )
-#         return atoms
-
-#     def close(self):
-#         """Close the dataset file."""
-#         self.storage.close()
-
-
 @overload
 def to_ase_atoms(
         structure: mbe_automation.storage.core.Structure,
@@ -348,27 +267,3 @@ def to_phonopy(
     return ph
 
 
-class NGLViewTrajectory(nglview.adaptor.Trajectory, nglview.adaptor.Structure):
-    """Adaptor for using mbe_automation.storage.Structure with nglview."""
-
-    def __init__(self, trajectory_struct: mbe_automation.storage.core.Structure):
-
-        if not isinstance(trajectory_struct, mbe_automation.storage.core.Structure):
-            raise TypeError("Input must be an mbe_automation.storage.Structure object")
-            
-        self.trajectory_struct = trajectory_struct
-        self.ext = "pdb"
-
-    @property
-    def n_frames(self) -> int:
-        return self.trajectory_struct.n_frames
-
-    def get_coordinates(self, index: int):
-        return self.trajectory_struct.positions[index]
-
-    def get_structure_string(self) -> str:
-
-        first_frame_ase = to_ase_atoms(self.trajectory_struct, frame_index=0)
-        with io.StringIO() as f:
-            first_frame_ase.write(f, format="proteindatabank")
-            return f.getvalue()

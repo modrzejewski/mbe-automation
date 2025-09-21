@@ -6,7 +6,7 @@ simulation and analysis data.
 # --- Core data structures and I/O functions ---
 from mbe_automation.storage.core import (
     # Data structures
-    FBZPath,
+    BrillouinZonePath,
     EOSCurves,
     Structure,
     Trajectory,
@@ -16,8 +16,8 @@ from mbe_automation.storage.core import (
     read_data_frame,
 
     # I/O for phonons
-    save_fbz_path,
-    read_fbz_path,
+    save_brillouin_zone_path,
+    read_brillouin_zone_path,
     save_force_constants,
     read_force_constants,
 
@@ -43,7 +43,6 @@ from mbe_automation.storage.display import tree
 
 # --- Views for external libraries ---
 from mbe_automation.storage.views import ASETrajectory
-from mbe_automation.storage.views import NGLViewTrajectory
 from mbe_automation.storage.views import to_ase_atoms
 from mbe_automation.storage.views import to_dynasor_mode_projector
 from mbe_automation.storage.views import to_phonopy
@@ -51,7 +50,7 @@ from mbe_automation.storage.views import to_phonopy
 # --- Define the public API of the package ---
 __all__ = [
     # Core classes
-    "FBZPath",
+    "BrillouinZonePath",
     "EOSCurves",
     "Structure",
     "Trajectory",
@@ -59,8 +58,10 @@ __all__ = [
     # Core I/O functions
     "save_data_frame",
     "read_data_frame",
-    "save_fbz_path",
-    "read_fbz_path",
+    "save_brillouin_zone_path",
+    "read_brillouin_zone_path",
+    "save_force_constants",
+    "read_force_constants",
     "save_eos_curves",
     "read_eos_curves",
     "save_structure",
@@ -74,7 +75,6 @@ __all__ = [
     
     # Views
     "ASETrajectory",
-    "NGLViewTrajectory",
     "to_ase_atoms",
     "to_dynasor_mode_projector",
     "to_phonopy",

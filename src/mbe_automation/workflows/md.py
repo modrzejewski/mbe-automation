@@ -4,10 +4,8 @@ import pandas as pd
 
 import mbe_automation.display
 import mbe_automation.storage
-import mbe_automation.configs.md
-import mbe_automation.dynamics.md.core
-import mbe_automation.dynamics.md.data
-import mbe_automation.dynamics.md.plot
+import mbe_automation.configs
+import mbe_automation.dynamics
 import mbe_automation.structure.crystal
 
 try:
@@ -18,7 +16,7 @@ except ImportError:
     mace_available = False
 
 
-def run(config: mbe_automation.configs.md.Sublimation):
+def run(config: mbe_automation.configs.md.Enthalpy):
 
     datetime_start = mbe_automation.display.timestamp_start()
     
@@ -51,7 +49,7 @@ def run(config: mbe_automation.configs.md.Sublimation):
         system_label=label_molecule
     )
     if config.save_plots:
-        mbe_automation.dynamics.md.plot.trajectory(
+        mbe_automation.dynamics.md.display.trajectory(
             dataset=config.dataset,
             key=f"md/trajectories/{label_molecule}",
             save_path=os.path.join(
@@ -60,7 +58,7 @@ def run(config: mbe_automation.configs.md.Sublimation):
                 f"{label_molecule}.png"
             )
         )
-        mbe_automation.dynamics.md.plot.reblocking(
+        mbe_automation.dynamics.md.display.reblocking(
             dataset=config.dataset,
             key=f"md/trajectories/{label_molecule}",
             save_path=os.path.join(
@@ -69,7 +67,7 @@ def run(config: mbe_automation.configs.md.Sublimation):
                 f"{label_molecule}.png"
             )
         )
-        mbe_automation.dynamics.md.plot.velocity_autocorrelation(
+        mbe_automation.dynamics.md.display.velocity_autocorrelation(
             dataset=config.dataset,
             key=f"md/trajectories/{label_molecule}",
             save_path=os.path.join(
@@ -107,7 +105,7 @@ def run(config: mbe_automation.configs.md.Sublimation):
         system_label=label_crystal
     )
     if config.save_plots:
-        mbe_automation.dynamics.md.plot.trajectory(
+        mbe_automation.dynamics.md.display.trajectory(
             dataset=config.dataset,
             key=f"md/trajectories/{label_crystal}",
             save_path=os.path.join(
@@ -116,7 +114,7 @@ def run(config: mbe_automation.configs.md.Sublimation):
                 f"{label_crystal}.png"
             )
         )
-        mbe_automation.dynamics.md.plot.reblocking(
+        mbe_automation.dynamics.md.display.reblocking(
             dataset=config.dataset,
             key=f"md/trajectories/{label_crystal}",
             save_path=os.path.join(
@@ -125,7 +123,7 @@ def run(config: mbe_automation.configs.md.Sublimation):
                 f"{label_crystal}.png"
             )
         )
-        mbe_automation.dynamics.md.plot.velocity_autocorrelation(
+        mbe_automation.dynamics.md.display.velocity_autocorrelation(
             dataset=config.dataset,
             key=f"md/trajectories/{label_crystal}",
             save_path=os.path.join(
