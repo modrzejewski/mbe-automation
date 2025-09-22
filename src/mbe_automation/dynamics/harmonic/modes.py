@@ -1,12 +1,30 @@
 from __future__ import annotations
+from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
-import mbe_automation.storage
 import ase
 import phonopy
 from ase.neighborlist import natural_cutoffs, build_neighbor_list
 from scipy.sparse import lil_matrix
 from scipy.sparse.csgraph import connected_components
+from ase.calculators.calculator import Calculator as ASECalculator
+
+import mbe_automation.storage
+
+@dataclass
+class Mode:
+    """
+    Results of a vibrational mode analysis.
+    
+    Attributes:
+        trajectory: The generated Structure object containing atomic coordinates.
+        scan_coordinates: Phase angle for 'cyclic' sampling and amplitude for 'linear' sampling.
+        potential_energies: Energy for unit cell/supercell/molecular cluster (eV)
+    """
+    trajectory: mbe_automation.storage.Structure
+    scan_coordinates: npt.NDArray
+    potential_energies: npt.NDArray | None
+    
 
 def _get_modulated_displacements(
     ph: phonopy.Phonopy,
@@ -132,10 +150,13 @@ def trajectory(
         max_amplitude: float = 1.0,
         n_frames: int = 10,
         use_supercell: bool = False,
-        filter_molecules: int | None = None,
-) -> mbe_automation.storage.Structure:
+        extract_molecular_cluster: int | None = None,
+        sampling: Literal["cyclic", "linear"] = "cyclic",
+        calculator: ASECalculator | None = None
+) -> Mode:
     """
-    Generate a trajectory for a single vibrational mode.
+    Generate a trajectory for a single vibrational mode and optionally
+    calculate its potential energy curve.
 
     Args:
         dataset: Path to the dataset file.
@@ -145,14 +166,17 @@ def trajectory(
         max_amplitude: Controls the maximum displacement of the mode.
         n_frames: Number of frames for the trajectory.
         use_supercell: If True, generate trajectory for the supercell.
-                       Otherwise, use the primitive cell.
-        filter_molecules: If not None, keep only the `m` molecules closest
-                          to the center of mass.
+        Otherwise, use the primitive cell.
+        extract_molecular_cluster: If not None, keep only the `m` molecules closest
+        to the center of mass.
+        sampling: "cyclic" for animation, "linear" for PES scan.
+        calculator: If not None, calculate the potential energy curve.
 
     Returns:
-        A Structure object containing the mode trajectory.
+        A Mode object containing the mode trajectory and, optionally,
+        the potential energy at each frame of the trajectory.
     """
-    # --- Part 1: Common Setup ---
+
     ph = mbe_automation.storage.to_phonopy(
         dataset=dataset,
         key=key
@@ -168,7 +192,6 @@ def trajectory(
     eigenvalues, eigenvectors = np.linalg.eigh(dm.dynamical_matrix)
     eigvec = eigenvectors[:, band_index]
 
-    # --- Part 2: Cell-Specific Setup ---
     if use_supercell:
         base_cell = ph.supercell
         displacements = _get_modulated_displacements(ph, eigvec, k_point)
@@ -181,13 +204,27 @@ def trajectory(
 
     n_atoms = len(base_cell)
     base_positions = base_cell.positions
-    
-    # --- Part 3: Generate Full Trajectory ---
+    scan_coordinates = np.zeros(n_frames)
+    potential_energies = []
+    #
+    # Perform scan in the direction of the selected normal coordinate.
+    # This generates the trajectory and optionally the energy points.
+    #
     positions_array = np.zeros((n_frames, n_atoms, 3))
     for i in range(n_frames):
-        phase = 2j * np.pi * i / n_frames
-        frame_displacement = (displacements * np.exp(phase)).imag * max_amplitude
-        positions_array[i] = base_positions + frame_displacement
+        if sampling == "cyclic":
+            phase = 2 * np.pi * i / n_frames
+            frame_displacement = (displacements * np.exp(1j * phase)).imag * max_amplitude
+            scan_coordinates[i] = phase
+        elif sampling == "linear":
+            amplitude = np.linspace(-max_amplitude, max_amplitude, n_frames)[i]
+            frame_displacement = displacements.real * amplitude
+            scan_coordinates[i] = amplitude
+        else:
+            raise ValueError(f"Unknown sampling type: {sampling}")
+
+        current_positions = base_positions + frame_displacement
+        positions_array[i] = current_positions
 
     traj = mbe_automation.storage.Structure(
         positions=positions_array,
@@ -197,25 +234,51 @@ def trajectory(
         n_atoms=n_atoms,
         n_frames=n_frames,
     )
-
-    # --- Part 4: Apply Filtering Post-Generation (if requested) ---
-    if filter_molecules is not None:
+    #
+    # Filter out everything except for a cluster of n molecules
+    # near the center of mass. This converts the structure to
+    # finite (non-periodic) system.
+    #
+    if extract_molecular_cluster is not None:
+        n_molecules = extract_molecular_cluster
         molecules = _get_molecules(base_cell)
-        indices_to_keep = _filter_closest_molecules(base_cell, molecules, filter_molecules)
+        indices_to_keep = _filter_closest_molecules(base_cell, molecules, n_molecules)
         
         if len(indices_to_keep) == 0:
             raise ValueError(
                 "Molecule filtering resulted in zero atoms."
             )
         
-        filtered_traj = mbe_automation.storage.Structure(
+        traj = mbe_automation.storage.Structure(
             positions=traj.positions[:, indices_to_keep, :],
             atomic_numbers=traj.atomic_numbers[indices_to_keep],
             masses=traj.masses[indices_to_keep],
-            cell_vectors=traj.cell_vectors,
+            #
+            # The system is no longer considered as periodic
+            # after we extract a cluster of molecules
+            #
+            cell_vectors=None, 
             n_atoms=len(indices_to_keep),
             n_frames=traj.n_frames,
         )
-        return filtered_traj
+
+    if calculator is not None:
+        potential_energies = []
+        for i in range(traj.n_frames):
+            single_frame = mbe_automation.storage.to_ase_atoms(
+                structure=traj,
+                frame_index=i
+            )
+            single_frame.calc = calculator
+            potential_energies.append(single_frame.get_potential_energy())
+            
+        potential_energies = np.array(potential_energies)
+        
     else:
-        return traj
+        potential_energies = None
+
+    return Mode(
+        trajectory=traj,
+        scan_coordinates=scan_coordinates,
+        potential_energies=potential_energies
+    )
