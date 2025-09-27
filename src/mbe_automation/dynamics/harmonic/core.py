@@ -1,9 +1,10 @@
 from ase.io import read
 from ase.atoms import Atoms
-from phonopy import Phonopy
+import phonopy
 from phonopy.structure.atoms import PhonopyAtoms
 import time
 import numpy as np
+import numpy.typing as npt
 import torch
 import ase.thermochemistry
 import ase.vibrations
@@ -28,7 +29,7 @@ import mbe_automation.dynamics.harmonic.display
 
 
 def _assert_supercell_consistency(
-    phonopy_instance: Phonopy,
+    phonopy_instance: phonopy.Phonopy,
     unit_cell: Atoms,
     supercell_matrix: np.ndarray,
 ):
@@ -93,7 +94,7 @@ def phonons(
         symmetrize_force_constants=False,
         force_constants_cutoff_radius=None,
         system_label=None
-):
+) -> phonopy.Phonopy:
 
     cuda_available = torch.cuda.is_available()
     if cuda_available:
@@ -128,7 +129,7 @@ def phonons(
     # units kJ∕K∕mol∕unit cell, kJ∕mol∕unit cell, J∕K∕mol∕unit cell
     # if the primitive cell matrix is set to None during initialization.
     #
-    phonons = Phonopy(
+    phonons = phonopy.Phonopy(
         phonopy_struct,
         #
         # Watch out! Phonopy supercell transformation matrix
@@ -202,7 +203,7 @@ def phonons(
         print(f"Symmetrization of force constants completed", flush=True)
     
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
-    print(f"Fourier interpolation mesh completed", flush=True)    
+    print(f"Fourier interpolation mesh completed", flush=True)
     return phonons
 
 
