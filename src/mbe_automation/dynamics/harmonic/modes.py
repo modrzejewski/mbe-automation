@@ -11,8 +11,24 @@ from scipy.sparse import lil_matrix
 from scipy.sparse.csgraph import connected_components
 from ase.calculators.calculator import Calculator as ASECalculator
 
+import mbe_automation.common
 import mbe_automation.storage
 
+@dataclass
+class ThermalDisplacements:
+    """
+    Coordinate displacements due to vibrational
+    motion.
+
+    1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
+       multi-temperature anisotropic displacement parameters. I. Theory
+       Acta Cryst. A 56, 403 (2000); doi: 10.1107/S0108767300005626
+    
+    """
+    mean_square_displacements_matrix_diagonal: npt.NDArray[np.float64] # eq 5 in ref 1
+    mean_square_displacements_matrix_full: npt.NDArray[np.float64] # eq 6 in ref 1
+    instantaneous_displacements: npt.NDArray[np.float64] | None # eq 2 in ref 1
+    
 @dataclass
 class Mode:
     """
@@ -77,17 +93,18 @@ def _absolute_amplitude_eq_2(
     Ajk_Angs = np.outer(SqrtEjq_Omega, inv_SqrtM)
     return Ajk_Angs # rank (n_freqs, n_atoms_primitive * 3)
 
-def _thermal_displacements_eq_2(
+def _thermal_displacements(
         dynamical_matrix: phonopy.DynamicalMatrix,
-        qpoints: npt.NDArray, # rank (n_qpoints, 3), scaled coordinates of points in the FBZ
+        qpoints: npt.NDArray, # rank (n_qpoints, 3), scaled coordinates of sampling points in the FBZ
         temperatures_K: npt.NDArray, # temperature points in K, rank (n_temperatures, )
         time_points_fs: npt.NDArray | None, # time points in fs, rank (n_time_points, )
         freq_min_THz: float = 0.0,
         freq_max_THz: float | None = None,
         cell_type: Literal["primitive", "supercell"] = "primitive"
-):
+) -> ThermalDisplacements:
     """
-    Thermal displacements of atoms in a primitive cell or a supercell,
+    Compute thermal displacement vectors of atoms
+    in a primitive cell or a supercell,
 
     u(k_l, t) = 1/Sqrt(N * m_k) * Sum(jq) ( E_j(q)**(1/2)/omega_j(q) ) * e(k,jq)
              * exp(i (q * r(k_l) - omega_j(q) * t))
@@ -102,7 +119,10 @@ def _thermal_displacements_eq_2(
 
     See eq 2 of Ref. 1.
 
-    The returned vector of coordinates is in the units of Angstrom.
+    Returns:
+    Diagonal mean square displacement matrix (Å²), eq 5 in ref 1
+    Full mean square displacement matrix (Å²), eq 6 in ref 1
+    Displacement vectors (Å), eq 2 in ref 1
 
     1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
        multi-temperature anisotropic displacement parameters. I. Theory
@@ -120,21 +140,39 @@ def _thermal_displacements_eq_2(
     n_time_points = (len(time_points_fs) if time_points_fs is not None else 0)
     n_atoms_primitive = len(dynamical_matrix.primitive)
     n_atoms_supercell = len(dynamical_matrix.supercell)
+
+    p2s_map = np.array(dynamical_matrix.primitive.p2s_map, dtype=np.int64)
+    s2p_map = np.array(dynamical_matrix.primitive.s2p_map, dtype=np.int64)
+    p2p_map = dynamical_matrix.primitive.p2p_map
+    supercell_to_primitive = np.array(
+        [p2p_map[s2p_map[i]] for i in range(n_atoms_supercell)],
+        dtype=np.int64
+    )
+    #
+    # Primitive->supercell map for Cartesian coordinate indices.
+    # Used to promote the dynamical matrix eigenvectors (ejk)
+    # and vibrational mode amplitudes (Ajk) to the full supercell
+    # dimension.
+    #
+    primitive_to_supercell_coords = (
+        np.repeat(supercell_to_primitive * 3, 3) + 
+        np.tile([0, 1, 2], n_atoms_supercell)
+    )
+    
     if n_time_points > 0:
         if cell_type == "primitive":
-            thermal_displacements = np.zeros(
-                (n_temperatures, n_time_points, n_atoms_primitive*3),
-                dtype=np.complex128
-            )
+            n_atoms = n_atoms_primitive
         elif cell_type == "supercell":
-            thermal_displacements = np.zeros(
-                (n_temperatures, n_time_points, n_atoms_supercell*3),
-                dtype=np.complex128
-            )
+            n_atoms = n_atoms_supercell
+        instant_disp = np.zeros(
+            (n_temperatures, n_time_points, n_atoms*3),
+            dtype=np.complex128
+        )
     else:
-        thermal_displacements = None
+        instant_disp = None
+        
     n_qpoints = len(qpoints)
-    mean_square_displacement_matrix = np.zeros(
+    mean_sq_disp = np.zeros(
         (n_temperatures, n_atoms_primitive*3, n_atoms_primitive*3),
         dtype=np.float64
     )
@@ -167,74 +205,195 @@ def _thermal_displacements_eq_2(
                 temperature_K=temp_K,
                 masses_AMU=dynamical_matrix.primitive.masses
             )
+        Ajk_ejk_primitive = Ajk_primitive * ejk_primitive
+        #
+        # U(k,k') defined in eq 6 of ref 1,
+        # except the 1/N normalization factor is added
+        # at a later stage
+        #
+        U_q = np.einsum(
+            "Tjk,Tjl->Tkl",
+            Ajk_ejk_primitive,
+            Ajk_ejk_primitive.conj()
+        ).real
+        mean_sq_disp += U_q
 
-        if cell_type == "supercell":
-            ejk_supercell = np.zeros(
-                (n_freqs, n_atoms_supercell * 3),
-                dtype=np.complex128
-            )
-            Ajk_supercell = np.zeros(
-                (n_temperatures, n_freqs, n_atoms_supercell * 3),
-                dtype=np.float64
-            )
-            p2s_map = np.array(dynamical_matrix.primitive.p2s_map, dtype=np.int64)
-            s2p_map = np.array(dynamical_matrix.primitive.s2p_map, dtype=np.int64)
-            p2p_map = np.array(dynamical_matrix.primitive.p2p_map, dtype=np.int64)
-            supercell_to_primitive = np.array(
-                [p2p_map[s2p_map[i]] for i in range(n_atoms_supercell)],
-                dtype=np.int64
-            )
-            for k in range(n_atoms_supercell):
-                s0 = k * 3
-                s1 = k * 3 + 3
-                p0 = supercell_to_primitive[k] * 3
-                p1 = supercell_to_primitive[k] * 3 + 3
-                ejk_supercell[:, s0:s1] = ejk_primitive[:, p0:p1]
-                Ajk_supercell[:, :, s0:s1] = Ajk_primitive[:, :, p0:p1]
+        if n_time_points > 0:
+            #
+            # Time-dependent part of the phase factor
+            # Exp(-i * omega * t)
+            #
+            omega_t = 2.0 * math.pi * 1.0E-3 * np.outer(time_points_fs, freqs_THz)
+            exp_iomegat = np.exp(-1j * omega_t) # rank (n_time_points, n_freqs)
+            
+            if cell_type == "supercell":
+                ejk = ejk_primitive[:, primitive_to_supercell_coords]
+                Ajk = Ajk_primitive[:, :, primitive_to_supercell_coords]
+                scaled_positions = dynamical_matrix.supercell.scaled_positions
+                supercell_matrix = dynamical_matrix.supercell.supercell_matrix
+                #
+                # Position-dependent part of the phase factor
+                # Exp(i * q * r)
+                #
+                exp_iqr = np.repeat(
+                    np.exp(2j * np.pi * np.dot(np.dot(scaled_positions, supercell_matrix.T), q)),
+                    3
+                ) # rank (n_atoms_supercell*3, )                
 
-            scaled_positions = dynamical_matrix.supercell.scaled_positions
-            supercell_matrix = dynamical_matrix.supercell.supercell_matrix
-            phase_r = np.exp(
-                2j * np.pi * np.dot(np.dot(scaled_positions, supercell_matrix.T), q)
-            ) # rank (n_atoms_supercell, )                
-            phase_r_supercell = np.repeat(phase_r, 3) # rank (n_atoms_supercell*3, )
+            if cell_type == "primitive":
+                ejk, Ajk = ejk_primitive, Ajk_primitive
+                scaled_positions = dynamical_matrix.primitive.scaled_positions
+                exp_iqr = np.repeat(
+                    np.exp(2j * np.pi * np.dot(scaled_positions, q)),
+                    3
+                ) # rank (n_atoms_primitive*3, )                
 
-        if cell_type == "primitive":
-            scaled_positions = dynamical_matrix.primitive.scaled_positions
-            phase_r = np.exp(
-                2j * np.pi * np.dot(scaled_positions, q)
-            ) # rank (n_atoms_primitive, )                
-            phase_r_primitive = np.repeat(phase_r, 3) # rank (n_atoms_primitive*3, )
-
-        for temp_idx, temp in enumerate(temperatures_K):
-            Ajk_ejk_primitive = Ajk_primitive[temp_idx] * ejk_primitive # rank (n_freqs, n_atoms_primitive*3)
-            Ajk_ejk_2 = Ajk_ejk_primitive.conj().T @ Ajk_ejk_primitive
-            mean_square_displacement_matrix[temp_idx] += Ajk_ejk_2.real
-            if n_time_points > 0 and cell_type == "supercell":
-                Ajk_ejk_supercell = Ajk_supercell[temp_idx] * ejk_supercell # rank (n_freqs, n_atoms_supercell*3)
-            if n_time_points > 0:
-                for time_idx, time_fs in enumerate(time_points_fs):
-                    omega_t = freqs_THz * 2.0 * math.pi * time_fs * 1.0E-3 # rank (n_freqs, )
-                    phase_t = np.exp(-1j * omega_t) # rank (n_freqs, )
-                    if cell_type == "supercell":
-                        phase_tr = np.outer(phase_t, phase_r_supercell) # rank (n_freqs, n_atoms_supercell*3)
-                        u = Ajk_ejk_supercell * phase_tr
-                    elif cell_type == "primitive":
-                        phase_tr = np.outer(phase_t, phase_r_primitive) # rank (n_freqs, n_atoms_primitive*3)
-                        u = Ajk_ejk_primitive * phase_tr
-
-                    thermal_displacements[temp_idx, time_idx, :] += u.sum(axis=0)
-
+            Ajk_ejk = Ajk * ejk # rank (n_temperatures, n_freqs, n_atoms * 3)
+            #
+            # u(k,t) from eq 2 in ref 1,
+            # except the 1/Sqrt(N) normalization factor is
+            # added at a later stage
+            #
+            u_q = np.einsum(
+                "Tjk,tj,k->Ttk",
+                Ajk_ejk, exp_iomegat, exp_iqr
+            ) # rank (n_temperatures, n_time_points, n_atoms * 3)
+            instant_disp += u_q
     #
-    # Take into account that <u u**T> and u are averaged
-    # over q-points, see the 1/Sqrt(N) factor in eq 2 of Ref. 1
+    # Take into account the normalization factors related
+    # to the averaging over the Brillouin zone:
     #
-    mean_square_displacement_matrix /= n_qpoints
+    # 1/N for <u u**T>
+    # 1/Sqrt(N) for u
+    #
+    # where N is the number of k-points.
+    #
+    mean_sq_disp /= n_qpoints
     if n_time_points > 0:
-        thermal_displacements /= np.sqrt(n_qpoints)
-        
-    return mean_square_displacement_matrix, thermal_displacements
+        instant_disp /= np.sqrt(n_qpoints)
+
+    mean_sq_disp_full = mean_sq_disp.reshape(
+        n_temperatures, n_atoms_primitive, 3, n_atoms_primitive, 3
+    ).transpose(0, 1, 3, 2, 4)
+    #
+    # Extract the diagonal blocks U(k, k), which represent the anisotropic
+    # displacement parameters for each atom.
+    #
+    mean_sq_disp_diagonal = np.einsum('tkkij->tkij', mean_sq_disp_full)
+
+    if instant_disp is not None:
+        instant_disp = instant_disp.reshape(
+            n_temperatures, n_time_points, n_atoms, 3
+        )
     
+    return ThermalDisplacements(
+        mean_square_displacements_matrix_diagonal=mean_sq_disp_diagonal,
+        mean_square_displacements_matrix_full=mean_sq_disp_full,
+        instantaneous_displacements=instant_disp
+    )
+
+
+def thermal_displacements(
+        dataset: str,
+        key: str,
+        temperatures_K: npt.NDArray[np.floating],
+        k_point_mesh: npt.NDArray | Literal["commensurate"] | float = "commensurate",
+        freq_min_THz: float = 0.0,
+        freq_max_THz: float | None = None,
+        time_points_fs: np.NDArray[np.floating] | None = None
+) -> ThermalDisplacements:
+    """
+    Compute thermal displacement properties of atoms in a crystal lattice.
+
+    This function serves as the main interface for calculating the mean square
+    displacement matrices based on the harmonic approximation of lattice
+    dynamics. It integrates over a specified k-point mesh in the Brillouin
+    zone to obtain thermal averages.
+
+    The calculation is based on the formalism described in Ref. 1.
+
+    Args:
+        dataset: Path to the dataset file containing the crystal structure
+            and force constants.
+        key: Key to the harmonic force constants model within the dataset.
+        temperatures_K: An array of temperatures (in Kelvin) at which to
+            calculate the thermal displacements.
+        k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
+            - "commensurate": Use the commensurate q-points corresponding to
+              the supercell matrix.
+            - A float or list/array of 3 integers: Defines a Monkhorst-Pack
+              mesh for Brillouin zone integration.
+        freq_min_THz: The minimum phonon frequency (in THz) to be included
+            in the calculations. Defaults to 0.0.
+        freq_max_THz: The maximum phonon frequency (in THz) to be included.
+            If None, all frequencies above `freq_min_THz` are included.
+            Defaults to None.
+        time_points_fs: An optional array of time points (in femtoseconds)
+            for which to calculate the instantaneous atomic displacements.
+            If None, this calculation is skipped. Defaults to None.
+
+    Returns:
+        A `ThermalDisplacements` object containing the following attributes:
+        - `mean_square_displacements_matrix_diagonal`: The anisotropic
+          displacement parameters U(k,k) for each atom k.
+          Shape: (n_temperatures, n_atoms_primitive, 3, 3)
+        - `mean_square_displacements_matrix_full`: The full mean square
+          displacement matrix U(k,l) between each pair of atoms k and l.
+          Shape: (n_temperatures, n_atoms_primitive, n_atoms_primitive, 3, 3)
+        - `instantaneous_displacements`: Time-dependent displacement vectors
+          u(k,t) if `time_points_fs` is provided, otherwise None.
+          Shape: (n_temperatures, n_time_points, n_atoms, 3)
+
+    References:
+        1. H. B. Bürgi and S. C. Capelli, "Dynamics of molecules in crystals
+           from multi-temperature anisotropic displacement parameters. I. Theory"
+           Acta Cryst. A 56, 403 (2000); doi: 10.1107/S0108767300005626
+    
+    """    
+    ph = mbe_automation.storage.to_phonopy(
+        dataset=dataset,
+        key=key
+    )
+    if isinstance(k_point_mesh, str) and k_point_mesh == "commensurate":
+        qpoints = phonopy.harmonic.dynmat_to_fc.get_commensurate_points(
+            ph.supercell_matrix
+        )
+    else:
+        ph.init_mesh(
+            mesh=k_point_mesh,
+            shift=None,
+            is_time_reversal=True,
+            is_mesh_symmetry=False,
+            with_eigenvectors=True,
+            with_group_velocities=False,
+            is_gamma_center=True,
+            use_iter_mesh=True
+        )
+        qpoints = ph.mesh.qpoints
+
+    mbe_automation.common.display.framed("Thermal displacements")
+    nx, ny, nz = ph.mesh.mesh_numbers
+    print(f"k_points_mesh       {nx}×{ny}×{nz}")
+    print(f"freq_min            {freq_min_THz:.1f} THz")
+    if freq_max_THz is not None:
+        print(f"freq_max            {freq_max_THz:.1f} THz")
+    else:
+        print(f"freq_max            unlimited")
+        
+    print("Diagonalization of dynamic matrix at each k point...")
+    
+    disp = _thermal_displacements(
+        dynamical_matrix=ph.dynamical_matrix,
+        qpoints=qpoints,
+        temperatures_K=temperatures_K,
+        time_points_fs=time_points_fs,
+        freq_min_THz=freq_min_THz,
+        freq_max_THz=freq_max_THz,
+        cell_type="primitive"
+    )
+    
+    print("Thermal displacements completed")
+    return disp
             
             
 def _get_modulated_displacements(
@@ -544,59 +703,6 @@ def mean_square_displacement_matrix(
     return ph.thermal_displacement_matrices.thermal_displacement_matrices
 
 
-def mean_square_displacement_matrix_v2(
-        dataset: str,
-        key: str,
-        k_point_mesh: npt.NDArray | float,
-        temperatures_K: npt.NDArray[np.floating],
-        freq_min_THz: float = 0.0,
-        freq_max_THz: float | None = None
-) -> npt.NDArray[np.floating]:
-    """
-    Compute the thermal displacements matrix
 
-    B(k) = <u(k) (u(k))**T>
 
-    where u(k) is the Cartesian displacement vector of k-th atom.
-
-    Args:
-        dataset: Path to the dataset file.
-        key: Key to the harmonic force constants model.
-        k_point_mesh: Dimension of the k-point interpolation mesh.
-        temperatures_K: Array of temperatures.
-        freq_min_THz: Minimum frequency to include.
-        freq_max_THz: Maximum frequency to include.
-
-    Returns:
-        An array of rank (n_temperatures, n_atoms_primitive, 3, 3)
-    """
-
-    ph = mbe_automation.storage.to_phonopy(
-        dataset=dataset,
-        key=key
-    )
-    commensurate_qpoints = phonopy.harmonic.dynmat_to_fc.get_commensurate_points(
-        ph.supercell_matrix
-    )    
-    ph.init_mesh(
-        mesh=k_point_mesh,
-        shift=None,
-        is_time_reversal=True,
-        is_mesh_symmetry=False,
-        with_eigenvectors=True,
-        with_group_velocities=False,
-        is_gamma_center=True,
-        use_iter_mesh=True
-    )
-    interpolated_qpoints = ph.mesh.qpoints
-    mean_u2, _ = _thermal_displacements_eq_2(
-        dynamical_matrix=ph.dynamical_matrix,
-        qpoints=interpolated_qpoints,
-        temperatures_K=temperatures_K,
-        time_points_fs=None,
-        freq_min_THz=freq_min_THz,
-        freq_max_THz=freq_max_THz,
-        cell_type="primitive"
-    )
-    return mean_u2
 

@@ -18,7 +18,7 @@ import pandas as pd
 import warnings
 from numpy.polynomial.polynomial import Polynomial
 
-import mbe_automation.display
+import mbe_automation.common
 import mbe_automation.storage
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
@@ -101,11 +101,11 @@ def phonons(
         torch.cuda.reset_peak_memory_stats()
 
     if system_label:
-        mbe_automation.display.framed([
+        mbe_automation.common.display.framed([
             "Phonons",
             system_label])
     else:
-        mbe_automation.display.framed("Phonons")
+        mbe_automation.common.display.framed("Phonons")
         
     phonopy_struct = PhonopyAtoms(
         symbols=unit_cell.symbols,
@@ -247,7 +247,7 @@ def equilibrium_curve(
     
     df_eos_points = []
     
-    mbe_automation.display.framed("F(V) curve sampling")
+    mbe_automation.common.display.framed("F(V) curve sampling")
     print(f"equation_of_state               {equation_of_state}")
     print(f"filter_out_imaginary_acoustic   {filter_out_imaginary_acoustic}")
     print(f"filter_out_imaginary_optical    {filter_out_imaginary_optical}")

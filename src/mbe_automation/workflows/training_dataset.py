@@ -6,13 +6,13 @@ import numpy as np
 import pandas as pd
 import h5py
 
+import mbe_automation.common
 import mbe_automation.ml.descriptors.mace
 import mbe_automation.ml.training_data
 import mbe_automation.ml.data_clustering
 import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
-import mbe_automation.display
 from mbe_automation.configs.training import TrainingConfig
 import mbe_automation.storage
 

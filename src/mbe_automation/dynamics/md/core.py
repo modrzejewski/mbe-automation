@@ -13,7 +13,7 @@ from ase.md.langevin import Langevin
 from ase.io.trajectory import Trajectory
 import ase.units
 
-import mbe_automation.display
+import mbe_automation.common
 from  mbe_automation.configs.md import ClassicalMD
 import mbe_automation.storage
 import mbe_automation.structure.molecule
@@ -100,7 +100,7 @@ def run(
         rng_seed=42
 ):
 
-    mbe_automation.display.framed([
+    mbe_automation.common.display.framed([
         f"{md.ensemble} molecular dynamics",
         system_label
     ])
@@ -246,7 +246,7 @@ def run(
     print(f"n_removed_trans_dof   {n_removed_trans_dof}")
     if is_periodic:
         print("supercell_matrix")
-        mbe_automation.display.matrix_3x3(supercell_matrix)
+        mbe_automation.common.display.matrix_3x3(supercell_matrix)
     
     display_frequency = 5
     milestones = [0]

@@ -4,6 +4,7 @@ import stat
 import shutil
 import sys
 
+import mbe_automation.common
 import mbe_automation.queue_scripts as queue_scripts
 import mbe_automation.directory_structure as directory_structure
 import mbe_automation.mbe
@@ -14,7 +15,6 @@ import mbe_automation.inputs.pyscf
 import mbe_automation.inputs.mace
 import mbe_automation.inputs.uma
 import mbe_automation.inputs.dftb
-import mbe_automation.display
 
 
 def prepare_inputs(ProjectDirectory, mlip_parameters, UnitCellFile, SystemTypes, Cutoffs,
@@ -46,7 +46,7 @@ def prepare_inputs(ProjectDirectory, mlip_parameters, UnitCellFile, SystemTypes,
     # both displayed on screen and written to the log file.
     #
     SummaryFile = os.path.join(directory_structure.PROJECT_DIR, "input_preparation.txt")
-    sys.stdout = mbe_automation.display.ReplicatedOutput(SummaryFile)
+    sys.stdout = mbe_automation.common.display.ReplicatedOutput(SummaryFile)
 
     if not UseExistingXYZ:
         mbe_automation.mbe.Make(UnitCellFile,

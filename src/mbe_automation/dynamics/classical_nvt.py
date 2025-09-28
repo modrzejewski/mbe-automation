@@ -7,8 +7,8 @@ from ase.md.langevin import Langevin
 from ase.md.bussi import Bussi
 from ase.io.trajectory import Trajectory
 import ase.units
+
 import mbe_automation.kpoints
-import mbe_automation.display
 
 def propagate(init_conf,
               temp_target_K,

@@ -2,7 +2,7 @@ import os
 import warnings
 import pandas as pd
 
-import mbe_automation.display
+import mbe_automation.common
 import mbe_automation.storage
 import mbe_automation.configs
 import mbe_automation.dynamics
@@ -18,7 +18,7 @@ except ImportError:
 
 def run(config: mbe_automation.configs.md.Enthalpy):
 
-    datetime_start = mbe_automation.display.timestamp_start()
+    datetime_start = mbe_automation.common.display.timestamp_start()
     
     if config.verbose == 0:
         warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -26,11 +26,11 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         warnings.filterwarnings("ignore", category=RuntimeWarning)
 
     if isinstance(config, mbe_automation.configs.md.Sublimation):
-        mbe_automation.display.framed("NVT/NPT simulation of sublimation properties")
+        mbe_automation.common.display.framed("NVT/NPT simulation of sublimation properties")
         
     if mace_available:
         if isinstance(config.calculator, MACECalculator):
-            mbe_automation.display.mace_summary(config.calculator)
+            mbe_automation.common.display.mace_summary(config.calculator)
     
     label_molecule = f"molecule_T_{config.temperature_K:.2f}"
     mbe_automation.dynamics.md.core.run(
@@ -150,6 +150,6 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         df_npt_nvt.to_csv(os.path.join(config.work_dir, "sublimation.csv"))
 
     print("MD workflow completed")
-    mbe_automation.display.timestamp_finish(datetime_start)
+    mbe_automation.common.display.timestamp_finish(datetime_start)
 
     
