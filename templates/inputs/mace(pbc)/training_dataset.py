@@ -1,10 +1,11 @@
 import numpy as np
 import os.path
 import mace.calculators
+import torch
+
 from mbe_automation.configs.training import TrainingConfig
 import mbe_automation.workflows.training_dataset
-import mbe_automation.io
-import torch
+from mbe_automation.structure import molecule, crystal
 
 xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
@@ -19,8 +20,8 @@ mace_calc = mace.calculators.MACECalculator(
 
 training_config = TrainingConfig(
     calculator = mace_calc,
-    unit_cell = mbe_automation.io.read(os.path.join(work_dir, xyz_solid)),
-    molecule = mbe_automation.io.read(os.path.join(work_dir, xyz_molecule)),
+    unit_cell = crystal.from_file(os.path.join(work_dir, xyz_solid)),
+    molecule = molecule.from_file(os.path.join(work_dir, xyz_molecule)),
     supercell_radius = 20.0,
     training_dir = training_dir,
     hdf5_dataset = os.path.join(training_dir, "training.hdf5"),
@@ -30,7 +31,7 @@ training_config = TrainingConfig(
     time_step_fs = 0.5,
     sampling_interval_fs = 50,
     averaging_window_fs = 5000    
-    )
+)
 
 mbe_automation.workflows.training_dataset.run(training_config)
 

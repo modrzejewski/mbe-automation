@@ -153,7 +153,7 @@ class ClassicalMD:
                                    
 
 @dataclass
-class Sublimation:
+class Enthalpy:
                                    #
                                    # Initial structure of crystal
                                    #

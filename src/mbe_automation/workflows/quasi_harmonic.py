@@ -5,15 +5,13 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from mbe_automation.configs.quasi_harmonic import QuasiHarmonic
+import mbe_automation.common
+import mbe_automation.configs
 import mbe_automation.storage
-import mbe_automation.dynamics.harmonic.core
-import mbe_automation.dynamics.harmonic.data
-import mbe_automation.dynamics.harmonic.plot
+import mbe_automation.dynamics.harmonic
 import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
-import mbe_automation.display
 
 try:
     from mace.calculators import MACECalculator
@@ -23,9 +21,9 @@ except ImportError:
     mace_available = False
 
 
-def run(config: QuasiHarmonic):
+def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
-    datetime_start = mbe_automation.display.timestamp_start()
+    datetime_start = mbe_automation.common.display.timestamp_start()
     
     if config.verbose == 0:
         warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -33,9 +31,9 @@ def run(config: QuasiHarmonic):
         warnings.filterwarnings("ignore", category=RuntimeWarning)
         
     if config.thermal_expansion:
-        mbe_automation.display.framed("Harmonic properties with thermal expansion")
+        mbe_automation.common.display.framed("Harmonic properties with thermal expansion")
     else:
-        mbe_automation.display.framed("Harmonic properties")
+        mbe_automation.common.display.framed("Harmonic properties")
         
     os.makedirs(config.work_dir, exist_ok=True)
     geom_opt_dir = os.path.join(config.work_dir, "relaxation")
@@ -60,7 +58,7 @@ def run(config: QuasiHarmonic):
 
     if mace_available:
         if isinstance(config.calculator, MACECalculator):
-            mbe_automation.display.mace_summary(config.calculator)
+            mbe_automation.common.display.mace_summary(config.calculator)
 
     label_molecule = "molecule_relaxed"
     molecule = mbe_automation.structure.relax.isolated_molecule(
@@ -168,7 +166,7 @@ def run(config: QuasiHarmonic):
     n_atoms_molecule = len(molecule)
     if not config.thermal_expansion:
         print("Harmonic calculations completed")
-        mbe_automation.display.timestamp_finish(datetime_start)
+        mbe_automation.common.display.timestamp_finish(datetime_start)
         return
     #
     # Thermal expansion
@@ -319,5 +317,5 @@ def run(config: QuasiHarmonic):
     print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom:.5f} kJ∕mol∕atom")
         
     print(f"Properties with thermal expansion completed")
-    mbe_automation.display.timestamp_finish(datetime_start)
+    mbe_automation.common.display.timestamp_finish(datetime_start)
 

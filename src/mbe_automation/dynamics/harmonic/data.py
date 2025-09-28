@@ -8,7 +8,7 @@ from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 
 import mbe_automation.structure.molecule
 import mbe_automation.structure.crystal
-import mbe_automation.dynamics.harmonic.plot
+import mbe_automation.dynamics.harmonic.display
 import mbe_automation.storage
 
 @dataclass
@@ -99,8 +99,7 @@ def generate_fbz_path(
         with_group_velocities=False,
         is_band_connection=band_connection,
         path_connections=path_connections,
-        labels=labels,
-        is_legacy_plot=False,
+        labels=labels
     )
         
 
@@ -214,15 +213,16 @@ def crystal(
         key=f"quasi_harmonic/phonons/force_constants/{system_label}",
         phonons=phonons
     )
-    mbe_automation.storage.save_fbz_path(
-        phonons,
-        dataset,
-        key=f"quasi_harmonic/phonons/fbz_path/{system_label}"
-    )
-    mbe_automation.dynamics.harmonic.plot.band_structure(
+    mbe_automation.storage.save_brillouin_zone_path(
+        phonons=phonons,
         dataset=dataset,
-        key=f"quasi_harmonic/phonons/fbz_path/{system_label}",
-        save_path=os.path.join(work_dir, "phonons", "fbz_path", f"{system_label}.png"),
+        key=f"quasi_harmonic/phonons/brillouin_zone_path/{system_label}",
+        save_eigenvectors=False
+    )
+    mbe_automation.dynamics.harmonic.display.band_structure(
+        dataset=dataset,
+        key=f"quasi_harmonic/phonons/brillouin_zone_path/{system_label}",
+        save_path=os.path.join(work_dir, "phonons", "brillouin_zone_path", f"{system_label}.png"),
         freq_max_thz=10.0 # THz
     )
     mbe_automation.storage.save_structure(

@@ -1,8 +1,3 @@
-import mbe_automation.dynamics.classical_nvt
-import mbe_automation.display
-import mbe_automation.kpoints
-import mbe_automation.ml.descriptors.mace
-import mbe_automation.ml.descriptors.generic
 import ase.build
 import ase.io
 import os.path
@@ -11,6 +6,12 @@ import numpy as np
 import h5py
 import os
 import math
+
+import mbe_automation.common
+import mbe_automation.dynamics.classical_nvt
+import mbe_automation.kpoints
+import mbe_automation.ml.descriptors.mace
+import mbe_automation.ml.descriptors.generic
 
 def unique_system_label(index, n_systems, system_type):
     singular_map = {
@@ -137,11 +138,11 @@ def supercell_md(unit_cell,
     # flush after every print.
     #
     summary_file = os.path.join(training_dir, "supercell_md.txt")
-    sys.stdout = mbe_automation.display.ReplicatedOutput(summary_file)
+    sys.stdout = mbe_automation.common.display.ReplicatedOutput(summary_file)
     
     dims = np.array(mbe_automation.kpoints.RminSupercell(unit_cell, supercell_radius))
     super_cell = ase.build.make_supercell(unit_cell, np.diag(dims))
-    mbe_automation.display.framed("Molecular dynamics (crystal)")
+    mbe_automation.common.display.framed("Molecular dynamics (crystal)")
     print(f"Requested supercell radius R={supercell_radius:.1f} Å")
     print(f"{len(super_cell)} atoms in the {dims[0]}×{dims[1]}×{dims[2]} supercell")
     
@@ -185,9 +186,9 @@ def molecule_md(molecule,
     # flush after every print.
     #
     summary_file = os.path.join(training_dir, "molecule_md.txt")
-    sys.stdout = mbe_automation.display.ReplicatedOutput(summary_file)
+    sys.stdout = mbe_automation.common.display.ReplicatedOutput(summary_file)
 
-    mbe_automation.display.framed("Molecular dynamics (single molecule)")
+    mbe_automation.common.display.framed("Molecular dynamics (single molecule)")
     print(f"{len(molecule)} atoms in the molecule")
     trajectory_file = os.path.join(training_dir, "molecule_md.traj")
     md_results, equilibrium_stats = mbe_automation.dynamics.classical_nvt.sample_NVT(molecule,

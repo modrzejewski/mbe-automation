@@ -14,7 +14,7 @@ import numpy as np
 import numpy.typing as npt
 from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
 
-import mbe_automation.display
+import mbe_automation.common
 
 try:
     from doped.generation import get_ideal_supercell_matrix
@@ -25,6 +25,10 @@ except ImportError:
     get_min_image_distance = None
     doped_available = False
 
+    
+def from_file(path):
+    return mbe_automation.common.io.read(path)
+
 
 def display(unit_cell: Atoms, system_label: str | None=None) -> None:
     """
@@ -32,11 +36,11 @@ def display(unit_cell: Atoms, system_label: str | None=None) -> None:
     """
     
     if system_label:
-        mbe_automation.display.framed([
+        mbe_automation.common.display.framed([
             "Cell parameters",
             system_label])
     else:
-        mbe_automation.display.framed("Cell parameters")
+        mbe_automation.common.display.framed("Cell parameters")
         
     La, Lb, Lc = unit_cell.cell.lengths()
     alpha, beta, gamma = unit_cell.cell.angles()
@@ -210,7 +214,7 @@ def supercell_matrix(
     optimal_matrix = np.round(optimal_matrix).astype(np.int64)
         
     supercell = structure.make_supercell(optimal_matrix)
-    mbe_automation.display.matrix_3x3(optimal_matrix)
+    mbe_automation.common.display.matrix_3x3(optimal_matrix)
     if backend == "doped":
         r = get_min_image_distance(supercell)
         print(f"Actual point-image distance {r:.1f} Å")

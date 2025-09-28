@@ -6,11 +6,12 @@ from ase.optimize.precon.lbfgs import PreconLBFGS
 from ase.optimize.precon.fire import PreconFIRE
 import ase.filters
 import ase.units
-import mbe_automation.structure.crystal
-import mbe_automation.display
 import numpy as np
 import warnings
 import torch
+
+import mbe_automation.structure.crystal
+import mbe_automation.common
 
 def crystal(unit_cell,
             calculator,
@@ -34,11 +35,11 @@ def crystal(unit_cell,
         torch.cuda.reset_peak_memory_stats()
     
     if system_label:
-        mbe_automation.display.framed([
+        mbe_automation.common.display.framed([
             "Relaxation",
             system_label])
     else:
-        mbe_automation.display.framed("Relaxation")
+        mbe_automation.common.display.framed("Relaxation")
         
     print(f"Optimize lattice vectors      {optimize_lattice_vectors}")
     print(f"Optimize volume               {optimize_volume}")
@@ -147,11 +148,11 @@ def isolated_molecule(molecule,
     """
 
     if system_label:
-        mbe_automation.display.framed([
+        mbe_automation.common.display.framed([
             "Relaxation",
             system_label])
     else:
-        mbe_automation.display.framed("Relaxation")
+        mbe_automation.common.display.framed("Relaxation")
     print(f"Max force threshold           {max_force_on_atom:.1e} eV/Å")
     
     relaxed_molecule = molecule.copy()

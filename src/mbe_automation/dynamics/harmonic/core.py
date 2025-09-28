@@ -1,9 +1,10 @@
 from ase.io import read
 from ase.atoms import Atoms
-from phonopy import Phonopy
+import phonopy
 from phonopy.structure.atoms import PhonopyAtoms
 import time
 import numpy as np
+import numpy.typing as npt
 import torch
 import ase.thermochemistry
 import ase.vibrations
@@ -17,18 +18,18 @@ import pandas as pd
 import warnings
 from numpy.polynomial.polynomial import Polynomial
 
-import mbe_automation.display
+import mbe_automation.common
 import mbe_automation.storage
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
 import mbe_automation.dynamics.harmonic.eos
 import mbe_automation.dynamics.harmonic.data
-import mbe_automation.dynamics.harmonic.plot
+import mbe_automation.dynamics.harmonic.display
 
 
 def _assert_supercell_consistency(
-    phonopy_instance: Phonopy,
+    phonopy_instance: phonopy.Phonopy,
     unit_cell: Atoms,
     supercell_matrix: np.ndarray,
 ):
@@ -93,18 +94,18 @@ def phonons(
         symmetrize_force_constants=False,
         force_constants_cutoff_radius=None,
         system_label=None
-):
+) -> phonopy.Phonopy:
 
     cuda_available = torch.cuda.is_available()
     if cuda_available:
         torch.cuda.reset_peak_memory_stats()
 
     if system_label:
-        mbe_automation.display.framed([
+        mbe_automation.common.display.framed([
             "Phonons",
             system_label])
     else:
-        mbe_automation.display.framed("Phonons")
+        mbe_automation.common.display.framed("Phonons")
         
     phonopy_struct = PhonopyAtoms(
         symbols=unit_cell.symbols,
@@ -128,7 +129,7 @@ def phonons(
     # units kJ∕K∕mol∕unit cell, kJ∕mol∕unit cell, J∕K∕mol∕unit cell
     # if the primitive cell matrix is set to None during initialization.
     #
-    phonons = Phonopy(
+    phonons = phonopy.Phonopy(
         phonopy_struct,
         #
         # Watch out! Phonopy supercell transformation matrix
@@ -202,7 +203,7 @@ def phonons(
         print(f"Symmetrization of force constants completed", flush=True)
     
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
-    print(f"Fourier interpolation mesh completed", flush=True)    
+    print(f"Fourier interpolation mesh completed", flush=True)
     return phonons
 
 
@@ -246,7 +247,7 @@ def equilibrium_curve(
     
     df_eos_points = []
     
-    mbe_automation.display.framed("F(V) curve sampling")
+    mbe_automation.common.display.framed("F(V) curve sampling")
     print(f"equation_of_state               {equation_of_state}")
     print(f"filter_out_imaginary_acoustic   {filter_out_imaginary_acoustic}")
     print(f"filter_out_imaginary_optical    {filter_out_imaginary_optical}")
@@ -449,7 +450,7 @@ def equilibrium_curve(
         dataset=dataset,
         key="quasi_harmonic/eos_interpolated"
     )
-    mbe_automation.dynamics.harmonic.plot.eos_curves(
+    mbe_automation.dynamics.harmonic.display.eos_curves(
         dataset=dataset,
         key="quasi_harmonic/eos_interpolated",
         save_path=os.path.join(work_dir, "eos_curves.png")

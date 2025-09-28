@@ -1,11 +1,516 @@
 from __future__ import annotations
+from typing import Literal
+from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 import ase
-
+import math
 import phonopy
+from ase.neighborlist import natural_cutoffs, build_neighbor_list
+from scipy.sparse import lil_matrix
+from scipy.sparse.csgraph import connected_components
+from ase.calculators.calculator import Calculator as ASECalculator
 
+import mbe_automation.common
 import mbe_automation.storage
+
+@dataclass
+class ThermalDisplacements:
+    """
+    Coordinate displacements due to vibrational
+    motion.
+
+    1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
+       multi-temperature anisotropic displacement parameters. I. Theory
+       Acta Cryst. A 56, 403 (2000); doi: 10.1107/S0108767300005626
+    
+    """
+    mean_square_displacements_matrix_diagonal: npt.NDArray[np.float64] # eq 5 in ref 1
+    mean_square_displacements_matrix_full: npt.NDArray[np.float64] # eq 6 in ref 1
+    instantaneous_displacements: npt.NDArray[np.float64] | None # eq 2 in ref 1
+    
+@dataclass
+class Mode:
+    """
+    Results of a vibrational mode analysis.
+    
+    Attributes:
+        trajectory: The generated Structure object containing atomic coordinates.
+        scan_coordinates: Phase angle for 'cyclic' sampling and amplitude for 'linear' sampling.
+        potential_energies: Energy for unit cell/supercell/molecular cluster (eV)
+    """
+    trajectory: mbe_automation.storage.Structure
+    scan_coordinates: npt.NDArray
+    potential_energies: npt.NDArray | None
+    
+
+def _Ejq_eq_3(
+        freqs_THz: npt.NDArray[np.floating],
+        temperature_K: np.floating
+) -> npt.NDArray[np.floating]: # eV
+    """
+    Average anergy of a quantum harmonic oscillator E_j(q)
+    at temperature T (eq 3 in Ref. 1). Computed for a series
+    of frequencies in a single batch. E_j(q) is required
+    to obtain the temperature-dependent amplitude of atomic
+    displacements.
+
+    1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
+       multi-temperature anisotropic displacement parameters. I. Theory
+       Acta Cryst. A 56, 403 (2000); doi: 10.1107/S0108767300005626
+    
+    """
+    hbar_omega_eV = phonopy.physical_units.get_physical_units().THzToEv * freqs_THz
+    kB_T_eV = phonopy.physical_units.get_physical_units().KB * temperature_K 
+    x = hbar_omega_eV / (2.0 * kB_T_eV)
+    Ejq = (hbar_omega_eV/2.0) / np.tanh(x) # eV
+    return Ejq # rank (n_freqs, )
+
+def _absolute_amplitude_eq_2(
+        freqs_THz: npt.NDArray[np.floating],
+        temperature_K: np.floating,
+        masses_AMU: npt.NDArray[np.floating] # rank (n_atoms_primitive, )
+) -> npt.NDArray[np.floating]: # Angs, rank (n_freqs, n_atoms_primitive * 3)
+    """
+    Absolute amplitude (maximum amplitude) of mode jq
+    ( E_j(q)**(1/2)/omega_j(q) in eq 2 of Ref. 1).
+    The returned values are in Angstroms.
+
+    1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
+       multi-temperature anisotropic displacement parameters. I. Theory
+       Acta Cryst. A 56, 403 (2000); doi: 10.1107/S0108767300005626
+    
+    """
+    Ejq_eV = _Ejq_eq_3(freqs_THz, temperature_K)
+    alpha = (
+        math.sqrt(phonopy.physical_units.get_physical_units().EV)
+        / (1E12 * 2.0 * math.pi)
+        / math.sqrt(phonopy.physical_units.get_physical_units().AMU)
+        * 1E10
+    )
+    SqrtEjq_Omega = (np.sqrt(Ejq_eV) / freqs_THz) * alpha # amu**(1/2) * Angs
+    inv_SqrtM = 1.0 / np.repeat(np.sqrt(masses_AMU), 3)
+    Ajk_Angs = np.outer(SqrtEjq_Omega, inv_SqrtM)
+    return Ajk_Angs # rank (n_freqs, n_atoms_primitive * 3)
+
+def _thermal_displacements(
+        dynamical_matrix: phonopy.DynamicalMatrix,
+        qpoints: npt.NDArray, # rank (n_qpoints, 3), scaled coordinates of sampling points in the FBZ
+        temperatures_K: npt.NDArray, # temperature points in K, rank (n_temperatures, )
+        time_points_fs: npt.NDArray | None, # time points in fs, rank (n_time_points, )
+        freq_min_THz: float = 0.0,
+        freq_max_THz: float | None = None,
+        cell_type: Literal["primitive", "supercell"] = "primitive"
+) -> ThermalDisplacements:
+    """
+    Compute thermal displacement vectors of atoms
+    in a primitive cell or a supercell,
+
+    u(k_l, t) = 1/Sqrt(N * m_k) * Sum(jq) ( E_j(q)**(1/2)/omega_j(q) ) * e(k,jq)
+             * exp(i (q * r(k_l) - omega_j(q) * t))
+
+    where
+
+    k_l represents atomic coordinates of k-th atom
+    in l-th unit cell if cell_type=="supercell"
+
+    k_l represents atomic coordinate of k-th atom
+    in the primitive cell if cell_type=="primitive"
+
+    See eq 2 of Ref. 1.
+
+    Returns:
+    Diagonal mean square displacement matrix (Å²), eq 5 in ref 1
+    Full mean square displacement matrix (Å²), eq 6 in ref 1
+    Displacement vectors (Å), eq 2 in ref 1
+
+    1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
+       multi-temperature anisotropic displacement parameters. I. Theory
+       Acta Cryst. A 56, 403 (2000); doi: 10.1107/S0108767300005626
+
+    """
+    if not freq_min_THz >= 0.0:
+        raise ValueError("freq_min_THz must be nonnegative")
+    if len(qpoints) == 0:
+        raise ValueError("qpoints array cannot be empty")
+    if np.any(temperatures_K <= 0):
+        raise ValueError("All temperatures must be positive")
+    
+    n_temperatures = len(temperatures_K)
+    n_time_points = (len(time_points_fs) if time_points_fs is not None else 0)
+    n_atoms_primitive = len(dynamical_matrix.primitive)
+    n_atoms_supercell = len(dynamical_matrix.supercell)
+
+    p2s_map = np.array(dynamical_matrix.primitive.p2s_map, dtype=np.int64)
+    s2p_map = np.array(dynamical_matrix.primitive.s2p_map, dtype=np.int64)
+    p2p_map = dynamical_matrix.primitive.p2p_map
+    supercell_to_primitive = np.array(
+        [p2p_map[s2p_map[i]] for i in range(n_atoms_supercell)],
+        dtype=np.int64
+    )
+    #
+    # Primitive->supercell map for Cartesian coordinate indices.
+    # Used to promote the dynamical matrix eigenvectors (ejk)
+    # and vibrational mode amplitudes (Ajk) to the full supercell
+    # dimension.
+    #
+    primitive_to_supercell_coords = (
+        np.repeat(supercell_to_primitive * 3, 3) + 
+        np.tile([0, 1, 2], n_atoms_supercell)
+    )
+    
+    if n_time_points > 0:
+        if cell_type == "primitive":
+            n_atoms = n_atoms_primitive
+        elif cell_type == "supercell":
+            n_atoms = n_atoms_supercell
+        instant_disp = np.zeros(
+            (n_temperatures, n_time_points, n_atoms*3),
+            dtype=np.complex128
+        )
+    else:
+        instant_disp = None
+        
+    n_qpoints = len(qpoints)
+    mean_sq_disp = np.zeros(
+        (n_temperatures, n_atoms_primitive*3, n_atoms_primitive*3),
+        dtype=np.float64
+    )
+
+    for q in qpoints:
+        dynamical_matrix.run(q)
+        D = dynamical_matrix.dynamical_matrix # mass-weighted dynamical matrix
+        eigenvals, eigenvecs = np.linalg.eigh(D) # eigenvectors ejk are dimensionless
+        all_freqs_THz = (
+            np.sqrt(abs(eigenvals)) * np.sign(eigenvals)
+        ) * phonopy.physical_units.get_physical_units().DefaultToTHz
+        
+        mask = (all_freqs_THz > freq_min_THz)
+        if freq_max_THz is not None:
+            mask &= (all_freqs_THz < freq_max_THz)
+            
+        freqs_THz = all_freqs_THz[mask] # rank (n_freqs)
+        ejk_primitive = eigenvecs[:, mask].T # rank (n_freqs, n_atoms_primitive*3)
+        n_freqs = len(freqs_THz)        
+        if n_freqs == 0:
+            continue
+            
+        Ajk_primitive = np.zeros(
+            (n_temperatures, n_freqs, n_atoms_primitive*3),
+            dtype=np.float64
+        )
+        for temp_idx, temp_K in enumerate(temperatures_K):
+            Ajk_primitive[temp_idx] = _absolute_amplitude_eq_2(
+                freqs_THz=freqs_THz,
+                temperature_K=temp_K,
+                masses_AMU=dynamical_matrix.primitive.masses
+            )
+        Ajk_ejk_primitive = Ajk_primitive * ejk_primitive
+        #
+        # U(k,k') defined in eq 6 of ref 1,
+        # except the 1/N normalization factor is added
+        # at a later stage
+        #
+        U_q = np.einsum(
+            "Tjk,Tjl->Tkl",
+            Ajk_ejk_primitive,
+            Ajk_ejk_primitive.conj()
+        ).real
+        mean_sq_disp += U_q
+
+        if n_time_points > 0:
+            #
+            # Time-dependent part of the phase factor
+            # Exp(-i * omega * t)
+            #
+            omega_t = 2.0 * math.pi * 1.0E-3 * np.outer(time_points_fs, freqs_THz)
+            exp_iomegat = np.exp(-1j * omega_t) # rank (n_time_points, n_freqs)
+            
+            if cell_type == "supercell":
+                ejk = ejk_primitive[:, primitive_to_supercell_coords]
+                Ajk = Ajk_primitive[:, :, primitive_to_supercell_coords]
+                scaled_positions = dynamical_matrix.supercell.scaled_positions
+                supercell_matrix = dynamical_matrix.supercell.supercell_matrix
+                #
+                # Position-dependent part of the phase factor
+                # Exp(i * q * r)
+                #
+                exp_iqr = np.repeat(
+                    np.exp(2j * np.pi * np.dot(np.dot(scaled_positions, supercell_matrix.T), q)),
+                    3
+                ) # rank (n_atoms_supercell*3, )                
+
+            if cell_type == "primitive":
+                ejk, Ajk = ejk_primitive, Ajk_primitive
+                scaled_positions = dynamical_matrix.primitive.scaled_positions
+                exp_iqr = np.repeat(
+                    np.exp(2j * np.pi * np.dot(scaled_positions, q)),
+                    3
+                ) # rank (n_atoms_primitive*3, )                
+
+            Ajk_ejk = Ajk * ejk # rank (n_temperatures, n_freqs, n_atoms * 3)
+            #
+            # u(k,t) from eq 2 in ref 1,
+            # except the 1/Sqrt(N) normalization factor is
+            # added at a later stage
+            #
+            u_q = np.einsum(
+                "Tjk,tj,k->Ttk",
+                Ajk_ejk, exp_iomegat, exp_iqr
+            ) # rank (n_temperatures, n_time_points, n_atoms * 3)
+            instant_disp += u_q
+    #
+    # Take into account the normalization factors related
+    # to the averaging over the Brillouin zone:
+    #
+    # 1/N for <u u**T>
+    # 1/Sqrt(N) for u
+    #
+    # where N is the number of k-points.
+    #
+    mean_sq_disp /= n_qpoints
+    if n_time_points > 0:
+        instant_disp /= np.sqrt(n_qpoints)
+
+    mean_sq_disp_full = mean_sq_disp.reshape(
+        n_temperatures, n_atoms_primitive, 3, n_atoms_primitive, 3
+    ).transpose(0, 1, 3, 2, 4)
+    #
+    # Extract the diagonal blocks U(k, k), which represent the anisotropic
+    # displacement parameters for each atom.
+    #
+    mean_sq_disp_diagonal = np.einsum('tkkij->tkij', mean_sq_disp_full)
+
+    if instant_disp is not None:
+        instant_disp = instant_disp.reshape(
+            n_temperatures, n_time_points, n_atoms, 3
+        )
+    
+    return ThermalDisplacements(
+        mean_square_displacements_matrix_diagonal=mean_sq_disp_diagonal,
+        mean_square_displacements_matrix_full=mean_sq_disp_full,
+        instantaneous_displacements=instant_disp
+    )
+
+
+def thermal_displacements(
+        dataset: str,
+        key: str,
+        temperatures_K: npt.NDArray[np.floating],
+        k_point_mesh: npt.NDArray | Literal["commensurate"] | float = "commensurate",
+        freq_min_THz: float = 0.0,
+        freq_max_THz: float | None = None,
+        time_points_fs: np.NDArray[np.floating] | None = None
+) -> ThermalDisplacements:
+    """
+    Compute thermal displacement properties of atoms in a crystal lattice.
+
+    This function serves as the main interface for calculating the mean square
+    displacement matrices based on the harmonic approximation of lattice
+    dynamics. It integrates over a specified k-point mesh in the Brillouin
+    zone to obtain thermal averages.
+
+    The calculation is based on the formalism described in Ref. 1.
+
+    Args:
+        dataset: Path to the dataset file containing the crystal structure
+            and force constants.
+        key: Key to the harmonic force constants model within the dataset.
+        temperatures_K: An array of temperatures (in Kelvin) at which to
+            calculate the thermal displacements.
+        k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
+            - "commensurate": Use the commensurate q-points corresponding to
+              the supercell matrix.
+            - A float or list/array of 3 integers: Defines a Monkhorst-Pack
+              mesh for Brillouin zone integration.
+        freq_min_THz: The minimum phonon frequency (in THz) to be included
+            in the calculations. Defaults to 0.0.
+        freq_max_THz: The maximum phonon frequency (in THz) to be included.
+            If None, all frequencies above `freq_min_THz` are included.
+            Defaults to None.
+        time_points_fs: An optional array of time points (in femtoseconds)
+            for which to calculate the instantaneous atomic displacements.
+            If None, this calculation is skipped. Defaults to None.
+
+    Returns:
+        A `ThermalDisplacements` object containing the following attributes:
+        - `mean_square_displacements_matrix_diagonal`: The anisotropic
+          displacement parameters U(k,k) for each atom k.
+          Shape: (n_temperatures, n_atoms_primitive, 3, 3)
+        - `mean_square_displacements_matrix_full`: The full mean square
+          displacement matrix U(k,l) between each pair of atoms k and l.
+          Shape: (n_temperatures, n_atoms_primitive, n_atoms_primitive, 3, 3)
+        - `instantaneous_displacements`: Time-dependent displacement vectors
+          u(k,t) if `time_points_fs` is provided, otherwise None.
+          Shape: (n_temperatures, n_time_points, n_atoms, 3)
+
+    References:
+        1. H. B. Bürgi and S. C. Capelli, "Dynamics of molecules in crystals
+           from multi-temperature anisotropic displacement parameters. I. Theory"
+           Acta Cryst. A 56, 403 (2000); doi: 10.1107/S0108767300005626
+    
+    """    
+    ph = mbe_automation.storage.to_phonopy(
+        dataset=dataset,
+        key=key
+    )
+    if isinstance(k_point_mesh, str) and k_point_mesh == "commensurate":
+        qpoints = phonopy.harmonic.dynmat_to_fc.get_commensurate_points(
+            ph.supercell_matrix
+        )
+    else:
+        ph.init_mesh(
+            mesh=k_point_mesh,
+            shift=None,
+            is_time_reversal=True,
+            is_mesh_symmetry=False,
+            with_eigenvectors=True,
+            with_group_velocities=False,
+            is_gamma_center=True,
+            use_iter_mesh=True
+        )
+        qpoints = ph.mesh.qpoints
+
+    mbe_automation.common.display.framed("Thermal displacements")
+    nx, ny, nz = ph.mesh.mesh_numbers
+    print(f"k_points_mesh       {nx}×{ny}×{nz}")
+    print(f"freq_min            {freq_min_THz:.1f} THz")
+    if freq_max_THz is not None:
+        print(f"freq_max            {freq_max_THz:.1f} THz")
+    else:
+        print(f"freq_max            unlimited")
+        
+    print("Diagonalization of dynamic matrix at each k point...")
+    
+    disp = _thermal_displacements(
+        dynamical_matrix=ph.dynamical_matrix,
+        qpoints=qpoints,
+        temperatures_K=temperatures_K,
+        time_points_fs=time_points_fs,
+        freq_min_THz=freq_min_THz,
+        freq_max_THz=freq_max_THz,
+        cell_type="primitive"
+    )
+    
+    print("Thermal displacements completed")
+    return disp
+            
+            
+def _get_modulated_displacements(
+    ph: phonopy.Phonopy,
+    eigvec: npt.NDArray[np.complex128],
+    q: npt.NDArray[np.floating]
+) -> npt.NDArray[np.complex128]:
+    """
+    Compute complex displacements for a supercell from a primitive cell eigenvector.
+    """
+    supercell = ph.supercell
+    spos = supercell.scaled_positions
+    n_atoms_supercell = len(supercell)
+    
+    # Create the composite mapping from supercell to primitive, as in phonopy
+    s2u_map = supercell.s2u_map
+    u2u_map = supercell.u2u_map
+    s2uu_map = [u2u_map[x] for x in s2u_map]
+
+    # Calculate phase factor and combine with mass normalization for each supercell atom
+    scaled_pos_in_prim = np.dot(spos, supercell.supercell_matrix.T)
+    phase_factors = np.exp(2j * np.pi * np.dot(scaled_pos_in_prim, q))
+    s_masses = supercell.masses
+    coefs = phase_factors / np.sqrt(s_masses)
+
+    # Map primitive displacements to supercell atoms with correct coefficient
+    u = np.zeros((n_atoms_supercell, 3), dtype=np.complex128)
+    for i in range(n_atoms_supercell):
+        p_index = s2uu_map[i]
+        u[i] = eigvec[p_index*3 : p_index*3 + 3] * coefs[i]
+
+    # Apply final normalization, as seen in phonopy.modulation
+    u /= np.sqrt(n_atoms_supercell)
+    return u
+
+
+def _get_molecules(
+    cell: phonopy.structure.atoms.PhonopyAtoms
+) -> list[npt.NDArray[np.int64]]:
+    """
+    Return a list of arrays of indices of whole molecules inside a cell.
+    """
+    atoms = ase.Atoms(
+        symbols=cell.symbols,
+        positions=cell.positions,
+        cell=cell.cell,
+        pbc=True
+    )
+    n_atoms = len(atoms)
+    
+    cutoffs = natural_cutoffs(atoms)
+    neighbor_list = build_neighbor_list(atoms, cutoffs=cutoffs)
+    
+    # Build adjacency matrix using only bonds with zero offset (internal to cell)
+    adj_matrix = lil_matrix((n_atoms, n_atoms), dtype=int)
+    for i in range(n_atoms):
+        neighbors, offsets = neighbor_list.get_neighbors(i)
+        for j, offset in zip(neighbors, offsets):
+            if np.all(offset == 0):
+                adj_matrix[i, j] = 1
+    
+    # Find connected components based on internal bonds only
+    n_molecules, labels = connected_components(adj_matrix.tocsr())
+    
+    molecules = []
+    for i in range(n_molecules):
+        molecules.append(np.where(labels == i)[0])
+        
+    return molecules
+
+
+def _filter_closest_molecules(
+    cell: phonopy.structure.atoms.PhonopyAtoms,
+    molecules: list[npt.NDArray[np.int64]],
+    n_molecules_to_keep: int
+) -> npt.NDArray[np.int64]:
+    """
+    Filter out all atoms except those in N molecules closest to the cell center.
+    """
+    positions = cell.positions
+
+    # First, compute the COM and mass for each individual molecule
+    molecular_coms = []
+    molecular_masses = []
+    for mol_indices in molecules:
+        molecule = ase.Atoms(
+            symbols=np.array(cell.symbols)[mol_indices],
+            positions=positions[mol_indices],
+            masses=cell.masses[mol_indices]
+        )
+        molecular_coms.append(molecule.get_center_of_mass())
+        molecular_masses.append(np.sum(molecule.get_masses()))
+        
+    molecular_coms = np.array(molecular_coms)
+    molecular_masses = np.array(molecular_masses)
+
+    # Second, compute the overall COM of all whole molecules
+    total_mass = np.sum(molecular_masses)
+    overall_com = np.sum(molecular_coms * molecular_masses[:, np.newaxis], axis=0) / total_mass
+    
+    # Third, compute distance of each molecule's COM to the overall COM
+    com_distances = []
+    for com in molecular_coms:
+        dist = np.linalg.norm(com - overall_com)
+        com_distances.append(dist)
+
+    # Sort molecules by distance and get indices of the N closest
+    sorted_mol_indices = np.argsort(com_distances)
+    closest_mol_indices = sorted_mol_indices[:n_molecules_to_keep]
+
+    # Flatten the list of atom indices for the selected molecules
+    filtered_atom_indices = np.concatenate(
+        [molecules[i] for i in closest_mol_indices]
+    )
+    
+    return np.sort(filtered_atom_indices)
+
 
 def trajectory(
         dataset: str,
@@ -14,15 +519,14 @@ def trajectory(
         band_index: int = 0,
         max_amplitude: float = 1.0,
         n_frames: int = 10,
-        wrap: bool = False,
-) -> mbe_automation.storage.Structure:
+        use_supercell: bool = False,
+        extract_molecular_cluster: int | None = None,
+        sampling: Literal["cyclic", "linear"] = "cyclic",
+        calculator: ASECalculator | None = None
+) -> Mode:
     """
-    Generate a primitive cell trajectory for a single vibrational mode.
-
-    This function uses the explicit algorithm found in phonopy's Animation
-    class, manually calculating displacements from the dynamical matrix
-    eigenvectors to produce a smooth, sinusoidal oscillation. The trajectory
-    is calculated for the primitive cell.
+    Generate a trajectory for a single vibrational mode and optionally
+    calculate its potential energy curve.
 
     Args:
         dataset: Path to the dataset file.
@@ -31,310 +535,172 @@ def trajectory(
         band_index: Index of the vibrational mode.
         max_amplitude: Controls the maximum displacement of the mode.
         n_frames: Number of frames for the trajectory.
-        wrap: If True, wrap atomic coordinates back into the primary
-              primitive cell.
+        use_supercell: If True, generate trajectory for the supercell.
+        Otherwise, use the primitive cell.
+        extract_molecular_cluster: If not None, keep only the `m` molecules closest
+        to the center of mass.
+        sampling: "cyclic" for animation, "linear" for PES scan.
+        calculator: If not None, calculate the potential energy curve.
 
     Returns:
-        A Structure object containing the mode trajectory for the primitive cell.
+        A Mode object containing the mode trajectory and, optionally,
+        the potential energy at each frame of the trajectory.
     """
+
     ph = mbe_automation.storage.to_phonopy(
         dataset=dataset,
         key=key
     )
-
-    primitive_cell = ph.primitive
-    n_bands = 3 * len(primitive_cell)
+    n_bands = 3 * len(ph.primitive)
     if not (0 <= band_index < n_bands):
         raise IndexError(
             f"band_index must be on the interval [0, {n_bands - 1}]."
         )
 
-    # 1. Run dynamical matrix and get eigenvectors for the primitive cell
     dm = ph.dynamical_matrix
     dm.run(k_point)
     eigenvalues, eigenvectors = np.linalg.eigh(dm.dynamical_matrix)
-
-    # 2. Calculate mass-normalized displacements for the primitive cell
-    masses = primitive_cell.masses
     eigvec = eigenvectors[:, band_index]
-    displacements = (eigvec / np.sqrt(np.repeat(masses, 3))).reshape(-1, 3)
 
-    # 3. Generate frames using the sinusoidal motion formula for the primitive cell
-    equilibrium_positions = primitive_cell.positions
-    positions_array = np.zeros((n_frames, len(primitive_cell), 3))
+    if use_supercell:
+        base_cell = ph.supercell
+        displacements = _get_modulated_displacements(ph, eigvec, k_point)
+    else:
+        base_cell = ph.primitive
+        masses = base_cell.masses
+        n_atoms_primitive = len(base_cell)
+        displacements = (eigvec / np.sqrt(np.repeat(masses, 3))).reshape(-1, 3)
+        displacements /= np.sqrt(n_atoms_primitive)
 
+    n_atoms = len(base_cell)
+    base_positions = base_cell.positions
+    scan_coordinates = np.zeros(n_frames)
+    potential_energies = []
+    #
+    # Perform scan in the direction of the selected normal coordinate.
+    # This generates the trajectory and optionally the energy points.
+    #
+    positions_array = np.zeros((n_frames, n_atoms, 3))
     for i in range(n_frames):
-        phase = 2j * np.pi * i / n_frames
-        # Use .imag for a sine-based oscillation to match write_xyz
-        frame_displacement = (displacements * np.exp(phase)).imag * max_amplitude
-        positions_array[i] = equilibrium_positions + frame_displacement
+        if sampling == "cyclic":
+            phase = 2 * np.pi * i / n_frames
+            frame_displacement = (displacements * np.exp(1j * phase)).imag * max_amplitude
+            scan_coordinates[i] = phase
+        elif sampling == "linear":
+            amplitude = np.linspace(-max_amplitude, max_amplitude, n_frames)[i]
+            frame_displacement = displacements.real * amplitude
+            scan_coordinates[i] = amplitude
+        else:
+            raise ValueError(f"Unknown sampling type: {sampling}")
 
-    if wrap:
-        lattice = primitive_cell.cell
-        inv_lattice = np.linalg.inv(lattice)
-        # Reshape for vectorized operation on all frames at once
-        flat_pos = positions_array.reshape(-1, 3)
-        frac_pos = np.dot(flat_pos, inv_lattice)
-        wrapped_frac_pos = frac_pos - np.floor(frac_pos)
-        wrapped_cart_pos = np.dot(wrapped_frac_pos, lattice)
-        positions_array = wrapped_cart_pos.reshape(n_frames, -1, 3)
+        current_positions = base_positions + frame_displacement
+        positions_array[i] = current_positions
 
-    trajectory = mbe_automation.storage.Structure(
+    traj = mbe_automation.storage.Structure(
         positions=positions_array,
-        atomic_numbers=primitive_cell.numbers,
-        masses=primitive_cell.masses,
-        cell_vectors=primitive_cell.cell,
-        n_atoms=len(primitive_cell),
+        atomic_numbers=base_cell.numbers,
+        masses=base_cell.masses,
+        cell_vectors=base_cell.cell,
+        n_atoms=n_atoms,
         n_frames=n_frames,
     )
-    return trajectory
+    #
+    # Filter out everything except for a cluster of n molecules
+    # near the center of mass. This converts the structure to
+    # finite (non-periodic) system.
+    #
+    if extract_molecular_cluster is not None:
+        n_molecules = extract_molecular_cluster
+        molecules = _get_molecules(base_cell)
+        indices_to_keep = _filter_closest_molecules(base_cell, molecules, n_molecules)
+        
+        if len(indices_to_keep) == 0:
+            raise ValueError(
+                "Molecule filtering resulted in zero atoms."
+            )
+        
+        traj = mbe_automation.storage.Structure(
+            positions=traj.positions[:, indices_to_keep, :],
+            atomic_numbers=traj.atomic_numbers[indices_to_keep],
+            masses=traj.masses[indices_to_keep],
+            #
+            # The system is no longer considered as periodic
+            # after we extract a cluster of molecules
+            #
+            cell_vectors=None, 
+            n_atoms=len(indices_to_keep),
+            n_frames=traj.n_frames,
+        )
+
+    if calculator is not None:
+        potential_energies = []
+        for i in range(traj.n_frames):
+            single_frame = mbe_automation.storage.to_ase_atoms(
+                structure=traj,
+                frame_index=i
+            )
+            single_frame.calc = calculator
+            potential_energies.append(single_frame.get_potential_energy())
+            
+        potential_energies = np.array(potential_energies)
+        
+    else:
+        potential_energies = None
+
+    return Mode(
+        trajectory=traj,
+        scan_coordinates=scan_coordinates,
+        potential_energies=potential_energies
+    )
 
 
+def mean_square_displacement_matrix(
+        dataset: str,
+        key: str,
+        k_point_mesh: npt.NDArray | float,
+        temperatures_K: npt.NDArray[np.floating],
+        freq_min_THz: float | None = None,
+        freq_max_THz: float | None = None
+) -> npt.NDArray[np.floating]:
+    """
+    Compute the thermal displacements matrix
 
+    B(k) = <u(k) (u(k))**T>
 
-# def trajectory(
-#         dataset: str,
-#         key: str,
-#         k_point: npt.NDArray[np.floating] = np.array([0, 0, 0]),
-#         band_index: int = 0,
-#         max_amplitude: float = 1.0,
-#         n_frames: int = 10,
-#         wrap: bool = False,
-# ) -> mbe_automation.storage.Structure:
-#     """
-#     Generate a trajectory for a single vibrational mode.
+    where u(k) is the Cartesian displacement vector of k-th atom.
 
-#     This function uses the explicit algorithm found in phonopy's Animation
-#     class, manually calculating displacements from the dynamical matrix
-#     eigenvectors to produce a smooth, sinusoidal oscillation.
+    Args:
+        dataset: Path to the dataset file.
+        key: Key to the harmonic force constants model.
+        k_point_mesh: Dimension of the k-point interpolation mesh.
+        temperatures_K: Array of temperatures.
+        freq_min_THz: Minimum frequency to include.
+        freq_max_THz: Maximum frequency to include.
 
-#     Args:
-#         dataset: Path to the dataset file.
-#         key: Key to the harmonic force constants model.
-#         k_point: Reduced coordinates of the k-point.
-#         band_index: Index of the vibrational mode.
-#         max_amplitude: Controls the maximum displacement of the mode.
-#         n_frames: Number of frames for the trajectory.
-#         wrap: If True, wrap atomic coordinates back into the primary
-#               supercell. Set to False for smooth animation trajectories.
+    Returns:
+        An array of rank (n_temperatures, n_atoms_primitive, 3, 3)
+    """
 
-#     Returns:
-#         A Structure object containing the mode trajectory.
-#     """
-#     ph = mbe_automation.storage.to_phonopy(
-#         dataset=dataset,
-#         key=key
-#     )
-
-#     n_bands = 3 * len(ph.primitive)
-#     if not (0 <= band_index < n_bands):
-#         raise IndexError(
-#             f"band_index must be on the interval [0, {n_bands - 1}]."
-#         )
-
-#     # 1. Run dynamical matrix and get eigenvectors
-#     dm = ph.dynamical_matrix
-#     dm.run(k_point)
-#     eigenvalues, eigenvectors = np.linalg.eigh(dm.dynamical_matrix)
-
-#     # 2. Calculate mass-normalized displacements
-#     masses = ph.primitive.masses
-#     eigvec = eigenvectors[:, band_index]
-#     displacements = (eigvec / np.sqrt(np.repeat(masses, 3))).reshape(-1, 3)
-
-#     # 3. Generate frames using the sinusoidal motion formula
-#     base_supercell = ph.supercell
-#     equilibrium_positions = base_supercell.positions
-#     positions_array = np.zeros((n_frames, len(base_supercell), 3))
-
-#     for i in range(n_frames):
-#         phase = 2j * np.pi * i / n_frames
-#         # Use .imag for a sine-based oscillation to match write_xyz
-#         frame_displacement = (displacements * np.exp(phase)).imag * max_amplitude
-#         positions_array[i] = equilibrium_positions + frame_displacement
-
-#     if wrap:
-#         lattice = base_supercell.cell
-#         inv_lattice = np.linalg.inv(lattice)
-#         # Reshape for vectorized operation on all frames at once
-#         flat_pos = positions_array.reshape(-1, 3)
-#         frac_pos = np.dot(flat_pos, inv_lattice)
-#         wrapped_frac_pos = frac_pos - np.floor(frac_pos)
-#         wrapped_cart_pos = np.dot(wrapped_frac_pos, lattice)
-#         positions_array = wrapped_cart_pos.reshape(n_frames, -1, 3)
-
-#     trajectory = mbe_automation.storage.Structure(
-#         positions=positions_array,
-#         atomic_numbers=base_supercell.numbers,
-#         masses=base_supercell.masses,
-#         cell_vectors=base_supercell.cell,
-#         n_atoms=len(base_supercell),
-#         n_frames=n_frames,
-#     )
-#     return trajectory
-
-
-
-# def trajectory(
-#         dataset: str,
-#         key: str,
-#         k_point: npt.NDArray[np.floating] = np.array([0, 0, 0]),
-#         band_index: int = 0,
-#         max_amplitude: float = 1.0,
-#         n_frames: int = 100,
-#         wrap: bool = True,
-# ) -> mbe_automation.storage.Structure:
-#     """
-#     Generate a trajectory for a single vibrational mode using phonopy.
-
-#     Args:
-#         dataset: Path to the dataset file.
-#         key: Key to the harmonic force constants model.
-#         k_point: Reduced coordinates of the k-point.
-#         band_index: Index of the vibrational mode.
-#         max_amplitude: Controls the maximum displacement of the mode.
-#         n_frames: Number of frames for the trajectory.
-#         wrap: If True, wrap atomic coordinates back into the primary
-#               supercell. Set to False for smooth animation trajectories.
-
-#     Returns:
-#         A Structure object containing the mode trajectory.
-#     """
-#     ph = mbe_automation.storage.to_phonopy(
-#         dataset=dataset,
-#         key=key
-#     )
-
-#     n_bands = 3 * len(ph.primitive)
-#     if not (0 <= band_index < n_bands):
-#         raise IndexError(
-#             f"band_index must be on the interval [0, {n_bands - 1}]."
-#         )
-    
-#     amplitudes = np.linspace(-max_amplitude, max_amplitude, n_frames)
-#     phonon_modes = [[k_point, band_index, amp, 0.0] for amp in amplitudes]
-#     mod = Modulation(
-#         dynamical_matrix=ph.dynamical_matrix,
-#         dimension=ph.supercell_matrix,
-#         phonon_modes=phonon_modes,
-#     )
-#     mod.run()
-
-#     raw_displacements, base_supercell = mod.get_modulations_and_supercell()
-#     positions_array = base_supercell.positions + raw_displacements.real
-
-#     if wrap:
-#         lattice = base_supercell.cell
-#         inv_lattice = np.linalg.inv(lattice)
-#         frac_pos = np.dot(positions_array, inv_lattice)
-#         wrapped_frac_pos = frac_pos - np.floor(frac_pos)
-#         positions_array = np.dot(wrapped_frac_pos, lattice)
-
-#     trajectory = mbe_automation.storage.Structure(
-#         positions=positions_array,
-#         atomic_numbers=base_supercell.numbers,
-#         masses=base_supercell.masses,
-#         cell_vectors=base_supercell.cell,
-#         n_atoms=len(base_supercell),
-#         n_frames=n_frames,
-#     )
-#     return trajectory
-
-
-
-# def commensurate_kpoints(
-#         dataset: str,
-#         key: str
-# ) -> npt.NDArray:
-    
-#     """Generate a list of the commensurate k-points (in reduced units)
-#     which fit into to the force model's supercell.
-
-#     Parameters
-#     ----------
-#     dataset
-#         Path to the dataset file.
-#     key
-#         Key to the harmonic force constants model.
-#     """
-
-#     mp = mbe_automation.storage.to_dynasor_mode_projector(
-#         dataset=dataset,
-#         key=key
-#     )
-#     return mp.q_reduced
-
-
-# def trajectory(
-#     dataset: str,
-#     key: str,
-#     k_point: npt.NDArray[np.floating],
-#     band_index: int,
-#     max_amplitude: float,
-#     n_frames: int = 100,
-# ) -> mbe_automation.storage.Structure:
-    
-#     """Generate a trajectory for a single vibrational mode.
-
-#     Parameters
-#     ----------
-#     dataset
-#         Path to the dataset file.
-#     key
-#         Key to the harmonic force constants model.
-#     k_point
-#         Reduced coordinates of the k-point.
-#     band_index
-#         Index of the vibrational mode.
-#     max_amplitude
-#         Controls the maximum displacement.
-#     n_frames
-#         Number of frames for the trajectory.
-
-#     Returns
-#     -------
-#     Structure
-#         A Structure object containing the mode trajectory.
-#     """
-#     mp = mbe_automation.storage.to_dynasor_mode_projector(
-#         dataset=dataset,
-#         key=key
-#     )
-#     try:
-#         q_point = mp(k_point)
-#         selected_mode = q_point.bands[band_index]
-#     except ValueError:
-#         raise ValueError(f"k-point {k_point} not found on the commensurate grid.")
-#     except IndexError:
-#         n_bands = len(q_point.bands)
-#         raise IndexError(
-#             f"Band index {band_index} is out of bounds. "
-#             f"There are {n_bands} bands at this k-point (indices 0 to {n_bands-1})."
-#         )
-#     supercell = mp.supercell.to_ase()
-#     n_atoms_supercell = len(supercell)
-#     atomic_numbers = supercell.get_atomic_numbers()
-#     masses = supercell.get_masses()
-#     cell = supercell.get_cell()
-
-#     positions_array = np.zeros((n_frames, n_atoms_supercell, 3))
-#     amplitudes = np.linspace(-max_amplitude, max_amplitude, n_frames)
-
-#     for i, amp in enumerate(amplitudes):
-#         selected_mode.Q.amplitude = amp
-#         displaced_atoms = mp.get_atoms()
-#         positions_array[i] = displaced_atoms.get_positions()
-
-#     trajectory = mbe_automation.storage.Structure(
-#         positions=positions_array,
-#         atomic_numbers=atomic_numbers,
-#         masses=masses,
-#         cell_vectors=cell,
-#         periodic=True,
-#         n_atoms=n_atoms_supercell,
-#         n_frames=n_frames
-#     )
-#     return trajectory
+    ph = mbe_automation.storage.to_phonopy(
+        dataset=dataset,
+        key=key
+    )
+    ph.init_mesh(
+        mesh=k_point_mesh,
+        shift=None,
+        is_time_reversal=True,
+        is_mesh_symmetry=False,
+        with_eigenvectors=True,
+        with_group_velocities=False,
+        is_gamma_center=True,
+        use_iter_mesh=True
+    )
+    ph.run_thermal_displacement_matrices(
+        temperatures=temperatures_K,
+        freq_min=freq_min_THz,
+        freq_max=freq_max_THz
+    ) 
+    return ph.thermal_displacement_matrices.thermal_displacement_matrices
 
 
 

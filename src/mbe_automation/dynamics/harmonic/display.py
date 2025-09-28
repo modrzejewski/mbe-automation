@@ -8,33 +8,20 @@ import os.path
 from typing import Literal
 import phonopy.physical_units
 import nglview
-import nglview.contrib.movie
 
 import mbe_automation.storage
 import mbe_automation.dynamics.harmonic.modes
 
-def animate_mode(
-    dataset: str,
-    key: str,
-    save_path: str | None = None,
-    k_point: npt.NDArray[np.floating] = np.array([0, 0, 0]),
-    band_index: int = 0,
-    max_amplitude: float = 1.0,
-    n_frames: int = 100,
-    framerate: int = 20,
-) -> nglview.NGLWidget | None:
+def animate(
+        mode: mbe_automation.dynamics.harmonic.modes.Mode,
+        framerate: int = 20,
+) -> nglview.NGLWidget:
     """
     Generate an animation or interactive view of a vibrational mode.
-
-    If `save_path` is provided, save an animation file. Otherwise, return
-    an interactive nglview widget. This function must be run in a Jupyter
-    environment. Saving a file requires `ffmpeg` to be installed.
 
     Args:
         dataset: Path to the dataset file.
         key: Key to the harmonic force constants model.
-        save_path: If not None, path to save the output animation file
-                   (e.g., "animation.gif" or "animation.mp4").
         k_point: Reduced coordinates of the k-point.
         band_index: Index of the vibrational mode.
         max_amplitude: Controls the maximum displacement of the mode.
@@ -42,38 +29,60 @@ def animate_mode(
         framerate: Frames per second for the output animation.
 
     Returns:
-        An nglview widget if `save_path` is None, otherwise None.
+        An nglview widget.
     """
-
-    mode_trajectory = mbe_automation.dynamics.harmonic.modes.trajectory(
-        dataset=dataset,
-        key=key,
-        k_point=k_point,
-        band_index=band_index,
-        max_amplitude=max_amplitude,
-        n_frames=n_frames,
-        wrap=False,
-    )
-    trajectory_ase = mbe_automation.storage.views.ASETrajectory(mode_trajectory)
+    
+    trajectory_ase = mbe_automation.storage.views.ASETrajectory(mode.trajectory)
     view = nglview.show_asetraj(trajectory_ase)
     view.parameters = dict(mode="rock", delay=1000 / framerate)
     view.clear_representations()
     view.add_ball_and_stick()
-    view.add_unitcell()
+    if mode.trajectory.periodic:
+        view.add_unitcell()
     view.center()
 
-    if save_path is not None:
-        movie = nglview.contrib.movie.MovieMaker(
-            view,
-            output=save_path,
-            in_memory=True,
-            framerate=framerate,
-        )
-        movie.make()
-        print(f"Animation saved to {save_path}")
-        return None
+    return view
+
+
+def potential_energy_curve(
+    mode: mbe_automation.dynamics.harmonic.modes.Mode,
+    sampling: Literal["cyclic", "linear"],
+    save_path: str | None = None,
+):
+    """
+    Plot potential energy as a function of the mode scan coordinate.
+    """
+    if mode.potential_energies is None:
+        raise ValueError("The Mode object does not contain a potential energy curve.")
+
+    scan_coordinates = mode.scan_coordinates
+    potential_energies = mode.potential_energies
+
+    energies_shifted = potential_energies - np.min(potential_energies)
+
+    fig, ax = plt.subplots()
+
+    ax.plot(scan_coordinates, energies_shifted, marker='o', linestyle='-')
+
+    if sampling == "cyclic":
+        ax.set_xlabel("Phase Angle (radians)")
     else:
-        return view
+        ax.set_xlabel("Displacement Amplitude (Å)")
+
+    ax.set_ylabel("Relative Potential Energy (eV)")
+    ax.set_title("Potential Energy along Mode Coordinate")
+    ax.grid(True, linestyle="--", alpha=0.6)
+
+    plt.tight_layout()
+
+    if save_path:
+        output_dir = os.path.dirname(save_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        plt.savefig(save_path, dpi=300)
+        plt.close(fig)
+    else:
+        return fig
 
     
 def band_structure(
@@ -81,10 +90,10 @@ def band_structure(
         key: str,
         save_path: str | None = None,
         freq_max_thz: float | None = None,
-        color_map: str = 'plasma',
+        color_map: str = "plasma",
         freq_units: Literal["THz", "cm-1"] = "THz"
 ):
-    fbz_path = mbe_automation.storage.read_fbz_path(dataset, key)
+    fbz_path = mbe_automation.storage.read_brillouin_zone_path(dataset, key)
     frequencies = fbz_path.frequencies
     distances = fbz_path.distances
     path_connections = fbz_path.path_connections
