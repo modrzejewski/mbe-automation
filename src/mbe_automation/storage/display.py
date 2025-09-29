@@ -19,7 +19,7 @@ def tree(dataset: str):
             info = f"shape={obj.shape}, dtype={obj.dtype}"
             print(f"{indent}{connector}{display_name} [{info}]")
         else:
-            print(f"{indent}{connector}{display_name}/")
+            print(f"{indent}{connector}{display_name}")
             
             child_indent = indent + ("    " if is_last else "│   ")
             

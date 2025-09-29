@@ -174,7 +174,7 @@ def _thermal_displacements(
     n_qpoints = len(qpoints)
     mean_sq_disp = np.zeros(
         (n_temperatures, n_atoms_primitive*3, n_atoms_primitive*3),
-        dtype=np.float64
+        dtype=np.complex128
     )
 
     for q in qpoints:
@@ -215,7 +215,7 @@ def _thermal_displacements(
             "Tjk,Tjl->Tkl",
             Ajk_ejk_primitive,
             Ajk_ejk_primitive.conj()
-        ).real
+        )
         mean_sq_disp += U_q
 
         if n_time_points > 0:
@@ -268,6 +268,8 @@ def _thermal_displacements(
     #
     # where N is the number of k-points.
     #
+    assert (abs(mean_sq_disp.imag) < 1.0E-10).all()
+    mean_sq_disp = mean_sq_disp.real
     mean_sq_disp /= n_qpoints
     if n_time_points > 0:
         instant_disp /= np.sqrt(n_qpoints)
@@ -297,7 +299,7 @@ def thermal_displacements(
         dataset: str,
         key: str,
         temperatures_K: npt.NDArray[np.floating],
-        k_point_mesh: npt.NDArray | Literal["commensurate"] | float = "commensurate",
+        k_point_mesh: npt.NDArray[np.integer] | Literal["gamma"] | float = 50.0,
         freq_min_THz: float = 0.0,
         freq_max_THz: float | None = None,
         time_points_fs: np.NDArray[np.floating] | None = None
@@ -319,8 +321,9 @@ def thermal_displacements(
         temperatures_K: An array of temperatures (in Kelvin) at which to
             calculate the thermal displacements.
         k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
-            - "commensurate": Use the commensurate q-points corresponding to
+            - "commensurate": Use the commensurate k-points corresponding to
               the supercell matrix.
+            - "gamma": Use only the [0, 0, 0] k-point.
             - A float or list/array of 3 integers: Defines a Monkhorst-Pack
               mesh for Brillouin zone integration.
         freq_min_THz: The minimum phonon frequency (in THz) to be included
@@ -354,32 +357,35 @@ def thermal_displacements(
         dataset=dataset,
         key=key
     )
-    if isinstance(k_point_mesh, str) and k_point_mesh == "commensurate":
-        qpoints = phonopy.harmonic.dynmat_to_fc.get_commensurate_points(
-            ph.supercell_matrix
+    if isinstance(k_point_mesh, float):
+        k_point_mesh = phonopy.structure.grid_points.length2mesh(
+            length=k_point_mesh,
+            lattice=ph.primitive.cell,
+            rotations=ph.primitive_symmetry.pointgroup_operations
         )
-    else:
-        ph.init_mesh(
-            mesh=k_point_mesh,
-            shift=None,
-            is_time_reversal=True,
-            is_mesh_symmetry=False,
-            with_eigenvectors=True,
-            with_group_velocities=False,
-            is_gamma_center=True,
-            use_iter_mesh=True
-        )
-        qpoints = ph.mesh.qpoints
+    if isinstance(k_point_mesh, str) and k_point_mesh == "gamma":
+        k_point_mesh = np.array([1, 1, 1])
+
+    ph.init_mesh(
+        mesh=k_point_mesh,
+        shift=None,
+        is_time_reversal=True,
+        is_mesh_symmetry=False,
+        with_eigenvectors=True,
+        with_group_velocities=False,
+        is_gamma_center=False,
+        use_iter_mesh=True
+    )
+    qpoints = ph.mesh.qpoints
 
     mbe_automation.common.display.framed("Thermal displacements")
-    nx, ny, nz = ph.mesh.mesh_numbers
-    print(f"k_points_mesh       {nx}×{ny}×{nz}")
     print(f"freq_min            {freq_min_THz:.1f} THz")
     if freq_max_THz is not None:
         print(f"freq_max            {freq_max_THz:.1f} THz")
     else:
         print(f"freq_max            unlimited")
-        
+    nx, ny, nz = ph.mesh.mesh_numbers
+    print(f"k_points_mesh       {nx}×{ny}×{nz}")
     print("Diagonalization of dynamic matrix at each k point...")
     
     disp = _thermal_displacements(

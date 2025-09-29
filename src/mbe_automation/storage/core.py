@@ -177,7 +177,7 @@ def save_brillouin_zone_path(
 
     band_structure = phonons.band_structure    
     n_segments = len(band_structure.frequencies)
-    n_kpoints, n_bands = band_structure.frequencies[0].shape
+    _, n_bands = band_structure.frequencies[0].shape
     
     with h5py.File(dataset, "a") as f:
         if key in f:
@@ -185,7 +185,6 @@ def save_brillouin_zone_path(
             
         group = f.create_group(key)
         group.attrs["n_segments"] = n_segments
-        group.attrs["n_kpoints"] = n_kpoints
         group.attrs["n_bands"] = n_bands
 
         group.create_dataset(
