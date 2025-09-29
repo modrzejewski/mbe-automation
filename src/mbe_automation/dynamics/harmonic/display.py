@@ -8,9 +8,40 @@ import os.path
 from typing import Literal
 import phonopy.physical_units
 import nglview
+import pymatviz
 
 import mbe_automation.storage
 import mbe_automation.dynamics.harmonic.modes
+
+def animate_pymatviz(
+        mode: mbe_automation.dynamics.harmonic.modes.Mode,
+) -> pymatviz.TrajectoryWidget:
+    """
+    Generate an animation or interactive view of a vibrational mode.
+
+    Args:
+        mode: An instance of mbe_automation.dynamics.harmonic.modes.Mode
+        produced by mbe_automation.dynamics.harmonic.modes.trajectory
+
+    Returns:
+        A pymatviz widget.
+    """
+
+    trajectory = []
+    for i in range(mode.trajectory.n_frames):
+        trajectory.append(
+            mbe_automation.storage.to_pymatgen(
+                structure=mode.trajectory,
+                frame_index=i
+            )
+        )
+    view = pymatviz.TrajectoryWidget(
+        trajectory=trajectory,
+        bonding_strategy="nearest_neighbor",
+        bond_thickness=0.35,
+    )
+    return view
+
 
 def animate(
         mode: mbe_automation.dynamics.harmonic.modes.Mode,
@@ -89,7 +120,7 @@ def band_structure(
         dataset: str,
         key: str,
         save_path: str | None = None,
-        freq_max_thz: float | None = None,
+        freq_max_THz: float | None = None,
         color_map: str = "plasma",
         freq_units: Literal["THz", "cm-1"] = "THz"
 ):
@@ -99,13 +130,13 @@ def band_structure(
     path_connections = fbz_path.path_connections
     labels = fbz_path.labels
 
-    omega_max = freq_max_thz
+    nu_max = freq_max_THz
     n_bands = frequencies[0].shape[1]
 
-    if freq_max_thz is not None:
+    if freq_max_THz is not None:
         all_freqs_thz = np.concatenate(frequencies)
         max_freq_per_band = np.max(all_freqs_thz, axis=0)
-        n_bands_for_norm = np.sum(max_freq_per_band <= freq_max_thz)
+        n_bands_for_norm = np.sum(max_freq_per_band <= freq_max_THz)
         vmax_norm = max(n_bands_for_norm - 1, 0)
     else:
         vmax_norm = n_bands - 1
@@ -121,8 +152,8 @@ def band_structure(
         unit_label = "cm⁻¹"
 
     frequencies = [f * scaling_factor for f in frequencies]
-    if omega_max is not None:
-        omega_max *= scaling_factor
+    if nu_max is not None:
+        nu_max *= scaling_factor
 
     breaks = np.where(~np.array(path_connections))[0]
     break_indices = [-1] + list(breaks)
@@ -168,13 +199,13 @@ def band_structure(
     all_freqs = np.concatenate(frequencies)
     min_freq = np.min(all_freqs)
     
-    if omega_max is None:
+    if nu_max is None:
         max_freq = np.max(all_freqs)
-        omega_max = max_freq + 0.05 * (max_freq - min_freq)
+        nu_max = max_freq + 0.05 * (max_freq - min_freq)
 
-    padding = 0.05 * (omega_max - min_freq)
-    omega_min = min_freq - padding
-    axes[0].set_ylim(omega_min, omega_max)
+    padding = 0.05 * (nu_max - min_freq)
+    nu_min = min_freq - padding
+    axes[0].set_ylim(nu_min, nu_max)
         
     fig.supylabel(f"Frequency ({unit_label})", fontsize=12)
     fig.subplots_adjust(

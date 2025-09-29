@@ -223,7 +223,7 @@ def crystal(
         dataset=dataset,
         key=f"quasi_harmonic/phonons/brillouin_zone_path/{system_label}",
         save_path=os.path.join(work_dir, "phonons", "brillouin_zone_path", f"{system_label}.png"),
-        freq_max_thz=10.0 # THz
+        freq_max_THz=10.0 # THz
     )
     mbe_automation.storage.save_structure(
         dataset=dataset,

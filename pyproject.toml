@@ -27,4 +27,5 @@ dependencies = [
   "doped",
   "dynasor",
   "nglview",
+  "pymatviz"
 ]
