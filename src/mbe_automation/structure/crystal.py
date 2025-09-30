@@ -30,6 +30,13 @@ def from_file(path):
     return mbe_automation.common.io.read(path)
 
 
+def to_file(
+        path: str,
+        system: Atoms
+):
+    mbe_automation.common.io.write(path, system)
+    
+
 def display(unit_cell: Atoms, system_label: str | None=None) -> None:
     """
     Display parameters of the unit cell.

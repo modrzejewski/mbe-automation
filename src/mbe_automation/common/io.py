@@ -1,8 +1,8 @@
 import pymatgen
 import ase.io
-from ase import Atoms
+import ase
 
-def read(file_path: str) -> Atoms:
+def read(file_path: str) -> ase.Atoms:
     if file_path.lower().endswith(".cif"):
         structure = pymatgen.core.Structure.from_file(file_path)
         system = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
@@ -15,3 +15,11 @@ def read(file_path: str) -> Atoms:
     })
     
     return system
+
+
+def write(
+        file_path: str,
+        system: ase.Atoms
+):    
+    ase.io.write(file_path, system)
+    

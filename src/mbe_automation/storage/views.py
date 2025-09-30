@@ -128,15 +128,15 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
             
     
 @overload
-def to_ase_atoms(
+def to_ase(
         structure: mbe_automation.storage.core.Structure,
         frame_index: int = 0
 ) -> ase.Atoms: ...
 
 @overload
-def to_ase_atoms(*, dataset: str, key: str, frame_index: int = 0) -> ase.Atoms: ...
+def to_ase(*, dataset: str, key: str, frame_index: int = 0) -> ase.Atoms: ...
 
-def to_ase_atoms(
+def to_ase(
     structure: mbe_automation.storage.core.Structure | None = None,
     *,
     dataset: str | None = None,
@@ -287,8 +287,8 @@ def to_dynasor_mode_projector(
         dataset=dataset,
         key=key
     )
-    primitive = to_ase_atoms(fc.primitive)
-    supercell = to_ase_atoms(fc.supercell)
+    primitive = to_ase(fc.primitive)
+    supercell = to_ase(fc.supercell)
     mp = dynasor.ModeProjector(
         primitive=primitive,
         supercell=supercell,

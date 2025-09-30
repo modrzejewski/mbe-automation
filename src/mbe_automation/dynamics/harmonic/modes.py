@@ -24,8 +24,13 @@ class ThermalDisplacements:
        multi-temperature anisotropic displacement parameters. I. Theory
        Acta Cryst. A 56, 403 (2000); doi: 10.1107/S0108767300005626
     
+    2. R. W. Grosse-Kunstleve and P. D. Adams, On the handling of atomic
+       anisotropic displacement parameters, J. Appl. Cryst. 35, 477 (2002);
+       doi: 10.1107/S0021889802008580
+    
     """
     mean_square_displacements_matrix_diagonal: npt.NDArray[np.float64] # eq 5 in ref 1
+    mean_square_displacements_matrix_diagonal_cif: npt.NDArray[np.float64] # eq 4a in ref 2
     mean_square_displacements_matrix_full: npt.NDArray[np.float64] # eq 6 in ref 1
     instantaneous_displacements: npt.NDArray[np.float64] | None # eq 2 in ref 1
     
@@ -92,6 +97,30 @@ def _absolute_amplitude_eq_2(
     inv_SqrtM = 1.0 / np.repeat(np.sqrt(masses_AMU), 3)
     Ajk_Angs = np.outer(SqrtEjq_Omega, inv_SqrtM)
     return Ajk_Angs # rank (n_freqs, n_atoms_primitive * 3)
+
+def _to_cif(
+        U_cart: npt.NDArray[np.floating],
+        lattice_vectors=npt.NDArray[np.floating] # lattice vectors stored in columns
+):
+    """
+    Convert the mean square displacement matrix U(k) to the CIF format.
+    Based on the implementation in phonopy. Different conventions of U(k)
+    are explained in ref 1.
+
+    1. R. W. Grosse-Kunstleve and P. D. Adams, On the handling of atomic
+       anisotropic displacement parameters, J. Appl. Cryst. 35, 477 (2002);
+       doi: 10.1107/S0021889802008580
+    """
+    n_temperatures, n_atoms, _, _ = U_cart.shape
+    U_cif = np.zeros((n_temperatures, n_atoms, 3, 3))
+    N = np.diag([np.linalg.norm(vrec) for vrec in np.linalg.inv(lattice_vectors)])
+    ANinv = np.linalg.inv(lattice_vectors @ N)
+    
+    for temp_idx in range(n_temperatures):
+        for atom_idx in range(n_atoms):            
+            U_cif[temp_idx, atom_idx] = ANinv @ U_cart[temp_idx, atom_idx] @ ANinv.T # eq 4a in ref 1
+            
+    return U_cif
 
 def _thermal_displacements(
         dynamical_matrix: phonopy.DynamicalMatrix,
@@ -302,6 +331,10 @@ def _thermal_displacements(
     
     return ThermalDisplacements(
         mean_square_displacements_matrix_diagonal=mean_sq_disp_diagonal,
+        mean_square_displacements_matrix_diagonal_cif=_to_cif(
+            U_cart=mean_sq_disp_diagonal,
+            lattice_vectors=dynamical_matrix.primitive.cell.T
+        ),
         mean_square_displacements_matrix_full=mean_sq_disp_full,
         instantaneous_displacements=instant_disp
     )
@@ -488,7 +521,7 @@ def trajectory(
     if calculator is not None:
         potential_energies = []
         for i in range(traj.n_frames):
-            single_frame = mbe_automation.storage.to_ase_atoms(
+            single_frame = mbe_automation.storage.to_ase(
                 structure=traj,
                 frame_index=i
             )
@@ -622,148 +655,6 @@ def _filter_closest_molecules(
     return np.sort(filtered_atom_indices)
 
 
-# def trajectory_v1(
-#         dataset: str,
-#         key: str,
-#         k_point: npt.NDArray[np.floating] = np.array([0, 0, 0]),
-#         band_index: int = 0,
-#         max_amplitude: float = 1.0,
-#         n_frames: int = 10,
-#         use_supercell: bool = False,
-#         extract_molecular_cluster: int | None = None,
-#         sampling: Literal["cyclic", "linear"] = "cyclic",
-#         calculator: ASECalculator | None = None
-# ) -> Mode:
-#     """
-#     Generate a trajectory for a single vibrational mode and optionally
-#     calculate its potential energy curve.
-
-#     Args:
-#         dataset: Path to the dataset file.
-#         key: Key to the harmonic force constants model.
-#         k_point: Reduced coordinates of the k-point.
-#         band_index: Index of the vibrational mode.
-#         max_amplitude: Controls the maximum displacement of the mode.
-#         n_frames: Number of frames for the trajectory.
-#         use_supercell: If True, generate trajectory for the supercell.
-#         Otherwise, use the primitive cell.
-#         extract_molecular_cluster: If not None, keep only the `m` molecules closest
-#         to the center of mass.
-#         sampling: "cyclic" for animation, "linear" for PES scan.
-#         calculator: If not None, calculate the potential energy curve.
-
-#     Returns:
-#         A Mode object containing the mode trajectory and, optionally,
-#         the potential energy at each frame of the trajectory.
-#     """
-
-#     ph = mbe_automation.storage.to_phonopy(
-#         dataset=dataset,
-#         key=key
-#     )
-#     n_bands = 3 * len(ph.primitive)
-#     if not (0 <= band_index < n_bands):
-#         raise IndexError(
-#             f"band_index must be on the interval [0, {n_bands - 1}]."
-#         )
-
-#     dm = ph.dynamical_matrix
-#     dm.run(k_point)
-#     eigenvalues, eigenvectors = np.linalg.eigh(dm.dynamical_matrix)
-#     eigvec = eigenvectors[:, band_index]
-
-#     if use_supercell:
-#         base_cell = ph.supercell
-#         displacements = _get_modulated_displacements(ph, eigvec, k_point)
-#     else:
-#         base_cell = ph.primitive
-#         masses = base_cell.masses
-#         n_atoms_primitive = len(base_cell)
-#         displacements = (eigvec / np.sqrt(np.repeat(masses, 3))).reshape(-1, 3)
-#         displacements /= np.sqrt(n_atoms_primitive)
-
-#     n_atoms = len(base_cell)
-#     base_positions = base_cell.positions
-#     scan_coordinates = np.zeros(n_frames)
-#     potential_energies = []
-#     #
-#     # Perform scan in the direction of the selected normal coordinate.
-#     # This generates the trajectory and optionally the energy points.
-#     #
-#     positions_array = np.zeros((n_frames, n_atoms, 3))
-#     for i in range(n_frames):
-#         if sampling == "cyclic":
-#             phase = 2 * np.pi * i / n_frames
-#             frame_displacement = (displacements * np.exp(1j * phase)).imag * max_amplitude
-#             scan_coordinates[i] = phase
-#         elif sampling == "linear":
-#             amplitude = np.linspace(-max_amplitude, max_amplitude, n_frames)[i]
-#             frame_displacement = displacements.real * amplitude
-#             scan_coordinates[i] = amplitude
-#         else:
-#             raise ValueError(f"Unknown sampling type: {sampling}")
-
-#         current_positions = base_positions + frame_displacement
-#         positions_array[i] = current_positions
-
-#     traj = mbe_automation.storage.Structure(
-#         positions=positions_array,
-#         atomic_numbers=base_cell.numbers,
-#         masses=base_cell.masses,
-#         cell_vectors=base_cell.cell,
-#         n_atoms=n_atoms,
-#         n_frames=n_frames,
-#     )
-#     #
-#     # Filter out everything except for a cluster of n molecules
-#     # near the center of mass. This converts the structure to
-#     # finite (non-periodic) system.
-#     #
-#     if extract_molecular_cluster is not None:
-#         n_molecules = extract_molecular_cluster
-#         molecules = _get_molecules(base_cell)
-#         indices_to_keep = _filter_closest_molecules(base_cell, molecules, n_molecules)
-        
-#         if len(indices_to_keep) == 0:
-#             raise ValueError(
-#                 "Molecule filtering resulted in zero atoms."
-#             )
-        
-#         traj = mbe_automation.storage.Structure(
-#             positions=traj.positions[:, indices_to_keep, :],
-#             atomic_numbers=traj.atomic_numbers[indices_to_keep],
-#             masses=traj.masses[indices_to_keep],
-#             #
-#             # The system is no longer considered as periodic
-#             # after we extract a cluster of molecules
-#             #
-#             cell_vectors=None, 
-#             n_atoms=len(indices_to_keep),
-#             n_frames=traj.n_frames,
-#         )
-
-#     if calculator is not None:
-#         potential_energies = []
-#         for i in range(traj.n_frames):
-#             single_frame = mbe_automation.storage.to_ase_atoms(
-#                 structure=traj,
-#                 frame_index=i
-#             )
-#             single_frame.calc = calculator
-#             potential_energies.append(single_frame.get_potential_energy())
-            
-#         potential_energies = np.array(potential_energies)
-        
-#     else:
-#         potential_energies = None
-
-#     return Mode(
-#         trajectory=traj,
-#         scan_coordinates=scan_coordinates,
-#         potential_energies=potential_energies
-#     )
-
-
 def mean_square_displacement_matrix(
         dataset: str,
         key: str,
@@ -810,7 +701,10 @@ def mean_square_displacement_matrix(
         freq_min=freq_min_THz,
         freq_max=freq_max_THz
     ) 
-    return ph.thermal_displacement_matrices.thermal_displacement_matrices
+    return (
+        ph.thermal_displacement_matrices.thermal_displacement_matrices,
+        ph.thermal_displacement_matrices.thermal_displacement_matrices_cif
+    )
 
 
 
