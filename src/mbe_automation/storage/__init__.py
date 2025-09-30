@@ -46,6 +46,7 @@ from mbe_automation.storage.views import ASETrajectory
 from mbe_automation.storage.views import to_ase_atoms
 from mbe_automation.storage.views import to_dynasor_mode_projector
 from mbe_automation.storage.views import to_phonopy
+from mbe_automation.storage.views import to_pymatgen
 
 # --- Define the public API of the package ---
 __all__ = [
@@ -78,6 +79,7 @@ __all__ = [
     "to_ase_atoms",
     "to_dynasor_mode_projector",
     "to_phonopy",
+    "to_pymatgen",
 ]
 
 

@@ -6,6 +6,7 @@ import ase
 import ase.io.trajectory
 import dynasor
 import phonopy
+import pymatgen
 from phonopy.structure.atoms import PhonopyAtoms
 
 import mbe_automation.storage.core
@@ -195,6 +196,86 @@ def to_ase_atoms(
         pbc=structure.periodic,
         masses=masses
     )
+
+
+@overload
+def to_pymatgen(
+    structure: mbe_automation.storage.core.Structure,
+    frame_index: int = 0
+) -> Union[pymatgen.core.Structure, pymatgen.core.Molecule]: ...
+
+@overload
+def to_pymatgen(
+    *, 
+    dataset: str, 
+    key: str, 
+    frame_index: int = 0
+) -> Union[pymatgen.core.Structure, pymatgen.core.Molecule]: ...
+
+def to_pymatgen(
+    structure: mbe_automation.storage.core.Structure | None = None,
+    *,
+    dataset: str | None = None,
+    key: str | None = None,
+    frame_index: int = 0
+) -> Union[pymatgen.core.Structure, pymatgen.core.Molecule]:
+    """Converts a single frame to a Pymatgen object.
+
+    - Returns a `pymatgen.core.Structure` for periodic systems.
+    - Returns a `pymatgen.core.Molecule` for non-periodic systems.
+
+    Can be called in two ways:
+    1.  By providing a Structure object directly.
+    2.  By providing a dataset path and a key to read the structure.
+    """
+    if structure is not None and (dataset is not None or key is not None):
+        raise ValueError("Provide either a 'structure' object or 'dataset'/'key', not both.")
+
+    if (dataset is not None and key is None) or (dataset is None and key is not None):
+         raise ValueError("Both 'dataset' and 'key' must be provided together.")
+
+    if structure is None:
+        structure = mbe_automation.storage.core.read_structure(
+            dataset=dataset,
+            key=key
+        )
+
+    if not 0 <= frame_index < structure.n_frames:
+        raise IndexError(
+            f"frame_index {frame_index} is out of bounds for a structure with "
+            f"{structure.n_frames} frames."
+        )
+
+    if structure.positions.ndim == 3:
+        positions = structure.positions[frame_index]
+    else:
+        positions = structure.positions
+
+    if structure.atomic_numbers.ndim == 2:
+        atomic_numbers = structure.atomic_numbers[frame_index]
+    else:
+        atomic_numbers = structure.atomic_numbers
+
+    if structure.periodic:
+        if structure.cell_vectors is None:
+            raise ValueError("Periodic structure must have cell_vectors.")
+            
+        if structure.cell_vectors.ndim == 3:
+            cell = structure.cell_vectors[frame_index]
+        else:
+            cell = structure.cell_vectors
+
+        return pymatgen.core.Structure(
+            lattice=cell,
+            species=atomic_numbers,
+            coords=positions,
+            coords_are_cartesian=True
+        )
+    else:
+        return pymatgen.core.Molecule(
+            species=atomic_numbers,
+            coords=positions
+        )
 
 
 def to_dynasor_mode_projector(
