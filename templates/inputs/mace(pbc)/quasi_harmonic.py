@@ -5,7 +5,7 @@ import torch
 
 import mbe_automation.configs
 import mbe_automation.workflows
-from mbe_automation.structure import molecule, crystal
+from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
@@ -19,8 +19,8 @@ mace_calc = mace.calculators.MACECalculator(
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.from_template(
     model_name = "MACE",
-    crystal = crystal.from_file(os.path.join(work_dir, xyz_solid)),
-    molecule = molecule.from_file(os.path.join(work_dir, xyz_molecule)),
+    crystal = from_xyz_file(os.path.join(work_dir, xyz_solid)),
+    molecule = from_xyz_file(os.path.join(work_dir, xyz_molecule)),
     temperatures_K = np.array([5.0, 200.0, 300.0]),
     calculator = mace_calc,
     supercell_radius = 25.0,

@@ -2,12 +2,11 @@ from dataclasses import dataclass
 import ase.spacegroup.symmetrize
 import ase.spacegroup.utils
 import os.path
+import ase
 from ase import Atoms
 import ase.build
 import ase.units
-import pymatgen.io.phonopy
-import pymatgen.core.structure
-import pymatgen.core.lattice
+import pymatgen
 from typing import Literal
 import warnings
 import numpy as np
@@ -26,18 +25,7 @@ except ImportError:
     doped_available = False
 
     
-def from_file(path):
-    return mbe_automation.common.io.read(path)
-
-
-def to_file(
-        path: str,
-        system: Atoms
-):
-    mbe_automation.common.io.write(path, system)
-    
-
-def display(unit_cell: Atoms, system_label: str | None=None) -> None:
+def display(unit_cell: ase.Atoms, system_label: str | None=None) -> None:
     """
     Display parameters of the unit cell.
     """
@@ -65,8 +53,31 @@ def display(unit_cell: Atoms, system_label: str | None=None) -> None:
     print(f"Space group: [{spgdata.international}][{spgdata.number}]")
 
 
+def to_symmetrized_primitive(
+        unit_cell: ase.Atoms,
+        symprec: float = 1.0E-5
+):
+    """
+    Convert unit cell to pymatgen's standard primitive cell.
+    Involves symmetry refinement with spglib. Search for
+    symmetry elements is controlled by symprec. The default
+    value of this threshold is extremely tight---equal to the
+    default threshold in phonopy. Apply cell refinement with
+    a loose threshold first if your structure comes immediately
+    from geometry optimization.
+    """
+    
+    pmg_unit_cell = pymatgen.io.AseAtomsAdaptor.get_structure(unit_cell)
+    spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(
+        structure=pmg_unit_cell,
+        symprec=symprec
+    )
+    pmg_primitive = spg_analyzer.get_primitive_standard_structure()
+    return pymatgen.io.AseAtomsAdaptor.get_atoms(pmg_primitive)
+    
+    
 def check_symmetry(
-        unit_cell: Atoms,
+        unit_cell: ase.Atoms,
         symmetry_thresh = 1.0E-5 # tight symmetry tolerance used in Phonopy
 ):
     """
@@ -82,7 +93,7 @@ def check_symmetry(
     return spgdata.number, spgdata.international
     
     
-def symmetrize(unit_cell: Atoms, symmetrization_thresh: float = 1.0E-2) -> tuple[Atoms, int]:
+def symmetrize(unit_cell: ase.Atoms, symmetrization_thresh: float = 1.0E-2) -> tuple[Atoms, int]:
     """
     Use spglib to remove the geometry optimization artifacts 
     and refine the unit cell to the closest space group.

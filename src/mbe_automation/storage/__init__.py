@@ -48,6 +48,9 @@ from mbe_automation.storage.views import to_dynasor_mode_projector
 from mbe_automation.storage.views import to_phonopy
 from mbe_automation.storage.views import to_pymatgen
 
+from mbe_automation.storage.xyz_formats import from_xyz_file
+from mbe_automation.storage.xyz_formats import to_xyz_file
+
 # --- Define the public API of the package ---
 __all__ = [
     # Core classes
@@ -80,6 +83,8 @@ __all__ = [
     "to_dynasor_mode_projector",
     "to_phonopy",
     "to_pymatgen",
+    "to_xyz_file",
+    "from_xyz_file"
 ]
 
 

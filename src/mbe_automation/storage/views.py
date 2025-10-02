@@ -9,7 +9,7 @@ import phonopy
 import pymatgen
 from phonopy.structure.atoms import PhonopyAtoms
 
-import mbe_automation.storage.core
+from . import core
 
 class SlicedTrajectory:
     """
@@ -41,14 +41,14 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
     objects for each frame on-demand.
     """
     @overload
-    def __init__(self, structure: mbe_automation.storage.core.Structure): ...
+    def __init__(self, structure: core.Structure): ...
 
     @overload
     def __init__(self, *, dataset: str, key: str): ...
 
     def __init__(
         self,
-        structure: mbe_automation.storage.core.Structure | None = None,
+        structure: core.Structure | None = None,
         *,
         dataset: str | None = None,
         key: str | None = None
@@ -129,7 +129,7 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
     
 @overload
 def to_ase(
-        structure: mbe_automation.storage.core.Structure,
+        structure: core.Structure,
         frame_index: int = 0
 ) -> ase.Atoms: ...
 
@@ -137,7 +137,7 @@ def to_ase(
 def to_ase(*, dataset: str, key: str, frame_index: int = 0) -> ase.Atoms: ...
 
 def to_ase(
-    structure: mbe_automation.storage.core.Structure | None = None,
+    structure: core.Structure | None = None,
     *,
     dataset: str | None = None,
     key: str | None = None,
@@ -156,7 +156,7 @@ def to_ase(
          raise ValueError("Both 'dataset' and 'key' must be provided together.")
 
     if structure is None:
-        structure = mbe_automation.storage.core.read_structure(
+        structure = core.read_structure(
             dataset,
             key
         )
@@ -200,7 +200,7 @@ def to_ase(
 
 @overload
 def to_pymatgen(
-    structure: mbe_automation.storage.core.Structure,
+    structure: core.Structure,
     frame_index: int = 0
 ) -> Union[pymatgen.core.Structure, pymatgen.core.Molecule]: ...
 
@@ -213,7 +213,7 @@ def to_pymatgen(
 ) -> Union[pymatgen.core.Structure, pymatgen.core.Molecule]: ...
 
 def to_pymatgen(
-    structure: mbe_automation.storage.core.Structure | None = None,
+    structure: core.Structure | None = None,
     *,
     dataset: str | None = None,
     key: str | None = None,
@@ -235,7 +235,7 @@ def to_pymatgen(
          raise ValueError("Both 'dataset' and 'key' must be provided together.")
 
     if structure is None:
-        structure = mbe_automation.storage.core.read_structure(
+        structure = core.read_structure(
             dataset=dataset,
             key=key
         )
@@ -283,7 +283,7 @@ def to_dynasor_mode_projector(
         key: str
 ):
     
-    fc = mbe_automation.storage.core.read_force_constants(
+    fc = core.read_force_constants(
         dataset=dataset,
         key=key
     )
@@ -299,14 +299,14 @@ def to_dynasor_mode_projector(
 
 @overload
 def to_phonopy(
-    force_constants: mbe_automation.storage.core.ForceConstants
+    force_constants: core.ForceConstants
 ) -> phonopy.Phonopy: ...
 
 @overload
 def to_phonopy(*, dataset: str, key: str) -> phonopy.Phonopy: ...
 
 def to_phonopy(
-    force_constants: mbe_automation.storage.core.ForceConstants | None = None,
+    force_constants: core.ForceConstants | None = None,
     *,
     dataset: str | None = None,
     key: str | None = None,
@@ -329,7 +329,7 @@ def to_phonopy(
     if force_constants is not None:
         fc_data = force_constants
     elif dataset is not None and key is not None:
-        fc_data = mbe_automation.storage.core.read_force_constants(dataset, key)
+        fc_data = core.read_force_constants(dataset, key)
     else:
         raise ValueError("Either 'force_constants' or both 'dataset' and 'key' must be provided.")
 
