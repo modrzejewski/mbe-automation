@@ -67,13 +67,13 @@ def to_symmetrized_primitive(
     from geometry optimization.
     """
     
-    pmg_unit_cell = pymatgen.io.AseAtomsAdaptor.get_structure(unit_cell)
+    pmg_unit_cell = pymatgen.io.ase.AseAtomsAdaptor.get_structure(unit_cell)
     spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(
         structure=pmg_unit_cell,
         symprec=symprec
     )
     pmg_primitive = spg_analyzer.get_primitive_standard_structure()
-    return pymatgen.io.AseAtomsAdaptor.get_atoms(pmg_primitive)
+    return pymatgen.io.ase.AseAtomsAdaptor.get_atoms(pmg_primitive)
     
     
 def check_symmetry(
