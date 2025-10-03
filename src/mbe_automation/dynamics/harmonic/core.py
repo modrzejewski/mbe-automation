@@ -6,6 +6,7 @@ import time
 import numpy as np
 import numpy.typing as npt
 import torch
+import ase
 import ase.thermochemistry
 import ase.vibrations
 import ase.units
@@ -28,6 +29,22 @@ import mbe_automation.dynamics.harmonic.data
 import mbe_automation.dynamics.harmonic.display
 
 
+def _assert_primitive_consistency(
+        ph: phonopy.Phonopy,
+        unit_cell: ase.Atoms
+):
+    """
+    Assert that the primitive cell used to compute phonons
+    is exactly equal to the input cell without any
+    permutations of atoms.
+    """
+    assert (
+        (unit_cell.numbers == ph.primitive.numbers).all() and
+        np.max(np.abs(unit_cell.positions - ph.primitive.positions)) < 1.0E-8 and
+        np.max(np.abs(unit_cell.get_masses() - ph.primitive.masses)) < 1.0E-8
+    ), "Phonopy primitive cell differs from the input cell."
+    
+    
 def _assert_supercell_consistency(
     phonopy_instance: phonopy.Phonopy,
     unit_cell: Atoms,
@@ -90,7 +107,6 @@ def phonons(
         supercell_matrix,
         supercell_displacement,
         interp_mesh=150.0,
-        automatic_primitive_cell=True,
         symmetrize_force_constants=False,
         force_constants_cutoff_radius=None,
         system_label=None
@@ -108,7 +124,7 @@ def phonons(
         mbe_automation.common.display.framed("Phonons")
         
     phonopy_struct = PhonopyAtoms(
-        symbols=unit_cell.symbols,
+        numbers=unit_cell.numbers,
         cell=unit_cell.cell.array,
         masses=unit_cell.get_masses(),
         scaled_positions=unit_cell.get_scaled_positions()
@@ -138,7 +154,11 @@ def phonons(
         # where supercell_matrix is nondiagonal.
         #
         supercell_matrix=supercell_matrix.T, 
-        primitive_matrix=("auto" if automatic_primitive_cell else None)
+        primitive_matrix=None
+    )
+    _assert_primitive_consistency(
+        ph=phonons,
+        unit_cell=unit_cell
     )
     _assert_supercell_consistency(
         phonopy_instance=phonons,
@@ -218,7 +238,6 @@ def equilibrium_curve(
         relax_algo_primary,
         relax_algo_fallback,
         supercell_displacement,
-        automatic_primitive_cell,
         work_dir,
         pressure_range,
         volume_range,
@@ -313,7 +332,6 @@ def equilibrium_curve(
             supercell_matrix,
             supercell_displacement,
             interp_mesh=interp_mesh,
-            automatic_primitive_cell=automatic_primitive_cell,
             symmetrize_force_constants=symmetrize_force_constants,
             force_constants_cutoff_radius=force_constants_cutoff_radius,
             system_label=label

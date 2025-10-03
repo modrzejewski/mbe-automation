@@ -172,12 +172,6 @@ class FreeEnergy:
                                    #
     supercell_displacement: float = 0.01
                                    #
-                                   # Enable automatic primitive cell determination
-                                   # in Phonopy. If disabled, Phonopy assumes that
-                                   # the input unit cell is the primitive cell.
-                                   #
-    automatic_primitive_cell: bool = False
-                                   #
                                    # Restore translational and permutational symmetry
                                    # of force constants produced from finite differences
                                    #
