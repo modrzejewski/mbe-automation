@@ -1,15 +1,11 @@
 import math
 import numpy as np
-import numpy.typing as npt
 import ase.geometry
 import ase.io
 import ase.build
 import ase.spacegroup.symmetrize
 import ase.spacegroup.utils
 from ase import Atoms, neighborlist
-from ase.neighborlist import natural_cutoffs, build_neighbor_list
-from scipy.sparse import lil_matrix
-from scipy.sparse.csgraph import connected_components
 from scipy import sparse
 import scipy
 
@@ -164,81 +160,3 @@ def GetSupercellDimensions(UnitCell, SupercellRadius):
         N[i] = 2 * (math.ceil(SupercellRadius / h)+Delta) + 1
         
     return N[0], N[1], N[2]
-
-
-def _detect_molecules(
-        atoms: ase.Atoms,
-) -> list[npt.NDArray[np.int64]]:
-    """
-    Return a list of arrays of indices, where the indices
-    grouped together in the same array correspond to atoms
-    in the same molecule.
-    """
-
-    n_atoms = len(atoms)    
-    cutoffs = natural_cutoffs(atoms)
-    neighbor_list = build_neighbor_list(atoms, cutoffs=cutoffs)
-    
-    # Build adjacency matrix using only bonds with zero offset (internal to cell)
-    adj_matrix = lil_matrix((n_atoms, n_atoms), dtype=int)
-    for i in range(n_atoms):
-        neighbors, offsets = neighbor_list.get_neighbors(i)
-        for j, offset in zip(neighbors, offsets):
-            if np.all(offset == 0):
-                adj_matrix[i, j] = 1
-    
-    # Find connected components based on internal bonds only
-    n_molecules, labels = connected_components(adj_matrix.tocsr())
-    
-    molecules = []
-    for i in range(n_molecules):
-        molecules.append(np.where(labels == i)[0])
-        
-    return molecules
-
-
-def select_single_cluster(
-        atoms: ase.Atoms,
-        n_molecules_to_keep: int
-) -> npt.NDArray[np.int64]:
-    """
-    Select atomic indices corresponding to single
-    molecular cluster of size equal to n_molecules_to_keep.
-    
-    """
-    grouped_indices = _detect_molecules(atoms)
-    # First, compute the COM and mass for each individual molecule
-    molecular_coms = []
-    molecular_masses = []
-    for mol_indices in grouped_indices:
-        molecule = ase.Atoms(
-            numbers=atoms.numbers[mol_indices],
-            positions=atoms.positions[mol_indices],
-            masses=atoms.get_masses()[mol_indices]
-        )
-        molecular_coms.append(molecule.get_center_of_mass())
-        molecular_masses.append(np.sum(molecule.get_masses()))
-        
-    molecular_coms = np.array(molecular_coms)
-    molecular_masses = np.array(molecular_masses)
-
-    # Second, compute the overall COM of all whole molecules
-    total_mass = np.sum(molecular_masses)
-    overall_com = np.sum(molecular_coms * molecular_masses[:, np.newaxis], axis=0) / total_mass
-    
-    # Third, compute distance of each molecule's COM to the overall COM
-    com_distances = []
-    for com in molecular_coms:
-        dist = np.linalg.norm(com - overall_com)
-        com_distances.append(dist)
-
-    # Sort molecules by distance and get indices of the N closest
-    sorted_mol_indices = np.argsort(com_distances)
-    closest_mol_indices = sorted_mol_indices[:n_molecules_to_keep]
-
-    # Flatten the list of atom indices for the selected molecules
-    filtered_atom_indices = np.concatenate(
-        [grouped_indices[i] for i in closest_mol_indices]
-    )
-    
-    return np.sort(filtered_atom_indices)
