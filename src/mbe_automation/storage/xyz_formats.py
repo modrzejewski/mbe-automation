@@ -37,12 +37,12 @@ def _cif_with_adps(
     blocks["_chemical_formula_sum"] = no_oxi_comp.formula
     if symprec is not None:
         spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(struct, symprec)
-        blocks["_symmetry_space_group_name_H-M"] = spg_analyzer.get_space_group_symbol()
         blocks["_space_group_crystal_system"] = spg_analyzer.get_crystal_system()
+        blocks["_space_group_name_H-M_alt"] = spg_analyzer.get_space_group_symbol()
         blocks["_space_group_IT_number"] = spg_analyzer.get_space_group_number()
         blocks["_space_group_name_Hall"] = spg_analyzer.get_hall()
     else:
-        blocks["_symmetry_space_group_name_H-M"] = "P 1"
+        blocks["_space_group_name_H-M_alt"] = "P 1"
         blocks["_space_group_IT_number"] = 1
         
     for cell_attr in ("a", "b", "c"):

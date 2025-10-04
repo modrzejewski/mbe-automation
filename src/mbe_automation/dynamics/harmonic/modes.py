@@ -6,13 +6,11 @@ import numpy.typing as npt
 import ase
 import math
 import phonopy
-from ase.neighborlist import natural_cutoffs, build_neighbor_list
-from scipy.sparse import lil_matrix
-from scipy.sparse.csgraph import connected_components
 from ase.calculators.calculator import Calculator as ASECalculator
 
 import mbe_automation.common
 import mbe_automation.storage
+import mbe_automation.structure
 
 @dataclass
 class ThermalDisplacements:
@@ -488,7 +486,8 @@ def trajectory(
         key=key
     )
     equilibrium_cell = ph.supercell
-    positions = equilibrium_cell.positions[np.newaxis, :, :] + disp.instantaneous_displacements[0]
+    positions = (equilibrium_cell.positions[np.newaxis, :, :]
+                 + disp.instantaneous_displacements[0])
     traj = mbe_automation.storage.Structure(
         positions=positions,
         atomic_numbers=equilibrium_cell.numbers,
@@ -499,12 +498,13 @@ def trajectory(
     )
     if extract_molecular_cluster is not None:
         #
-        # Extract a molecular cluster from each frame
-        # of the periodic cell trajectory
+        # Extract the central molecular cluster
+        # composed of n molecules, where n=extract_molecular_cluster
         #
-        n_molecules = extract_molecular_cluster
-        molecules = _get_molecules(equilibrium_cell)
-        indices_to_keep = _filter_closest_molecules(equilibrium_cell, molecules, n_molecules)
+        indices_to_keep = mbe_automation.structure.clusters.select_single_cluster(
+            atoms=mbe_automation.storage.to_ase(equilibrium_cell),
+            n_molecules_to_keep=extract_molecular_cluster
+        )
         if len(indices_to_keep) == 0:
             raise ValueError(
                 "Molecule filtering resulted in zero atoms."
@@ -515,6 +515,11 @@ def trajectory(
             masses=traj.masses[indices_to_keep],
             cell_vectors=None, 
             n_atoms=len(indices_to_keep),
+            #
+            # Note: the connectivity does not change
+            # between frames of harmonic vibrations,
+            # so we reuse indices_to_keep for all frames
+            #
             n_frames=traj.n_frames,
         )
 
@@ -573,88 +578,6 @@ def _get_modulated_displacements(
     return u
 
 
-def _get_molecules(
-    cell: phonopy.structure.atoms.PhonopyAtoms
-) -> list[npt.NDArray[np.int64]]:
-    """
-    Return a list of arrays of indices of whole molecules inside a cell.
-    """
-    atoms = ase.Atoms(
-        symbols=cell.symbols,
-        positions=cell.positions,
-        cell=cell.cell,
-        pbc=True
-    )
-    n_atoms = len(atoms)
-    
-    cutoffs = natural_cutoffs(atoms)
-    neighbor_list = build_neighbor_list(atoms, cutoffs=cutoffs)
-    
-    # Build adjacency matrix using only bonds with zero offset (internal to cell)
-    adj_matrix = lil_matrix((n_atoms, n_atoms), dtype=int)
-    for i in range(n_atoms):
-        neighbors, offsets = neighbor_list.get_neighbors(i)
-        for j, offset in zip(neighbors, offsets):
-            if np.all(offset == 0):
-                adj_matrix[i, j] = 1
-    
-    # Find connected components based on internal bonds only
-    n_molecules, labels = connected_components(adj_matrix.tocsr())
-    
-    molecules = []
-    for i in range(n_molecules):
-        molecules.append(np.where(labels == i)[0])
-        
-    return molecules
-
-
-def _filter_closest_molecules(
-    cell: phonopy.structure.atoms.PhonopyAtoms,
-    molecules: list[npt.NDArray[np.int64]],
-    n_molecules_to_keep: int
-) -> npt.NDArray[np.int64]:
-    """
-    Filter out all atoms except those in N molecules closest to the cell center.
-    """
-    positions = cell.positions
-
-    # First, compute the COM and mass for each individual molecule
-    molecular_coms = []
-    molecular_masses = []
-    for mol_indices in molecules:
-        molecule = ase.Atoms(
-            symbols=np.array(cell.symbols)[mol_indices],
-            positions=positions[mol_indices],
-            masses=cell.masses[mol_indices]
-        )
-        molecular_coms.append(molecule.get_center_of_mass())
-        molecular_masses.append(np.sum(molecule.get_masses()))
-        
-    molecular_coms = np.array(molecular_coms)
-    molecular_masses = np.array(molecular_masses)
-
-    # Second, compute the overall COM of all whole molecules
-    total_mass = np.sum(molecular_masses)
-    overall_com = np.sum(molecular_coms * molecular_masses[:, np.newaxis], axis=0) / total_mass
-    
-    # Third, compute distance of each molecule's COM to the overall COM
-    com_distances = []
-    for com in molecular_coms:
-        dist = np.linalg.norm(com - overall_com)
-        com_distances.append(dist)
-
-    # Sort molecules by distance and get indices of the N closest
-    sorted_mol_indices = np.argsort(com_distances)
-    closest_mol_indices = sorted_mol_indices[:n_molecules_to_keep]
-
-    # Flatten the list of atom indices for the selected molecules
-    filtered_atom_indices = np.concatenate(
-        [molecules[i] for i in closest_mol_indices]
-    )
-    
-    return np.sort(filtered_atom_indices)
-
-
 def mean_square_displacement_matrix(
         dataset: str,
         key: str,
@@ -705,8 +628,4 @@ def mean_square_displacement_matrix(
         ph.thermal_displacement_matrices.thermal_displacement_matrices,
         ph.thermal_displacement_matrices.thermal_displacement_matrices_cif
     )
-
-
-
-
 

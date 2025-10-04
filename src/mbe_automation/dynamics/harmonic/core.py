@@ -89,13 +89,11 @@ def molecular_vibrations(
     return vib
 
 
-def forces_in_displaced_supercell(supercell, calculator):
-    s_ase = Atoms(
-        symbols=supercell.symbols,
-        scaled_positions=supercell.scaled_positions,
-        cell=supercell.cell,
-        pbc=True
-    )
+def forces_in_displaced_supercell(
+        supercell,
+        calculator
+):
+    s_ase = mbe_automation.storage.to_ase(supercell)
     s_ase.calc = calculator
     forces = s_ase.get_forces()
     return forces

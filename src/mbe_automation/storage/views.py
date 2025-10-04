@@ -1,6 +1,7 @@
 from __future__ import annotations
 import io
 from typing import overload
+from functools import singledispatch
 import h5py
 import ase
 import ase.io.trajectory
@@ -125,42 +126,19 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
         """Close the dataset file if it was opened."""
         if self._is_file_based and self.storage:
             self.storage.close()
+
             
-    
-@overload
-def to_ase(
-        structure: core.Structure,
-        frame_index: int = 0
-) -> ase.Atoms: ...
+@singledispatch
+def to_ase_converter(structure: object, frame_index: int = 0) -> ase.Atoms:
+    """Generic converter function. The base implementation raises an error for unsupported types."""
+    raise TypeError(f"to_ase does not support conversion for type {type(structure).__name__}")
 
-@overload
-def to_ase(*, dataset: str, key: str, frame_index: int = 0) -> ase.Atoms: ...
-
-def to_ase(
-    structure: core.Structure | None = None,
-    *,
-    dataset: str | None = None,
-    key: str | None = None,
-    frame_index: int = 0
-) -> ase.Atoms:
-    """Convert a single frame from a Structure to an ASE Atoms object.
-
-    Can be called in two ways:
-    1.  By providing a Structure object directly.
-    2.  By providing a dataset path and a key to read the structure.
+@to_ase_converter.register
+def _(structure: core.Structure, frame_index: int = 0) -> ase.Atoms:
     """
-    if structure is not None and (dataset is not None or key is not None):
-        raise ValueError("Provide either a 'structure' object or 'dataset'/'key', not both.")
-
-    if (dataset is not None and key is None) or (dataset is None and key is not None):
-         raise ValueError("Both 'dataset' and 'key' must be provided together.")
-
-    if structure is None:
-        structure = core.read_structure(
-            dataset,
-            key
-        )
-
+    Converter implementation for mbe_automation.storage.Structure.
+    """
+    
     if not 0 <= frame_index < structure.n_frames:
         raise IndexError(
             f"frame_index {frame_index} is out of bounds for a structure with "
@@ -197,6 +175,57 @@ def to_ase(
         masses=masses
     )
 
+@to_ase_converter.register
+def _(structure: PhonopyAtoms, frame_index: int = 0) -> ase.Atoms:
+    """
+    Converter implementation for phonopy.structure.atoms.PhonopyAtoms.
+    The frame_index argument is ignored but is kept for a consistent signature.
+    """
+
+    return ase.Atoms(
+        numbers=structure.numbers,
+        scaled_positions=structure.scaled_positions,
+        cell=structure.cell,
+        pbc=True,  # PhonopyAtoms are always periodic
+        masses=structure.masses
+    )
+
+# The public-facing function `to_ase` handles all input variations and then dispatches.
+@overload
+def to_ase(structure: core.Structure, frame_index: int = 0) -> ase.Atoms: ...
+
+@overload
+def to_ase(*, dataset: str, key: str, frame_index: int = 0) -> ase.Atoms: ...
+
+@overload
+def to_ase(structure: PhonopyAtoms, frame_index: int = 0) -> ase.Atoms: ...
+
+def to_ase(
+    structure: core.Structure | PhonopyAtoms | None = None,
+    *,
+    dataset: str | None = None,
+    key: str | None = None,
+    frame_index: int = 0
+) -> ase.Atoms:
+    """
+    Convert a supported structure object or a file-based structure to an ASE Atoms object.
+
+    This function can be called in multiple ways:
+    1.  By providing a `mbe_automation.storage.Structure` object.
+    2.  By providing a `phonopy.structure.atoms.PhonopyAtoms` object.
+    3.  By providing a `dataset` path and a `key` to read a structure from a file.
+    """
+
+    if structure is not None and (dataset is not None or key is not None):
+        raise ValueError("Provide either a 'structure' object or both 'dataset' and 'key', not both.")
+
+    if structure is None:
+        if dataset and key:
+            structure = core.read_structure(dataset, key)
+        else:
+            raise ValueError("Provide either a structure object or both 'dataset' and 'key'.")
+
+    return to_ase_converter(structure, frame_index=frame_index)
 
 @overload
 def to_pymatgen(
