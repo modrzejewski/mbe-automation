@@ -63,7 +63,7 @@ def animate(
         An nglview widget.
     """
     
-    trajectory_ase = mbe_automation.storage.views.ASETrajectory(mode.trajectory)
+    trajectory_ase = mbe_automation.storage.ASETrajectory(mode.trajectory)
     view = nglview.show_asetraj(trajectory_ase)
     view.parameters = dict(mode="rock", delay=1000 / framerate)
     view.clear_representations()

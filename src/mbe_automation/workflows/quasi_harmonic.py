@@ -130,7 +130,6 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         supercell_matrix,
         config.supercell_displacement,
         interp_mesh=config.fourier_interpolation_mesh,
-        automatic_primitive_cell=config.automatic_primitive_cell,
         symmetrize_force_constants=config.symmetrize_force_constants,
         force_constants_cutoff_radius=force_constants_cutoff_radius,
         system_label=label_crystal
@@ -193,7 +192,6 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             config.relax_algo_primary,
             config.relax_algo_fallback,
             config.supercell_displacement,
-            config.automatic_primitive_cell,
             config.work_dir,
             config.pressure_range,
             config.volume_range,
@@ -270,7 +268,6 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             supercell_matrix,
             config.supercell_displacement,
             interp_mesh=interp_mesh,
-            automatic_primitive_cell=config.automatic_primitive_cell,
             symmetrize_force_constants=config.symmetrize_force_constants,
             force_constants_cutoff_radius=force_constants_cutoff_radius,
             system_label=label_crystal

@@ -5,7 +5,7 @@ import torch
 
 import mbe_automation.configs
 import mbe_automation.workflows
-from mbe_automation.structure import molecule, crystal
+from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
@@ -18,8 +18,8 @@ mace_calc = mace.calculators.MACECalculator(
 )
 
 md_config = mbe_automation.configs.md.Enthalpy(
-    molecule = molecule.from_file(os.path.join(work_dir, xyz_molecule)),
-    crystal = crystal.from_file(os.path.join(work_dir, xyz_solid)),
+    molecule = from_xyz_file(os.path.join(work_dir, xyz_molecule)),
+    crystal = from_xyz_file(os.path.join(work_dir, xyz_solid)),
     calculator = mace_calc,
     temperature_K = 298.15,
     pressure_GPa = 1.0E-4,
