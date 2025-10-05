@@ -4,16 +4,12 @@ from typing import List
 import math
 from collections import deque
 import numpy as np
-import numpy.typing as npt
 import ase.geometry
 import ase.io
 import ase.build
 import ase.spacegroup.symmetrize
 import ase.spacegroup.utils
 from ase import Atoms, neighborlist
-from ase.neighborlist import natural_cutoffs, build_neighbor_list
-from scipy.sparse import lil_matrix
-from scipy.sparse.csgraph import connected_components
 from scipy import sparse
 import scipy
 

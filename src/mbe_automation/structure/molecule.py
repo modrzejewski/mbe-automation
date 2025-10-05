@@ -4,6 +4,11 @@ import pyscf
 import pyscf.hessian.thermo
 from typing import Tuple, Optional
 
+import mbe_automation.common
+
+def from_file(path):
+    return mbe_automation.common.io.read(path)
+
 
 def to_pyscf(atoms: ase.Atoms, charge: int = 0, spin: int = 0) -> pyscf.gto.Mole:
     """
