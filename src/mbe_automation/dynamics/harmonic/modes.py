@@ -501,26 +501,16 @@ def trajectory(
         # Extract the central molecular cluster
         # composed of n molecules, where n=extract_molecular_cluster
         #
-        indices_to_keep = mbe_automation.structure.clusters.select_single_cluster(
-            atoms=mbe_automation.storage.to_ase(equilibrium_cell),
-            n_molecules_to_keep=extract_molecular_cluster
+        # The connectivity does not change so the molecules
+        # are identified only for frame 0.
+        #
+        clustering = mbe_automation.structure.clusters.extract_all_molecules(
+            system=traj,
+            frame_index=0
         )
-        if len(indices_to_keep) == 0:
-            raise ValueError(
-                "Molecule filtering resulted in zero atoms."
-            )
-        traj = mbe_automation.storage.Structure(
-            positions=traj.positions[:, indices_to_keep, :],
-            atomic_numbers=traj.atomic_numbers[indices_to_keep],
-            masses=traj.masses[indices_to_keep],
-            cell_vectors=None, 
-            n_atoms=len(indices_to_keep),
-            #
-            # Note: the connectivity does not change
-            # between frames of harmonic vibrations,
-            # so we reuse indices_to_keep for all frames
-            #
-            n_frames=traj.n_frames,
+        traj = mbe_automation.structure.clusters.filter_central_molecular_cluster(
+            clustering=clustering,
+            n_molecules=extract_molecular_cluster
         )
 
     if calculator is not None:

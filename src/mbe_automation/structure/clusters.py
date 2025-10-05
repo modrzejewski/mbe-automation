@@ -1,4 +1,8 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import List
 import math
+from collections import deque
 import numpy as np
 import numpy.typing as npt
 import ase.geometry
@@ -13,6 +17,16 @@ from scipy.sparse.csgraph import connected_components
 from scipy import sparse
 import scipy
 
+import mbe_automation.storage
+
+@dataclass
+class Clustering:
+    total_system: mbe_automation.storage.Structure
+    index_map: List[npt.NDArray[np.integer]]
+    centers_of_mass: npt.NDArray[np.floating]
+    n_clusters: int
+
+    
 def Label(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
     prefixes = {1:"monomer", 2:"dimer", 3:"trimer", 4:"tetramer"}
@@ -166,79 +180,148 @@ def GetSupercellDimensions(UnitCell, SupercellRadius):
     return N[0], N[1], N[2]
 
 
-def _detect_molecules(
-        atoms: ase.Atoms,
-) -> list[npt.NDArray[np.int64]]:
+def extract_all_molecules(
+        system: mbe_automation.storage.Structure,
+        frame_index: int = 0
+) -> Clustering:
     """
-    Return a list of arrays of indices, where the indices
-    grouped together in the same array correspond to atoms
-    in the same molecule.
+    Identify all molecules in a periodic system or a molecular cluster.
+    
+    (1) For a periodic system, shift the periodic images by the lattice
+    vectors in sucha a way that the atoms are contiguous in space if they
+    belong to the same molecule.
+
+    (2) For the molecules from step (1), shift the molecular centers of mass
+    to the inside of the original unit cell.
+
+    Args:
+        atoms: An ase.Atoms object.
+
+    Returns:
+        A tuple containing:
+        - A list of numpy arrays, where each array contains the indices
+          of the atoms belonging to one molecule.
+        - A new (n_atoms, 3) numpy array with atomic positions satisfying
+          conditions (1) and (2).
     """
+    if not system.periodic:
+        raise ValueError("extract_all_molecules is not designed for non-periodic systems")
 
-    n_atoms = len(atoms)    
-    cutoffs = natural_cutoffs(atoms)
-    neighbor_list = build_neighbor_list(atoms, cutoffs=cutoffs)
-    
-    # Build adjacency matrix using only bonds with zero offset (internal to cell)
-    adj_matrix = lil_matrix((n_atoms, n_atoms), dtype=int)
-    for i in range(n_atoms):
-        neighbors, offsets = neighbor_list.get_neighbors(i)
-        for j, offset in zip(neighbors, offsets):
-            if np.all(offset == 0):
-                adj_matrix[i, j] = 1
-    
-    # Find connected components based on internal bonds only
-    n_molecules, labels = connected_components(adj_matrix.tocsr())
-    
-    molecules = []
-    for i in range(n_molecules):
-        molecules.append(np.where(labels == i)[0])
-        
-    return molecules
-
-
-def select_single_cluster(
-        atoms: ase.Atoms,
-        n_molecules_to_keep: int
-) -> npt.NDArray[np.int64]:
-    """
-    Select atomic indices corresponding to single
-    molecular cluster of size equal to n_molecules_to_keep.
-    
-    """
-    grouped_indices = _detect_molecules(atoms)
-    # First, compute the COM and mass for each individual molecule
-    molecular_coms = []
-    molecular_masses = []
-    for mol_indices in grouped_indices:
-        molecule = ase.Atoms(
-            numbers=atoms.numbers[mol_indices],
-            positions=atoms.positions[mol_indices],
-            masses=atoms.get_masses()[mol_indices]
-        )
-        molecular_coms.append(molecule.get_center_of_mass())
-        molecular_masses.append(np.sum(molecule.get_masses()))
-        
-    molecular_coms = np.array(molecular_coms)
-    molecular_masses = np.array(molecular_masses)
-
-    # Second, compute the overall COM of all whole molecules
-    total_mass = np.sum(molecular_masses)
-    overall_com = np.sum(molecular_coms * molecular_masses[:, np.newaxis], axis=0) / total_mass
-    
-    # Third, compute distance of each molecule's COM to the overall COM
-    com_distances = []
-    for com in molecular_coms:
-        dist = np.linalg.norm(com - overall_com)
-        com_distances.append(dist)
-
-    # Sort molecules by distance and get indices of the N closest
-    sorted_mol_indices = np.argsort(com_distances)
-    closest_mol_indices = sorted_mol_indices[:n_molecules_to_keep]
-
-    # Flatten the list of atom indices for the selected molecules
-    filtered_atom_indices = np.concatenate(
-        [grouped_indices[i] for i in closest_mol_indices]
+    atoms = mbe_automation.storage.to_ase(
+        structure=system,
+        frame_index=frame_index
     )
+    neighbor_list = build_neighbor_list(atoms, cutoffs=natural_cutoffs(atoms), bothways=True)
+    adj_matrix = neighbor_list.get_connectivity_matrix()
+    n_molecules, molecule_labels = connected_components(adj_matrix)
+    grouped_indices = [np.where(molecule_labels == i)[0] for i in range(n_molecules)]    
+    contiguous_positions = atoms.positions.copy()
+    processed_indices = set()
     
-    return np.sort(filtered_atom_indices)
+    cell = atoms.get_cell()
+    inv_cell = np.linalg.inv(cell)
+    masses = atoms.get_masses()
+    com_vectors = np.zeros((n_molecules, 3))
+
+    for molecule_idx, indices in enumerate(grouped_indices):
+        if len(indices) == 0 or indices[0] in processed_indices:
+            continue
+        #
+        # Translate periodic images to make the atomic positions
+        # within the molecule contiguous in space
+        #
+        q = deque()
+        start_idx = indices[0]
+        q.append(start_idx)
+        processed_indices.add(start_idx)
+
+        # We need to keep track of visited atoms within this molecule's traversal
+        # because the global `processed_indices` is only for starting new traversals.
+        visited_in_molecule = {start_idx}
+
+        while q:
+            current_idx = q.popleft()
+            neighbors, offsets = neighbor_list.get_neighbors(current_idx)
+
+            for neighbor_idx, offset in zip(neighbors, offsets):
+                if neighbor_idx not in visited_in_molecule:
+                    
+                    visited_in_molecule.add(neighbor_idx)
+                    processed_indices.add(neighbor_idx)
+                    
+                    offset_vec = offset @ cell
+                    bond_vector = (atoms.positions[neighbor_idx] + offset_vec) - atoms.positions[current_idx]
+                    contiguous_positions[neighbor_idx] = contiguous_positions[current_idx] + bond_vector
+                    q.append(neighbor_idx)
+
+        mol_masses = masses[indices]
+        total_mol_mass = np.sum(mol_masses)
+        com_vectors[molecule_idx] = np.sum(contiguous_positions[indices] * mol_masses[:, np.newaxis], axis=0) / total_mol_mass
+
+    #
+    # Translate molecular centers of mass to the interior of the original
+    # unit cell
+    #
+    shifted_com_vectors = ase.geometry.wrap_positions(
+        positions=com_vectors,
+        cell=atoms.cell,
+        pbc=atoms.pbc
+    )
+    delta_r = shifted_com_vectors - com_vectors
+    for molecule_idx, indices in enumerate(grouped_indices):
+        contiguous_positions[indices] += delta_r[molecule_idx][np.newaxis, :]
+    #
+    # Set the center of mass of the total system to (0, 0, 0)
+    #
+    total_system_com = np.sum(contiguous_positions * masses[:, np.newaxis], axis=0) / np.sum(masses)
+    contiguous_positions -= total_system_com[np.newaxis, :]
+    shifted_com_vectors -= total_system_com[np.newaxis, :]
+
+    clustering = Clustering(
+        total_system=system.copy(),
+        index_map=grouped_indices,
+        centers_of_mass=shifted_com_vectors,
+        n_clusters=n_molecules
+    )
+    if system.n_frames == 1:
+        clustering.total_system.positions = contiguous_positions
+    else:
+        delta_r = contiguous_positions - clustering.total_system.positions[frame_index]
+        clustering.total_system.positions += delta_r[np.newaxis, :, :]
+
+    return clustering
+
+
+def filter_central_molecular_cluster(
+        clustering: Clustering,
+        n_molecules: int
+) -> mbe_automation.storage.Structure:
+    """
+    Filter out a finite molecular cluster from a periodic structure.
+    The molecules belonging to the cluster are chosen according
+    to their distance from the origin of the coordinate system.
+
+    For a structure with n_frames > 1, it is assumed that
+    (1) the covalent bonds do not change between frames,
+    (2) there is no permutation of atoms between frames.
+    """
+
+    distances_from_origin = np.linalg.norm(clustering.centers_of_mass, axis=1)
+    filtered_molecule_indices = np.argsort(distances_from_origin, stable=True)[0:n_molecules]
+    filtered_atom_indices = np.concatenate(
+        [clustering.index_map[i] for i in filtered_molecule_indices]
+    )
+    filtered_system = mbe_automation.storage.Structure(
+        positions=(clustering.total_system.positions[:, filtered_atom_indices, :]
+                   if clustering.total_system.n_frames > 1
+                   else clustering.total_system.positions[filtered_atom_indices]
+                   ),
+        atomic_numbers=clustering.total_system.atomic_numbers[filtered_atom_indices],
+        masses=clustering.total_system.masses[filtered_atom_indices], 
+        cell_vectors=None,
+        n_frames=clustering.total_system.n_frames,
+        n_atoms=len(filtered_atom_indices),
+        periodic=False
+    )
+    return filtered_system
+    

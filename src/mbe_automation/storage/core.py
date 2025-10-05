@@ -38,6 +38,16 @@ class Structure:
     periodic: bool = False
     def __post_init__(self):
         self.periodic = (self.cell_vectors is not None)
+    def copy(self) -> Structure:
+        return Structure(
+            positions=self.positions.copy(),
+            atomic_numbers=self.atomic_numbers.copy(),
+            masses=self.masses.copy(),
+            cell_vectors=(self.cell_vectors.copy() if self.cell_vectors is not None else None),
+            n_frames=self.n_frames,
+            n_atoms=self.n_atoms,
+            periodic=self.periodic,
+        )
 
 @dataclass
 class ForceConstants:
