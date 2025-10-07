@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List
+from typing import List, Literal
 import math
 from collections import deque
 import numpy as np
@@ -347,7 +347,12 @@ def extract_all_molecules(
 
 def filter_central_molecular_cluster(
         clustering: mbe_automation.storage.Clustering,
-        criterion: Literal["number_of_molecules", "max_min_distance", "max_max_distance"],
+        criterion: Literal[
+            "closest_to_center_of_mass",
+            "closest_to_central_molecule",
+            "max_min_distance_to_central_molecule",
+            "max_max_distance_to_central_molecule"
+        ],
         n_molecules: int | None = None,
         distance: float | None = None
 ) -> mbe_automation.storage.Structure:
@@ -361,23 +366,30 @@ def filter_central_molecular_cluster(
     (2) there is no permutation of atoms between frames.
     """
 
-    if criterion == "number_of_molecules":
+    if criterion in ["closest_to_center_of_mass",
+                     "closest_to_central_molecule"]:
         if not (n_molecules is not None and distance is None):
-            raise ValueError("For 'number_of_molecules', n_molecules must be set and distance must be None.")
-    elif criterion in ["max_min_distance", "max_max_distance"]:
+            raise ValueError("n_molecules must be set and distance must be None.")
+    elif criterion in ["max_min_distance_to_central_molecule",
+                       "max_max_distance_to_central_molecule"]:
         if not (distance is not None and n_molecules is None):
-            raise ValueError("For 'max_distance', distance must be set and n_molecules must be None.")
+            raise ValueError("distance must be set and n_molecules must be None.")
 
-    if criterion == "number_of_molecules":
+    if criterion == "closest_to_center_of_mass":
         com_distances_from_origin = np.linalg.norm(clustering.centers_of_mass, axis=1)
         sorted_indices = np.argsort(com_distances_from_origin, stable=True)
         filtered_molecule_indices = sorted_indices[0:n_molecules]
-    else:
-        if criterion == "max_max_distance":
-            mask = clustering.max_distances_to_central_molecule < distance
-        elif criterion == "max_min_distance":
-            mask = clustering.min_distances_to_central_molecule < distance            
+    elif criterion == "closest_to_central_molecule":
+        sorted_indices = np.argsort(clustering.min_distances_to_central_molecule, stable=True)
+        filtered_molecule_indices = sorted_indices[0:n_molecules]
+    elif criterion == "max_max_distance_to_central_molecule":
+        mask = clustering.max_distances_to_central_molecule < distance
         filtered_molecule_indices = np.where(mask)[0]
+    elif criterion == "max_min_distance_to_central_molecule":
+        mask = clustering.min_distances_to_central_molecule < distance            
+        filtered_molecule_indices = np.where(mask)[0]
+    else:
+        raise ValueError(f"Invalid filtering criterion: {criterion}")
 
     filtered_atom_indices = np.concatenate(
         [clustering.index_map[i] for i in filtered_molecule_indices]
