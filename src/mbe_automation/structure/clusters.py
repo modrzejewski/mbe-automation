@@ -12,21 +12,12 @@ import ase.spacegroup.symmetrize
 import ase.spacegroup.utils
 from ase import Atoms, neighborlist
 from ase.neighborlist import natural_cutoffs, build_neighbor_list
-from scipy.sparse import lil_matrix
 from scipy.sparse.csgraph import connected_components
 from scipy import sparse
 import scipy
 
 import mbe_automation.storage
 
-@dataclass
-class Clustering:
-    total_system: mbe_automation.storage.Structure
-    index_map: List[npt.NDArray[np.integer]]
-    centers_of_mass: npt.NDArray[np.floating]
-    n_clusters: int
-
-    
 def Label(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
     prefixes = {1:"monomer", 2:"dimer", 3:"trimer", 4:"tetramer"}
@@ -180,29 +171,57 @@ def GetSupercellDimensions(UnitCell, SupercellRadius):
     return N[0], N[1], N[2]
 
 
+def _test_identical_composition(
+    system: mbe_automation.storage.Structure, 
+    index_map: List[npt.NDArray[np.integer]]
+) -> bool:
+    """
+    Tests if all molecules have the same elemental composition using np.bincount.
+
+    Args:
+        system: The structure object containing atomic numbers for all atoms.
+        index_map: A list where each element is a NumPy array of atom indices
+                   for a single identified molecule.
+
+    Returns:
+        True if all molecules have identical elemental composition, False otherwise.
+    """
+    if len(index_map) <= 1:
+        return True
+
+    all_atomic_numbers = system.atomic_numbers
+    reference_indices = index_map[0]
+    max_z = np.max(all_atomic_numbers)
+    reference_composition = np.bincount(all_atomic_numbers[reference_indices], minlength=max_z + 1)
+
+    for i in range(1, len(index_map)):
+        current_indices = index_map[i]
+        
+        if len(current_indices) != len(reference_indices):
+            return False
+
+        current_composition = np.bincount(all_atomic_numbers[current_indices], minlength=max_z + 1)
+        if not np.array_equal(reference_composition, current_composition):
+            return False
+
+    return True
+    
+
 def extract_all_molecules(
         system: mbe_automation.storage.Structure,
-        frame_index: int = 0
-) -> Clustering:
+        frame_index: int = 0,
+        assert_identical_composition=True,
+) -> mbe_automation.storage.Clustering:
     """
     Identify all molecules in a periodic system or a molecular cluster.
     
     (1) For a periodic system, shift the periodic images by the lattice
-    vectors in sucha a way that the atoms are contiguous in space if they
+    vectors in such a way that the atoms are contiguous in space if they
     belong to the same molecule.
 
     (2) For the molecules from step (1), shift the molecular centers of mass
     to the inside of the original unit cell.
 
-    Args:
-        atoms: An ase.Atoms object.
-
-    Returns:
-        A tuple containing:
-        - A list of numpy arrays, where each array contains the indices
-          of the atoms belonging to one molecule.
-        - A new (n_atoms, 3) numpy array with atomic positions satisfying
-          conditions (1) and (2).
     """
     if not system.periodic:
         raise ValueError("extract_all_molecules is not designed for non-periodic systems")
@@ -211,9 +230,15 @@ def extract_all_molecules(
         structure=system,
         frame_index=frame_index
     )
-    neighbor_list = build_neighbor_list(atoms, cutoffs=natural_cutoffs(atoms), bothways=True)
-    adj_matrix = neighbor_list.get_connectivity_matrix()
+    neighbor_list = build_neighbor_list(
+        atoms,
+        cutoffs=natural_cutoffs(atoms),
+        bothways=True
+    )
+    adj_matrix = neighbor_list.get_connectivity_matrix()    
     n_molecules, molecule_labels = connected_components(adj_matrix)
+    assert n_molecules > 0
+    
     grouped_indices = [np.where(molecule_labels == i)[0] for i in range(n_molecules)]    
     contiguous_positions = atoms.positions.copy()
     processed_indices = set()
@@ -277,11 +302,21 @@ def extract_all_molecules(
     contiguous_positions -= total_system_com[np.newaxis, :]
     shifted_com_vectors -= total_system_com[np.newaxis, :]
 
-    clustering = Clustering(
+    identical = _test_identical_composition(
+        system,
+        grouped_indices
+    )
+    if assert_identical_composition:
+        assert identical, "Found molecules which differ in composition"
+    if identical:
+        grouped_indices = np.array(grouped_indices)
+    
+    clustering = mbe_automation.storage.Clustering(
         total_system=system.copy(),
         index_map=grouped_indices,
         centers_of_mass=shifted_com_vectors,
-        n_clusters=n_molecules
+        identical_composition=identical,
+        n_molecules=n_molecules
     )
     if system.n_frames == 1:
         clustering.total_system.positions = contiguous_positions

@@ -118,6 +118,14 @@ class Trajectory(Structure):
             n_removed_rot_dof=n_removed_rot_dof
         )
 
+@dataclass
+class Clustering:
+    total_system: mbe_automation.storage.Structure
+    index_map: List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
+    centers_of_mass: npt.NDArray[np.floating]
+    identical_composition: bool
+    n_molecules: int
+    
 def save_data_frame(
         dataset: str,
         key: str,
@@ -616,3 +624,83 @@ def read_gamma_point_eigenvecs(
                     return frequencies, eigenvectors
 
         raise ValueError(f"Γ point not found in dataset '{dataset}' at key '{key}'.")
+
+
+def save_clustering(
+        dataset: str,
+        key: str,
+        clustering: Clustering
+):
+    """
+    Save a Clustering object to a dataset.
+
+    If molecules have different compositions, the index_map (a list of arrays)
+    is converted to a single 2D array padded with -1.
+    """
+    
+    with h5py.File(dataset, "a") as f:
+        if key in f:
+            del f[key]
+        
+        group = f.create_group(key)
+
+        group.attrs["n_molecules"] = clustering.n_molecules
+        group.attrs["identical_composition"] = clustering.identical_composition
+        group.create_dataset(
+            name="centers_of_mass (Å)",
+            data=clustering.centers_of_mass
+        )
+        index_map_to_save = clustering.index_map
+        if not clustering.identical_composition:
+            max_len = max(len(indices) for indices in clustering.index_map)
+            padded_array = np.full(
+                (clustering.n_molecules, max_len), 
+                fill_value=-1, 
+                dtype=clustering.index_map[0].dtype
+            )
+            for i, indices in enumerate(clustering.index_map):
+                padded_array[i, :len(indices)] = indices
+            index_map_to_save = padded_array
+
+        group.create_dataset(
+            name="index_map",
+            data=index_map_to_save
+        )
+        
+    save_structure(
+        dataset=dataset,
+        key=f"{key}/total_system",
+        positions=clustering.total_system.positions,
+        atomic_numbers=clustering.total_system.atomic_numbers,
+        masses=clustering.total_system.masses,
+        cell_vectors=clustering.total_system.cell_vectors
+    )
+
+
+def read_clustering(dataset: str, key: str) -> Clustering:
+    """
+    Read a Clustering object from a dataset.
+    
+    """
+    with h5py.File(dataset, "r") as f:
+        group = f[key]
+        
+        n_molecules = group.attrs["n_molecules"]
+        identical_composition = group.attrs["identical_composition"]
+        centers_of_mass = group["centers_of_mass (Å)"][...]
+        if identical_composition:
+            index_map = group["index_map"][...]
+        else:
+            padded_index_map = group["index_map"][...]
+            index_map = [row[row != -1] for row in padded_index_map]
+
+    total_system = read_structure(dataset, key=f"{key}/total_system")
+
+    return Clustering(
+        total_system=total_system,
+        index_map=index_map,
+        centers_of_mass=centers_of_mass,
+        identical_composition=identical_composition,
+        n_molecules=n_molecules
+    )
+
