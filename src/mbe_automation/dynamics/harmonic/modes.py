@@ -511,16 +511,17 @@ def trajectory(
         # The connectivity does not change so the molecules
         # are identified only for frame 0.
         #
-        clustering = mbe_automation.structure.clusters.extract_all_molecules(
+        clustering = mbe_automation.structure.clusters.detect_molecules(
             system=traj,
             frame_index=0
         )
-        traj = mbe_automation.structure.clusters.filter_central_molecular_cluster(
+        finite_subsystem = mbe_automation.structure.clusters.define_finite_subsystem(
             clustering=clustering,
             criterion=finite_cluster,
             distance=finite_cluster_distance,
             n_molecules=finite_cluster_n_molecules
         )
+        traj = finite_subsystem.structure
 
     if calculator is not None:
         potential_energies = []

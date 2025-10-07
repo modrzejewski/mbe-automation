@@ -207,7 +207,7 @@ def _test_identical_composition(
     return True
     
 
-def extract_all_molecules(
+def detect_molecules(
         system: mbe_automation.storage.Structure,
         frame_index: int = 0,
         assert_identical_composition=True,
@@ -334,7 +334,7 @@ def extract_all_molecules(
             max_distances[i] = np.max(pairwise_distances)
             
     return mbe_automation.storage.Clustering(
-        total_system=total_system,
+        supercell=total_system,
         index_map=grouped_indices,
         centers_of_mass=shifted_com_vectors,
         identical_composition=identical,
@@ -345,7 +345,7 @@ def extract_all_molecules(
     )
 
 
-def filter_central_molecular_cluster(
+def define_finite_subsystem(
         clustering: mbe_automation.storage.Clustering,
         criterion: Literal[
             "closest_to_center_of_mass",
@@ -355,7 +355,7 @@ def filter_central_molecular_cluster(
         ],
         n_molecules: int | None = None,
         distance: float | None = None
-) -> mbe_automation.storage.Structure:
+) -> mbe_automation.storage.FiniteSubsystem:
     """
     Filter out a finite molecular cluster from a periodic structure.
     The molecules belonging to the cluster are chosen according
@@ -394,17 +394,21 @@ def filter_central_molecular_cluster(
     filtered_atom_indices = np.concatenate(
         [clustering.index_map[i] for i in filtered_molecule_indices]
     )
-    filtered_system = mbe_automation.storage.Structure(
-        positions=(clustering.total_system.positions[:, filtered_atom_indices, :]
-                   if clustering.total_system.n_frames > 1
-                   else clustering.total_system.positions[filtered_atom_indices]
-                   ),
-        atomic_numbers=clustering.total_system.atomic_numbers[filtered_atom_indices],
-        masses=clustering.total_system.masses[filtered_atom_indices], 
-        cell_vectors=None,
-        n_frames=clustering.total_system.n_frames,
-        n_atoms=len(filtered_atom_indices),
-        periodic=False
+    return mbe_automation.storage.FiniteSubsystem(
+        structure=mbe_automation.storage.Structure(
+            positions=(clustering.supercell.positions[:, filtered_atom_indices, :]
+                       if clustering.supercell.n_frames > 1
+                       else clustering.supercell.positions[filtered_atom_indices]
+                       ),
+            atomic_numbers=clustering.supercell.atomic_numbers[filtered_atom_indices],
+            masses=clustering.supercell.masses[filtered_atom_indices], 
+            cell_vectors=None,
+            n_frames=clustering.supercell.n_frames,
+            n_atoms=len(filtered_atom_indices),
+            periodic=False
+        ),
+        molecule_indices=filtered_molecule_indices,
+        n_molecules=len(filtered_molecule_indices)
     )
-    return filtered_system
+
     
