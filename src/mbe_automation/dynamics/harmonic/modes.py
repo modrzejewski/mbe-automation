@@ -463,7 +463,7 @@ def trajectory(
         freq_max_THz: float = 10.0,
         time_step_fs: float = 100.0,
         n_frames: int = 20,
-        extract_molecular_cluster: int | None = None,
+        extract_molecular_cluster: int | float | None = None,
         sampling: Literal["cyclic", "linear"] = "cyclic",
         calculator: ASECalculator | None = None,
         cell_type: Literal["primitive", "supercell"] = "supercell"
@@ -508,10 +508,18 @@ def trajectory(
             system=traj,
             frame_index=0
         )
-        traj = mbe_automation.structure.clusters.filter_central_molecular_cluster(
-            clustering=clustering,
-            n_molecules=extract_molecular_cluster
-        )
+        if isinstance(extract_molecular_cluster, float):
+            traj = mbe_automation.structure.clusters.filter_central_molecular_cluster(
+                clustering=clustering,
+                criterion="max_min_distance",
+                distance=extract_molecular_cluster
+            )
+        elif isinstance(extract_molecular_cluster, int):
+            traj = mbe_automation.structure.clusters.filter_central_molecular_cluster(
+                clustering=clustering,
+                criterion="number_of_molecules",
+                n_molecules=extract_molecular_cluster
+            )
 
     if calculator is not None:
         potential_energies = []
