@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List
+from typing import List, Literal
 import math
 from collections import deque
 import numpy as np
@@ -213,7 +213,7 @@ def extract_all_molecules(
         assert_identical_composition=True,
 ) -> mbe_automation.storage.Clustering:
     """
-    Identify all molecules in a periodic system or a molecular cluster.
+    Identify all molecules in a periodic system.
     
     (1) For a periodic system, shift the periodic images by the lattice
     vectors in such a way that the atoms are contiguous in space if they
@@ -310,26 +310,51 @@ def extract_all_molecules(
         assert identical, "Found molecules which differ in composition"
     if identical:
         grouped_indices = np.array(grouped_indices)
-    
-    clustering = mbe_automation.storage.Clustering(
-        total_system=system.copy(),
+
+    total_system = system.copy()
+    if system.n_frames == 1:
+        total_system.positions = contiguous_positions
+    else:
+        delta_r = contiguous_positions - total_system.positions[frame_index]
+        total_system.positions += delta_r[np.newaxis, :, :]
+
+    com_distances_from_origin = np.linalg.norm(shifted_com_vectors, axis=1)
+    central_molecule_index = int(np.argmin(com_distances_from_origin))
+    ref_positions = contiguous_positions[grouped_indices[central_molecule_index]]
+    min_distances = np.zeros(n_molecules)
+    max_distances = np.zeros(n_molecules)
+    for i in range(n_molecules):
+        if i == central_molecule_index:
+            min_distances[i] = 0.0
+            max_distances[i] = 0.0
+        else:
+            neighbor_positions = contiguous_positions[grouped_indices[i]]
+            pairwise_distances = scipy.spatial.distance.cdist(ref_positions, neighbor_positions)
+            min_distances[i] = np.min(pairwise_distances) 
+            max_distances[i] = np.max(pairwise_distances)
+            
+    return mbe_automation.storage.Clustering(
+        total_system=total_system,
         index_map=grouped_indices,
         centers_of_mass=shifted_com_vectors,
         identical_composition=identical,
-        n_molecules=n_molecules
+        n_molecules=n_molecules,
+        central_molecule_index=central_molecule_index,
+        min_distances_to_central_molecule=min_distances,
+        max_distances_to_central_molecule=max_distances
     )
-    if system.n_frames == 1:
-        clustering.total_system.positions = contiguous_positions
-    else:
-        delta_r = contiguous_positions - clustering.total_system.positions[frame_index]
-        clustering.total_system.positions += delta_r[np.newaxis, :, :]
-
-    return clustering
 
 
 def filter_central_molecular_cluster(
-        clustering: Clustering,
-        n_molecules: int
+        clustering: mbe_automation.storage.Clustering,
+        criterion: Literal[
+            "closest_to_center_of_mass",
+            "closest_to_central_molecule",
+            "max_min_distance_to_central_molecule",
+            "max_max_distance_to_central_molecule"
+        ],
+        n_molecules: int | None = None,
+        distance: float | None = None
 ) -> mbe_automation.storage.Structure:
     """
     Filter out a finite molecular cluster from a periodic structure.
@@ -341,8 +366,31 @@ def filter_central_molecular_cluster(
     (2) there is no permutation of atoms between frames.
     """
 
-    distances_from_origin = np.linalg.norm(clustering.centers_of_mass, axis=1)
-    filtered_molecule_indices = np.argsort(distances_from_origin, stable=True)[0:n_molecules]
+    if criterion in ["closest_to_center_of_mass",
+                     "closest_to_central_molecule"]:
+        if not (n_molecules is not None and distance is None):
+            raise ValueError("n_molecules must be set and distance must be None.")
+    elif criterion in ["max_min_distance_to_central_molecule",
+                       "max_max_distance_to_central_molecule"]:
+        if not (distance is not None and n_molecules is None):
+            raise ValueError("distance must be set and n_molecules must be None.")
+
+    if criterion == "closest_to_center_of_mass":
+        com_distances_from_origin = np.linalg.norm(clustering.centers_of_mass, axis=1)
+        sorted_indices = np.argsort(com_distances_from_origin, stable=True)
+        filtered_molecule_indices = sorted_indices[0:n_molecules]
+    elif criterion == "closest_to_central_molecule":
+        sorted_indices = np.argsort(clustering.min_distances_to_central_molecule, stable=True)
+        filtered_molecule_indices = sorted_indices[0:n_molecules]
+    elif criterion == "max_max_distance_to_central_molecule":
+        mask = clustering.max_distances_to_central_molecule < distance
+        filtered_molecule_indices = np.where(mask)[0]
+    elif criterion == "max_min_distance_to_central_molecule":
+        mask = clustering.min_distances_to_central_molecule < distance            
+        filtered_molecule_indices = np.where(mask)[0]
+    else:
+        raise ValueError(f"Invalid filtering criterion: {criterion}")
+
     filtered_atom_indices = np.concatenate(
         [clustering.index_map[i] for i in filtered_molecule_indices]
     )

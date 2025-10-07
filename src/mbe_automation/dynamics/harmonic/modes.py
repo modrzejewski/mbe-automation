@@ -463,7 +463,14 @@ def trajectory(
         freq_max_THz: float = 10.0,
         time_step_fs: float = 100.0,
         n_frames: int = 20,
-        extract_molecular_cluster: int | None = None,
+        finite_cluster: Literal[
+            "closest_to_center_of_mass",
+            "closest_to_central_molecule",
+            "max_min_distance_to_central_molecule",
+            "max_max_distance_to_central_molecule"
+        ] | None = None,
+        finite_cluster_n_molecules: int | None = None,
+        finite_cluster_distance: float | None = None,
         sampling: Literal["cyclic", "linear"] = "cyclic",
         calculator: ASECalculator | None = None,
         cell_type: Literal["primitive", "supercell"] = "supercell"
@@ -496,7 +503,7 @@ def trajectory(
         n_atoms=len(equilibrium_cell),
         n_frames=n_frames,
     )
-    if extract_molecular_cluster is not None:
+    if finite_cluster is not None:
         #
         # Extract the central molecular cluster
         # composed of n molecules, where n=extract_molecular_cluster
@@ -510,7 +517,9 @@ def trajectory(
         )
         traj = mbe_automation.structure.clusters.filter_central_molecular_cluster(
             clustering=clustering,
-            n_molecules=extract_molecular_cluster
+            criterion=finite_cluster,
+            distance=finite_cluster_distance,
+            n_molecules=finite_cluster_n_molecules
         )
 
     if calculator is not None:

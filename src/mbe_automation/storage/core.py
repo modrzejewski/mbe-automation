@@ -125,6 +125,9 @@ class Clustering:
     centers_of_mass: npt.NDArray[np.floating]
     identical_composition: bool
     n_molecules: int
+    central_molecule_index: int
+    min_distances_to_central_molecule: npt.NDArray[np.floating]
+    max_distances_to_central_molecule: npt.NDArray[np.floating]
     
 def save_data_frame(
         dataset: str,
@@ -646,6 +649,7 @@ def save_clustering(
 
         group.attrs["n_molecules"] = clustering.n_molecules
         group.attrs["identical_composition"] = clustering.identical_composition
+        group.attrs["central_molecule_index"] = clustering.central_molecule_index
         group.create_dataset(
             name="centers_of_mass (Å)",
             data=clustering.centers_of_mass
@@ -665,6 +669,14 @@ def save_clustering(
         group.create_dataset(
             name="index_map",
             data=index_map_to_save
+        )
+        group.create_dataset(
+            name="min_distances_to_central_molecule (Å)",
+            data=clustering.min_distances_to_central_molecule
+        )
+        group.create_dataset(
+            name="max_distances_to_central_molecule (Å)",
+            data=clustering.max_distances_to_central_molecule
         )
         
     save_structure(
@@ -687,12 +699,15 @@ def read_clustering(dataset: str, key: str) -> Clustering:
         
         n_molecules = group.attrs["n_molecules"]
         identical_composition = group.attrs["identical_composition"]
+        central_molecule_index = group.attrs["central_molecule_index"]
         centers_of_mass = group["centers_of_mass (Å)"][...]
         if identical_composition:
             index_map = group["index_map"][...]
         else:
             padded_index_map = group["index_map"][...]
             index_map = [row[row != -1] for row in padded_index_map]
+        min_distances_to_central_molecule = group["min_distances_to_central_molecule (Å)"][...]
+        max_distances_to_central_molecule = group["max_distances_to_central_molecule (Å)"][...]
 
     total_system = read_structure(dataset, key=f"{key}/total_system")
 
@@ -701,6 +716,9 @@ def read_clustering(dataset: str, key: str) -> Clustering:
         index_map=index_map,
         centers_of_mass=centers_of_mass,
         identical_composition=identical_composition,
-        n_molecules=n_molecules
+        n_molecules=n_molecules,
+        central_molecule_index=central_molecule_index,
+        min_distances_to_central_molecule=min_distances_to_central_molecule,
+        max_distances_to_central_molecule=max_distances_to_central_molecule
     )
 
