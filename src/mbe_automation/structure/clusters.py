@@ -205,7 +205,7 @@ def _test_identical_composition(
             return False
 
     return True
-    
+
 
 def detect_molecules(
         system: mbe_automation.storage.Structure,
@@ -345,9 +345,9 @@ def detect_molecules(
     )
 
 
-def define_finite_subsystem(
+def extract_finite_subsystem(
         clustering: mbe_automation.storage.Clustering,
-        criterion: Literal[
+        filter: Literal[
             "closest_to_center_of_mass",
             "closest_to_central_molecule",
             "max_min_distance_to_central_molecule",
@@ -366,40 +366,44 @@ def define_finite_subsystem(
     (2) there is no permutation of atoms between frames.
     """
 
-    if criterion in ["closest_to_center_of_mass",
+    if filter in ["closest_to_center_of_mass",
                      "closest_to_central_molecule"]:
         if not (n_molecules is not None and distance is None):
             raise ValueError("n_molecules must be set and distance must be None.")
-    elif criterion in ["max_min_distance_to_central_molecule",
+    elif filter in ["max_min_distance_to_central_molecule",
                        "max_max_distance_to_central_molecule"]:
         if not (distance is not None and n_molecules is None):
             raise ValueError("distance must be set and n_molecules must be None.")
 
-    if criterion == "closest_to_center_of_mass":
+    if filter == "closest_to_center_of_mass":
         com_distances_from_origin = np.linalg.norm(clustering.centers_of_mass, axis=1)
         sorted_indices = np.argsort(com_distances_from_origin, stable=True)
         filtered_molecule_indices = sorted_indices[0:n_molecules]
-    elif criterion == "closest_to_central_molecule":
+    elif filter == "closest_to_central_molecule":
         sorted_indices = np.argsort(clustering.min_distances_to_central_molecule, stable=True)
         filtered_molecule_indices = sorted_indices[0:n_molecules]
-    elif criterion == "max_max_distance_to_central_molecule":
+    elif filter == "max_max_distance_to_central_molecule":
         mask = clustering.max_distances_to_central_molecule < distance
         filtered_molecule_indices = np.where(mask)[0]
-    elif criterion == "max_min_distance_to_central_molecule":
+    elif filter == "max_min_distance_to_central_molecule":
         mask = clustering.min_distances_to_central_molecule < distance            
         filtered_molecule_indices = np.where(mask)[0]
     else:
-        raise ValueError(f"Invalid filtering criterion: {criterion}")
+        raise ValueError(f"Invalid filter: {filter}")
 
     filtered_atom_indices = np.concatenate(
         [clustering.index_map[i] for i in filtered_molecule_indices]
     )
-    return mbe_automation.storage.FiniteSubsystem(
+    if clustering.supercell.positions.ndim == 3:
+        subsystem_pos = clustering.supercell.positions[:, filtered_atom_indices, :]
+    elif clustering.supercell.positions.ndim == 2:
+        subsystem_pos = clustering.supercell.positions[filtered_atom_indices, :]
+    else:
+        raise ValueError(f"Invalid rank of clustering.supercell.positions: {clustering.supercell.positions.ndim}")
+        
+    finite_subsystem = mbe_automation.storage.FiniteSubsystem(
         structure=mbe_automation.storage.Structure(
-            positions=(clustering.supercell.positions[:, filtered_atom_indices, :]
-                       if clustering.supercell.n_frames > 1
-                       else clustering.supercell.positions[filtered_atom_indices]
-                       ),
+            positions=subsystem_pos,
             atomic_numbers=clustering.supercell.atomic_numbers[filtered_atom_indices],
             masses=clustering.supercell.masses[filtered_atom_indices], 
             cell_vectors=None,
@@ -411,4 +415,4 @@ def define_finite_subsystem(
         n_molecules=len(filtered_molecule_indices)
     )
 
-    
+    return finite_subsystem

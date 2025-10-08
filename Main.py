@@ -10,7 +10,7 @@ import mbe_automation.single_point
                                                 # If the path already exists, e.g., it's your previous project,
                                                 # all existing files will be moved to a backup location.
                                                 #
-ProjectDirectory    = "./Projects/MD_01_1,4-cyclohexanedione"
+ProjectDirectory    = "./Projects/training_01_1,4-cyclohexanedione"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -131,7 +131,8 @@ InputTemplates = {
     "MACE(PBC)": {
         "training_dataset": "./templates/inputs/mace(pbc)/training_dataset.py",
         "quasi_harmonic": "./templates/inputs/mace(pbc)/quasi_harmonic.py",
-        "md": "./templates/inputs/mace(pbc)/md.py"
+        "md": "./templates/inputs/mace(pbc)/md.py",
+        "training": "./templates/inputs/mace(pbc)/training.py",
         },
     "UMA(PBC)": {
         "quasi_harmonic": "./templates/inputs/uma(pbc)/quasi_harmonic.py"
