@@ -354,7 +354,7 @@ def extract_finite_subsystem(
             "max_max_distance_to_central_molecule"
         ],
         n_molecules: int | None = None,
-        distance: float | None = None
+        distance: float | None = None,
 ) -> mbe_automation.storage.FiniteSubsystem:
     """
     Filter out a finite molecular cluster from a periodic structure.

@@ -23,7 +23,8 @@ class TrainingSet:
     md_crystal: ClassicalMD = field(
         default_factory=lambda: ClassicalMD(
             ensemble="NPT",
-            time_total_fs=100000.0, 
+            time_total_fs=100000.0,
+            time_step_fs=1.0,
             time_equilibration_fs=1000.0,
             sampling_interval_fs=1000.0,
             supercell_radius=15.0,
@@ -40,14 +41,14 @@ class TrainingSet:
                                    # max_min_distance_to_central_molecule     distance
                                    # max_max_distance_to_central_molecule
                                    #
-    filter: Literal[
+    finite_subsystem_filter: Literal[
         "closest_to_center_of_mass",
         "closest_to_central_molecule",
         "max_min_distance_to_central_molecule",
         "max_max_distance_to_central_molecule"
     ] = "closest_to_central_molecule"
-    n_molecules: int | None = 4
-    distance: float | None = None
+    finite_subsystem_n_molecules: int | None = 4
+    finite_subsystem_distance: float | None = None
                                    #
                                    # Assert that all molecules in the PBC structure
                                    # have identical elemental composition.

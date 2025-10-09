@@ -489,7 +489,7 @@ def save_trajectory(
         group.create_dataset(
             name="E_pot (eV∕atom)",
             data=traj.E_pot
-        )        
+        )   
         group.create_dataset(
             name="E_trans_drift (eV∕atom)",
             data=traj.E_trans_drift

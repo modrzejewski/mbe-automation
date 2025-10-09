@@ -83,9 +83,9 @@ def run(
     )
     finite_subsystem = mbe_automation.structure.clusters.extract_finite_subsystem(
         clustering=pbc_md_clustering,
-        filter=config.filter,
-        n_molecules=config.n_molecules,
-        distance=config.distance
+        filter=config.finite_subsystem_filter,
+        n_molecules=config.finite_subsystem_n_molecules,
+        distance=config.finite_subsystem_distance
     )
     mbe_automation.storage.save_finite_subsystem(
         dataset=config.dataset,
