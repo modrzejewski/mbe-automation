@@ -96,13 +96,13 @@ def run(
         target_pressure_GPa: float | None,
         md: ClassicalMD,
         dataset: str,
-        system_label: str,
+        key: str,
         rng_seed=42
 ):
 
     mbe_automation.common.display.framed([
         f"{md.ensemble} molecular dynamics",
-        system_label
+        key
     ])
 
     if np.any(system.pbc) and supercell_matrix is None:
@@ -130,7 +130,7 @@ def run(
 
     MaxwellBoltzmannDistribution(
         init_conf,
-        temperature_K=md.target_temperature_K,
+        temperature_K=target_temperature_K,
         rng=rng
     )
     Stationary(init_conf)
@@ -275,7 +275,9 @@ def run(
             traj.E_rot_drift[sample_idx] = E_rot_drift / n_atoms
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
         traj.velocities[sample_idx, :, :] = velocities / (ase.units.Angstrom/ase.units.fs) # Å/fs, COM translation removed 
-        traj.positions[sample_idx, :, :] = dyn.atoms.get_positions()
+        traj.positions[sample_idx, :, :] = dyn.atoms.positions
+        if is_periodic:
+            traj.cell_vectors[sample_idx, :, :] = dyn.atoms.cell.array
         traj.temperature[sample_idx] = T_insta
         traj.time[sample_idx] = dyn.get_time() / ase.units.fs
         if md.ensemble == "NPT":
@@ -306,7 +308,7 @@ def run(
 
     mbe_automation.storage.save_trajectory(
         dataset=dataset,
-        key=f"md/trajectories/{system_label}",
+        key=key,
         traj=traj
     )
     print(f"MD completed in {(t1 - t0) / 60:.2f} minutes", flush=True)

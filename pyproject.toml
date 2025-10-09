@@ -29,3 +29,17 @@ dependencies = [
   "nglview",
   "pymatviz"
 ]
+
+[project.optional-dependencies]
+# For CUDA 11.X environments
+gpu-cuda11 = [
+  "cuequivariance",
+  "cuequivariance-torch",
+  "cuequivariance-ops-torch-cu11",
+]
+# For CUDA 12.X environments
+gpu-cuda12 = [
+  "cuequivariance",
+  "cuequivariance-torch",
+  "cuequivariance-ops-torch-cu12",
+]

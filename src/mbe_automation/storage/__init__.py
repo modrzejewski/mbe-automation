@@ -7,6 +7,7 @@ from mbe_automation.storage.core import (
     Structure,
     Trajectory,
     Clustering,
+    FiniteSubsystem,
 
     save_data_frame,
     read_data_frame,
@@ -25,6 +26,8 @@ from mbe_automation.storage.core import (
     read_trajectory,
     save_clustering,
     read_clustering,
+    save_finite_subsystem,
+    read_finite_subsystem,
     
     read_gamma_point_eigenvecs,
     
@@ -51,6 +54,7 @@ __all__ = [
     "Structure",
     "Trajectory",
     "Clustering",
+    "FiniteSubsystem",
     
     # Core I/O functions
     "save_data_frame",
@@ -67,6 +71,8 @@ __all__ = [
     "read_trajectory",
     "save_clustering",
     "read_clustering",
+    "save_finite_subsystem",
+    "read_finite_subsystem",
     "read_gamma_point_eigenvecs",
     
     # Visualization of the dataset tree structure

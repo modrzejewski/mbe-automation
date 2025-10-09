@@ -463,7 +463,7 @@ def trajectory(
         freq_max_THz: float = 10.0,
         time_step_fs: float = 100.0,
         n_frames: int = 20,
-        finite_cluster: Literal[
+        finite_cluster_filter: Literal[
             "closest_to_center_of_mass",
             "closest_to_central_molecule",
             "max_min_distance_to_central_molecule",
@@ -503,7 +503,7 @@ def trajectory(
         n_atoms=len(equilibrium_cell),
         n_frames=n_frames,
     )
-    if finite_cluster is not None:
+    if finite_cluster_filter is not None:
         #
         # Extract the central molecular cluster
         # composed of n molecules, where n=extract_molecular_cluster
@@ -511,16 +511,17 @@ def trajectory(
         # The connectivity does not change so the molecules
         # are identified only for frame 0.
         #
-        clustering = mbe_automation.structure.clusters.extract_all_molecules(
+        clustering = mbe_automation.structure.clusters.detect_molecules(
             system=traj,
             frame_index=0
         )
-        traj = mbe_automation.structure.clusters.filter_central_molecular_cluster(
+        finite_subsystem = mbe_automation.structure.clusters.extract_finite_subsystem(
             clustering=clustering,
-            criterion=finite_cluster,
+            filter=finite_cluster_filter,
             distance=finite_cluster_distance,
             n_molecules=finite_cluster_n_molecules
         )
+        traj = finite_subsystem.structure
 
     if calculator is not None:
         potential_energies = []

@@ -8,7 +8,7 @@ import numpy as np
 
 def Make(InpDirs, XYZDirs, CSV_Dir, Plot_Dir, ML_Dirs, InputTemplates, QueueTemplate, SymmetrizeUnitCell, mlip_parameters):
 
-    for workflow in ["training_dataset", "quasi_harmonic", "md"]:
+    for workflow in ["training_dataset", "quasi_harmonic", "md", "training"]:
         Method = "MACE"
         WithoutGhosts, WithGhosts = mbe_automation.directory_structure.FindMonomerXYZ(XYZDirs["monomers-supercell"])
         RelaxedMonomers, _ = mbe_automation.directory_structure.FindMonomerXYZ(XYZDirs["monomers-relaxed"])

@@ -1,83 +1,88 @@
 from dataclasses import dataclass, field
-from typing import Dict, Any, Union
+from typing import Literal
 from pathlib import Path
-from ase import Atoms
+import ase
+from ase.calculators.calculator import Calculator as ASECalculator
 
+from mbe_automation.configs.md import ClassicalMD
 
 @dataclass
-class TrainingConfig:
-    """
-    Configuration class for training dataset creation.
-    """
+class TrainingSet:
                                    #
-                                   # Initial unit cell in the MD
-                                   # simulation
+                                   # Initial structure
                                    #
-    unit_cell: Atoms
+    crystal: ase.Atoms
                                    #
-                                   # Initial configuration of the isolated
-                                   # molecule in the MD simulation
+                                   # Energy and forces calculator
                                    #
-    molecule: Atoms
+    calculator: ASECalculator
                                    #
-                                   # MACE calculator object
+                                   # Technical details for a short MD sampling of
+                                   # configurations for delta learning
                                    #
-    calculator: Any                 
-    
-    training_dir: str = "./"
-    hdf5_dataset: str = "./training.hdf5"
+    md_crystal: ClassicalMD = field(
+        default_factory=lambda: ClassicalMD(
+            ensemble="NPT",
+            time_total_fs=100000.0,
+            time_step_fs=1.0,
+            time_equilibration_fs=1000.0,
+            sampling_interval_fs=1000.0,
+            supercell_radius=15.0,
+        )
+    )
+                                   # ------------------------------------------------------------------------
+                                   # Filter used to select molecules          Size parameter, which controls
+                                   # from the PBC structure to create         how many molecules to include
+                                   # a finite cluster                 
+                                   # ------------------------------------------------------------------------
+                                   # closest_to_center_of_mass,               n_molecules      
+                                   # closest_to_central_molecule
                                    #
-                                   # Size of the supercell
-                                   # in the MD simulation
+                                   # max_min_distance_to_central_molecule     distance
+                                   # max_max_distance_to_central_molecule
                                    #
-    supercell_radius: float = 20.0
-    
+    finite_subsystem_filter: Literal[
+        "closest_to_center_of_mass",
+        "closest_to_central_molecule",
+        "max_min_distance_to_central_molecule",
+        "max_max_distance_to_central_molecule"
+    ] = "closest_to_central_molecule"
+    finite_subsystem_n_molecules: int | None = 4
+    finite_subsystem_distance: float | None = None
                                    #
-                                   # Thermostat temperature
+                                   # Assert that all molecules in the PBC structure
+                                   # have identical elemental composition.
+                                   #
+                                   # Used only for validation during the clustering
+                                   # step. Setting this parameter to False disables
+                                   # the sanity check.
+                                   #
+    assert_identical_composition: bool = True
+                                   #
+                                   # Target temperature (K)
+                                   # and pressure (GPa)
                                    #
     temperature_K: float = 298.15
+    pressure_GPa: float = 1.0E-4
                                    #
-                                   # Total time of the MD simulation including
-                                   # the equilibration time.
                                    #
-    time_total_fs: float = 50000.0
                                    #
-                                   # Time step for numerical propagation.
-                                   # Typical values should be in the range
-                                   # of (0.5, 1.0) fs.
-                                   #
-    time_step_fs: float = 0.5
-                                   #
-                                   # Intervals for trajectory sampling.
-                                   # Too small interval doesn't improve
-                                   # the sampling quality because
-                                   # the structures are too correlated.
-                                   #
-    sampling_interval_fs: float = 50.0
-                                   #
-                                   # Time window for the plot of running
-                                   # average T and E.
-                                   # Used only for data visualization.
-                                   #
-    averaging_window_fs: float = 5000.0
-                                   #
-                                   # Time after which the system is assumed
-                                   # to reach thermal equilibrium. Structures
-                                   # are extracted from the trajectory only
-                                   # for t > time_equilibration_fs.
-                                   #
-    time_equilibration_fs: float = 5000.0
     
-    select_n_systems: Dict[str, int] = field(default_factory=lambda: {
-        "crystals": 10,
-        "molecules": 10,
-        "dimers": 100,
-        "trimers": 0,
-        "tetramers": 0
-    })
-
-
-
-    
-
-    
+                                   #
+                                   # Directory where files are stored
+                                   # at runtime
+                                   #
+    work_dir: str = "./"
+                                   #
+                                   # The main result of the calculations:
+                                   # a single HDF5 file with all data computed
+                                   # for the physical system
+                                   #
+    dataset: str = "./properties.hdf5"
+                                   #
+                                   # Verbosity of the program's output.
+                                   # 0 -> suppressed warnings
+                                   #
+    verbose: int = 0
+    save_plots: bool = True
+    save_csv: bool = True

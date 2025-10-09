@@ -1,5 +1,5 @@
 from typing import Any, Literal
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from ase import Atoms
 from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
@@ -11,12 +11,6 @@ class ClassicalMD:
         "NPT",
         "NVT"
     ] = "NVT"
-                                   #
-                                   # Target temperature (K)
-                                   # and pressure (GPa)
-                                   #
-    target_temperature_K: float = 298.15
-    target_pressure_GPa: float = 1.0E-4
                                    #
                                    # Simulation times
                                    #

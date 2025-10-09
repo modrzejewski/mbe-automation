@@ -120,7 +120,7 @@ class Trajectory(Structure):
 
 @dataclass
 class Clustering:
-    total_system: mbe_automation.storage.Structure
+    supercell: Structure
     index_map: List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
     centers_of_mass: npt.NDArray[np.floating]
     identical_composition: bool
@@ -128,6 +128,12 @@ class Clustering:
     central_molecule_index: int
     min_distances_to_central_molecule: npt.NDArray[np.floating]
     max_distances_to_central_molecule: npt.NDArray[np.floating]
+
+@dataclass
+class FiniteSubsystem:
+    structure: Structure
+    molecule_indices: npt.NDArray[np.integer]
+    n_molecules: int
     
 def save_data_frame(
         dataset: str,
@@ -483,7 +489,7 @@ def save_trajectory(
         group.create_dataset(
             name="E_pot (eV∕atom)",
             data=traj.E_pot
-        )        
+        )   
         group.create_dataset(
             name="E_trans_drift (eV∕atom)",
             data=traj.E_trans_drift
@@ -681,11 +687,11 @@ def save_clustering(
         
     save_structure(
         dataset=dataset,
-        key=f"{key}/total_system",
-        positions=clustering.total_system.positions,
-        atomic_numbers=clustering.total_system.atomic_numbers,
-        masses=clustering.total_system.masses,
-        cell_vectors=clustering.total_system.cell_vectors
+        key=f"{key}/supercell",
+        positions=clustering.supercell.positions,
+        atomic_numbers=clustering.supercell.atomic_numbers,
+        masses=clustering.supercell.masses,
+        cell_vectors=clustering.supercell.cell_vectors
     )
 
 
@@ -709,10 +715,10 @@ def read_clustering(dataset: str, key: str) -> Clustering:
         min_distances_to_central_molecule = group["min_distances_to_central_molecule (Å)"][...]
         max_distances_to_central_molecule = group["max_distances_to_central_molecule (Å)"][...]
 
-    total_system = read_structure(dataset, key=f"{key}/total_system")
+    supercell = read_structure(dataset, key=f"{key}/supercell")
 
     return Clustering(
-        total_system=total_system,
+        supercell=supercell,
         index_map=index_map,
         centers_of_mass=centers_of_mass,
         identical_composition=identical_composition,
@@ -722,3 +728,43 @@ def read_clustering(dataset: str, key: str) -> Clustering:
         max_distances_to_central_molecule=max_distances_to_central_molecule
     )
 
+
+def save_finite_subsystem(
+        dataset: str,
+        key: str,
+        subsystem: FiniteSubsystem
+):
+    with h5py.File(dataset, "a") as f:
+        if key in f:
+            del f[key]
+        
+        group = f.create_group(key)
+        group.attrs["n_molecules"] = subsystem.n_molecules
+        group.create_dataset(
+            name="molecule_indices",
+            data=subsystem.molecule_indices
+        )
+        
+    save_structure(
+        dataset=dataset,
+        key=f"{key}/structure",
+        positions=subsystem.structure.positions,
+        atomic_numbers=subsystem.structure.atomic_numbers,
+        masses=subsystem.structure.masses,
+        cell_vectors=None
+    )
+
+
+def read_finite_subsystem(dataset: str, key: str) -> FiniteSubsystem:
+
+    structure = read_structure(dataset, key=f"{key}/structure")
+    with h5py.File(dataset, "r") as f:
+        group = f[key]
+        n_molecules = group.attrs["n_molecules"]
+        molecule_indices = group["molecule_indices"][...]
+
+    return FiniteSubsystem(
+        structure=structure,
+        molecule_indices=molecule_indices,
+        n_molecules=n_molecules
+    )

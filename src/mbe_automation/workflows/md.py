@@ -6,7 +6,7 @@ import mbe_automation.common
 import mbe_automation.storage
 import mbe_automation.configs
 import mbe_automation.dynamics
-import mbe_automation.structure.crystal
+import mbe_automation.structure
 
 try:
     from mace.calculators import MACECalculator
@@ -25,8 +25,8 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         warnings.filterwarnings("ignore", category=UserWarning)
         warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-    if isinstance(config, mbe_automation.configs.md.Sublimation):
-        mbe_automation.common.display.framed("NVT/NPT simulation of sublimation properties")
+    if isinstance(config, mbe_automation.configs.md.Enthalpy):
+        mbe_automation.common.display.framed("Sublimation enthalpy")
         
     if mace_available:
         if isinstance(config.calculator, MACECalculator):
@@ -41,7 +41,7 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         target_pressure_GPa=None,
         md=config.md_molecule,
         dataset=config.dataset,
-        system_label=label_molecule
+        key=f"md/trajectories/{label_molecule}",
     )
     df_molecule = mbe_automation.dynamics.md.data.molecule(
         dataset=config.dataset,
@@ -96,7 +96,7 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         target_pressure_GPa=config.pressure_GPa,
         md=config.md_crystal,
         dataset=config.dataset,
-        system_label=label_crystal
+        key=f"md/trajectories/{label_crystal}",
     )
     df_crystal = mbe_automation.dynamics.md.data.crystal(
         dataset=config.dataset,
