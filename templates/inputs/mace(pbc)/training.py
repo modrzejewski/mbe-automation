@@ -4,6 +4,7 @@ import mace.calculators
 import torch
 
 import mbe_automation
+from mbe_automation.configs.md import ClassicalMD
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "{xyz_solid}"

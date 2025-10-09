@@ -275,7 +275,9 @@ def run(
             traj.E_rot_drift[sample_idx] = E_rot_drift / n_atoms
         traj.forces[sample_idx, :, :] = dyn.atoms.get_forces()
         traj.velocities[sample_idx, :, :] = velocities / (ase.units.Angstrom/ase.units.fs) # Å/fs, COM translation removed 
-        traj.positions[sample_idx, :, :] = dyn.atoms.get_positions()
+        traj.positions[sample_idx, :, :] = dyn.atoms.positions
+        if is_periodic:
+            traj.cell_vectors[sample_idx, :, :] = dyn.atoms.cell.array
         traj.temperature[sample_idx] = T_insta
         traj.time[sample_idx] = dyn.get_time() / ase.units.fs
         if md.ensemble == "NPT":

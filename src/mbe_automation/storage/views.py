@@ -151,7 +151,7 @@ def _(structure: core.Structure, frame_index: int = 0) -> ase.Atoms:
         positions = structure.positions
 
     cell = None
-    if structure.periodic and structure.cell_vectors is not None:
+    if structure.periodic:
         if structure.cell_vectors.ndim == 3:
             cell = structure.cell_vectors[frame_index]
         else:
