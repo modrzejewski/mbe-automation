@@ -9,6 +9,7 @@ import mbe_automation.structure
 
 try:
     from mace.calculators import MACECalculator
+    import mbe_automation.ml.mace
     mace_available = True
 except ImportError:
     MACECalculator = None
@@ -44,7 +45,7 @@ def run(
     system_label = f"crystal_T_{config.temperature_K:.2f}_p_{config.pressure_GPa:.5f}"
     pbc_trajectory_key = f"training_set/md/trajectories/{system_label}"
     pbc_clustering_key = f"training_set/md/clustering/{system_label}"
-    finite_subsystem_key = f"training_set/md/finite_subsystem/{system_label}"
+    finite_subsystem_key = f"training_set/md/finite_subsystems/{system_label}"
     
     mbe_automation.dynamics.md.core.run(
         system=config.crystal,
@@ -87,6 +88,19 @@ def run(
         n_molecules=config.finite_subsystem_n_molecules,
         distance=config.finite_subsystem_distance
     )
+    if mace_available:
+        if isinstance(config.calculator, MACECalculator):
+            mace_output = mbe_automation.ml.mace.inference(
+                calculator=config.calculator,
+                structure=finite_subsystem.cluster_of_molecules,
+                energies=True,
+                forces=True,
+                feature_vectors=True
+            )
+            finite_subsystem.cluster_of_molecules.E_pot = mace_output.E_pot
+            finite_subsystem.cluster_of_molecules.forces = mace_output.forces
+            finite_subsystem.cluster_of_molecules.feature_vectors = mace_output.feature_vectors
+            
     mbe_automation.storage.save_finite_subsystem(
         dataset=config.dataset,
         key=finite_subsystem_key,

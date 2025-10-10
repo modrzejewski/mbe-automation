@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Tuple, Literal
+from typing import List, Tuple, Literal, overload
 import pandas as pd
 from phonopy import Phonopy
 import h5py
@@ -36,6 +36,9 @@ class Structure:
     n_frames: int
     n_atoms: int
     periodic: bool = False
+    E_pot: npt.NDArray[np.floating] | None = None
+    forces: npt.NDArray[np.floating] | None = None
+    feature_vectors: npt.NDArray[np.floating] | None = None
     def __post_init__(self):
         self.periodic = (self.cell_vectors is not None)
     def copy(self) -> Structure:
@@ -47,6 +50,9 @@ class Structure:
             n_frames=self.n_frames,
             n_atoms=self.n_atoms,
             periodic=self.periodic,
+            E_pot=self.E_pot,
+            forces=self.forces,
+            feature_vectors=self.feature_vectors
         )
 
 @dataclass
@@ -67,10 +73,8 @@ class Trajectory(Structure):
     temperature: npt.NDArray[np.floating]
     pressure: npt.NDArray[np.floating] | None
     volume: npt.NDArray[np.floating] | None
-    forces: npt.NDArray[np.floating]
     velocities: npt.NDArray[np.floating]
     E_kin: npt.NDArray[np.floating]
-    E_pot: npt.NDArray[np.floating]
     E_trans_drift: npt.NDArray[np.floating]
     E_rot_drift: npt.NDArray[np.floating] | None
     n_removed_trans_dof: int
@@ -131,7 +135,7 @@ class Clustering:
 
 @dataclass
 class FiniteSubsystem:
-    structure: Structure
+    cluster_of_molecules: Structure
     molecule_indices: npt.NDArray[np.integer]
     n_molecules: int
     
@@ -369,14 +373,17 @@ def read_eos_curves(
     return eos_curves
 
 
-def save_structure(
+def _save_structure(
         dataset: str,
         key: str,
         positions: npt.NDArray[np.floating],
         atomic_numbers: npt.NDArray[np.integer],
         masses: npt.NDArray[np.floating],
-        cell_vectors: npt.NDArray[np.floating] | None=None):
-
+        cell_vectors: npt.NDArray[np.floating] | None=None,
+        E_pot: npt.NDArray[np.floating] | None=None,
+        forces: npt.NDArray[np.floating] | None=None,
+        feature_vectors: npt.NDArray[np.floating] | None=None
+):
     if positions.ndim == 2:
         n_frames = 1
         n_atoms = positions.shape[0]
@@ -411,14 +418,95 @@ def save_structure(
                 name="cell_vectors (Å)",
                 data=cell_vectors
             )
-
+        if feature_vectors is not None:
+            group.create_dataset(
+                name="feature_vectors",
+                data=feature_vectors
+            )
+        if E_pot is not None:
+            group.create_dataset(
+                name="E_pot (eV∕atom)",
+                data=E_pot
+            )
+        if forces is not None:
+            group.create_dataset(
+                name="forces (eV∕Å)",
+                data=forces
+            )            
         group.attrs["n_frames"] = n_frames
         group.attrs["n_atoms"] = n_atoms
         group.attrs["periodic"] = is_periodic
 
 
+@overload
+def save_structure(*, dataset: str, key: str, structure: Structure) -> None: ...
+
+@overload
+def save_structure(
+    *,
+    dataset: str,
+    key: str,
+    positions: npt.NDArray[np.floating],
+    atomic_numbers: npt.NDArray[np.integer],
+    masses: npt.NDArray[np.floating],
+    cell_vectors: npt.NDArray[np.floating] | None = None,
+    E_pot: npt.NDArray[np.floating] | None = None,
+    forces: npt.NDArray[np.floating] | None = None,
+    feature_vectors: npt.NDArray[np.floating] | None = None
+) -> None: ...
+
+def save_structure(*, dataset: str, key: str, **kwargs):
+    """
+    Save a structure to a dataset.
+
+    This function is overloaded and can be called in two ways:
+
+    1. By providing a Structure object as a keyword argument:
+       save_structure(dataset="...", key="...", structure=structure)
+
+    2. By providing individual data arrays as keyword arguments:
+       save_structure(dataset="...", key="...", positions=..., ...)
+    """
+    if "structure" in kwargs:
+        # --- Signature 1: Called with a Structure object ---
+        structure = kwargs["structure"]
+        if not isinstance(structure, Structure):
+             raise TypeError(
+                "Argument 'structure' must be a Structure object, "
+                f"but got {type(structure).__name__}"
+            )
+        _save_structure(
+            dataset=dataset,
+            key=key,
+            positions=structure.positions,
+            atomic_numbers=structure.atomic_numbers,
+            masses=structure.masses,
+            cell_vectors=structure.cell_vectors,
+            E_pot=structure.E_pot,
+            forces=structure.forces,
+            feature_vectors=structure.feature_vectors
+        )
+    elif "positions" in kwargs:
+        # --- Signature 2: Called with individual arrays ---
+        _save_structure(
+            dataset=dataset,
+            key=key,
+            positions=kwargs.get("positions"),
+            atomic_numbers=kwargs.get("atomic_numbers"),
+            masses=kwargs.get("masses"),
+            cell_vectors=kwargs.get("cell_vectors"),
+            E_pot=kwargs.get("E_pot"),
+            forces=kwargs.get("forces"),
+            feature_vectors=kwargs.get("feature_vectors")
+        )
+    else:
+        raise ValueError(
+            "Either a 'structure' object or 'positions' and other arrays "
+            "must be provided as keyword arguments."
+        )
+        
+
 def read_structure(dataset, key):
-    
     with h5py.File(dataset, "r") as f:
         group = f[key]
         is_periodic = group.attrs["periodic"]
@@ -426,12 +514,26 @@ def read_structure(dataset, key):
             positions=group["positions (Å)"][...],
             atomic_numbers=group["atomic_numbers"][...],
             masses=group["masses (u)"][...],
-            cell_vectors=(group["cell_vectors (Å)"][...] if is_periodic else None),
+            cell_vectors=(
+                group["cell_vectors (Å)"][...]
+                if is_periodic else None
+            ),
             n_frames=group.attrs["n_frames"],
             n_atoms=group.attrs["n_atoms"],
-            periodic=is_periodic
+            periodic=is_periodic,
+            feature_vectors=(
+                group["feature_vectors"][...]
+                if "feature_vectors" in group else None
+            ),
+            E_pot=(
+                group["E_pot (eV∕atom)"][...]
+                if "E_pot (eV∕atom)" in group else None
+            ),
+            forces=(
+                group["forces (eV∕Å)"][...]
+                if "forces (eV∕Å)" in group else None
+            )
         )
-        
     return structure
 
 
@@ -688,10 +790,7 @@ def save_clustering(
     save_structure(
         dataset=dataset,
         key=f"{key}/supercell",
-        positions=clustering.supercell.positions,
-        atomic_numbers=clustering.supercell.atomic_numbers,
-        masses=clustering.supercell.masses,
-        cell_vectors=clustering.supercell.cell_vectors
+        structure=clustering.supercell
     )
 
 
@@ -733,38 +832,34 @@ def save_finite_subsystem(
         dataset: str,
         key: str,
         subsystem: FiniteSubsystem
-):
-    with h5py.File(dataset, "a") as f:
-        if key in f:
-            del f[key]
-        
-        group = f.create_group(key)
-        group.attrs["n_molecules"] = subsystem.n_molecules
-        group.create_dataset(
-            name="molecule_indices",
-            data=subsystem.molecule_indices
-        )
-        
+) -> None:
+    """Save a FiniteSubsystem object to a dataset."""
     save_structure(
+        structure=subsystem.cluster_of_molecules,
         dataset=dataset,
-        key=f"{key}/structure",
-        positions=subsystem.structure.positions,
-        atomic_numbers=subsystem.structure.atomic_numbers,
-        masses=subsystem.structure.masses,
-        cell_vectors=None
+        key=f"{key}/cluster_of_molecules"
     )
+    with h5py.File(dataset, "a") as f:
+        group = f[key]
+        group.attrs["n_molecules"] = subsystem.n_molecules
+        group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
 
-
+        
 def read_finite_subsystem(dataset: str, key: str) -> FiniteSubsystem:
 
-    structure = read_structure(dataset, key=f"{key}/structure")
+    structure = read_structure(
+        dataset,
+        key=f"{key}/cluster_of_molecules"
+    )
     with h5py.File(dataset, "r") as f:
         group = f[key]
         n_molecules = group.attrs["n_molecules"]
         molecule_indices = group["molecule_indices"][...]
 
     return FiniteSubsystem(
-        structure=structure,
+        cluster_of_molecules=structure,
         molecule_indices=molecule_indices,
         n_molecules=n_molecules
     )
+
+

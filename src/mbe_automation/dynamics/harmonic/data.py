@@ -190,12 +190,12 @@ def crystal(
     alpha = n_atoms_unit_cell/n_atoms_primitive_cell
     
     phonons.run_thermal_properties(temperatures=temperatures)
-    _, F_vib_crystal, S_vib_crystal, C_v_vib_crystal = phonons.thermal_properties.thermal_properties
+    _, F_vib_crystal, S_vib_crystal, C_V_vib_crystal = phonons.thermal_properties.thermal_properties
     
     ZPE_crystal = phonons.thermal_properties.zero_point_energy * alpha # kJ/mol/unit cell
     F_vib_crystal *= alpha # kJ/mol/unit cell
     S_vib_crystal *= alpha # J/K/mol/unit cell
-    C_v_vib_crystal *= alpha # J/K/mol/unit cell
+    C_V_vib_crystal *= alpha # J/K/mol/unit cell
     E_vib_crystal = F_vib_crystal + temperatures * S_vib_crystal / 1000 # kJ/mol/unit cell
     E_el_crystal = unit_cell.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
     F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
@@ -241,7 +241,7 @@ def crystal(
         "S_vib_crystal (J∕K∕mol∕unit cell)": S_vib_crystal,
         "E_vib_crystal (kJ∕mol∕unit cell)": E_vib_crystal,
         "ZPE_crystal (kJ∕mol∕unit cell)": ZPE_crystal,
-        "C_v_vib_crystal (J∕K∕mol∕unit cell)": C_v_vib_crystal,
+        "C_V_vib_crystal (J∕K∕mol∕unit cell)": C_V_vib_crystal,
         "E_el_crystal (kJ∕mol∕unit cell)": E_el_crystal,
         "F_tot_crystal (kJ∕mol∕unit cell)": F_tot_crystal,
         "V_crystal (Å³∕unit cell)": V,
