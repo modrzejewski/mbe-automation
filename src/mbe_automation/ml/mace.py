@@ -33,20 +33,12 @@ def inference(
         forces_out = np.zeros((structure.n_frames, structure.n_atoms, 3))
 
     ase_traj = mbe_automation.storage.ASETrajectory(structure)
-    props_to_calc = []
-    if energies:
-        props_to_calc.append("energy")
-    if forces:
-        props_to_calc.append("forces")
-
     for i, atoms in enumerate(ase_traj):
-        if props_to_calc:
-            results = calculator.get_properties(atoms, properties=props_to_calc)
-            if energies:
-                energies_out[i] = results["energy"] / structure.n_atoms
-            if forces:
-                forces_out[i] = results["forces"]
-
+        atoms.calc = calculator
+        if energies:
+            energies_out[i] = atoms.get_potential_energy() / structure.n_atoms
+        if forces:
+            forces_out[i] = atoms.get_forces()
         if feature_vectors:
             current_features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
             if i == 0:
