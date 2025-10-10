@@ -7,6 +7,13 @@ import ase
 import math
 import phonopy
 from ase.calculators.calculator import Calculator as ASECalculator
+try:
+    from mace.calculators import MACECalculator
+    import mbe_automation.ml.mace
+    mace_available = True
+except ImportError:
+    MACECalculator = None
+    mace_available = False
 
 import mbe_automation.common
 import mbe_automation.storage
@@ -32,21 +39,6 @@ class ThermalDisplacements:
     mean_square_displacements_matrix_full: npt.NDArray[np.float64] # eq 6 in ref 1
     instantaneous_displacements: npt.NDArray[np.float64] | None # eq 2 in ref 1
     
-@dataclass
-class Mode:
-    """
-    Results of a vibrational mode analysis.
-    
-    Attributes:
-        trajectory: The generated Structure object containing atomic coordinates.
-        scan_coordinates: Phase angle for 'cyclic' sampling and amplitude for 'linear' sampling.
-        potential_energies: Energy for unit cell/supercell/molecular cluster (eV)
-    """
-    trajectory: mbe_automation.storage.Structure
-    scan_coordinates: npt.NDArray
-    potential_energies: npt.NDArray | None
-    
-
 def _Ejq_eq_3(
         freqs_THz: npt.NDArray[np.floating],
         temperature_K: np.floating
@@ -474,7 +466,7 @@ def trajectory(
         sampling: Literal["cyclic", "linear"] = "cyclic",
         calculator: ASECalculator | None = None,
         cell_type: Literal["primitive", "supercell"] = "supercell"
-) -> Mode:
+) -> mbe_automation.storage.Structure:
 
     time_points_fs = np.linspace(0.0, time_step_fs * (n_frames - 1), n_frames)
     disp = thermal_displacements(
@@ -521,28 +513,23 @@ def trajectory(
             distance=finite_cluster_distance,
             n_molecules=finite_cluster_n_molecules
         )
-        traj = finite_subsystem.structure
+        traj = finite_subsystem.cluster_of_molecules
 
-    if calculator is not None:
-        potential_energies = []
-        for i in range(traj.n_frames):
-            single_frame = mbe_automation.storage.to_ase(
-                structure=traj,
-                frame_index=i
-            )
-            single_frame.calc = calculator
-            potential_energies.append(single_frame.get_potential_energy())
-            
-        potential_energies = np.array(potential_energies)
-    else:
-        potential_energies = None
+    if mace_available:
+        if calculator is not None:
+            if isinstance(calculator, MACECalculator):
+                mace_output = mbe_automation.ml.mace.inference(
+                    calculator=calculator,
+                    structure=traj,
+                    energies=True,
+                    forces=False,
+                    feature_vectors=True
+                )
+                traj.E_pot = mace_output.E_pot
+                traj.feature_vectors = mace_output.feature_vectors
+                
+    return traj
 
-    return Mode(
-        trajectory=traj,
-        scan_coordinates=time_points_fs,
-        potential_energies=potential_energies
-    )
-            
 
 def _get_modulated_displacements(
     ph: phonopy.Phonopy,

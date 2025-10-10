@@ -284,6 +284,14 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         )
         df_crystal_T.index = [i] # map current dataframe to temperature T
         data_frames_at_T.append(df_crystal_T)
+
+    if not data_frames_at_T:
+        warnings.warn(
+            "Thermal expansion analysis could not find a valid free energy minimum "
+            "at any temperature. Halting workflow."
+        )
+        mbe_automation.common.display.timestamp_finish(datetime_start)
+        return
     #
     # Create a single data frame for the whole temperature range
     # by vertically stacking data frames computed for individual

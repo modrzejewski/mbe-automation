@@ -402,7 +402,7 @@ def extract_finite_subsystem(
         raise ValueError(f"Invalid rank of clustering.supercell.positions: {clustering.supercell.positions.ndim}")
         
     finite_subsystem = mbe_automation.storage.FiniteSubsystem(
-        structure=mbe_automation.storage.Structure(
+        cluster_of_molecules=mbe_automation.storage.Structure(
             positions=subsystem_pos,
             atomic_numbers=clustering.supercell.atomic_numbers[filtered_atom_indices],
             masses=clustering.supercell.masses[filtered_atom_indices], 

@@ -14,13 +14,13 @@ import mbe_automation.storage
 import mbe_automation.dynamics.harmonic.modes
 
 def animate_pymatviz(
-        mode: mbe_automation.dynamics.harmonic.modes.Mode,
+        mode: mbe_automation.storage.Structure,
 ) -> pymatviz.TrajectoryWidget:
     """
     Generate an animation or interactive view of a vibrational mode.
 
     Args:
-        mode: An instance of mbe_automation.dynamics.harmonic.modes.Mode
+        mode: An instance of mbe_automation.storage.Structure
         produced by mbe_automation.dynamics.harmonic.modes.trajectory
 
     Returns:
@@ -28,10 +28,10 @@ def animate_pymatviz(
     """
 
     trajectory = []
-    for i in range(mode.trajectory.n_frames):
+    for i in range(mode.n_frames):
         trajectory.append(
             mbe_automation.storage.to_pymatgen(
-                structure=mode.trajectory,
+                structure=mode,
                 frame_index=i
             )
         )
@@ -44,31 +44,22 @@ def animate_pymatviz(
 
 
 def animate(
-        mode: mbe_automation.dynamics.harmonic.modes.Mode,
+        mode: mbe_automation.storage.Structure,
         framerate: int = 20,
 ) -> nglview.NGLWidget:
     """
     Generate an animation or interactive view of a vibrational mode.
 
-    Args:
-        dataset: Path to the dataset file.
-        key: Key to the harmonic force constants model.
-        k_point: Reduced coordinates of the k-point.
-        band_index: Index of the vibrational mode.
-        max_amplitude: Controls the maximum displacement of the mode.
-        n_frames: Number of frames for the trajectory.
-        framerate: Frames per second for the output animation.
-
     Returns:
         An nglview widget.
     """
     
-    trajectory_ase = mbe_automation.storage.ASETrajectory(mode.trajectory)
+    trajectory_ase = mbe_automation.storage.ASETrajectory(mode)
     view = nglview.show_asetraj(trajectory_ase)
     view.parameters = dict(mode="rock", delay=1000 / framerate)
     view.clear_representations()
     view.add_ball_and_stick()
-    if mode.trajectory.periodic:
+    if mode.periodic:
         view.add_unitcell()
     view.center()
 
@@ -76,32 +67,24 @@ def animate(
 
 
 def potential_energy_curve(
-    mode: mbe_automation.dynamics.harmonic.modes.Mode,
-    sampling: Literal["cyclic", "linear"],
-    save_path: str | None = None,
+        mode: mbe_automation.storage.Structure,
+        sampling: Literal["cyclic", "linear"],
+        save_path: str | None = None,
 ):
     """
     Plot potential energy as a function of the mode scan coordinate.
     """
-    if mode.potential_energies is None:
+    if mode.E_pot is None:
         raise ValueError("The Mode object does not contain a potential energy curve.")
 
-    scan_coordinates = mode.scan_coordinates
-    potential_energies = mode.potential_energies
-
+    scan_coordinates = np.arange(mode.n_frames)
+    potential_energies = mode.E_pot
     energies_shifted = potential_energies - np.min(potential_energies)
 
     fig, ax = plt.subplots()
-
     ax.plot(scan_coordinates, energies_shifted, marker='o', linestyle='-')
-
-    if sampling == "cyclic":
-        ax.set_xlabel("Phase Angle (radians)")
-    else:
-        ax.set_xlabel("Displacement Amplitude (Å)")
-
-    ax.set_ylabel("Relative Potential Energy (eV)")
-    ax.set_title("Potential Energy along Mode Coordinate")
+    ax.set_xlabel("Frame index")
+    ax.set_ylabel("Potential energy (eV/atom)")
     ax.grid(True, linestyle="--", alpha=0.6)
 
     plt.tight_layout()
