@@ -273,10 +273,10 @@ def detect_molecules(
                     
                     visited_in_molecule.add(neighbor_idx)
                     processed_indices.add(neighbor_idx)
-                    
+                    parent_displacement = contiguous_positions[current_idx] - atoms.positions[current_idx]
                     offset_vec = offset @ cell
-                    bond_vector = (atoms.positions[neighbor_idx] + offset_vec) - atoms.positions[current_idx]
-                    contiguous_positions[neighbor_idx] = contiguous_positions[current_idx] + bond_vector
+                    total_displacement = parent_displacement + offset_vec
+                    contiguous_positions[neighbor_idx] = atoms.positions[neighbor_idx] + total_displacement
                     q.append(neighbor_idx)
 
         mol_masses = masses[indices]
