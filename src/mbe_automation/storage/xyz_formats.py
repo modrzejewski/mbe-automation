@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     import mbe_automation.dynamics.harmonic.modes
 
 import mbe_automation.structure
+import mbe_automation.storage.core
+import mbe_automation.storage.views
 
 def _cif_with_adps(
         save_path: str,
@@ -206,13 +208,19 @@ def from_xyz_file(
 
 def to_xyz_file(
         save_path: str,
-        system: ase.Atoms,
+        system: ase.Atoms | mbe_automation.storage.core.Structure,
+        frame_index: int = 0,
         thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None = None,
         temperature_idx: int = 0,
         symprec: float = 1.0E-5
 ):
+    if isinstance(system, mbe_automation.storage.core.Structure):
+        system_ase = mbe_automation.storage.views.to_ase(system, frame_index=frame_index)
+    else:
+        system_ase = system
+        
     if save_path.lower().endswith(".cif"):
-        pmg_structure = pymatgen.io.ase.AseAtomsAdaptor.get_structure(system)
+        pmg_structure = pymatgen.io.ase.AseAtomsAdaptor.get_structure(system_ase)
         _cif_with_adps(
             save_path=save_path,
             struct=pmg_structure,
@@ -223,4 +231,4 @@ def to_xyz_file(
             symprec=symprec
         )
     else:
-        ase.io.write(save_path, system)
+        ase.io.write(save_path, system_ase)
