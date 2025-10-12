@@ -74,7 +74,7 @@ def run(
     )
     pbc_md_clustering = mbe_automation.structure.clusters.detect_molecules(
         system=pbc_md_frames,
-        frame_index=0,
+        reference_frame_index=0,
         assert_identical_composition=config.assert_identical_composition,
     )
     mbe_automation.storage.save_clustering(
