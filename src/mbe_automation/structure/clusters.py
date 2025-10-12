@@ -209,136 +209,150 @@ def _test_identical_composition(
 
 def detect_molecules(
         system: mbe_automation.storage.Structure,
-        frame_index: int = 0,
-        assert_identical_composition=True,
+        reference_frame_index: int = 0,
+        assert_identical_composition: bool = True,
+        bond_cutoff_scaling: float = 1.0
 ) -> mbe_automation.storage.Clustering:
     """
-    Identify all molecules in a periodic system.
-    
-    (1) For a periodic system, shift the periodic images by the lattice
-    vectors in such a way that the atoms are contiguous in space if they
-    belong to the same molecule.
+    Identify molecules in a periodic Structure.
 
-    (2) For the molecules from step (1), shift the molecular centers of mass
-    to the inside of the original unit cell.
+    Resolve periodic boundary conditions to represent each molecule as a
+    contiguous set of atoms. The final system is centered at its
+    center of mass.
 
+    Args:
+        system: A periodic Structure object.
+        reference_frame_index: Frame index for geometry if system has n_frames > 1.
+        assert_identical_composition: If True, raise error if molecules differ
+        in elemental composition.
+        bond_cutoff_scaling: Scaling factor for covalent bond radii.
+
+    Returns:
+        A Clustering object containing the unwrapped supercell and molecule map.
     """
     if not system.periodic:
-        raise ValueError("extract_all_molecules is not designed for non-periodic systems")
+        raise ValueError("detect_molecules is designed for periodic systems.")
 
-    atoms = mbe_automation.storage.to_ase(
-        structure=system,
-        frame_index=frame_index
+    if system.positions.ndim == 3:
+        positions_ref = system.positions[reference_frame_index]
+    else:
+        positions_ref = system.positions
+        
+    n_atoms_unit_cell = system.n_atoms        
+    positions_super = np.zeros((3, 3, 3, n_atoms_unit_cell, 3))
+    masses_super = np.zeros((3, 3, 3, n_atoms_unit_cell))
+    atomic_numbers_super = np.zeros((3, 3, 3, n_atoms_unit_cell), dtype=int)
+    supercell_to_unit_cell = np.zeros((3, 3, 3, n_atoms_unit_cell), dtype=int)
+    if system.cell_vectors.ndim == 3:
+        unit_cell_vectors = system.cell_vectors[reference_frame_index]
+    else:
+        unit_cell_vectors = system.cell_vectors
+    for ix, x in enumerate(np.array([-1, 0, 1])):
+        for iy, y in enumerate(np.array([-1, 0, 1])):
+            for iz, z in enumerate(np.array([-1, 0, 1])):
+                v = np.array([x, y, z]) @ unit_cell_vectors
+                positions_super[ix, iy, iz, :, :] = positions_ref + v[np.newaxis, :]
+                masses_super[ix, iy, iz, :] = system.masses
+                atomic_numbers_super[ix, iy, iz, :] = system.atomic_numbers
+                supercell_to_unit_cell[ix, iy, iz, :] = np.arange(n_atoms_unit_cell)
+    n_atoms_supercell = 3**3 * n_atoms_unit_cell
+    supercell_to_unit_cell = supercell_to_unit_cell.reshape(-1)
+    supercell = ase.Atoms(
+        positions=positions_super.reshape(n_atoms_supercell, 3),
+        masses=masses_super.reshape(-1),
+        numbers=atomic_numbers_super.reshape(-1),
+        cell=unit_cell_vectors * 3.0,
+        pbc=np.array([True, True, True])
     )
-    neighbor_list = build_neighbor_list(
-        atoms,
-        cutoffs=natural_cutoffs(atoms),
+    supercell.wrap()
+
+    neighbor_list = ase.neighborlist.build_neighbor_list(
+        supercell,
+        cutoffs=natural_cutoffs(supercell, mult=bond_cutoff_scaling),
         bothways=True
     )
-    adj_matrix = neighbor_list.get_connectivity_matrix()    
-    n_molecules, molecule_labels = connected_components(adj_matrix)
-    assert n_molecules > 0
+    adj_matrix = neighbor_list.get_connectivity_matrix(sparse=True)
+    n_molecules_supercell, mol_labels = scipy.sparse.csgraph.connected_components(adj_matrix)
+
+    masses = supercell.get_masses()
+    scaled_positions = supercell.get_scaled_positions()
+    supercell_subset = []
+    n_atoms_found = 0
+    for mol_id in range(n_molecules_supercell):
+        atom_indices = np.where(mol_labels == mol_id)[0]
+        contiguous = True
+        for atom_idx in atom_indices:
+            _, offsets = neighbor_list.get_neighbors(atom_idx)
+            if np.any(offsets != 0):
+                contiguous = False
+        if contiguous:
+            mol_positions = scaled_positions[atom_indices]
+            mol_masses = masses[atom_indices]
+            com_scaled = np.sum(mol_positions * mol_masses[:, np.newaxis], axis=0) / np.sum(mol_masses)
+            if np.all(com_scaled >= 1.0/3.0) and np.all(com_scaled < 2.0/3.0):
+                supercell_subset.append(atom_indices)
+                n_atoms_found += len(atom_indices)
     
-    grouped_indices = [np.where(molecule_labels == i)[0] for i in range(n_molecules)]    
-    contiguous_positions = atoms.positions.copy()
-    processed_indices = set()
-    
-    cell = atoms.get_cell()
-    inv_cell = np.linalg.inv(cell)
-    masses = atoms.get_masses()
-    com_vectors = np.zeros((n_molecules, 3))
+    assert n_atoms_found == n_atoms_unit_cell
 
-    for molecule_idx, indices in enumerate(grouped_indices):
-        if len(indices) == 0 or indices[0] in processed_indices:
-            continue
-        #
-        # Translate periodic images to make the atomic positions
-        # within the molecule contiguous in space
-        #
-        q = deque()
-        start_idx = indices[0]
-        q.append(start_idx)
-        processed_indices.add(start_idx)
+    grouped_indices = []
+    for x in supercell_subset:
+        grouped_indices.append(supercell_to_unit_cell[x])
 
-        # We need to keep track of visited atoms within this molecule's traversal
-        # because the global `processed_indices` is only for starting new traversals.
-        visited_in_molecule = {start_idx}
-
-        while q:
-            current_idx = q.popleft()
-            neighbors, offsets = neighbor_list.get_neighbors(current_idx)
-
-            for neighbor_idx, offset in zip(neighbors, offsets):
-                if neighbor_idx not in visited_in_molecule:
-                    
-                    visited_in_molecule.add(neighbor_idx)
-                    processed_indices.add(neighbor_idx)
-                    
-                    offset_vec = offset @ cell
-                    bond_vector = (atoms.positions[neighbor_idx] + offset_vec) - atoms.positions[current_idx]
-                    contiguous_positions[neighbor_idx] = contiguous_positions[current_idx] + bond_vector
-                    q.append(neighbor_idx)
-
-        mol_masses = masses[indices]
-        total_mol_mass = np.sum(mol_masses)
-        com_vectors[molecule_idx] = np.sum(contiguous_positions[indices] * mol_masses[:, np.newaxis], axis=0) / total_mol_mass
-
+    supercell_subset = np.concatenate(supercell_subset)
+    system_unwrapped = system.copy()
+    positions_unwrapped = np.zeros((n_atoms_unit_cell, 3))
+    positions_unwrapped[supercell_to_unit_cell[supercell_subset]] = supercell.positions[supercell_subset]
     #
-    # Translate molecular centers of mass to the interior of the original
-    # unit cell
+    # Shift COM to (0, 0, 0)
     #
-    shifted_com_vectors = ase.geometry.wrap_positions(
-        positions=com_vectors,
-        cell=atoms.cell,
-        pbc=atoms.pbc
-    )
-    delta_r = shifted_com_vectors - com_vectors
-    for molecule_idx, indices in enumerate(grouped_indices):
-        contiguous_positions[indices] += delta_r[molecule_idx][np.newaxis, :]
-    #
-    # Set the center of mass of the total system to (0, 0, 0)
-    #
-    total_system_com = np.sum(contiguous_positions * masses[:, np.newaxis], axis=0) / np.sum(masses)
-    contiguous_positions -= total_system_com[np.newaxis, :]
-    shifted_com_vectors -= total_system_com[np.newaxis, :]
+    com = (np.sum(positions_unwrapped * system_unwrapped.masses[:, np.newaxis], axis=0)
+           / np.sum(system_unwrapped.masses))
+    positions_unwrapped -= com[np.newaxis, :]
 
-    identical = _test_identical_composition(
-        system,
-        grouped_indices
-    )
-    if assert_identical_composition:
-        assert identical, "Found molecules which differ in composition"
-    if identical:
-        grouped_indices = np.array(grouped_indices)
-
-    total_system = system.copy()
     if system.n_frames == 1:
-        total_system.positions = contiguous_positions
+        system_unwrapped.positions = positions_unwrapped
     else:
-        delta_r = contiguous_positions - total_system.positions[frame_index]
-        total_system.positions += delta_r[np.newaxis, :, :]
+        delta_r = positions_unwrapped - system.positions[reference_frame_index]
+        system_unwrapped.positions = system.positions + delta_r[np.newaxis, :, :]
 
-    com_distances_from_origin = np.linalg.norm(shifted_com_vectors, axis=1)
-    central_molecule_index = int(np.argmin(com_distances_from_origin))
-    ref_positions = contiguous_positions[grouped_indices[central_molecule_index]]
-    min_distances = np.zeros(n_molecules)
-    max_distances = np.zeros(n_molecules)
-    for i in range(n_molecules):
+    n_molecules_unit_cell = len(grouped_indices)
+    centers_of_mass = np.zeros((n_molecules_unit_cell, 3))
+    for i in range(n_molecules_unit_cell):
+        r = positions_unwrapped[grouped_indices[i]]
+        m = system_unwrapped.masses[grouped_indices[i]]
+        centers_of_mass[i] = np.sum(r * m[:, np.newaxis], axis=0) / np.sum(m)
+
+    identical = _test_identical_composition(system_unwrapped, grouped_indices)
+    if assert_identical_composition and not identical:
+        raise ValueError("Found molecules which differ in composition.")
+
+    if identical:
+        grouped_indices = np.stack(grouped_indices, axis=0)
+    
+    com_distances_from_origin = np.linalg.norm(centers_of_mass, axis=1)
+    central_molecule_index = np.argmin(com_distances_from_origin)
+    
+    ref_indices = grouped_indices[central_molecule_index]
+    ref_positions = positions_unwrapped[ref_indices]
+    min_distances = np.zeros(n_molecules_unit_cell)
+    max_distances = np.zeros(n_molecules_unit_cell)
+
+    for i in range(n_molecules_unit_cell):
         if i == central_molecule_index:
-            min_distances[i] = 0.0
-            max_distances[i] = 0.0
-        else:
-            neighbor_positions = contiguous_positions[grouped_indices[i]]
-            pairwise_distances = scipy.spatial.distance.cdist(ref_positions, neighbor_positions)
-            min_distances[i] = np.min(pairwise_distances) 
-            max_distances[i] = np.max(pairwise_distances)
-            
+            continue
+        neighbor_indices = grouped_indices[i]
+        neighbor_positions = positions_unwrapped[neighbor_indices]
+        pairwise_distances = scipy.spatial.distance.cdist(ref_positions, neighbor_positions)
+        min_distances[i] = np.min(pairwise_distances) 
+        max_distances[i] = np.max(pairwise_distances)
+
     return mbe_automation.storage.Clustering(
-        supercell=total_system,
+        supercell=system_unwrapped,
         index_map=grouped_indices,
-        centers_of_mass=shifted_com_vectors,
+        centers_of_mass=centers_of_mass,
         identical_composition=identical,
-        n_molecules=n_molecules,
+        n_molecules=n_molecules_unit_cell,
         central_molecule_index=central_molecule_index,
         min_distances_to_central_molecule=min_distances,
         max_distances_to_central_molecule=max_distances
@@ -357,13 +371,11 @@ def extract_finite_subsystem(
         distance: float | None = None,
 ) -> mbe_automation.storage.FiniteSubsystem:
     """
-    Filter out a finite molecular cluster from a periodic structure.
-    The molecules belonging to the cluster are chosen according
-    to their distance from the origin of the coordinate system.
+    Extract a finite molecular cluster from a periodic structure.
 
-    For a structure with n_frames > 1, it is assumed that
-    (1) the covalent bonds do not change between frames,
-    (2) there is no permutation of atoms between frames.
+    Molecules are selected based on specified distance criteria. For
+    trajectories, assumes constant covalent bonds and no atom
+    permutation between frames.
     """
 
     if filter in ["closest_to_center_of_mass",

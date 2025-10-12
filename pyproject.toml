@@ -27,7 +27,8 @@ dependencies = [
   "doped",
   "dynasor",
   "nglview",
-  "pymatviz"
+  "pymatviz",
+  "chemiscope",
 ]
 
 [project.optional-dependencies]
