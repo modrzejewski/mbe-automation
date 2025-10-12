@@ -497,15 +497,15 @@ def trajectory(
     )
     if finite_cluster_filter is not None:
         #
-        # Extract the central molecular cluster
-        # composed of n molecules, where n=extract_molecular_cluster
+        # Extract a finite molecular cluster by filtering
+        # whole molecules out of the supercell structure.
         #
-        # The connectivity does not change so the molecules
-        # are identified only for frame 0.
+        # Note that the connectivity does not change in the harmonic
+        # model. Thus, the covalent bonds are identified only at frame 0.
         #
         clustering = mbe_automation.structure.clusters.detect_molecules(
             system=traj,
-            frame_index=0
+            reference_frame_index=0
         )
         finite_subsystem = mbe_automation.structure.clusters.extract_finite_subsystem(
             clustering=clustering,
