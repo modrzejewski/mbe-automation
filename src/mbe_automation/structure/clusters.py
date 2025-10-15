@@ -22,6 +22,7 @@ import pymatgen.analysis.local_env
 import pymatgen.analysis.graphs
 
 import mbe_automation.storage
+import mbe_automation.structure.crystal
 
 def Label(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
@@ -324,6 +325,30 @@ def detect_molecules(
         pairwise_distances = scipy.spatial.distance.cdist(ref_positions, neighbor_positions)
         min_distances[i] = np.min(pairwise_distances) 
         max_distances[i] = np.max(pairwise_distances)
+
+    for i in range(system.n_frames):
+        if system.positions.ndim == 3:
+            positions_a = system.positions[i]
+            positions_b = system_unwrapped.positions[i]
+        else:
+            positions_a = system.positions
+            positions_b = system_unwrapped.positions
+        if system.cell_vectors.ndim == 3:
+            cell_a = system.cell_vectors[i]
+            cell_b = system_unwrapped.cell_vectors[i]
+        else:
+            cell_a = system.cell_vectors
+            cell_b = system_unwrapped.cell_vectors
+
+        atomic_numbers_a = system.atomic_numbers
+        atomic_numbers_b = system_unwrapped.atomic_numbers
+            
+        rmsd = mbe_automation.structure.crystal.match(
+            positions_a, atomic_numbers_a, cell_a,
+            positions_b, atomic_numbers_b, cell_b
+        )
+        assert rmsd is not None
+        assert rmsd < 1.0E-8
 
     return mbe_automation.storage.MolecularCrystal(
         supercell=system_unwrapped,

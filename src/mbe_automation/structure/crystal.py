@@ -12,6 +12,7 @@ import warnings
 import numpy as np
 import numpy.typing as npt
 from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
+from pymatgen.analysis.structure_matcher import StructureMatcher
 import pymatgen
 
 import mbe_automation.storage
@@ -271,3 +272,62 @@ def density(unit_cell: Atoms):
     return rho_g_per_cm3
 
 
+def match(
+    positions_a: npt.NDArray[np.floating],
+    atomic_numbers_a: npt.NDArray[np.integer],
+    cell_vectors_a: npt.NDArray[np.floating],
+    positions_b: npt.NDArray[np.floating],
+    atomic_numbers_b: npt.NDArray[np.integer],
+    cell_vectors_b: npt.NDArray[np.floating],
+    ltol: float = 0.2,
+    stol: float = 0.3,
+    angle_tol: float = 5.0
+) -> float | None:
+    """
+    Calculate minimum RMSD between two periodic structures.
+
+    Verifies identical atom count and elemental composition before matching.
+    The function reorders atoms to find the optimal fit.
+
+    Args:
+        positions_a: Atomic positions for structure A. Shape: (n_atoms, 3).
+        atomic_numbers_a: Atomic numbers for structure A. Shape: (n_atoms,).
+        cell_vectors_a: Lattice vectors for structure A. Shape: (3, 3).
+        positions_b: Atomic positions for structure B. Shape: (n_atoms, 3).
+        atomic_numbers_b: Atomic numbers for structure B. Shape: (n_atoms,).
+        cell_vectors_b: Lattice vectors for structure B. Shape: (3, 3).
+        ltol: Fractional length tolerance for lattice matching.
+        stol: Site tolerance for matching.
+        angle_tol: Angle tolerance for lattice matching in degrees.
+
+    Returns:
+        The minimum RMSD between the two structures in Å, or None if they
+        do not match within the given tolerances.
+    """
+    if atomic_numbers_a.shape[0] != atomic_numbers_b.shape[0]:
+         raise ValueError("Structures must have the same number of atoms.")
+
+    max_z = max(np.max(atomic_numbers_a), np.max(atomic_numbers_b))
+    composition_a = np.bincount(atomic_numbers_a, minlength=max_z + 1)
+    composition_b = np.bincount(atomic_numbers_b, minlength=max_z + 1)
+    if not np.array_equal(composition_a, composition_b):
+        raise ValueError("Structures have different elemental compositions.")
+
+    pmg_struct_a = pymatgen.core.Structure(
+        lattice=cell_vectors_a,
+        species=atomic_numbers_a,
+        coords=positions_a,
+        coords_are_cartesian=True
+    )
+    pmg_struct_b = pymatgen.core.Structure(
+        lattice=cell_vectors_b,
+        species=atomic_numbers_b,
+        coords=positions_b,
+        coords_are_cartesian=True
+    )
+
+    matcher = StructureMatcher(ltol=ltol, stol=stol, angle_tol=angle_tol)
+    # get_rms_dist returns (rmsd, mapping)
+    rmsd, _ = matcher.get_rms_dist(pmg_struct_a, pmg_struct_b)
+
+    return rmsd
