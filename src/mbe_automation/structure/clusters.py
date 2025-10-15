@@ -15,6 +15,11 @@ from ase.neighborlist import natural_cutoffs, build_neighbor_list
 from scipy.sparse.csgraph import connected_components
 from scipy import sparse
 import scipy
+import networkx
+import pymatgen
+import pymatgen.analysis
+import pymatgen.analysis.local_env
+import pymatgen.analysis.graphs
 
 import mbe_automation.storage
 
@@ -211,24 +216,10 @@ def detect_molecules(
         system: mbe_automation.storage.Structure,
         reference_frame_index: int = 0,
         assert_identical_composition: bool = True,
-        bond_cutoff_scaling: float = 1.0
-) -> mbe_automation.storage.Clustering:
+        bonding_algo: pymatgen.analysis.local_env.NearNeighbors=pymatgen.analysis.local_env.JmolNN()
+) -> mbe_automation.storage.MolecularCrystal:
     """
     Identify molecules in a periodic Structure.
-
-    Resolve periodic boundary conditions to represent each molecule as a
-    contiguous set of atoms. The final system is centered at its
-    center of mass.
-
-    Args:
-        system: A periodic Structure object.
-        reference_frame_index: Frame index for geometry if system has n_frames > 1.
-        assert_identical_composition: If True, raise error if molecules differ
-        in elemental composition.
-        bond_cutoff_scaling: Scaling factor for covalent bond radii.
-
-    Returns:
-        A Clustering object containing the unwrapped supercell and molecule map.
     """
     if not system.periodic:
         raise ValueError("detect_molecules is designed for periodic systems.")
@@ -237,54 +228,40 @@ def detect_molecules(
         positions_ref = system.positions[reference_frame_index]
     else:
         positions_ref = system.positions
-        
-    n_atoms_unit_cell = system.n_atoms        
-    positions_super = np.zeros((3, 3, 3, n_atoms_unit_cell, 3))
-    masses_super = np.zeros((3, 3, 3, n_atoms_unit_cell))
-    atomic_numbers_super = np.zeros((3, 3, 3, n_atoms_unit_cell), dtype=int)
-    supercell_to_unit_cell = np.zeros((3, 3, 3, n_atoms_unit_cell), dtype=int)
+
     if system.cell_vectors.ndim == 3:
         unit_cell_vectors = system.cell_vectors[reference_frame_index]
     else:
         unit_cell_vectors = system.cell_vectors
-    for ix, x in enumerate(np.array([-1, 0, 1])):
-        for iy, y in enumerate(np.array([-1, 0, 1])):
-            for iz, z in enumerate(np.array([-1, 0, 1])):
-                v = np.array([x, y, z]) @ unit_cell_vectors
-                positions_super[ix, iy, iz, :, :] = positions_ref + v[np.newaxis, :]
-                masses_super[ix, iy, iz, :] = system.masses
-                atomic_numbers_super[ix, iy, iz, :] = system.atomic_numbers
-                supercell_to_unit_cell[ix, iy, iz, :] = np.arange(n_atoms_unit_cell)
-    n_atoms_supercell = 3**3 * n_atoms_unit_cell
-    supercell_to_unit_cell = supercell_to_unit_cell.reshape(-1)
-    supercell = ase.Atoms(
-        positions=positions_super.reshape(n_atoms_supercell, 3),
-        masses=masses_super.reshape(-1),
-        numbers=atomic_numbers_super.reshape(-1),
-        cell=unit_cell_vectors * 3.0,
-        pbc=np.array([True, True, True])
-    )
-    supercell.wrap()
+        
+    n_atoms_unit_cell = system.n_atoms
 
-    neighbor_list = ase.neighborlist.build_neighbor_list(
-        supercell,
-        cutoffs=natural_cutoffs(supercell, mult=bond_cutoff_scaling),
-        bothways=True
+    supercell = pymatgen.core.Structure(
+        lattice=unit_cell_vectors,
+        species=system.atomic_numbers,
+        coords=positions_ref,
+        coords_are_cartesian=True,
+        site_properties={"original_index": np.arange(n_atoms_unit_cell)}
+    ).make_supercell([3, 3, 3])
+    supercell_to_unit_cell = np.array(supercell.site_properties["original_index"])
+    
+    structure_graph = pymatgen.analysis.graphs.StructureGraph.from_local_env_strategy(
+        structure=supercell,
+        strategy=bonding_algo
     )
-    adj_matrix = neighbor_list.get_connectivity_matrix(sparse=True)
-    n_molecules_supercell, mol_labels = scipy.sparse.csgraph.connected_components(adj_matrix)
-
-    masses = supercell.get_masses()
-    scaled_positions = supercell.get_scaled_positions()
+    components = list(networkx.weakly_connected_components(structure_graph.graph))
+    masses = np.array([site.specie.atomic_mass for site in supercell.sites])
+    scaled_positions = supercell.frac_coords
+    
     supercell_subset = []
     n_atoms_found = 0
-    for mol_id in range(n_molecules_supercell):
-        atom_indices = np.where(mol_labels == mol_id)[0]
-        contiguous = True
-        for atom_idx in atom_indices:
-            _, offsets = neighbor_list.get_neighbors(atom_idx)
-            if np.any(offsets != 0):
-                contiguous = False
+    for component in components:
+        atom_indices = np.array(list(component))        
+        subgraph = structure_graph.graph.subgraph(atom_indices)
+        if any(d["to_jimage"] != (0, 0, 0) for _, _, d in subgraph.edges(data=True)):
+            contiguous = False
+        else:
+            contiguous = True
         if contiguous:
             mol_positions = scaled_positions[atom_indices]
             mol_masses = masses[atom_indices]
@@ -298,28 +275,29 @@ def detect_molecules(
     grouped_indices = []
     for x in supercell_subset:
         grouped_indices.append(supercell_to_unit_cell[x])
-
     supercell_subset = np.concatenate(supercell_subset)
+
+    positions_ref_unwrapped = np.zeros((n_atoms_unit_cell, 3))
+    positions_ref_unwrapped[supercell_to_unit_cell[supercell_subset]] = supercell.cart_coords[supercell_subset]
+    com = (np.sum(positions_ref_unwrapped * system.masses[:, np.newaxis], axis=0)
+           / np.sum(system.masses))
+    positions_ref_unwrapped -= com[np.newaxis, :]
+    shifts_cart = positions_ref_unwrapped - positions_ref
+    shifts_frac = shifts_cart @ np.linalg.inv(unit_cell_vectors)
+
     system_unwrapped = system.copy()
-    positions_unwrapped = np.zeros((n_atoms_unit_cell, 3))
-    positions_unwrapped[supercell_to_unit_cell[supercell_subset]] = supercell.positions[supercell_subset]
-    #
-    # Shift COM to (0, 0, 0)
-    #
-    com = (np.sum(positions_unwrapped * system_unwrapped.masses[:, np.newaxis], axis=0)
-           / np.sum(system_unwrapped.masses))
-    positions_unwrapped -= com[np.newaxis, :]
-
-    if system.n_frames == 1:
-        system_unwrapped.positions = positions_unwrapped
-    else:
-        delta_r = positions_unwrapped - system.positions[reference_frame_index]
-        system_unwrapped.positions = system.positions + delta_r[np.newaxis, :, :]
-
+    if system.n_frames > 1:
+        for i in range(system.n_frames):
+            cell_i = system.cell_vectors[i]
+            unwrapped_cart_i = (system.positions[i] @ np.linalg.inv(cell_i) + shifts_frac) @ cell_i
+            system_unwrapped.positions[i] = unwrapped_cart_i
+    else:        
+        system_unwrapped.positions = positions_ref_unwrapped
+        
     n_molecules_unit_cell = len(grouped_indices)
     centers_of_mass = np.zeros((n_molecules_unit_cell, 3))
     for i in range(n_molecules_unit_cell):
-        r = positions_unwrapped[grouped_indices[i]]
+        r = positions_ref_unwrapped[grouped_indices[i]]
         m = system_unwrapped.masses[grouped_indices[i]]
         centers_of_mass[i] = np.sum(r * m[:, np.newaxis], axis=0) / np.sum(m)
 
@@ -334,7 +312,7 @@ def detect_molecules(
     central_molecule_index = np.argmin(com_distances_from_origin)
     
     ref_indices = grouped_indices[central_molecule_index]
-    ref_positions = positions_unwrapped[ref_indices]
+    ref_positions = positions_ref_unwrapped[ref_indices]
     min_distances = np.zeros(n_molecules_unit_cell)
     max_distances = np.zeros(n_molecules_unit_cell)
 
@@ -342,12 +320,12 @@ def detect_molecules(
         if i == central_molecule_index:
             continue
         neighbor_indices = grouped_indices[i]
-        neighbor_positions = positions_unwrapped[neighbor_indices]
+        neighbor_positions = positions_ref_unwrapped[neighbor_indices]
         pairwise_distances = scipy.spatial.distance.cdist(ref_positions, neighbor_positions)
         min_distances[i] = np.min(pairwise_distances) 
         max_distances[i] = np.max(pairwise_distances)
 
-    return mbe_automation.storage.Clustering(
+    return mbe_automation.storage.MolecularCrystal(
         supercell=system_unwrapped,
         index_map=grouped_indices,
         centers_of_mass=centers_of_mass,
@@ -360,7 +338,7 @@ def detect_molecules(
 
 
 def extract_finite_subsystem(
-        clustering: mbe_automation.storage.Clustering,
+        system: mbe_automation.storage.MolecularCrystal,
         filter: Literal[
             "closest_to_center_of_mass",
             "closest_to_central_molecule",
@@ -388,38 +366,38 @@ def extract_finite_subsystem(
             raise ValueError("distance must be set and n_molecules must be None.")
 
     if filter == "closest_to_center_of_mass":
-        com_distances_from_origin = np.linalg.norm(clustering.centers_of_mass, axis=1)
+        com_distances_from_origin = np.linalg.norm(system.centers_of_mass, axis=1)
         sorted_indices = np.argsort(com_distances_from_origin, stable=True)
         filtered_molecule_indices = sorted_indices[0:n_molecules]
     elif filter == "closest_to_central_molecule":
-        sorted_indices = np.argsort(clustering.min_distances_to_central_molecule, stable=True)
+        sorted_indices = np.argsort(system.min_distances_to_central_molecule, stable=True)
         filtered_molecule_indices = sorted_indices[0:n_molecules]
     elif filter == "max_max_distance_to_central_molecule":
-        mask = clustering.max_distances_to_central_molecule < distance
+        mask = system.max_distances_to_central_molecule < distance
         filtered_molecule_indices = np.where(mask)[0]
     elif filter == "max_min_distance_to_central_molecule":
-        mask = clustering.min_distances_to_central_molecule < distance            
+        mask = system.min_distances_to_central_molecule < distance            
         filtered_molecule_indices = np.where(mask)[0]
     else:
         raise ValueError(f"Invalid filter: {filter}")
 
     filtered_atom_indices = np.concatenate(
-        [clustering.index_map[i] for i in filtered_molecule_indices]
+        [system.index_map[i] for i in filtered_molecule_indices]
     )
-    if clustering.supercell.positions.ndim == 3:
-        subsystem_pos = clustering.supercell.positions[:, filtered_atom_indices, :]
-    elif clustering.supercell.positions.ndim == 2:
-        subsystem_pos = clustering.supercell.positions[filtered_atom_indices, :]
+    if system.supercell.positions.ndim == 3:
+        subsystem_pos = system.supercell.positions[:, filtered_atom_indices, :]
+    elif system.supercell.positions.ndim == 2:
+        subsystem_pos = system.supercell.positions[filtered_atom_indices, :]
     else:
-        raise ValueError(f"Invalid rank of clustering.supercell.positions: {clustering.supercell.positions.ndim}")
+        raise ValueError(f"Invalid rank of system.supercell.positions: {system.supercell.positions.ndim}")
         
     finite_subsystem = mbe_automation.storage.FiniteSubsystem(
         cluster_of_molecules=mbe_automation.storage.Structure(
             positions=subsystem_pos,
-            atomic_numbers=clustering.supercell.atomic_numbers[filtered_atom_indices],
-            masses=clustering.supercell.masses[filtered_atom_indices], 
+            atomic_numbers=system.supercell.atomic_numbers[filtered_atom_indices],
+            masses=system.supercell.masses[filtered_atom_indices], 
             cell_vectors=None,
-            n_frames=clustering.supercell.n_frames,
+            n_frames=system.supercell.n_frames,
             n_atoms=len(filtered_atom_indices),
             periodic=False
         ),

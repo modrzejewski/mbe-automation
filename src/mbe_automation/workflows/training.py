@@ -44,8 +44,6 @@ def run(
 
     system_label = f"crystal_T_{config.temperature_K:.2f}_p_{config.pressure_GPa:.5f}"
     pbc_trajectory_key = f"training_set/md/trajectories/{system_label}"
-    pbc_clustering_key = f"training_set/md/clustering/{system_label}"
-    finite_subsystem_key = f"training_set/md/finite_subsystems/{system_label}"
     
     mbe_automation.dynamics.md.core.run(
         system=config.crystal,
@@ -72,40 +70,63 @@ def run(
         dataset=config.dataset,
         key=pbc_trajectory_key
     )
-    pbc_md_clustering = mbe_automation.structure.clusters.detect_molecules(
+    md_molecular_crystal_key = f"training_set/md/molecular_crystals/{system_label}"
+    md_molecular_crystal = mbe_automation.structure.clusters.detect_molecules(
         system=pbc_md_frames,
         reference_frame_index=0,
         assert_identical_composition=config.assert_identical_composition,
     )
-    mbe_automation.storage.save_clustering(
+    mbe_automation.storage.save_molecular_crystal(
         dataset=config.dataset,
-        key=pbc_clustering_key,
-        clustering=pbc_md_clustering,
+        key=md_molecular_crystal_key,
+        system=md_molecular_crystal,
     )
-    finite_subsystem = mbe_automation.structure.clusters.extract_finite_subsystem(
-        clustering=pbc_md_clustering,
-        filter=config.finite_subsystem_filter,
-        n_molecules=config.finite_subsystem_n_molecules,
-        distance=config.finite_subsystem_distance
-    )
-    if mace_available:
-        if isinstance(config.calculator, MACECalculator):
-            mace_output = mbe_automation.ml.mace.inference(
-                calculator=config.calculator,
-                structure=finite_subsystem.cluster_of_molecules,
-                energies=True,
-                forces=True,
-                feature_vectors=True
-            )
-            finite_subsystem.cluster_of_molecules.E_pot = mace_output.E_pot
-            finite_subsystem.cluster_of_molecules.forces = mace_output.forces
-            finite_subsystem.cluster_of_molecules.feature_vectors = mace_output.feature_vectors
+    if config.finite_subsystem_filter in [
+            "closest_to_center_of_mass",
+            "closest_to_central_molecule"
+    ]:
+        finite_subsystem_keys = [
+            f"training_set/md/finite_subsystems/{system_label}_{n}_molecules"
+            for n in config.finite_subsystem_n_molecules]
+        n_subsystems = len(config.finite_subsystem_n_molecules)
+
+    elif config.finite_subsystem_filter == "max_min_distance_to_central_molecule":
+        finite_subsystem_keys = [
+            f"training_set/md/finite_subsystems/{system_label}_max_min_r_{r:.2f}"
+            for r in config.finite_subsystem_distances]
+        n_subsystems = len(config.finite_subsystem_distances)
+
+    elif config.finite_subsystem_filter == "max_max_distance_to_central_molecule":
+        finite_subsystem_keys = [
+            f"training_set/md/finite_subsystems/{system_label}_max_max_r_{r:.2f}"
+            for r in config.finite_subsystem_distances]
+        n_subsystems = len(config.finite_subsystem_distances)
+
+    for i in range(n_subsystems):
+        finite_subsystem = mbe_automation.structure.clusters.extract_finite_subsystem(
+            system=md_molecular_crystal,
+            filter=config.finite_subsystem_filter,
+            n_molecules=config.finite_subsystem_n_molecules[i],
+            distance=config.finite_subsystem_distances[i]
+        )
+        if mace_available:
+            if isinstance(config.calculator, MACECalculator):
+                mace_output = mbe_automation.ml.mace.inference(
+                    calculator=config.calculator,
+                    structure=finite_subsystem.cluster_of_molecules,
+                    energies=True,
+                    forces=True,
+                    feature_vectors=True
+                )
+                finite_subsystem.cluster_of_molecules.E_pot = mace_output.E_pot
+                finite_subsystem.cluster_of_molecules.forces = mace_output.forces
+                finite_subsystem.cluster_of_molecules.feature_vectors = mace_output.feature_vectors
             
-    mbe_automation.storage.save_finite_subsystem(
-        dataset=config.dataset,
-        key=finite_subsystem_key,
-        subsystem=finite_subsystem
-    )
+        mbe_automation.storage.save_finite_subsystem(
+            dataset=config.dataset,
+            key=finite_subsystem_keys[i],
+            subsystem=finite_subsystem
+        )
         
     print("Training set completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)
