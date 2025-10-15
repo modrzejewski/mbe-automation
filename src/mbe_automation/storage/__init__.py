@@ -6,7 +6,7 @@ from mbe_automation.storage.core import (
     EOSCurves,
     Structure,
     Trajectory,
-    Clustering,
+    MolecularCrystal,
     FiniteSubsystem,
 
     save_data_frame,
@@ -24,8 +24,8 @@ from mbe_automation.storage.core import (
     read_structure,
     save_trajectory,
     read_trajectory,
-    save_clustering,
-    read_clustering,
+    save_molecular_crystal,
+    read_molecular_crystal,
     save_finite_subsystem,
     read_finite_subsystem,
     
@@ -53,7 +53,7 @@ __all__ = [
     "EOSCurves",
     "Structure",
     "Trajectory",
-    "Clustering",
+    "MolecularCrystal",
     "FiniteSubsystem",
     
     # Core I/O functions
@@ -69,8 +69,8 @@ __all__ = [
     "read_structure",
     "save_trajectory",
     "read_trajectory",
-    "save_clustering",
-    "read_clustering",
+    "save_molecular_crystal",
+    "read_molecular_crystal",
     "save_finite_subsystem",
     "read_finite_subsystem",
     "read_gamma_point_eigenvecs",

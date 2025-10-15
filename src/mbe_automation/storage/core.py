@@ -123,7 +123,7 @@ class Trajectory(Structure):
         )
 
 @dataclass
-class Clustering:
+class MolecularCrystal:
     supercell: Structure
     index_map: List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
     centers_of_mass: npt.NDArray[np.floating]
@@ -737,13 +737,13 @@ def read_gamma_point_eigenvecs(
         raise ValueError(f"Γ point not found in dataset '{dataset}' at key '{key}'.")
 
 
-def save_clustering(
+def save_molecular_crystal(
         dataset: str,
         key: str,
-        clustering: Clustering
+        system: MolecularCrystal
 ):
     """
-    Save a Clustering object to a dataset.
+    Save a MolecularCrystal object to a dataset.
 
     If molecules have different compositions, the index_map (a list of arrays)
     is converted to a single 2D array padded with -1.
@@ -755,22 +755,22 @@ def save_clustering(
         
         group = f.create_group(key)
 
-        group.attrs["n_molecules"] = clustering.n_molecules
-        group.attrs["identical_composition"] = clustering.identical_composition
-        group.attrs["central_molecule_index"] = clustering.central_molecule_index
+        group.attrs["n_molecules"] = system.n_molecules
+        group.attrs["identical_composition"] = system.identical_composition
+        group.attrs["central_molecule_index"] = system.central_molecule_index
         group.create_dataset(
             name="centers_of_mass (Å)",
-            data=clustering.centers_of_mass
+            data=system.centers_of_mass
         )
-        index_map_to_save = clustering.index_map
-        if not clustering.identical_composition:
-            max_len = max(len(indices) for indices in clustering.index_map)
+        index_map_to_save = system.index_map
+        if not system.identical_composition:
+            max_len = max(len(indices) for indices in system.index_map)
             padded_array = np.full(
-                (clustering.n_molecules, max_len), 
+                (system.n_molecules, max_len), 
                 fill_value=-1, 
-                dtype=clustering.index_map[0].dtype
+                dtype=system.index_map[0].dtype
             )
-            for i, indices in enumerate(clustering.index_map):
+            for i, indices in enumerate(system.index_map):
                 padded_array[i, :len(indices)] = indices
             index_map_to_save = padded_array
 
@@ -780,23 +780,23 @@ def save_clustering(
         )
         group.create_dataset(
             name="min_distances_to_central_molecule (Å)",
-            data=clustering.min_distances_to_central_molecule
+            data=system.min_distances_to_central_molecule
         )
         group.create_dataset(
             name="max_distances_to_central_molecule (Å)",
-            data=clustering.max_distances_to_central_molecule
+            data=system.max_distances_to_central_molecule
         )
         
     save_structure(
         dataset=dataset,
         key=f"{key}/supercell",
-        structure=clustering.supercell
+        structure=system.supercell
     )
 
 
-def read_clustering(dataset: str, key: str) -> Clustering:
+def read_molecular_crystal(dataset: str, key: str) -> MolecularCrystal:
     """
-    Read a Clustering object from a dataset.
+    Read a MolecularCrystal object from a dataset.
     
     """
     with h5py.File(dataset, "r") as f:
@@ -816,7 +816,7 @@ def read_clustering(dataset: str, key: str) -> Clustering:
 
     supercell = read_structure(dataset, key=f"{key}/supercell")
 
-    return Clustering(
+    return MolecularCrystal(
         supercell=supercell,
         index_map=index_map,
         centers_of_mass=centers_of_mass,

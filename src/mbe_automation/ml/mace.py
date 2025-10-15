@@ -40,11 +40,11 @@ def inference(
         if forces:
             forces_out[i] = atoms.get_forces()
         if feature_vectors:
-            current_features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
+            features = calculator.get_descriptors(atoms)
             if i == 0:
-                n_features = current_features.shape[1]
-                features_out = np.zeros((structure.n_frames, structure.n_atoms, n_features))
-            features_out[i] = current_features
+                n_features = features.size // structure.n_atoms
+                features_out = np.zeros((structure.n_frames, *features.shape))
+            features_out[i] = features
 
     return MACEOutput(
         n_frames=structure.n_frames,
