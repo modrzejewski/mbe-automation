@@ -15,9 +15,7 @@ class FreeEnergy:
                                    # and isolated molecule
                                    #
     crystal: Atoms
-    crystal_label: str = "crystal_base"
     molecule: Atoms | None
-    molecule_label: str = "molecule_base"
                                    #
                                    # Calculator of energies and forces
                                    #
@@ -118,9 +116,9 @@ class FreeEnergy:
                                    #
                                    # Needed to keep separate quasi-harmonic training data 
                                    # and final quasi-harmonic properties from the trained
-                                   # model.
+                                   # model. 
                                    #
-    root_key: Literal["quasi_harmonic", "training_set/quasi_harmonic"] = "quasi_harmonic"
+    root_key: str = "quasi_harmonic"
                                    #
                                    # Minimum point-periodic image distance
                                    # in the supercell used to compute phonons.

@@ -42,8 +42,8 @@ def run(
     else:
         supercell_matrix = config.md_crystal.supercell_matrix
 
-    system_label = f"crystal_T_{config.temperature_K:.2f}_p_{config.pressure_GPa:.5f}"
-    pbc_trajectory_key = f"training_set/md/trajectories/{system_label}"
+    system_label = f"crystal[T={config.temperature_K:.2f},p={config.pressure_GPa:.5f}]"
+    pbc_trajectory_key = f"{config.root_key}/md/{system_label}/trajectory"
     
     mbe_automation.dynamics.md.core.run(
         system=config.crystal,
@@ -61,8 +61,10 @@ def run(
             key=pbc_trajectory_key,
             save_path=os.path.join(
                 config.work_dir,
-                "training_set", "md", "pbc",
-                f"{system_label}.png"
+                "training_set",
+                "md",
+                system_label,
+                "trajectory.png"
             )
         )
 
@@ -70,7 +72,7 @@ def run(
         dataset=config.dataset,
         key=pbc_trajectory_key
     )
-    md_molecular_crystal_key = f"training_set/md/molecular_crystals/{system_label}"
+    md_molecular_crystal_key = f"{config.root_key}/md/{system_label}/molecular_crystal"
     md_molecular_crystal = mbe_automation.structure.clusters.detect_molecules(
         system=pbc_md_frames,
         reference_frame_index=0,
@@ -86,19 +88,19 @@ def run(
             "closest_to_central_molecule"
     ]:
         finite_subsystem_keys = [
-            f"training_set/md/finite_subsystems/{system_label}_{n}_molecules"
+            f"{config.root_key}/md/{system_label}/finite_subsystems/n={n}"
             for n in config.finite_subsystem_n_molecules]
         n_subsystems = len(config.finite_subsystem_n_molecules)
 
     elif config.finite_subsystem_filter == "max_min_distance_to_central_molecule":
         finite_subsystem_keys = [
-            f"training_set/md/finite_subsystems/{system_label}_max_min_r_{r:.2f}"
+            f"{config.root_key}/md/{system_label}/finite_subsystems/r={r:.2f}"
             for r in config.finite_subsystem_distances]
         n_subsystems = len(config.finite_subsystem_distances)
 
     elif config.finite_subsystem_filter == "max_max_distance_to_central_molecule":
         finite_subsystem_keys = [
-            f"training_set/md/finite_subsystems/{system_label}_max_max_r_{r:.2f}"
+            f"{config.root_key}/md/{system_label}/finite_subsystems/r={r:.2f}"
             for r in config.finite_subsystem_distances]
         n_subsystems = len(config.finite_subsystem_distances)
 

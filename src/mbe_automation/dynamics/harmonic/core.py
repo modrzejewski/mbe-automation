@@ -249,8 +249,7 @@ def equilibrium_curve(
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
         dataset,
-        root_key,
-        crystal_label
+        root_key
 ):
 
     geom_opt_dir = os.path.join(work_dir, "relaxation")
@@ -289,7 +288,7 @@ def equilibrium_curve(
             # to the pressure.
             #
             thermal_pressure = pressure_range[i]
-            label = f"{crystal_label}→(eos,p_thermal={thermal_pressure:.4f})"
+            label = f"crystal[eos,p_thermal={thermal_pressure:.4f}]"
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V0,
                 calculator,
@@ -301,7 +300,7 @@ def equilibrium_curve(
                 algo_primary=relax_algo_primary,
                 algo_fallback=relax_algo_fallback,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
-                key=f"{root_key}/relaxed_structures/{label}"
+                key=f"{root_key}/structures/{label}"
             )
         elif eos_sampling == "volume":
             #
@@ -315,7 +314,7 @@ def equilibrium_curve(
                 unit_cell_V0.cell * (V/V0)**(1/3),
                 scale_atoms=True
             )
-            label = f"{crystal_label}→(eos,V={V/V0:.4f})"
+            label = f"crystal[eos,V={V/V0:.4f}]"
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V,
                 calculator,                
@@ -327,7 +326,7 @@ def equilibrium_curve(
                 algo_primary=relax_algo_primary,
                 algo_fallback=relax_algo_fallback,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
-                key=f"{root_key}/relaxed_structures/{label}"
+                key=f"{root_key}/structures/{label}"
             )
         ph = phonons(
             unit_cell_V,

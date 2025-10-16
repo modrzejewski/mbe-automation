@@ -84,6 +84,10 @@ class TrainingSet:
                                    #
     dataset: str = "./properties.hdf5"
                                    #
+                                   # Root of the dataset hierarchical structure
+                                   #
+    root_key: str = "training_set"
+                                   #
                                    # Verbosity of the program's output.
                                    # 0 -> suppressed warnings
                                    #

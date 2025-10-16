@@ -39,11 +39,6 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     geom_opt_dir = os.path.join(config.work_dir, "relaxation")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
-    label_crystal = config.crystal_label
-    mbe_automation.structure.crystal.display(
-        unit_cell=config.crystal,
-        key=label_crystal
-    )
     if config.symmetrize_unit_cell:
         unit_cell, input_space_group = mbe_automation.structure.crystal.symmetrize(
             config.crystal
@@ -66,8 +61,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             max_force_on_atom=config.max_force_on_atom,
             algo_primary=config.relax_algo_primary,
             algo_fallback=config.relax_algo_fallback,
-            log=os.path.join(geom_opt_dir, f"{config.molecule_label}.txt"),
-            key=f"{config.root_key}/relaxed_structures/{config.molecule_label}"
+            log=os.path.join(geom_opt_dir, "molecule[relaxed].txt"),
+            key=f"{config.root_key}/structures/molecule[relaxed]"
         )
         vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
             molecule,
@@ -91,14 +86,14 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         max_force_on_atom=config.max_force_on_atom,
         algo_primary=config.relax_algo_primary,
         algo_fallback=config.relax_algo_fallback,
-        log=os.path.join(geom_opt_dir, f"{config.crystal_label}.txt"),
-        key=f"{config.root_key}/relaxed_structures/{config.crystal_label}"
+        log=os.path.join(geom_opt_dir, "crystal[relaxed].txt"),
+        key=f"{config.root_key}/structures/crystal[relaxed]"
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
     mbe_automation.structure.crystal.display(
         unit_cell=unit_cell_V0,
-        key=f"{config.root_key}/relaxed_structures/{config.crystal_label}"
+        key=f"{config.root_key}/structures/crystal[relaxed]"
     )
     #
     # The supercell transformation is computed once and kept
@@ -130,7 +125,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         interp_mesh=config.fourier_interpolation_mesh,
         symmetrize_force_constants=config.symmetrize_force_constants,
         force_constants_cutoff_radius=force_constants_cutoff_radius,
-        key=f"{config.root_key}/phonons/{config.crystal_label}"
+        key=f"{config.root_key}/phonons/crystal[relaxed]"
     )
     df_crystal = mbe_automation.dynamics.harmonic.data.crystal(
         unit_cell_V0,
@@ -141,7 +136,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         work_dir=config.work_dir,
         dataset=config.dataset,
         root_key=config.root_key,
-        system_label=config.crystal_label
+        system_label="crystal[relaxed]"
     )
     
     if config.molecule is not None:
@@ -149,7 +144,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             molecule,
             vibrations,
             config.temperatures_K,
-            system_label=config.molecule_label
+            system_label="molecule[relaxed]"
         )
         df_sublimation = mbe_automation.dynamics.harmonic.data.sublimation(
             df_crystal,
@@ -212,8 +207,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             config.filter_out_imaginary_optical,
             config.filter_out_broken_symmetry,
             config.dataset,
-            config.root_key,
-            config.crystal_label
+            config.root_key
         )
     except RuntimeError as e:
         print(f"An error occurred: {e}")
@@ -238,7 +232,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             unit_cell_V0.cell * (V/V0)**(1/3),
             scale_atoms=True
         )
-        label_crystal = f"{config.crystal_label}→(eq,T={T:.4f})"
+        label_crystal = f"crystal[eq,T={T:.4f}]"
         if config.eos_sampling == "pressure":
             #
             # Relax geometry with an effective pressure which
@@ -253,7 +247,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 symmetrize_final_structure=config.symmetrize_unit_cell,
                 max_force_on_atom=config.max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
-                key=f"{config.root_key}/relaxed_structures/{label_crystal}"
+                key=f"{config.root_key}/structures/{label_crystal}"
             )
         elif config.eos_sampling == "volume":
             #
@@ -269,7 +263,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 symmetrize_final_structure=config.symmetrize_unit_cell,
                 max_force_on_atom=config.max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
-                key=f"{config.root_key}/relaxed_structures/{label_crystal}"
+                key=f"{config.root_key}/structures/{label_crystal}"
             )
         phonons = mbe_automation.dynamics.harmonic.core.phonons(
             unit_cell_T,
