@@ -42,7 +42,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     label_crystal = config.crystal_label
     mbe_automation.structure.crystal.display(
         unit_cell=config.crystal,
-        system_label=label_crystal
+        key=label_crystal
     )
     if config.symmetrize_unit_cell:
         unit_cell, input_space_group = mbe_automation.structure.crystal.symmetrize(
@@ -91,7 +91,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         max_force_on_atom=config.max_force_on_atom,
         algo_primary=config.relax_algo_primary,
         algo_fallback=config.relax_algo_fallback,
-        log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
+        log=os.path.join(geom_opt_dir, f"{config.crystal_label}.txt"),
         key=f"{config.root_key}/relaxed_structures/{config.crystal_label}"
     )
     V0 = unit_cell_V0.get_volume()
@@ -130,7 +130,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         interp_mesh=config.fourier_interpolation_mesh,
         symmetrize_force_constants=config.symmetrize_force_constants,
         force_constants_cutoff_radius=force_constants_cutoff_radius,
-        system_label=config.crystal_label
+        key=f"{config.root_key}/phonons/{config.crystal_label}"
     )
     df_crystal = mbe_automation.dynamics.harmonic.data.crystal(
         unit_cell_V0,
@@ -279,7 +279,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             interp_mesh=interp_mesh,
             symmetrize_force_constants=config.symmetrize_force_constants,
             force_constants_cutoff_radius=force_constants_cutoff_radius,
-            system_label=label_crystal
+            key=f"{config.root_key}/phonons/{label_crystal}"
         )
         df_crystal_T = mbe_automation.dynamics.harmonic.data.crystal(
             unit_cell_T,
@@ -289,6 +289,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             space_group=space_group_T,
             work_dir=config.work_dir,
             dataset=config.dataset,
+            root_key=config.root_key,
             system_label=label_crystal
         )
         df_crystal_T.index = [i] # map current dataframe to temperature T
