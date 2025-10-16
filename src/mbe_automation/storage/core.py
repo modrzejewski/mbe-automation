@@ -677,7 +677,8 @@ def save_force_constants(
 
     primitive = phonons.primitive
     save_structure(
-        dataset, f"{key}/primitive",
+        dataset=dataset,
+        key=f"{key}/primitive",
         positions=primitive.positions,
         atomic_numbers=primitive.numbers,
         masses=primitive.masses,
@@ -686,7 +687,8 @@ def save_force_constants(
     
     supercell = phonons.supercell
     save_structure(
-        dataset, f"{key}/supercell",
+        dataset=dataset,
+        key=f"{key}/supercell",
         positions=supercell.positions,
         atomic_numbers=supercell.numbers,
         masses=supercell.masses,
