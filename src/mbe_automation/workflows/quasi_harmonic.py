@@ -39,7 +39,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     geom_opt_dir = os.path.join(config.work_dir, "relaxation")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
-    label_crystal = "crystal_input"
+    label_crystal = config.crystal_label
     mbe_automation.structure.crystal.display(
         unit_cell=config.crystal,
         system_label=label_crystal
@@ -53,27 +53,26 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             config.crystal
         )
         unit_cell = config.crystal.copy()
-        
-    molecule = config.molecule.copy()
 
     if mace_available:
         if isinstance(config.calculator, MACECalculator):
             mbe_automation.common.display.mace_summary(config.calculator)
 
-    label_molecule = "molecule_relaxed"
-    molecule = mbe_automation.structure.relax.isolated_molecule(
-        molecule,
-        config.calculator,
-        max_force_on_atom=config.max_force_on_atom,
-        algo_primary=config.relax_algo_primary,
-        algo_fallback=config.relax_algo_fallback,
-        log=os.path.join(geom_opt_dir, f"{label_molecule}.txt"),
-        system_label=label_molecule
-    )
-    vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
-        molecule,
-        config.calculator
-    )
+    if config.molecule is not None:
+        molecule = config.molecule.copy()
+        molecule = mbe_automation.structure.relax.isolated_molecule(
+            molecule,
+            config.calculator,
+            max_force_on_atom=config.max_force_on_atom,
+            algo_primary=config.relax_algo_primary,
+            algo_fallback=config.relax_algo_fallback,
+            log=os.path.join(geom_opt_dir, f"{config.molecule_label}.txt"),
+            key=f"{config.root_key}/relaxed_structures/{config.molecule_label}"
+        )
+        vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
+            molecule,
+            config.calculator
+        )
     #
     # Compute the reference cell volume (V0), lattice vectors, and atomic
     # positions by minimization of the electronic
@@ -83,7 +82,6 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # The points on the volume axis will be determined
     # by rescaling of V0.
     #
-    label_crystal = "crystal_relaxed"
     unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
         unit_cell,
         config.calculator,
@@ -94,13 +92,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         algo_primary=config.relax_algo_primary,
         algo_fallback=config.relax_algo_fallback,
         log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
-        system_label=label_crystal
+        key=f"{config.root_key}/relaxed_structures/{config.crystal_label}"
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
     mbe_automation.structure.crystal.display(
         unit_cell=unit_cell_V0,
-        system_label=label_crystal
+        key=f"{config.root_key}/relaxed_structures/{config.crystal_label}"
     )
     #
     # The supercell transformation is computed once and kept
@@ -132,7 +130,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         interp_mesh=config.fourier_interpolation_mesh,
         symmetrize_force_constants=config.symmetrize_force_constants,
         force_constants_cutoff_radius=force_constants_cutoff_radius,
-        system_label=label_crystal
+        system_label=config.crystal_label
     )
     df_crystal = mbe_automation.dynamics.harmonic.data.crystal(
         unit_cell_V0,
@@ -142,27 +140,36 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         space_group=space_group_V0,
         work_dir=config.work_dir,
         dataset=config.dataset,
-        system_label=label_crystal)
-    df_molecule = mbe_automation.dynamics.harmonic.data.molecule(
-        molecule,
-        vibrations,
-        config.temperatures_K,
-        system_label=label_molecule
+        root_key=config.root_key,
+        system_label=config.crystal_label
     )
-    df_sublimation = mbe_automation.dynamics.harmonic.data.sublimation(
-        df_crystal,
-        df_molecule
-    )
-    del df_crystal["T (K)"]
-    del df_molecule["T (K)"]
-    df_harmonic = pd.concat([df_sublimation, df_crystal, df_molecule], axis=1)
+    
+    if config.molecule is not None:
+        df_molecule = mbe_automation.dynamics.harmonic.data.molecule(
+            molecule,
+            vibrations,
+            config.temperatures_K,
+            system_label=config.molecule_label
+        )
+        df_sublimation = mbe_automation.dynamics.harmonic.data.sublimation(
+            df_crystal,
+            df_molecule
+        )
+        del df_crystal["T (K)"]
+        del df_molecule["T (K)"]
+        df_harmonic = pd.concat([df_sublimation, df_crystal, df_molecule], axis=1)
+        
+    else:
+        df_harmonic = df_crystal
+        
     mbe_automation.storage.save_data_frame(
         df=df_harmonic,
         dataset=config.dataset,
-        key="quasi_harmonic/no_thermal_expansion"
+        key=f"{config.root_key}/thermodynamics_fixed_volume"
     )
-    df_harmonic.to_csv(os.path.join(config.work_dir, "no_thermal_expansion.csv"))
-    n_atoms_molecule = len(molecule)
+    if config.save_csv:
+        df_harmonic.to_csv(os.path.join(config.work_dir, "thermodynamics_fixed_volume.csv"))
+
     if not config.thermal_expansion:
         print("Harmonic calculations completed")
         mbe_automation.common.display.timestamp_finish(datetime_start)
@@ -204,7 +211,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             config.filter_out_imaginary_acoustic,
             config.filter_out_imaginary_optical,
             config.filter_out_broken_symmetry,
-            config.dataset
+            config.dataset,
+            config.root_key,
+            config.crystal_label
         )
     except RuntimeError as e:
         print(f"An error occurred: {e}")
@@ -229,7 +238,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             unit_cell_V0.cell * (V/V0)**(1/3),
             scale_atoms=True
         )
-        label_crystal = f"crystal_T_{T:.4f}"
+        label_crystal = f"{config.crystal_label}→(eq,T={T:.4f})"
         if config.eos_sampling == "pressure":
             #
             # Relax geometry with an effective pressure which
@@ -244,7 +253,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 symmetrize_final_structure=config.symmetrize_unit_cell,
                 max_force_on_atom=config.max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
-                system_label=label_crystal
+                key=f"{config.root_key}/relaxed_structures/{label_crystal}"
             )
         elif config.eos_sampling == "volume":
             #
@@ -260,7 +269,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 symmetrize_final_structure=config.symmetrize_unit_cell,
                 max_force_on_atom=config.max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
-                system_label=label_crystal
+                key=f"{config.root_key}/relaxed_structures/{label_crystal}"
             )
         phonons = mbe_automation.dynamics.harmonic.core.phonons(
             unit_cell_T,
@@ -312,9 +321,10 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     mbe_automation.storage.save_data_frame(
         df=df_quasi_harmonic,
         dataset=config.dataset,
-        key="quasi_harmonic/thermal_expansion"
+        key=f"{config.root_key}/thermodynamics_equilibrium_volume"
     )
-    df_quasi_harmonic.to_csv(os.path.join(config.work_dir, "thermal_expansion.csv"))
+    if config.save_csv:
+        df_quasi_harmonic.to_csv(os.path.join(config.work_dir, "thermodynamics_equilibrium_volume.csv"))
 
     F_tot_diff = (df_crystal_eos["F_tot_crystal_eos (kJ∕mol∕unit cell)"]
                   - df_crystal_qha["F_tot_crystal (kJ∕mol∕unit cell)"])

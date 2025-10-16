@@ -5,7 +5,7 @@ from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
 import numpy.typing as npt
 
-@dataclass
+@dataclass(kw_only=True)
 class FreeEnergy:
     """
     Default parameters for free energy calculations
@@ -15,7 +15,9 @@ class FreeEnergy:
                                    # and isolated molecule
                                    #
     crystal: Atoms
-    molecule: Atoms
+    crystal_label: str = "crystal_base"
+    molecule: Atoms | None
+    molecule_label: str = "molecule_base"
                                    #
                                    # Calculator of energies and forces
                                    #
@@ -65,7 +67,7 @@ class FreeEnergy:
                                    # after geometry relaxation (eV/Angs).
                                    #
                                    # Should be extra tight if:
-                                   # (1) symmetrization is enabled
+                                   # (1) you run space group recognition with tight threshold (symprec=1.0E-5)
                                    # (2) supercell_displacement is small
                                    #
                                    # Recommendations from literature:
@@ -106,10 +108,19 @@ class FreeEnergy:
     work_dir: str = "./"
                                    #
                                    # The main result of the calculations:
-                                   # a single HDF5 file with all data computed
+                                   # a single dataset file with all data computed
                                    # for the physical system
                                    #
     dataset: str = "./properties.hdf5"
+                                   #
+                                   # Root location in the dataset hierarchical
+                                   # structure.
+                                   #
+                                   # Needed to keep separate quasi-harmonic training data 
+                                   # and final quasi-harmonic properties from the trained
+                                   # model.
+                                   #
+    root_key: Literal["quasi_harmonic", "training_set/quasi_harmonic"] = "quasi_harmonic"
                                    #
                                    # Minimum point-periodic image distance
                                    # in the supercell used to compute phonons.
@@ -282,6 +293,8 @@ class FreeEnergy:
                                    # 0 -> suppressed warnings
                                    #
     verbose: int = 0
+    save_plots: bool = True
+    save_csv: bool = True
                                    
     @classmethod
     def from_template(cls,

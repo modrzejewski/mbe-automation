@@ -107,17 +107,17 @@ def phonons(
         interp_mesh=150.0,
         symmetrize_force_constants=False,
         force_constants_cutoff_radius=None,
-        system_label=None
+        key: str | None = None
 ) -> phonopy.Phonopy:
 
     cuda_available = torch.cuda.is_available()
     if cuda_available:
         torch.cuda.reset_peak_memory_stats()
 
-    if system_label:
+    if key:
         mbe_automation.common.display.framed([
             "Phonons",
-            system_label])
+            key])
     else:
         mbe_automation.common.display.framed("Phonons")
         
@@ -248,7 +248,9 @@ def equilibrium_curve(
         filter_out_imaginary_acoustic,
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
-        dataset
+        dataset,
+        root_key,
+        crystal_label
 ):
 
     geom_opt_dir = os.path.join(work_dir, "relaxation")
@@ -264,7 +266,10 @@ def equilibrium_curve(
     
     df_eos_points = []
     
-    mbe_automation.common.display.framed("F(V) curve sampling")
+    mbe_automation.common.display.framed([
+        "F(V) curve sampling",
+        f"{root_key}/phonons"
+    ])
     print(f"equation_of_state               {equation_of_state}")
     print(f"filter_out_imaginary_acoustic   {filter_out_imaginary_acoustic}")
     print(f"filter_out_imaginary_optical    {filter_out_imaginary_optical}")
@@ -284,7 +289,7 @@ def equilibrium_curve(
             # to the pressure.
             #
             thermal_pressure = pressure_range[i]
-            label = f"crystal_eos_p_thermal_{thermal_pressure:.4f}_GPa"
+            label = f"{crystal_label}→(eos,p_thermal={thermal_pressure:.4f})"
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V0,
                 calculator,
@@ -296,7 +301,7 @@ def equilibrium_curve(
                 algo_primary=relax_algo_primary,
                 algo_fallback=relax_algo_fallback,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
-                system_label=label
+                key=f"{root_key}/relaxed_structures/{label}"
             )
         elif eos_sampling == "volume":
             #
@@ -310,7 +315,7 @@ def equilibrium_curve(
                 unit_cell_V0.cell * (V/V0)**(1/3),
                 scale_atoms=True
             )
-            label = f"crystal_eos_V_{V/V0:.4f}"
+            label = f"{crystal_label}→(eos,V={V/V0:.4f})"
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V,
                 calculator,                
@@ -322,7 +327,7 @@ def equilibrium_curve(
                 algo_primary=relax_algo_primary,
                 algo_fallback=relax_algo_fallback,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
-                system_label=label
+                key=f"{root_key}/relaxed_structures/{label}"
             )
         ph = phonons(
             unit_cell_V,
@@ -332,7 +337,7 @@ def equilibrium_curve(
             interp_mesh=interp_mesh,
             symmetrize_force_constants=symmetrize_force_constants,
             force_constants_cutoff_radius=force_constants_cutoff_radius,
-            system_label=label
+            key=f"{root_key}/phonons/{label}"
         )
         df_crystal_V = mbe_automation.dynamics.harmonic.data.crystal(
             unit_cell_V,
@@ -342,6 +347,7 @@ def equilibrium_curve(
             space_group=space_group_V,
             work_dir=work_dir,
             dataset=dataset,
+            root_key=root_key,
             system_label=label
         )
         df_eos_points.append(df_crystal_V)
@@ -464,11 +470,11 @@ def equilibrium_curve(
         F_tot_curves=F_tot_curves,
         temperatures=temperatures,
         dataset=dataset,
-        key="quasi_harmonic/eos_interpolated"
+        key=f"{root_key}/eos_interpolated"
     )
     mbe_automation.dynamics.harmonic.display.eos_curves(
         dataset=dataset,
-        key="quasi_harmonic/eos_interpolated",
+        key=f"{root_key}/eos_interpolated",
         save_path=os.path.join(work_dir, "eos_curves.png")
     )
         

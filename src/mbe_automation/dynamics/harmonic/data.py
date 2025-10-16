@@ -179,7 +179,8 @@ def crystal(
         space_group,
         work_dir,
         dataset,
-        system_label
+        root_key,
+        system_label,
 ):
     """
     Physical properties derived from the harmonic model
@@ -210,24 +211,24 @@ def crystal(
     )
     mbe_automation.storage.save_force_constants(
         dataset=dataset,
-        key=f"quasi_harmonic/phonons/force_constants/{system_label}",
+        key=f"{root_key}/phonons/{system_label}/force_constants",
         phonons=phonons
     )
     mbe_automation.storage.save_brillouin_zone_path(
         phonons=phonons,
         dataset=dataset,
-        key=f"quasi_harmonic/phonons/brillouin_zone_path/{system_label}",
+        key=f"{root_key}/phonons/{system_label}/brillouin_zone_path",
         save_eigenvectors=False
     )
     mbe_automation.dynamics.harmonic.display.band_structure(
         dataset=dataset,
-        key=f"quasi_harmonic/phonons/brillouin_zone_path/{system_label}",
-        save_path=os.path.join(work_dir, "phonons", "brillouin_zone_path", f"{system_label}.png"),
+        key=f"{root_key}/phonons/{system_label}/brillouin_zone_path",
+        save_path=os.path.join(work_dir, "phonons", system_label, "brillouin_zone_path.png"),
         freq_max_THz=10.0 # THz
     )
     mbe_automation.storage.save_structure(
         dataset=dataset,
-        key=f"quasi_harmonic/structures/{system_label}",
+        key=f"{root_key}/relaxed_structures/{system_label}",
         positions=unit_cell.get_positions(),
         atomic_numbers=unit_cell.get_atomic_numbers(),
         masses=unit_cell.get_masses(),
