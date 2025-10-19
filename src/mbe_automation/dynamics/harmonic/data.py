@@ -263,6 +263,9 @@ def sublimation(df_crystal, df_molecule):
     """    
     Vibrational energy, lattice energy, and sublimation enthalpy
     defined as in ref 1. Additional definitions in ref 2.
+
+    The returned data frame will include NaNs for temperatures
+    where the computation of the equilibrium cell volume has failed.
     
     Approximations used in the sublimation enthalpy:
     
@@ -311,7 +314,7 @@ def sublimation(df_crystal, df_molecule):
     ) # J/K/mol/molecule
 
     df = pd.DataFrame({
-        "T (K)": df_crystal["T (K)"],
+        "T (K)": df_molecule["T (K)"],
         "E_latt (kJ∕mol∕molecule)": E_latt,
         "ΔE_vib (kJ∕mol∕molecule)": ΔE_vib,
         "ΔH_sub (kJ∕mol∕molecule)": ΔH_sub,

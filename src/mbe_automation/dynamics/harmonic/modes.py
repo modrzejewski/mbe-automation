@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Literal
+from typing import Literal, Tuple, List
 from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
@@ -18,6 +18,33 @@ except ImportError:
 import mbe_automation.common
 import mbe_automation.storage
 import mbe_automation.structure
+
+@dataclass(kw_only=True)
+class PhononFilter:
+    """
+    Selection of a subset from the full set of phonons.
+
+    k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
+            - "gamma": Use only the [0, 0, 0] k-point.
+            - A floating point number: Defines a supercell of radius R,
+              which corresponds to the Mohkhorst-Pack sampling grid.
+            - array of 3 integers: Defines an explicit Monkhorst-Pack
+              mesh for Brillouin zone integration.
+    selected_modes:  An array of 1-based mode indices to include. This will
+            select the Nth lowest frequency mode at each k-point. Note that due
+            to band crossing, this may not correspond to a single continuous
+            phonon branch across the Brillouin zone. If specified,
+            freq_min_THz and freq_max_THz are ignored.
+    freq_min_THz: The minimum phonon frequency (in THz) to be included
+            in the calculations. Defaults to 0.0.
+    freq_max_THz: The maximum phonon frequency (in THz) to be included.
+            If None, all frequencies above `freq_min_THz` are included.
+            Defaults to None.
+    """
+    selected_modes: npt.NDArray[np.integer] | None = None
+    freq_min_THz: float = 0.1
+    freq_max_THz: float | None = 8.0
+    k_point_mesh: npt.NDArray[np.integer] | Literal["gamma"] | float = "gamma"
 
 @dataclass
 class ThermalDisplacements:
@@ -329,16 +356,12 @@ def _thermal_displacements(
         instantaneous_displacements=instant_disp
     )
 
-
 def thermal_displacements(
         dataset: str,
         key: str,
         temperatures_K: npt.NDArray[np.floating],
-        k_point_mesh: npt.NDArray[np.integer] | Literal["gamma"] | float = 50.0,
-        selected_modes: npt.NDArray[np.integer] | None = None,
-        freq_min_THz: float = 0.0,
-        freq_max_THz: float | None = None,
-        time_points_fs: np.NDArray[np.floating] | None = None,
+        phonon_filter: PhononFilter,
+        time_points_fs: npt.NDArray | None = None,
         cell_type: Literal["primitive", "supercell"] = "supercell"
 ) -> ThermalDisplacements:
     """
@@ -357,23 +380,10 @@ def thermal_displacements(
         key: Key to the harmonic force constants model within the dataset.
         temperatures_K: An array of temperatures (in Kelvin) at which to
             calculate the thermal displacements.
-        k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
-            - "gamma": Use only the [0, 0, 0] k-point.
-            - A float or list/array of 3 integers: Defines a Monkhorst-Pack
-              mesh for Brillouin zone integration.
-        selected_modes:  An array of 1-based mode indices to include. This will
-            select the Nth lowest frequency mode at each k-point. Note that due
-            to band crossing, this may not correspond to a single continuous
-            phonon branch across the Brillouin zone. If specified,
-            freq_min_THz and freq_max_THz are ignored.
-        freq_min_THz: The minimum phonon frequency (in THz) to be included
-            in the calculations. Defaults to 0.0.
-        freq_max_THz: The maximum phonon frequency (in THz) to be included.
-            If None, all frequencies above `freq_min_THz` are included.
-            Defaults to None.
+        phonon_filter: A PhononFilter object which defines the subset
+            of phonons.
         time_points_fs: An optional array of time points (in femtoseconds)
             for which to calculate the instantaneous atomic displacements.
-            If None, this calculation is skipped. Defaults to None.
         cell_type: Type of cell used to express the instantaneous atomic
             displacements. Defaults to supercell.
 
@@ -399,14 +409,18 @@ def thermal_displacements(
         dataset=dataset,
         key=key
     )
-    if isinstance(k_point_mesh, float):
+    if isinstance(phonon_filter.k_point_mesh, float):
         k_point_mesh = phonopy.structure.grid_points.length2mesh(
-            length=k_point_mesh,
+            length=phonon_filter.k_point_mesh,
             lattice=ph.primitive.cell,
             rotations=ph.primitive_symmetry.pointgroup_operations
         )
-    if isinstance(k_point_mesh, str) and k_point_mesh == "gamma":
+        
+    elif isinstance(phonon_filter.k_point_mesh, str) and phonon_filter.k_point_mesh == "gamma":
         k_point_mesh = np.array([1, 1, 1])
+        
+    else:
+        k_point_mesh = phonon_filter.k_point_mesh
 
     ph.init_mesh(
         mesh=k_point_mesh,
@@ -421,9 +435,9 @@ def thermal_displacements(
     qpoints = ph.mesh.qpoints
 
     mbe_automation.common.display.framed("Thermal displacements")
-    print(f"freq_min            {freq_min_THz:.1f} THz")
-    if freq_max_THz is not None:
-        print(f"freq_max            {freq_max_THz:.1f} THz")
+    print(f"freq_min            {phonon_filter.freq_min_THz:.1f} THz")
+    if phonon_filter.freq_max_THz is not None:
+        print(f"freq_max            {phonon_filter.freq_max_THz:.1f} THz")
     else:
         print(f"freq_max            unlimited")
     nx, ny, nz = ph.mesh.mesh_numbers
@@ -435,9 +449,9 @@ def thermal_displacements(
         qpoints=qpoints,
         temperatures_K=temperatures_K,
         time_points_fs=time_points_fs,
-        selected_modes=selected_modes,
-        freq_min_THz=freq_min_THz,
-        freq_max_THz=freq_max_THz,
+        selected_modes=phonon_filter.selected_modes,
+        freq_min_THz=phonon_filter.freq_min_THz,
+        freq_max_THz=phonon_filter.freq_max_THz,
         cell_type=cell_type
     )
     
@@ -449,23 +463,9 @@ def trajectory(
         dataset: str,
         key: str,
         temperature_K: float,
-        k_point_mesh: npt.NDArray[np.integer] | Literal["gamma"] | float = "gamma",
-        selected_modes: npt.NDArray[np.integer] | None = None,
-        freq_min_THz: float = 0.0,
-        freq_max_THz: float = 10.0,
+        phonon_filter: PhononFilter = PhononFilter(),
         time_step_fs: float = 100.0,
         n_frames: int = 20,
-        finite_cluster_filter: Literal[
-            "closest_to_center_of_mass",
-            "closest_to_central_molecule",
-            "max_min_distance_to_central_molecule",
-            "max_max_distance_to_central_molecule"
-        ] | None = None,
-        finite_cluster_n_molecules: int | None = None,
-        finite_cluster_distance: float | None = None,
-        sampling: Literal["cyclic", "linear"] = "cyclic",
-        calculator: ASECalculator | None = None,
-        cell_type: Literal["primitive", "supercell"] = "supercell"
 ) -> mbe_automation.storage.Structure:
 
     time_points_fs = np.linspace(0.0, time_step_fs * (n_frames - 1), n_frames)
@@ -473,12 +473,9 @@ def trajectory(
         dataset=dataset,
         key=key,
         temperatures_K=np.array([temperature_K]),
-        k_point_mesh=k_point_mesh,
-        selected_modes=selected_modes,
-        freq_min_THz=freq_min_THz,
-        freq_max_THz=freq_max_THz,
+        phonon_filter=phonon_filter,
         time_points_fs=time_points_fs,
-        cell_type=cell_type
+        cell_type="supercell"
     )
     ph = mbe_automation.storage.to_phonopy(
         dataset=dataset,
@@ -487,7 +484,8 @@ def trajectory(
     equilibrium_cell = ph.supercell
     positions = (equilibrium_cell.positions[np.newaxis, :, :]
                  + disp.instantaneous_displacements[0])
-    traj = mbe_automation.storage.Structure(
+    
+    return mbe_automation.storage.Structure(
         positions=positions,
         atomic_numbers=equilibrium_cell.numbers,
         masses=equilibrium_cell.masses,
@@ -495,37 +493,3 @@ def trajectory(
         n_atoms=len(equilibrium_cell),
         n_frames=n_frames,
     )
-    if finite_cluster_filter is not None:
-        #
-        # Extract a finite molecular cluster by filtering
-        # whole molecules out of the supercell structure.
-        #
-        # Note that the connectivity does not change in the harmonic
-        # model. Thus, the covalent bonds are identified only at frame 0.
-        #
-        clustering = mbe_automation.structure.clusters.detect_molecules(
-            system=traj,
-            reference_frame_index=0
-        )
-        finite_subsystem = mbe_automation.structure.clusters.extract_finite_subsystem(
-            clustering=clustering,
-            filter=finite_cluster_filter,
-            distance=finite_cluster_distance,
-            n_molecules=finite_cluster_n_molecules
-        )
-        traj = finite_subsystem.cluster_of_molecules
-
-    if mace_available:
-        if calculator is not None:
-            if isinstance(calculator, MACECalculator):
-                mace_output = mbe_automation.ml.mace.inference(
-                    calculator=calculator,
-                    structure=traj,
-                    energies=True,
-                    forces=False,
-                    feature_vectors=True
-                )
-                traj.E_pot = mace_output.E_pot
-                traj.feature_vectors = mace_output.feature_vectors
-                
-    return traj

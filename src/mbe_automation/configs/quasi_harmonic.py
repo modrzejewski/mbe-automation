@@ -15,7 +15,7 @@ class FreeEnergy:
                                    # and isolated molecule
                                    #
     crystal: Atoms
-    molecule: Atoms | None
+    molecule: Atoms | None = None
                                    #
                                    # Calculator of energies and forces
                                    #
@@ -49,7 +49,7 @@ class FreeEnergy:
                                    # Range of temperatures (K) at which phonons
                                    # and thermodynamic properties are computed
                                    #
-    temperatures_K: npt.NDArray[np.floating] = field(default_factory=lambda: np.arange(0, 301, 10))
+    temperatures_K: npt.NDArray[np.floating] = field(default_factory=lambda: np.array([298.15])
                                    #
                                    # Refine the space group symmetry after
                                    # each geometry relaxation of the unit cell.
@@ -181,16 +181,6 @@ class FreeEnergy:
                                    #
     supercell_displacement: float = 0.01
                                    #
-                                   # Restore translational and permutational symmetry
-                                   # of force constants produced from finite differences
-                                   #
-    symmetrize_force_constants: bool = False
-                                   #
-                                   # Interatomic distance beyond which force constants
-                                   # are set to zero.
-                                   #
-    force_constants_cutoff_radius: float | Literal["auto"] | None = None
-                                   #
                                    # Scaling factors used to sample volumes w.r.t.
                                    # the reference cell volume V0 obtained by relaxing
                                    # the input structure (see relax_input_cell).
@@ -293,6 +283,7 @@ class FreeEnergy:
     verbose: int = 0
     save_plots: bool = True
     save_csv: bool = True
+    save_xyz: bool = True
                                    
     @classmethod
     def from_template(cls,

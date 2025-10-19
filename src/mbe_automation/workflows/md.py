@@ -32,7 +32,7 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         if isinstance(config.calculator, MACECalculator):
             mbe_automation.common.display.mace_summary(config.calculator)
     
-    label_molecule = f"molecule[T={config.temperature_K:.2f}]"
+    label_molecule = f"molecule[dyn:T={config.temperature_K:.2f}]"
     mbe_automation.dynamics.md.core.run(
         system=config.molecule,
         supercell_matrix=None,
@@ -77,7 +77,7 @@ def run(config: mbe_automation.configs.md.Enthalpy):
             )
         )
 
-    label_crystal = f"crystal[T={config.temperature_K:.2f},p={config.pressure_GPa:.5f}]"
+    label_crystal = f"crystal[dyn:T={config.temperature_K:.2f},p={config.pressure_GPa:.5f}]"
     
     if config.md_crystal.supercell_matrix is None:
         supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(

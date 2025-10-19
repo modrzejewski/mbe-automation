@@ -16,8 +16,74 @@ except ImportError:
     mace_available = False
 
 
-def run(
-        config: mbe_automation.configs.training.TrainingSet
+def phonon_sampling(
+        config: mbe_automation.configs.training.PhononSampling
+):
+
+    traj_pbc = mbe_automation.dynamics.harmonic.modes.trajectory(
+        dataset=config.force_constants_dataset,
+        key=config.force_constants_key,
+        temperature_K=config.temperature_K,
+        phonon_filter=config.phonon_filter,
+        time_step_fs=config.time_step_fs,
+        n_frames=config.n_frames
+    )    
+    #
+    # Extract a finite molecular cluster by filtering
+    # whole molecules out of the supercell structure.
+    #
+    # Note that the connectivity does not change in the harmonic
+    # model. Thus, the covalent bonds are identified only
+    # at a single frame.
+    #
+    molecular_crystal = mbe_automation.structure.clusters.detect_molecules(
+        system=traj_pbc,
+        reference_frame_index=0
+    )
+    finite_subsystems = mbe_automation.structure.clusters.extract_finite_subsystem(
+        system=molecular_crystal,
+        filter=config.finite_subsystem_filter
+    )
+    
+    if mace_available:
+        if isinstance(config.calculator, MACECalculator):
+            structures = [molecular_crystal.supercell] + [s.cluster_of_molecules for s in finite_subsystems]
+            for s in structures:
+                mace_output = mbe_automation.ml.mace.inference(
+                    calculator=config.calculator,
+                    structure=s,
+                    energies=True,
+                    forces=False,
+                    feature_vectors=True
+                )
+                s.E_pot = mace_output.E_pot
+                s.feature_vectors = mace_output.feature_vectors
+
+    mbe_automation.storage.save_molecular_crystal(
+        dataset=config.dataset,
+        key=f"{config.root_key}/molecular_crystal",
+        system=molecular_crystal
+    )
+
+    for i, s in enumerate(finite_subsystems):
+        if config.finite_subsystem_filter.selection_rule in mbe_automation.structure.clusters.NUMBER_SELECTION:
+            key = f"{config.root_key}/finite_subsystems/n={s.n_molecules}"
+            
+        elif config.finite_subsystem_filter.selection_rule in mbe_automation.structure.clusters.DISTANCE_SELECTION:
+            distance = config.finite_subsystem_filter.distances[i]
+            key = f"{config.root_key}/finite_subsystems/r={distance:.2f}"
+
+        mbe_automation.storage.save_finite_subsystem(
+            dataset=config.dataset,
+            key=key,
+            subsystem=s
+        )
+        
+    return
+
+
+def md_sampling(
+        config: mbe_automation.configs.training.MDSampling
 ):
 
     datetime_start = mbe_automation.common.display.timestamp_start()
@@ -27,7 +93,7 @@ def run(
         warnings.filterwarnings("ignore", category=UserWarning)
         warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-    mbe_automation.common.display.framed("Training set")
+    mbe_automation.common.display.framed(["Training set", "MD sampling"])
         
     if mace_available:
         if isinstance(config.calculator, MACECalculator):
@@ -42,8 +108,8 @@ def run(
     else:
         supercell_matrix = config.md_crystal.supercell_matrix
 
-    system_label = f"crystal[T={config.temperature_K:.2f},p={config.pressure_GPa:.5f}]"
-    pbc_trajectory_key = f"{config.root_key}/md/{system_label}/trajectory"
+    system_label = f"crystal[dyn:T={config.temperature_K:.2f},p={config.pressure_GPa:.5f}]"
+    pbc_trajectory_key = f"{config.root_key}/{system_label}/trajectory"
     
     mbe_automation.dynamics.md.core.run(
         system=config.crystal,
@@ -61,75 +127,73 @@ def run(
             key=pbc_trajectory_key,
             save_path=os.path.join(
                 config.work_dir,
-                "training_set",
-                "md",
+                config.root_key,
                 system_label,
                 "trajectory.png"
             )
         )
 
-    pbc_md_frames = mbe_automation.storage.read_structure(
-        dataset=config.dataset,
-        key=pbc_trajectory_key
-    )
-    md_molecular_crystal_key = f"{config.root_key}/md/{system_label}/molecular_crystal"
-    md_molecular_crystal = mbe_automation.structure.clusters.detect_molecules(
-        system=pbc_md_frames,
-        reference_frame_index=0,
-        assert_identical_composition=config.assert_identical_composition,
-    )
-    mbe_automation.storage.save_molecular_crystal(
-        dataset=config.dataset,
-        key=md_molecular_crystal_key,
-        system=md_molecular_crystal,
-    )
-    if config.finite_subsystem_filter in [
-            "closest_to_center_of_mass",
-            "closest_to_central_molecule"
-    ]:
-        finite_subsystem_keys = [
-            f"{config.root_key}/md/{system_label}/finite_subsystems/n={n}"
-            for n in config.finite_subsystem_n_molecules]
-        n_subsystems = len(config.finite_subsystem_n_molecules)
-
-    elif config.finite_subsystem_filter == "max_min_distance_to_central_molecule":
-        finite_subsystem_keys = [
-            f"{config.root_key}/md/{system_label}/finite_subsystems/r={r:.2f}"
-            for r in config.finite_subsystem_distances]
-        n_subsystems = len(config.finite_subsystem_distances)
-
-    elif config.finite_subsystem_filter == "max_max_distance_to_central_molecule":
-        finite_subsystem_keys = [
-            f"{config.root_key}/md/{system_label}/finite_subsystems/r={r:.2f}"
-            for r in config.finite_subsystem_distances]
-        n_subsystems = len(config.finite_subsystem_distances)
-
-    for i in range(n_subsystems):
-        finite_subsystem = mbe_automation.structure.clusters.extract_finite_subsystem(
-            system=md_molecular_crystal,
-            filter=config.finite_subsystem_filter,
-            n_molecules=config.finite_subsystem_n_molecules[i],
-            distance=config.finite_subsystem_distances[i]
-        )
-        if mace_available:
-            if isinstance(config.calculator, MACECalculator):
-                mace_output = mbe_automation.ml.mace.inference(
-                    calculator=config.calculator,
-                    structure=finite_subsystem.cluster_of_molecules,
-                    energies=True,
-                    forces=True,
-                    feature_vectors=True
-                )
-                finite_subsystem.cluster_of_molecules.E_pot = mace_output.E_pot
-                finite_subsystem.cluster_of_molecules.forces = mace_output.forces
-                finite_subsystem.cluster_of_molecules.feature_vectors = mace_output.feature_vectors
-            
-        mbe_automation.storage.save_finite_subsystem(
+    if config.finite_subsystem_filter is not None:
+        pbc_md_frames = mbe_automation.storage.read_structure(
             dataset=config.dataset,
-            key=finite_subsystem_keys[i],
-            subsystem=finite_subsystem
+            key=pbc_trajectory_key
         )
+        md_molecular_crystal_key = f"{config.root_key}/{system_label}/molecular_crystal"
+        md_molecular_crystal = mbe_automation.structure.clusters.detect_molecules(
+            system=pbc_md_frames,
+            reference_frame_index=0,
+            assert_identical_composition=config.finite_subsystem_filter.assert_identical_composition,
+        )
+        mbe_automation.storage.save_molecular_crystal(
+            dataset=config.dataset,
+            key=md_molecular_crystal_key,
+            system=md_molecular_crystal,
+        )
+        finite_subsystems = mbe_automation.structure.clusters.extract_finite_subsystem(
+            system=md_molecular_crystal,
+            filter=config.finite_subsystem_filter
+        )
+
+        for i, s in enumerate(finite_subsystems):
+            if config.finite_subsystem_filter.selection_rule in mbe_automation.structure.clusters.NUMBER_SELECTION:
+                key = f"{config.root_key}/{system_label}/finite_subsystems/n={s.n_molecules}"
+                
+            elif config.finite_subsystem_filter.selection_rule in mbe_automation.structure.clusters.DISTANCE_SELECTION:
+                distance = config.finite_subsystem_filter.distances[i]
+                key = f"{config.root_key}/{system_label}/finite_subsystems/r={distance:.2f}"
+
+            if mace_available:
+                if isinstance(config.calculator, MACECalculator):
+                    mace_output = mbe_automation.ml.mace.inference(
+                        calculator=config.calculator,
+                        structure=s.cluster_of_molecules,
+                        energies=True,
+                        forces=True,
+                        feature_vectors=True
+                    )
+                    s.cluster_of_molecules.E_pot = mace_output.E_pot
+                    s.cluster_of_molecules.forces = mace_output.forces
+                    s.cluster_of_molecules.feature_vectors = mace_output.feature_vectors
+
+            mbe_automation.storage.save_finite_subsystem(
+                dataset=config.dataset,
+                key=key,
+                subsystem=s
+            )
         
-    print("Training set completed")
+    print("MD sampling completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)
 
+
+def run(
+        config: (mbe_automation.configs.training.MDSampling
+                 | mbe_automation.configs.training.PhononSampling)
+):
+
+    if isinstance(config, mbe_automation.configs.training.PhononSampling):
+        phonon_sampling(config)
+        
+    elif isinstance(config, mbe_automation.configs.training.MDSampling):
+        md_sampling(config)
+
+    return
