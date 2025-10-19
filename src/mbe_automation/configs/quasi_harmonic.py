@@ -49,7 +49,7 @@ class FreeEnergy:
                                    # Range of temperatures (K) at which phonons
                                    # and thermodynamic properties are computed
                                    #
-    temperatures_K: npt.NDArray[np.floating] = field(default_factory=lambda: np.array([298.15])
+    temperatures_K: npt.NDArray[np.floating] = field(default_factory=lambda: np.array([298.15]))
                                    #
                                    # Refine the space group symmetry after
                                    # each geometry relaxation of the unit cell.
