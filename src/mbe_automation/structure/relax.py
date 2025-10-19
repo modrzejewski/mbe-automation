@@ -24,7 +24,7 @@ def crystal(unit_cell,
             algo_primary="PreconLBFGS",
             algo_fallback="PreconFIRE",
             log="geometry_opt.txt",
-            system_label=None
+            key=None
             ):
     """
     Optimize atomic positions and lattice vectors simultaneously.
@@ -34,10 +34,10 @@ def crystal(unit_cell,
     if cuda_available:
         torch.cuda.reset_peak_memory_stats()
     
-    if system_label:
+    if key:
         mbe_automation.common.display.framed([
             "Relaxation",
-            system_label])
+            key])
     else:
         mbe_automation.common.display.framed("Relaxation")
         
@@ -141,16 +141,16 @@ def isolated_molecule(molecule,
                       algo_primary="PreconLBFGS",
                       algo_fallback="PreconFIRE",
                       log="geometry_opt.txt",
-                      system_label=None
+                      key=None
                       ):
     """
     Optimize atomic coordinates in a gas-phase finite system.
     """
 
-    if system_label:
+    if key:
         mbe_automation.common.display.framed([
             "Relaxation",
-            system_label])
+            key])
     else:
         mbe_automation.common.display.framed("Relaxation")
     print(f"Max force threshold           {max_force_on_atom:.1e} eV/Å")

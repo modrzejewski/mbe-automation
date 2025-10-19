@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Literal
 import math
 from collections import deque
@@ -23,6 +23,61 @@ import pymatgen.analysis.graphs
 
 import mbe_automation.storage
 import mbe_automation.structure.crystal
+
+NUMBER_SELECTION = [
+    "closest_to_center_of_mass",
+    "closest_to_central_molecule"
+]
+DISTANCE_SELECTION = [
+    "max_min_distance_to_central_molecule",
+    "max_max_distance_to_central_molecule"
+]
+
+@dataclass(kw_only=True)
+class FiniteSubsystemFilter:
+                                   # ------------------------------------------------------------------------
+                                   # Filter used to select molecules          Size parameter, which controls
+                                   # from a PBC structure to create           how many molecules to include
+                                   # a finite cluster                 
+                                   # ------------------------------------------------------------------------
+                                   # closest_to_center_of_mass,               n_molecules      
+                                   # closest_to_central_molecule
+                                   #
+                                   # max_min_distance_to_central_molecule     distances
+                                   # max_max_distance_to_central_molecule
+                                   #
+    selection_rule: Literal[
+        *DISTANCE_SELECTION,
+        *NUMBER_SELECTION
+    ] = "closest_to_central_molecule"
+    
+    n_molecules: npt.NDArray[np.integer] | None = field(
+        default_factory=lambda: np.array([1, 2, 3, 4, 5, 6, 7, 8])
+    )
+    
+    distances: npt.NDArray[np.floating] | None  = None
+                                   #
+                                   # Assert that all molecules in the PBC structure
+                                   # have identical elemental composition.
+                                   #
+                                   # Used only for validation during the clustering
+                                   # step. Setting this parameter to False disables
+                                   # the sanity check.
+                                   #
+    assert_identical_composition: bool = True
+
+    def __post_init__(self):
+        if self.selection_rule in NUMBER_SELECTION:
+            if not (self.n_molecules is not None and self.distances is None):
+                raise ValueError("n_molecules must be set and distance must be None.")
+            
+        elif self.selection_rule in DISTANCE_SELECTION:
+            if not (self.distances is not None and self.n_molecules is None):
+                raise ValueError("distance must be set and n_molecules must be None.")
+            
+        else:
+            raise ValueError(f"Invalid selection_rule: {self.selection_rule}")
+
 
 def Label(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
@@ -289,7 +344,18 @@ def detect_molecules(
     system_unwrapped = system.copy()
     if system.n_frames > 1:
         for i in range(system.n_frames):
-            cell_i = system.cell_vectors[i]
+            if system.cell_vectors.ndim == 3:
+                #
+                # Cell vectors are frame-dependent:
+                # NPT simulation
+                #
+                cell_i = system.cell_vectors[i]
+            else:
+                #
+                # Cell vectors are frame-independent:
+                # NVT simulation, phonon sampling
+                #
+                cell_i = system.cell_vectors
             unwrapped_cart_i = (system.positions[i] @ np.linalg.inv(cell_i) + shifts_frac) @ cell_i
             system_unwrapped.positions[i] = unwrapped_cart_i
     else:        
@@ -362,16 +428,11 @@ def detect_molecules(
     )
 
 
-def extract_finite_subsystem(
+def _extract_finite_subsystem(
         system: mbe_automation.storage.MolecularCrystal,
-        filter: Literal[
-            "closest_to_center_of_mass",
-            "closest_to_central_molecule",
-            "max_min_distance_to_central_molecule",
-            "max_max_distance_to_central_molecule"
-        ],
-        n_molecules: int | None = None,
-        distance: float | None = None,
+        selection_rule: str,
+        n_molecules: int | None,
+        distance: float | None
 ) -> mbe_automation.storage.FiniteSubsystem:
     """
     Extract a finite molecular cluster from a periodic structure.
@@ -381,30 +442,25 @@ def extract_finite_subsystem(
     permutation between frames.
     """
 
-    if filter in ["closest_to_center_of_mass",
-                     "closest_to_central_molecule"]:
-        if not (n_molecules is not None and distance is None):
-            raise ValueError("n_molecules must be set and distance must be None.")
-    elif filter in ["max_min_distance_to_central_molecule",
-                       "max_max_distance_to_central_molecule"]:
-        if not (distance is not None and n_molecules is None):
-            raise ValueError("distance must be set and n_molecules must be None.")
-
-    if filter == "closest_to_center_of_mass":
+    if selection_rule == "closest_to_center_of_mass":
         com_distances_from_origin = np.linalg.norm(system.centers_of_mass, axis=1)
         sorted_indices = np.argsort(com_distances_from_origin, stable=True)
         filtered_molecule_indices = sorted_indices[0:n_molecules]
-    elif filter == "closest_to_central_molecule":
+        
+    elif selection_rule == "closest_to_central_molecule":
         sorted_indices = np.argsort(system.min_distances_to_central_molecule, stable=True)
         filtered_molecule_indices = sorted_indices[0:n_molecules]
-    elif filter == "max_max_distance_to_central_molecule":
+        
+    elif selection_rule == "max_max_distance_to_central_molecule":
         mask = system.max_distances_to_central_molecule < distance
         filtered_molecule_indices = np.where(mask)[0]
-    elif filter == "max_min_distance_to_central_molecule":
+        
+    elif selection_rule == "max_min_distance_to_central_molecule":
         mask = system.min_distances_to_central_molecule < distance            
         filtered_molecule_indices = np.where(mask)[0]
-    else:
-        raise ValueError(f"Invalid filter: {filter}")
+        
+    else:        
+        raise ValueError(f"Invalid selection_rule: {selection_rule}")
 
     filtered_atom_indices = np.concatenate(
         [system.index_map[i] for i in filtered_molecule_indices]
@@ -431,3 +487,35 @@ def extract_finite_subsystem(
     )
 
     return finite_subsystem
+
+
+def extract_finite_subsystem(
+        system: mbe_automation.storage.MolecularCrystal,
+        filter: FiniteSubsystemFilter=FiniteSubsystemFilter()
+) -> List[mbe_automation.storage.FiniteSubsystem]:
+
+    finite_subsystems = []
+    
+    if filter.selection_rule in NUMBER_SELECTION:
+        for n_molecules in filter.n_molecules:
+            finite_subsystems.append(
+                _extract_finite_subsystem(
+                    system=system,
+                    selection_rule=filter.selection_rule,
+                    n_molecules=n_molecules,
+                    distance=None
+                )
+            )
+            
+    elif filter.selection_rule in DISTANCE_SELECTION:
+        for distance in filter.distances:
+            finite_subsystems.append(
+                _extract_finite_subsystem(
+                    system=system,
+                    selection_rule=filter.selection_rule,
+                    n_molecules=None,
+                    distance=distance
+                )
+            )
+
+    return finite_subsystems

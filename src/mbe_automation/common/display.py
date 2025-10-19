@@ -36,9 +36,9 @@ def timestamp_start():
     datestr = datetime_start.strftime(dateformat)
     host = platform.node()
     user = getpass.getuser()
-    print("% Job started at {s}".format(s=datestr))
-    print("% User                     {s}".format(s=user))
-    print("% Node name                {s}".format(s=host))
+    print("% Workflow started at {s}".format(s=datestr))
+    print("% User                {s}".format(s=user))
+    print("% Node name           {s}".format(s=host))
 
     return datetime_start
 
@@ -49,7 +49,7 @@ def timestamp_finish(datetime_start):
     td = datetime_finish - datetime_start
     wallhours = ((td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 10**6) / 3600.0
     datestr_finish = datetime_finish.strftime(dateformat)
-    print("% Job finished at {datestr}".format(datestr=datestr_finish))
+    print("% Workflow finished at {datestr}".format(datestr=datestr_finish))
     print("% Total wall clock time [hours]: {WALLHOURS:.3f}".format(WALLHOURS=wallhours))
     
         

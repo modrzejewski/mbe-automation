@@ -28,15 +28,15 @@ except ImportError:
     doped_available = False
 
     
-def display(unit_cell: ase.Atoms, system_label: str | None=None) -> None:
+def display(unit_cell: ase.Atoms, key: str | None=None) -> None:
     """
     Display parameters of the unit cell.
     """
     
-    if system_label:
+    if key:
         mbe_automation.common.display.framed([
             "Cell parameters",
-            system_label])
+            key])
     else:
         mbe_automation.common.display.framed("Cell parameters")
         

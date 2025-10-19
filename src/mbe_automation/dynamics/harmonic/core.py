@@ -105,19 +105,17 @@ def phonons(
         supercell_matrix,
         supercell_displacement,
         interp_mesh=150.0,
-        symmetrize_force_constants=False,
-        force_constants_cutoff_radius=None,
-        system_label=None
+        key: str | None = None
 ) -> phonopy.Phonopy:
 
     cuda_available = torch.cuda.is_available()
     if cuda_available:
         torch.cuda.reset_peak_memory_stats()
 
-    if system_label:
+    if key:
         mbe_automation.common.display.framed([
             "Phonons",
-            system_label])
+            key])
     else:
         mbe_automation.common.display.framed("Phonons")
         
@@ -175,9 +173,6 @@ def phonons(
     print(f"n_supercells                    {n_supercells}")
     print(f"n_atoms_super_cell              {n_atoms_super_cell}")
     print(f"supercell_displacement          {supercell_displacement:.3f} Å")
-    if force_constants_cutoff_radius:
-        print(f"force_constants_cutoff_radius   {force_constants_cutoff_radius:.1f} Å")
-    print(f"symmetrize_force_constants      {symmetrize_force_constants}")
     #
     # Compute second-order dynamic matrix (Hessian)
     # by numerical differentiation. The force vectors
@@ -209,17 +204,8 @@ def phonons(
         show_drift=True,
         fc_calculator_log_level=1
     )
-    if force_constants_cutoff_radius:
-        phonons.set_force_constants_zero_with_radius(
-            cutoff_radius=force_constants_cutoff_radius
-        )
     print(f"Force constants completed", flush=True)
 
-    if symmetrize_force_constants:
-        phonons.symmetrize_force_constants()
-        # phonons.symmetrize_force_constants_by_space_group()
-        print(f"Symmetrization of force constants completed", flush=True)
-    
     phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
     print(f"Fourier interpolation mesh completed", flush=True)
     return phonons
@@ -242,13 +228,12 @@ def equilibrium_curve(
         equation_of_state,
         eos_sampling,
         symmetrize_unit_cell,
-        symmetrize_force_constants,
-        force_constants_cutoff_radius,
         imaginary_mode_threshold,
         filter_out_imaginary_acoustic,
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
-        dataset
+        dataset,
+        root_key
 ):
 
     geom_opt_dir = os.path.join(work_dir, "relaxation")
@@ -264,7 +249,10 @@ def equilibrium_curve(
     
     df_eos_points = []
     
-    mbe_automation.common.display.framed("F(V) curve sampling")
+    mbe_automation.common.display.framed([
+        "F(V) curve sampling",
+        f"{root_key}/phonons"
+    ])
     print(f"equation_of_state               {equation_of_state}")
     print(f"filter_out_imaginary_acoustic   {filter_out_imaginary_acoustic}")
     print(f"filter_out_imaginary_optical    {filter_out_imaginary_optical}")
@@ -284,7 +272,7 @@ def equilibrium_curve(
             # to the pressure.
             #
             thermal_pressure = pressure_range[i]
-            label = f"crystal_eos_p_thermal_{thermal_pressure:.4f}_GPa"
+            label = f"crystal[eos:p_thermal={thermal_pressure:.4f}]"
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V0,
                 calculator,
@@ -296,7 +284,7 @@ def equilibrium_curve(
                 algo_primary=relax_algo_primary,
                 algo_fallback=relax_algo_fallback,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
-                system_label=label
+                key=f"{root_key}/structures/{label}"
             )
         elif eos_sampling == "volume":
             #
@@ -310,7 +298,7 @@ def equilibrium_curve(
                 unit_cell_V0.cell * (V/V0)**(1/3),
                 scale_atoms=True
             )
-            label = f"crystal_eos_V_{V/V0:.4f}"
+            label = f"crystal[eos:V={V/V0:.4f}]"
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell_V,
                 calculator,                
@@ -322,7 +310,7 @@ def equilibrium_curve(
                 algo_primary=relax_algo_primary,
                 algo_fallback=relax_algo_fallback,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
-                system_label=label
+                key=f"{root_key}/structures/{label}"
             )
         ph = phonons(
             unit_cell_V,
@@ -330,9 +318,7 @@ def equilibrium_curve(
             supercell_matrix,
             supercell_displacement,
             interp_mesh=interp_mesh,
-            symmetrize_force_constants=symmetrize_force_constants,
-            force_constants_cutoff_radius=force_constants_cutoff_radius,
-            system_label=label
+            key=f"{root_key}/phonons/{label}"
         )
         df_crystal_V = mbe_automation.dynamics.harmonic.data.crystal(
             unit_cell_V,
@@ -342,6 +328,7 @@ def equilibrium_curve(
             space_group=space_group_V,
             work_dir=work_dir,
             dataset=dataset,
+            root_key=root_key,
             system_label=label
         )
         df_eos_points.append(df_crystal_V)
@@ -464,11 +451,11 @@ def equilibrium_curve(
         F_tot_curves=F_tot_curves,
         temperatures=temperatures,
         dataset=dataset,
-        key="quasi_harmonic/eos_interpolated"
+        key=f"{root_key}/eos_interpolated"
     )
     mbe_automation.dynamics.harmonic.display.eos_curves(
         dataset=dataset,
-        key="quasi_harmonic/eos_interpolated",
+        key=f"{root_key}/eos_interpolated",
         save_path=os.path.join(work_dir, "eos_curves.png")
     )
         

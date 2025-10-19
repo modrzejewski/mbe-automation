@@ -181,6 +181,7 @@ class Enthalpy:
                                    # for the physical system
                                    #
     dataset: str = "./properties.hdf5"
+    root_key: str = "md"
                                    #
                                    # Verbosity of the program's output.
                                    # 0 -> suppressed warnings

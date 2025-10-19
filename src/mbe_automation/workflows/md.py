@@ -32,7 +32,7 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         if isinstance(config.calculator, MACECalculator):
             mbe_automation.common.display.mace_summary(config.calculator)
     
-    label_molecule = f"molecule_T_{config.temperature_K:.2f}"
+    label_molecule = f"molecule[dyn:T={config.temperature_K:.2f}]"
     mbe_automation.dynamics.md.core.run(
         system=config.molecule,
         supercell_matrix=None,
@@ -41,43 +41,43 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         target_pressure_GPa=None,
         md=config.md_molecule,
         dataset=config.dataset,
-        key=f"md/trajectories/{label_molecule}",
+        key=f"{config.root_key}/{label_molecule}/trajectory",
     )
     df_molecule = mbe_automation.dynamics.md.data.molecule(
         dataset=config.dataset,
-        key=f"md/trajectories/{label_molecule}",
+        key=f"{config.root_key}/{label_molecule}/trajectory",
         system_label=label_molecule
     )
     if config.save_plots:
         mbe_automation.dynamics.md.display.trajectory(
             dataset=config.dataset,
-            key=f"md/trajectories/{label_molecule}",
+            key=f"{config.root_key}/{label_molecule}/trajectory",
             save_path=os.path.join(
                 config.work_dir,
-                "trajectories",
-                f"{label_molecule}.png"
+                label_molecule,
+                "trajectory.png",
             )
         )
         mbe_automation.dynamics.md.display.reblocking(
             dataset=config.dataset,
-            key=f"md/trajectories/{label_molecule}",
+            key=f"{config.root_key}/{label_molecule}/trajectory",
             save_path=os.path.join(
                 config.work_dir,
-                "reblocking",
-                f"{label_molecule}.png"
+                label_molecule,
+                "reblocking.png",
             )
         )
         mbe_automation.dynamics.md.display.velocity_autocorrelation(
             dataset=config.dataset,
-            key=f"md/trajectories/{label_molecule}",
+            key=f"{config.root_key}/{label_molecule}/trajectory",
             save_path=os.path.join(
                 config.work_dir,
-                "velocity_autocorrelation",
-                f"{label_molecule}.png"
+                label_molecule,
+                "velocity_autocorrelation.png",
             )
         )
 
-    label_crystal = f"crystal_T_{config.temperature_K:.2f}_p_{config.pressure_GPa:.5f}"
+    label_crystal = f"crystal[dyn:T={config.temperature_K:.2f},p={config.pressure_GPa:.5f}]"
     
     if config.md_crystal.supercell_matrix is None:
         supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(
@@ -96,40 +96,40 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         target_pressure_GPa=config.pressure_GPa,
         md=config.md_crystal,
         dataset=config.dataset,
-        key=f"md/trajectories/{label_crystal}",
+        key=f"{config.root_key}/{label_crystal}/trajectory",
     )
     df_crystal = mbe_automation.dynamics.md.data.crystal(
         dataset=config.dataset,
-        key=f"md/trajectories/{label_crystal}",
+        key=f"{config.root_key}/{label_crystal}/trajectory",
         n_atoms_unit_cell=len(config.crystal),
         system_label=label_crystal
     )
     if config.save_plots:
         mbe_automation.dynamics.md.display.trajectory(
             dataset=config.dataset,
-            key=f"md/trajectories/{label_crystal}",
+            key=f"{config.root_key}/{label_crystal}/trajectory",
             save_path=os.path.join(
                 config.work_dir,
-                "trajectories",
-                f"{label_crystal}.png"
+                label_crystal,
+                "trajectory.png",
             )
         )
         mbe_automation.dynamics.md.display.reblocking(
             dataset=config.dataset,
-            key=f"md/trajectories/{label_crystal}",
+            key=f"{config.root_key}/{label_crystal}/trajectory",
             save_path=os.path.join(
                 config.work_dir,
-                "reblocking",
-                f"{label_crystal}.png"
+                label_crystal,
+                "reblocking.png",
             )
         )
         mbe_automation.dynamics.md.display.velocity_autocorrelation(
             dataset=config.dataset,
-            key=f"md/trajectories/{label_crystal}",
+            key=f"{config.root_key}/{label_crystal}/trajectory",
             save_path=os.path.join(
                 config.work_dir,
-                "velocity_autocorrelation",
-                f"{label_crystal}.png"
+                label_crystal,
+                "velocity_autocorrelation.png"
             )
         )
     
@@ -143,11 +143,11 @@ def run(config: mbe_automation.configs.md.Enthalpy):
 
     mbe_automation.storage.save_data_frame(
         dataset=config.dataset,
-        key="md/sublimation",
+        key=f"{config.root_key}/enthalpy",
         df=df_npt_nvt
     )
     if config.save_csv:
-        df_npt_nvt.to_csv(os.path.join(config.work_dir, "sublimation.csv"))
+        df_npt_nvt.to_csv(os.path.join(config.work_dir, "enthalpy.csv"))
 
     print("MD workflow completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)
