@@ -53,8 +53,13 @@ class PhononSampling:
                                    # Root of the dataset hierarchical structure
                                    #
     root_key: str = "training/phonon_sampling"
+                                   #
+                                   # Verbosity of the program's output.
+                                   # 0 -> suppressed warnings
+                                   #
+    verbose: int = 0
 
-
+    
 @dataclass(kw_only=True)
 class MDSampling:
                                    #

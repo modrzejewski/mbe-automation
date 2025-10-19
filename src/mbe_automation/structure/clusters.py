@@ -344,7 +344,18 @@ def detect_molecules(
     system_unwrapped = system.copy()
     if system.n_frames > 1:
         for i in range(system.n_frames):
-            cell_i = system.cell_vectors[i]
+            if system.cell_vectors.ndim == 3:
+                #
+                # Cell vectors are frame-dependent:
+                # NPT simulation
+                #
+                cell_i = system.cell_vectors[i]
+            else:
+                #
+                # Cell vectors are frame-independent:
+                # NVT simulation, phonon sampling
+                #
+                cell_i = system.cell_vectors
             unwrapped_cart_i = (system.positions[i] @ np.linalg.inv(cell_i) + shifts_frac) @ cell_i
             system_unwrapped.positions[i] = unwrapped_cart_i
     else:        

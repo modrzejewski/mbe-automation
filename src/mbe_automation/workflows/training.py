@@ -20,6 +20,19 @@ def phonon_sampling(
         config: mbe_automation.configs.training.PhononSampling
 ):
 
+    datetime_start = mbe_automation.common.display.timestamp_start()
+    
+    if config.verbose == 0:
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        warnings.filterwarnings("ignore", category=UserWarning)
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+    mbe_automation.common.display.framed(["Training set", "Normal-mode coordinate sampling"])
+        
+    if mace_available:
+        if isinstance(config.calculator, MACECalculator):
+            mbe_automation.common.display.mace_summary(config.calculator)
+
     traj_pbc = mbe_automation.dynamics.harmonic.modes.trajectory(
         dataset=config.force_constants_dataset,
         key=config.force_constants_key,
@@ -79,7 +92,8 @@ def phonon_sampling(
             subsystem=s
         )
         
-    return
+    print("Normal-mode coordinate sampling completed")
+    mbe_automation.common.display.timestamp_finish(datetime_start)
 
 
 def md_sampling(
