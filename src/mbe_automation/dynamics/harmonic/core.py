@@ -38,20 +38,14 @@ def _assert_primitive_consistency(
     is exactly equal to the input cell without any
     permutations of atoms.
     """
-    assert (
-        (unit_cell.numbers == ph.primitive.numbers).all(),
+    assert (unit_cell.numbers == ph.primitive.numbers).all(), \
         "Inconsistent arrays of atomic numbers."
-    )
-    assert (
-        np.max(np.abs(unit_cell.get_masses() - ph.primitive.masses)) < 1.0E-8,
+    assert np.max(np.abs(unit_cell.get_masses() - ph.primitive.masses)) < 1.0E-8, \
         "Inconsistent arrays of atomic masses."
-    )
     max_abs_diff = np.max(np.abs(unit_cell.positions - ph.primitive.positions))
-    assert (
-        max_abs_diff < 1.0E-8,
+    assert max_abs_diff < 1.0E-8, \
         "Inconsistent arrays of atomic positions (max_abs_diff={max_abs_diff:.2e})."
-    )
-    
+
     
 def _assert_supercell_consistency(
     phonopy_instance: phonopy.Phonopy,
