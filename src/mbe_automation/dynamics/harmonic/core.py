@@ -152,7 +152,7 @@ def phonons(
         # where supercell_matrix is nondiagonal.
         #
         supercell_matrix=supercell_matrix.T, 
-        primitive_matrix=None
+        primitive_matrix=np.eye(3)
     )
     _assert_primitive_consistency(
         ph=phonons,
