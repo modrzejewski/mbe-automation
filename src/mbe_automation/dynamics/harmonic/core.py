@@ -44,7 +44,7 @@ def _assert_primitive_consistency(
         "Inconsistent arrays of atomic masses."
     max_abs_diff = np.max(np.abs(unit_cell.positions - ph.primitive.positions))
     assert max_abs_diff < 1.0E-8, \
-        "Inconsistent arrays of atomic positions (max_abs_diff={max_abs_diff:.2e})."
+        f"Inconsistent arrays of atomic positions (max_abs_diff={max_abs_diff:.2e})."
 
     
 def _assert_supercell_consistency(
