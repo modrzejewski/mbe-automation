@@ -272,7 +272,8 @@ def detect_molecules(
         system: mbe_automation.storage.Structure,
         reference_frame_index: int = 0,
         assert_identical_composition: bool = True,
-        bonding_algo: pymatgen.analysis.local_env.NearNeighbors=pymatgen.analysis.local_env.JmolNN()
+        bonding_algo: pymatgen.analysis.local_env.NearNeighbors=pymatgen.analysis.local_env.JmolNN(),
+        validate_pbc_structure: bool = False
 ) -> mbe_automation.storage.MolecularCrystal:
     """
     Identify molecules in a periodic Structure.
@@ -408,13 +409,17 @@ def detect_molecules(
 
         atomic_numbers_a = system.atomic_numbers
         atomic_numbers_b = system_unwrapped.atomic_numbers
-            
-        rmsd = mbe_automation.structure.crystal.match(
-            positions_a, atomic_numbers_a, cell_a,
-            positions_b, atomic_numbers_b, cell_b
-        )
-        assert rmsd is not None
-        assert rmsd < 1.0E-8
+
+        if validate_pbc_structure:
+            #
+            # For debugging
+            #
+            rmsd = mbe_automation.structure.crystal.match(
+                positions_a, atomic_numbers_a, cell_a,
+                positions_b, atomic_numbers_b, cell_b
+            )
+            assert rmsd is not None
+            assert rmsd < 1.0E-8
 
     return mbe_automation.storage.MolecularCrystal(
         supercell=system_unwrapped,

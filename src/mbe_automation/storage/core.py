@@ -8,6 +8,8 @@ import numpy as np
 import numpy.typing as npt
 import os
 
+import mbe_automation.ml.core
+
 @dataclass
 class BrillouinZonePath:
     kpoints: List[npt.NDArray[np.floating]]
@@ -53,6 +55,60 @@ class Structure:
             E_pot=self.E_pot,
             forces=self.forces,
             feature_vectors=self.feature_vectors
+        )
+    def subsample(
+        self,
+        n: int,
+        algorithm: Literal[
+            "farthest_point_sampling",
+            "kmeans"
+        ] = "farthest_point_sampling"
+    ) -> Structure:
+        """
+        Return new Structure containing a subset of frames selected using
+        either either farthest point sampling or K-means sampling.
+
+        The feature vectors used to compute distances in the feature
+        space are averaged over atoms and normalized.
+        """
+
+        if self.feature_vectors is None:
+            raise ValueError(
+                "subsample requires the Structure to have feature_vectors."
+            )
+        if self.masses.ndim == 2 or self.atomic_numbers.ndim == 2:
+            raise ValueError(
+                "subsample cannot work on a structure where atoms"
+                "are permuted between frames."
+            )
+        selected_indices = mbe_automation.ml.core.subsample(
+            feature_vectors=self.feature_vectors,
+            n_samples=n,
+            algorithm=algorithm,
+        )
+        selected_cell_vectors = self.cell_vectors
+        if self.cell_vectors is not None:
+            if self.cell_vectors.ndim == 3:
+                selected_cell_vectors = self.cell_vectors[selected_indices].copy()
+            else:
+                selected_cell_vectors = self.cell_vectors.copy()
+        return Structure(
+            positions=self.positions[selected_indices].copy(),
+            atomic_numbers=self.atomic_numbers.copy(),
+            masses=self.masses.copy(),
+            cell_vectors=selected_cell_vectors,
+            n_frames=len(selected_indices),
+            n_atoms=self.n_atoms,
+            E_pot=(
+                self.E_pot[selected_indices].copy()
+                if self.E_pot is not None else None
+            ),
+            forces=(
+                self.forces[selected_indices].copy()
+                if self.forces is not None
+                else None
+            ),
+            feature_vectors=self.feature_vectors[selected_indices].copy()
         )
 
 @dataclass
@@ -618,7 +674,12 @@ def save_trajectory(
                 name="cell_vectors (Å)",
                 data=traj.cell_vectors
             )
-
+        if traj.feature_vectors is not None:
+            group.create_dataset(
+                name="feature_vectors",
+                data=traj.feature_vectors
+            )
+            
             
 def read_trajectory(dataset: str, key: str) -> Trajectory:
     
@@ -645,6 +706,10 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             E_pot=group["E_pot (eV∕atom)"][...],
             E_trans_drift=group["E_trans_drift (eV∕atom)"][...],
             E_rot_drift=(group["E_rot_drift (eV∕atom)"][...] if not is_periodic else None),
+            feature_vectors=(
+                group["feature_vectors"][...]
+                if "feature_vectors" in group else None
+            ),
             target_temperature=group.attrs["target_temperature (K)"],
             target_pressure=(group.attrs["target_pressure (GPa)"] if ensemble=="NPT" else None),
             time_equilibration=group.attrs["time_equilibration (fs)"],
