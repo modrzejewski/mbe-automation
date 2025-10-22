@@ -125,7 +125,7 @@ def phonons(
         numbers=unit_cell.numbers,
         cell=unit_cell.cell.array,
         masses=unit_cell.get_masses(),
-        scaled_positions=unit_cell.get_scaled_positions()
+        positions=unit_cell.positions
     )
     #    
     # Note regarding the use of primitive cells in phonopy.
