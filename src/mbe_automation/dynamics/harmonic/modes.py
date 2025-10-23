@@ -435,7 +435,7 @@ def thermal_displacements(
     qpoints = ph.mesh.qpoints
 
     mbe_automation.common.display.framed("Thermal displacements")
-    print(f"temperatures_K      {np.array2string(temperature_K,precision=1,separator=',')}")
+    print(f"temperatures_K      {np.array2string(temperatures_K,precision=1,separator=',')}")
     print(f"freq_min            {phonon_filter.freq_min_THz:.1f} THz")
     if phonon_filter.freq_max_THz is not None:
         print(f"freq_max            {phonon_filter.freq_max_THz:.1f} THz")

@@ -303,7 +303,7 @@ def detect_molecules(
     ).make_supercell([3, 3, 3])
     supercell_to_unit_cell = np.array(supercell.site_properties["original_index"])
 
-    print("Building graph of covalent bonds...", flush=True)
+    print("Graph of covalent bonds...", flush=True)
     structure_graph = pymatgen.analysis.graphs.StructureGraph.from_local_env_strategy(
         structure=supercell,
         strategy=bonding_algo
