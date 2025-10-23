@@ -187,8 +187,8 @@ def _cif_with_adps(
 
 def from_xyz_file(
         read_path: str,
-        convert_to_symmetrized_primitive: bool = True,
-        symprec: float = 1.0E-2
+        transform_to_symmetrized_primitive: bool = True,
+        symprec: float = mbe_automation.structure.crystal.SYMMETRY_TOLERANCE_LOOSE
 ) -> ase.Atoms:
     
     if read_path.lower().endswith(".cif"):
@@ -197,7 +197,7 @@ def from_xyz_file(
     else:
         system = ase.io.read(read_path)
 
-    if convert_to_symmetrized_primitive and np.all(system.pbc):
+    if transform_to_symmetrized_primitive and np.all(system.pbc):
         system = mbe_automation.structure.crystal.to_symmetrized_primitive(
             unit_cell=system,
             symprec=symprec
@@ -212,7 +212,7 @@ def to_xyz_file(
         frame_index: int = 0,
         thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None = None,
         temperature_idx: int = 0,
-        symprec: float = 1.0E-5
+        symprec: float = mbe_automation.structure.crystal.SYMMETRY_TOLERANCE_STRICT
 ):
     if isinstance(system, mbe_automation.storage.core.Structure):
         system_ase = mbe_automation.storage.views.to_ase(system, frame_index=frame_index)

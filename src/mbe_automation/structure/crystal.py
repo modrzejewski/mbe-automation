@@ -62,9 +62,11 @@ def display(unit_cell: ase.Atoms, key: str | None=None) -> None:
     print(f"γ = {gamma:.1f}°")
     print(f"V = {volume:.1f} Å³")
     print(f"Number of atoms {len(unit_cell)}")
-    tight_symmetry_thresh = 1.0E-5 # symmetry tolerance used in Phonopy
-    spgdata = ase.spacegroup.symmetrize.check_symmetry(unit_cell, symprec=tight_symmetry_thresh)
-    print(f"Space group: [{spgdata.international}][{spgdata.number}]")
+    space_group, hmsymbol = check_symmetry(
+        unit_cell,
+        symmetry_thresh=SYMMETRY_TOLERANCE_STRICT
+    )
+    print(f"Space group: [{hmsymbol}][{space_group}]")
 
 
 def to_symmetrized_primitive(
@@ -77,7 +79,7 @@ def to_symmetrized_primitive(
     symmetry elements is controlled by symprec. The default
     value of this threshold is extremely tight---equal to the
     default threshold in phonopy. Apply cell refinement with
-    a loose threshold (e.g., symprec=0.01) if your structure
+    a loose threshold (SYMMETRY_TOLERANCE_LOOSE) if your structure
     comes immediately from geometry optimization.
     """
     
@@ -92,7 +94,7 @@ def to_symmetrized_primitive(
     
 def check_symmetry(
         unit_cell: ase.Atoms,
-        symmetry_thresh = 1.0E-5 # tight symmetry tolerance used in Phonopy
+        symmetry_thresh = SYMMETRY_TOLERANCE_STRICT # tight symmetry tolerance used in Phonopy
 ):
     """
     Detect space group symmetry (no change to the input system is applied).
