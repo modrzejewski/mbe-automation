@@ -19,10 +19,12 @@ import networkx
 import pymatgen
 import pymatgen.analysis
 import pymatgen.analysis.local_env
+from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 import pymatgen.analysis.graphs
 
 import mbe_automation.storage
 import mbe_automation.structure.crystal
+import mbe_automation.common.display
 
 NUMBER_SELECTION = [
     "closest_to_center_of_mass",
@@ -272,12 +274,16 @@ def detect_molecules(
         system: mbe_automation.storage.Structure,
         reference_frame_index: int = 0,
         assert_identical_composition: bool = True,
-        bonding_algo: pymatgen.analysis.local_env.NearNeighbors=pymatgen.analysis.local_env.JmolNN(),
+        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
         validate_pbc_structure: bool = False
 ) -> mbe_automation.storage.MolecularCrystal:
     """
     Identify molecules in a periodic Structure.
     """
+    mbe_automation.common.display.framed("Molecule detection")
+    print(f"n_frames                {system.n_frames}")
+    print(f"reference_frame_index   {reference_frame_index}")
+    
     if not system.periodic:
         raise ValueError("detect_molecules is designed for periodic systems.")
 
@@ -301,11 +307,14 @@ def detect_molecules(
         site_properties={"original_index": np.arange(n_atoms_unit_cell)}
     ).make_supercell([3, 3, 3])
     supercell_to_unit_cell = np.array(supercell.site_properties["original_index"])
-    
+
+    print("Computing graph of covalent bonds...", flush=True)
     structure_graph = pymatgen.analysis.graphs.StructureGraph.from_local_env_strategy(
         structure=supercell,
         strategy=bonding_algo
     )
+    print("Graph completed", flush=True)
+    
     components = list(networkx.weakly_connected_components(structure_graph.graph))
     masses = np.array([site.specie.atomic_mass for site in supercell.sites])
     scaled_positions = supercell.frac_coords
@@ -499,9 +508,14 @@ def extract_finite_subsystem(
         filter: FiniteSubsystemFilter=FiniteSubsystemFilter()
 ) -> List[mbe_automation.storage.FiniteSubsystem]:
 
+    mbe_automation.common.display.framed("Finite subsystem extraction")
     finite_subsystems = []
     
     if filter.selection_rule in NUMBER_SELECTION:
+        
+        print(f"selection_rule  {filter.selection_rule}")
+        print(f"n_molecules     {np.array2string(filter.n_molecules)}", flush=True)
+        
         for n_molecules in filter.n_molecules:
             finite_subsystems.append(
                 _extract_finite_subsystem(
@@ -513,6 +527,10 @@ def extract_finite_subsystem(
             )
             
     elif filter.selection_rule in DISTANCE_SELECTION:
+
+        print(f"selection_rule  {filter.selection_rule}")
+        print(f"distances       {np.array2string(f.distances, precision=1, separator=' ')}", flush=True)
+        
         for distance in filter.distances:
             finite_subsystems.append(
                 _extract_finite_subsystem(
@@ -523,4 +541,6 @@ def extract_finite_subsystem(
                 )
             )
 
+    print(f"Subsystem extraction completed", flush=True)
+            
     return finite_subsystems

@@ -435,6 +435,7 @@ def thermal_displacements(
     qpoints = ph.mesh.qpoints
 
     mbe_automation.common.display.framed("Thermal displacements")
+    print(f"temperatures_K      {np.array2string(temperatures_K,precision=1,separator=',')}")
     print(f"freq_min            {phonon_filter.freq_min_THz:.1f} THz")
     if phonon_filter.freq_max_THz is not None:
         print(f"freq_max            {phonon_filter.freq_max_THz:.1f} THz")
@@ -442,7 +443,7 @@ def thermal_displacements(
         print(f"freq_max            unlimited")
     nx, ny, nz = ph.mesh.mesh_numbers
     print(f"k_points_mesh       {nx}×{ny}×{nz}")
-    print("Diagonalization of dynamic matrix at each k point...")
+    print("Diagonalization of dynamic matrix at each k point...", flush=True)
     
     disp = _thermal_displacements(
         dynamical_matrix=ph.dynamical_matrix,
@@ -455,7 +456,7 @@ def thermal_displacements(
         cell_type=cell_type
     )
     
-    print("Thermal displacements completed")
+    print("Thermal displacements completed", flush=True)
     return disp
 
 
@@ -467,7 +468,7 @@ def trajectory(
         time_step_fs: float = 100.0,
         n_frames: int = 20,
 ) -> mbe_automation.storage.Structure:
-
+    
     time_points_fs = np.linspace(0.0, time_step_fs * (n_frames - 1), n_frames)
     disp = thermal_displacements(
         dataset=dataset,
@@ -484,7 +485,7 @@ def trajectory(
     equilibrium_cell = ph.supercell
     positions = (equilibrium_cell.positions[np.newaxis, :, :]
                  + disp.instantaneous_displacements[0])
-    
+
     return mbe_automation.storage.Structure(
         positions=positions,
         atomic_numbers=equilibrium_cell.numbers,
