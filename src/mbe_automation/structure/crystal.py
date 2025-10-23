@@ -26,8 +26,19 @@ except ImportError:
     get_ideal_supercell_matrix = None
     get_min_image_distance = None
     doped_available = False
+#
+# Tolerances for symmetry detection and refinement
+#
+# (1) Strict tolerance: recommended for phonon calculations.
+#     1.0E-05 is the default value used in phonopy.
+# (2) Loose tolerance: recommended for symmetry refinement
+#     of a structure after coordinate relaxation.
+#     1.0E-2 is the default value in pymatgen for
+#     symmetry refinement.
+#
+SYMMETRY_TOLERANCE_STRICT = 1.0E-5
+SYMMETRY_TOLERANCE_LOOSE = 1.0E-2
 
-    
 def display(unit_cell: ase.Atoms, key: str | None=None) -> None:
     """
     Display parameters of the unit cell.
@@ -58,7 +69,7 @@ def display(unit_cell: ase.Atoms, key: str | None=None) -> None:
 
 def to_symmetrized_primitive(
         unit_cell: ase.Atoms,
-        symprec: float = 1.0E-5
+        symprec: float = SYMMETRY_TOLERANCE_STRICT
 ):
     """
     Convert unit cell to pymatgen's standard primitive cell.
@@ -66,8 +77,8 @@ def to_symmetrized_primitive(
     symmetry elements is controlled by symprec. The default
     value of this threshold is extremely tight---equal to the
     default threshold in phonopy. Apply cell refinement with
-    a loose threshold first if your structure comes immediately
-    from geometry optimization.
+    a loose threshold (e.g., symprec=0.01) if your structure
+    comes immediately from geometry optimization.
     """
     
     pmg_unit_cell = pymatgen.io.ase.AseAtomsAdaptor.get_structure(unit_cell)
@@ -84,18 +95,24 @@ def check_symmetry(
         symmetry_thresh = 1.0E-5 # tight symmetry tolerance used in Phonopy
 ):
     """
-    Detect space group symmetry.
+    Detect space group symmetry (no change to the input system is applied).
 
-    Uses spglib
+    Uses spglib:
 
     Sci. Technol. Adv. Mater. Meth. 4, 2384822 (2024);
     doi: 10.1080/27660400.2024.2384822
     """
 
-    spgdata = ase.spacegroup.symmetrize.check_symmetry(unit_cell, symprec=symmetry_thresh)
-    return spgdata.number, spgdata.international
-    
-    
+    pmg_unit_cell = pymatgen.io.ase.AseAtomsAdaptor.get_structure(unit_cell)
+    spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(
+        structure=pmg_unit_cell,
+        symprec=symmetry_thresh
+    )
+    space_group_number = spg_analyzer.get_space_group_number()
+    space_group_symbol = spg_analyzer.get_space_group_symbol()
+    return space_group_number, space_group_symbol
+
+
 def symmetrize(unit_cell: ase.Atoms, symmetrization_thresh: float = 1.0E-2) -> tuple[Atoms, int]:
     """
     Use spglib to remove the geometry optimization artifacts 

@@ -50,7 +50,7 @@ def _assert_primitive_consistency(
 def _assert_supercell_consistency(
     phonopy_instance: phonopy.Phonopy,
     unit_cell: Atoms,
-    supercell_matrix: np.ndarray,
+    supercell_matrix: npt.NDArray[np.integer]
 ):
     """
     Assert that ASE and Phonopy supercells are identical.
@@ -141,7 +141,8 @@ def phonons(
     #
     # variant 2:
     # units kJ∕K∕mol∕unit cell, kJ∕mol∕unit cell, J∕K∕mol∕unit cell
-    # if the primitive cell matrix is set to None during initialization.
+    # if the primitive cell matrix is set to None or the unit matrix
+    # during initialization.
     #
     phonons = phonopy.Phonopy(
         phonopy_struct,
