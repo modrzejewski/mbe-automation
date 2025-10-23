@@ -435,6 +435,7 @@ def thermal_displacements(
     qpoints = ph.mesh.qpoints
 
     mbe_automation.common.display.framed("Thermal displacements")
+    print(f"temperatures_K      {np.array2string(temperature_K,precision=1,separator=',')}")
     print(f"freq_min            {phonon_filter.freq_min_THz:.1f} THz")
     if phonon_filter.freq_max_THz is not None:
         print(f"freq_max            {phonon_filter.freq_max_THz:.1f} THz")
@@ -467,10 +468,6 @@ def trajectory(
         time_step_fs: float = 100.0,
         n_frames: int = 20,
 ) -> mbe_automation.storage.Structure:
-
-    mbe_automation.common.display.framed("Coordinate scan along normal-mode vectors")
-    print(f"temperature_K                {temperature_K}")
-    print(f"n_frames                     {n_frames}")
     
     time_points_fs = np.linspace(0.0, time_step_fs * (n_frames - 1), n_frames)
     disp = thermal_displacements(
@@ -489,8 +486,6 @@ def trajectory(
     positions = (equilibrium_cell.positions[np.newaxis, :, :]
                  + disp.instantaneous_displacements[0])
 
-    print("Coordinate scan completed", flush=True)
-    
     return mbe_automation.storage.Structure(
         positions=positions,
         atomic_numbers=equilibrium_cell.numbers,

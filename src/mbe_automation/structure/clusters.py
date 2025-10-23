@@ -302,11 +302,14 @@ def detect_molecules(
         site_properties={"original_index": np.arange(n_atoms_unit_cell)}
     ).make_supercell([3, 3, 3])
     supercell_to_unit_cell = np.array(supercell.site_properties["original_index"])
-    
+
+    print("Building graph of covalent bonds...", flush=True)
     structure_graph = pymatgen.analysis.graphs.StructureGraph.from_local_env_strategy(
         structure=supercell,
         strategy=bonding_algo
     )
+    print("Graph completed", flush=True)
+    
     components = list(networkx.weakly_connected_components(structure_graph.graph))
     masses = np.array([site.specie.atomic_mass for site in supercell.sites])
     scaled_positions = supercell.frac_coords
@@ -533,4 +536,6 @@ def extract_finite_subsystem(
                 )
             )
 
+    print(f"Subsystem extraction completed", flush=True)
+            
     return finite_subsystems

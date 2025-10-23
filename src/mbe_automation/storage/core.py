@@ -901,6 +901,10 @@ def save_finite_subsystem(
         subsystem: FiniteSubsystem
 ) -> None:
     """Save a FiniteSubsystem object to a dataset."""
+
+    with h5py.File(dataset, "a") as f:
+        if key in f:
+            del f[key]            
     save_structure(
         structure=subsystem.cluster_of_molecules,
         dataset=dataset,
@@ -910,8 +914,10 @@ def save_finite_subsystem(
         group = f[key]
         group.attrs["n_molecules"] = subsystem.n_molecules
         group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
-
         
+    return
+
+
 def read_finite_subsystem(dataset: str, key: str) -> FiniteSubsystem:
 
     structure = read_structure(
