@@ -281,8 +281,8 @@ def detect_molecules(
     Identify molecules in a periodic Structure.
     """
     mbe_automation.common.display.framed("Molecule detection")
-    print("n_frames                {system.n_frames}")
-    print("reference_frame_index   {reference_frame_index}")
+    print(f"n_frames                {system.n_frames}")
+    print(f"reference_frame_index   {reference_frame_index}")
     
     if not system.periodic:
         raise ValueError("detect_molecules is designed for periodic systems.")
