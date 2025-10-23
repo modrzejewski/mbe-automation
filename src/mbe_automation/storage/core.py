@@ -9,6 +9,7 @@ import numpy.typing as npt
 import os
 
 import mbe_automation.ml.core
+from mbe_automation.ml.core import SUBSAMPLING_ALGOS
 
 @dataclass
 class BrillouinZonePath:
@@ -52,17 +53,17 @@ class Structure:
             n_frames=self.n_frames,
             n_atoms=self.n_atoms,
             periodic=self.periodic,
-            E_pot=self.E_pot,
-            forces=self.forces,
-            feature_vectors=self.feature_vectors
+            E_pot=(self.E_pot.copy() if self.E_pot is not None else None),
+            forces=(self.forces.copy() if self.forces is not None else None),
+            feature_vectors=(
+                self.feature_vectors.copy() 
+                if self.feature_vectors is not None else None
+            )
         )
     def subsample(
         self,
         n: int,
-        algorithm: Literal[
-            "farthest_point_sampling",
-            "kmeans"
-        ] = "farthest_point_sampling"
+        algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
     ) -> Structure:
         """
         Return new Structure containing a subset of frames selected using
@@ -89,26 +90,26 @@ class Structure:
         selected_cell_vectors = self.cell_vectors
         if self.cell_vectors is not None:
             if self.cell_vectors.ndim == 3:
-                selected_cell_vectors = self.cell_vectors[selected_indices].copy()
+                selected_cell_vectors = self.cell_vectors[selected_indices]
             else:
-                selected_cell_vectors = self.cell_vectors.copy()
+                selected_cell_vectors = self.cell_vectors
         return Structure(
-            positions=self.positions[selected_indices].copy(),
-            atomic_numbers=self.atomic_numbers.copy(),
-            masses=self.masses.copy(),
+            positions=self.positions[selected_indices],
+            atomic_numbers=self.atomic_numbers,
+            masses=self.masses,
             cell_vectors=selected_cell_vectors,
             n_frames=len(selected_indices),
             n_atoms=self.n_atoms,
             E_pot=(
-                self.E_pot[selected_indices].copy()
+                self.E_pot[selected_indices]
                 if self.E_pot is not None else None
             ),
             forces=(
-                self.forces[selected_indices].copy()
+                self.forces[selected_indices]
                 if self.forces is not None
                 else None
             ),
-            feature_vectors=self.feature_vectors[selected_indices].copy()
+            feature_vectors=self.feature_vectors[selected_indices]
         )
 
 @dataclass
@@ -177,6 +178,78 @@ class Trajectory(Structure):
             n_removed_trans_dof=n_removed_trans_dof,
             n_removed_rot_dof=n_removed_rot_dof
         )
+    
+    def subsample(
+            self,
+            n: int,
+            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
+    ) -> Trajectory:
+        """
+        Return new Trajectory containing a subset of frames
+        selected based on the distances in the feature
+        vector space.
+        """
+        if self.feature_vectors is None:
+            raise ValueError(
+                "subsample requires the Trajectory to have feature_vectors."
+            )
+        if self.masses.ndim == 2 or self.atomic_numbers.ndim == 2:
+            raise ValueError(
+                "subsample cannot work on a trajectory where atoms"
+                "are permuted between frames."
+            )
+                
+        selected_indices = mbe_automation.ml.core.subsample(
+            feature_vectors=self.feature_vectors,
+            n_samples=n,
+            algorithm=algorithm,
+        )
+        
+        selected_cell_vectors = self.cell_vectors
+        if self.cell_vectors is not None and self.cell_vectors.ndim == 3:
+            selected_cell_vectors = self.cell_vectors[selected_indices]
+                
+        return Trajectory(
+            time_equilibration=self.time_equilibration,
+            target_temperature=self.target_temperature,
+            target_pressure=self.target_pressure,
+            ensemble=self.ensemble,
+            n_removed_trans_dof=self.n_removed_trans_dof,
+            n_removed_rot_dof=self.n_removed_rot_dof,
+            n_atoms=self.n_atoms,
+            periodic=self.periodic,
+            atomic_numbers=self.atomic_numbers,
+            masses=self.masses,
+            n_frames=len(selected_indices),
+            positions=self.positions[selected_indices],
+            velocities=self.velocities[selected_indices],
+            time=self.time[selected_indices],
+            temperature=self.temperature[selected_indices],
+            E_kin=self.E_kin[selected_indices],
+            E_trans_drift=self.E_trans_drift[selected_indices],
+            cell_vectors=selected_cell_vectors,
+            E_pot=(
+                self.E_pot[selected_indices] 
+                if self.E_pot is not None else None
+            ),
+            forces=(
+                self.forces[selected_indices] 
+                if self.forces is not None else None
+            ),
+            feature_vectors=self.feature_vectors[selected_indices],
+            pressure=(
+                self.pressure[selected_indices] 
+                if self.pressure is not None else None
+            ),
+            volume=(
+                self.volume[selected_indices] 
+                if self.volume is not None else None
+            ),
+            E_rot_drift=(
+                self.E_rot_drift[selected_indices] 
+                if self.E_rot_drift is not None else None
+            ),
+        )
 
 @dataclass
 class MolecularCrystal:
@@ -188,12 +261,37 @@ class MolecularCrystal:
     central_molecule_index: int
     min_distances_to_central_molecule: npt.NDArray[np.floating]
     max_distances_to_central_molecule: npt.NDArray[np.floating]
+    def subsample(
+            self,
+            n: int,
+            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
+    ) -> MolecularCrystal:
+        return MolecularCrystal(
+            supercell=self.supercell.subsample(n, algorithm),
+            index_map=self.index_map,
+            centers_of_mass=self.centers_of_mass,
+            identical_composition=self.identical_composition,
+            n_molecules=self.n_molecules,
+            central_molecule_index=self.central_molecule_index,
+            min_distances_to_central_molecule=self.min_distances_to_central_molecule,
+            max_distances_to_central_molecule=self.max_distances_to_central_molecule
+        )
 
 @dataclass
 class FiniteSubsystem:
     cluster_of_molecules: Structure
     molecule_indices: npt.NDArray[np.integer]
     n_molecules: int
+    def subsample(
+            self,
+            n: int,
+            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
+    ) -> FiniteSubsystem:
+        return FiniteSubsystem(
+            cluster_of_molecules=self.cluster_of_molecules.subsample(n, algorithm),
+            molecule_indices=self.molecule_indices,
+            n_molecules=self.n_molecules
+        )
     
 def save_data_frame(
         dataset: str,
@@ -904,16 +1002,16 @@ def save_finite_subsystem(
 
     with h5py.File(dataset, "a") as f:
         if key in f:
-            del f[key]            
+            del f[key]  
+        group = f.create_group(key)
+        group.attrs["n_molecules"] = subsystem.n_molecules
+        group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
+        
     save_structure(
         structure=subsystem.cluster_of_molecules,
         dataset=dataset,
         key=f"{key}/cluster_of_molecules"
     )
-    with h5py.File(dataset, "a") as f:
-        group = f[key]
-        group.attrs["n_molecules"] = subsystem.n_molecules
-        group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
         
     return
 
