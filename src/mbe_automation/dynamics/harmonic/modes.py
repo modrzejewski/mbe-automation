@@ -469,8 +469,6 @@ def trajectory(
 ) -> mbe_automation.storage.Structure:
 
     mbe_automation.common.display.framed("Coordinate scan along normal-mode vectors")
-    print(f"force_constants (dataset)    {dataset}")
-    print(f"force_constants (key)        {key}")
     print(f"temperature_K                {temperature_K}")
     print(f"n_frames                     {n_frames}")
     
@@ -488,9 +486,6 @@ def trajectory(
         key=key
     )
     equilibrium_cell = ph.supercell
-
-    print("Generating displaced positions for all frames...", flush=True)
-    
     positions = (equilibrium_cell.positions[np.newaxis, :, :]
                  + disp.instantaneous_displacements[0])
 

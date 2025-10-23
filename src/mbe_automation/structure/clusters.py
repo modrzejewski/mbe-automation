@@ -23,6 +23,7 @@ import pymatgen.analysis.graphs
 
 import mbe_automation.storage
 import mbe_automation.structure.crystal
+import mbe_automation.common.display
 
 NUMBER_SELECTION = [
     "closest_to_center_of_mass",
@@ -499,9 +500,14 @@ def extract_finite_subsystem(
         filter: FiniteSubsystemFilter=FiniteSubsystemFilter()
 ) -> List[mbe_automation.storage.FiniteSubsystem]:
 
+    mbe_automation.common.display.framed("Finite subsystem extraction")
     finite_subsystems = []
     
     if filter.selection_rule in NUMBER_SELECTION:
+        
+        print(f"selection_rule  {filter.selection_rule}")
+        print(f"n_molecules     {np.array2string(filter.n_molecules)}", flush=True)
+        
         for n_molecules in filter.n_molecules:
             finite_subsystems.append(
                 _extract_finite_subsystem(
@@ -513,6 +519,10 @@ def extract_finite_subsystem(
             )
             
     elif filter.selection_rule in DISTANCE_SELECTION:
+
+        print(f"selection_rule  {filter.selection_rule}")
+        print(f"distances       {np.array2string(f.distances, precision=1, separator=' ')}", flush=True)
+        
         for distance in filter.distances:
             finite_subsystems.append(
                 _extract_finite_subsystem(
