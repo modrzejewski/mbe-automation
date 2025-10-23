@@ -468,6 +468,12 @@ def trajectory(
         n_frames: int = 20,
 ) -> mbe_automation.storage.Structure:
 
+    mbe_automation.common.display.framed("Coordinate scan along normal-mode vectors")
+    print(f"force_constants (dataset)    {dataset}")
+    print(f"force_constants (key)        {key}")
+    print(f"temperature_K                {temperature_K}")
+    print(f"n_frames                     {n_frames}")
+    
     time_points_fs = np.linspace(0.0, time_step_fs * (n_frames - 1), n_frames)
     disp = thermal_displacements(
         dataset=dataset,
@@ -482,8 +488,13 @@ def trajectory(
         key=key
     )
     equilibrium_cell = ph.supercell
+
+    print("Generating displaced positions for all frames...", flush=True)
+    
     positions = (equilibrium_cell.positions[np.newaxis, :, :]
                  + disp.instantaneous_displacements[0])
+
+    print("Coordinate scan completed", flush=True)
     
     return mbe_automation.storage.Structure(
         positions=positions,
