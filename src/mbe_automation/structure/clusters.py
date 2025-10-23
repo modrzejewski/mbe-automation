@@ -19,6 +19,7 @@ import networkx
 import pymatgen
 import pymatgen.analysis
 import pymatgen.analysis.local_env
+from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 import pymatgen.analysis.graphs
 
 import mbe_automation.storage
@@ -273,12 +274,16 @@ def detect_molecules(
         system: mbe_automation.storage.Structure,
         reference_frame_index: int = 0,
         assert_identical_composition: bool = True,
-        bonding_algo: pymatgen.analysis.local_env.NearNeighbors=pymatgen.analysis.local_env.JmolNN(),
+        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
         validate_pbc_structure: bool = False
 ) -> mbe_automation.storage.MolecularCrystal:
     """
     Identify molecules in a periodic Structure.
     """
+    mbe_automation.common.display.framed("Molecule detection")
+    print("n_frames                {system.n_frames}")
+    print("reference_frame_index   {reference_frame_index}")
+    
     if not system.periodic:
         raise ValueError("detect_molecules is designed for periodic systems.")
 
@@ -303,7 +308,7 @@ def detect_molecules(
     ).make_supercell([3, 3, 3])
     supercell_to_unit_cell = np.array(supercell.site_properties["original_index"])
 
-    print("Graph of covalent bonds...", flush=True)
+    print("Computing graph of covalent bonds...", flush=True)
     structure_graph = pymatgen.analysis.graphs.StructureGraph.from_local_env_strategy(
         structure=supercell,
         strategy=bonding_algo
