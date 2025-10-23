@@ -442,7 +442,7 @@ def thermal_displacements(
         print(f"freq_max            unlimited")
     nx, ny, nz = ph.mesh.mesh_numbers
     print(f"k_points_mesh       {nx}×{ny}×{nz}")
-    print("Diagonalization of dynamic matrix at each k point...")
+    print("Diagonalization of dynamic matrix at each k point...", flush=True)
     
     disp = _thermal_displacements(
         dynamical_matrix=ph.dynamical_matrix,
@@ -455,7 +455,7 @@ def thermal_displacements(
         cell_type=cell_type
     )
     
-    print("Thermal displacements completed")
+    print("Thermal displacements completed", flush=True)
     return disp
 
 
