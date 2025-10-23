@@ -508,7 +508,7 @@ def extract_finite_subsystem(
         filter: FiniteSubsystemFilter=FiniteSubsystemFilter()
 ) -> List[mbe_automation.storage.FiniteSubsystem]:
 
-    mbe_automation.common.display.framed("Finite subsystem extraction")
+    mbe_automation.common.display.framed("Finite subsystem")
     finite_subsystems = []
     
     if filter.selection_rule in NUMBER_SELECTION:
@@ -517,6 +517,13 @@ def extract_finite_subsystem(
         print(f"n_molecules     {np.array2string(filter.n_molecules)}", flush=True)
         
         for n_molecules in filter.n_molecules:
+            #
+            # Ignore request if n_molecules exceeds total
+            # molecules in the unit cell.
+            #
+            if n_molecules > system.n_molecules:
+                print(f"Skipping n_molecules={n_molecules} (exceeds system.n_molecules={system.n_molecules})", flush=True)
+                continue
             finite_subsystems.append(
                 _extract_finite_subsystem(
                     system=system,
@@ -529,18 +536,24 @@ def extract_finite_subsystem(
     elif filter.selection_rule in DISTANCE_SELECTION:
 
         print(f"selection_rule  {filter.selection_rule}")
-        print(f"distances       {np.array2string(f.distances, precision=1, separator=' ')}", flush=True)
-        
-        for distance in filter.distances:
-            finite_subsystems.append(
-                _extract_finite_subsystem(
-                    system=system,
-                    selection_rule=filter.selection_rule,
-                    n_molecules=None,
-                    distance=distance
-                )
-            )
+        print(f"distances       {np.array2string(filter.distances, precision=1, separator=' ')}", flush=True)
 
+        last_n_molecules = 0
+        for distance in np.sort(filter.distances):
+            new_subsystem = _extract_finite_subsystem(
+                system=system,
+                selection_rule=filter.selection_rule,
+                n_molecules=None,
+                distance=distance
+            )
+            #
+            # Add subsystem only if the number of
+            # molecules is different from the previous one.
+            #
+            if new_subsystem.n_molecules > last_n_molecules:
+                finite_subsystems.append(new_subsystem)
+                last_n_molecules = new_subsystem.n_molecules
+                
     print(f"Subsystem extraction completed", flush=True)
             
     return finite_subsystems
