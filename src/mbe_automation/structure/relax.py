@@ -12,6 +12,7 @@ import torch
 
 import mbe_automation.structure.crystal
 import mbe_automation.common
+from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 def crystal(unit_cell,
             calculator,
@@ -49,6 +50,16 @@ def crystal(unit_cell,
     pressure_eV_A3 = pressure_GPa * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
     relaxed_system = unit_cell.copy()
     relaxed_system.calc = calculator
+
+    if symmetrize_final_structure:
+        #
+        # Check symmetry of the input structure
+        # with tight tolerance
+        #
+        input_space_group, input_hmsymbol = mbe_automation.structure.crystal.check_symmetry(
+            unit_cell=unit_cell,
+            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT
+        )
     
     if optimize_lattice_vectors:
         print("Applying Frechet cell filter")
@@ -117,13 +128,26 @@ def crystal(unit_cell,
         raise RuntimeError("All optimization algorithms failed")
 
     if symmetrize_final_structure:
-        print("Post-relaxation symmetry refinement")
-        relaxed_system, space_group = mbe_automation.structure.crystal.symmetrize(
-            relaxed_system
+        print("Transformation to symmetrized primitive cell...")
+        relaxed_system = mbe_automation.structure.crystal.to_symmetrized_primitive(
+            unit_cell=relaxed_system,
+            symprec=SYMMETRY_TOLERANCE_LOOSE
+        )
+        space_group, hmsymbol = mbe_automation.structure.crystal.check_symmetry(
+            unit_cell=relaxed_system,
+            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT
         )
         relaxed_system.calc = calculator
+        
+        if space_group != input_space_group:
+            print(f"Refinement: [{input_hmsymbol}][{input_space_group}] → [{hmsymbol}][{space_group}]")
+        else:
+            print(f"Symmetry under strict tolerance: [{input_hmsymbol}][{input_space_group}]")
     else:
-        space_group, _ = mbe_automation.structure.crystal.check_symmetry(relaxed_system)
+        space_group, _ = mbe_automation.structure.crystal.check_symmetry(
+            relaxed_system,
+            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT
+        )
 
     max_force = np.abs(relaxed_system.get_forces()).max()
     print(f"Final max residual force = {max_force:.1e} eV/Å", flush=True)

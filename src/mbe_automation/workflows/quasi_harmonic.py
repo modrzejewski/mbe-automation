@@ -39,15 +39,10 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     geom_opt_dir = os.path.join(config.work_dir, "relaxation")
     os.makedirs(geom_opt_dir, exist_ok=True)
 
-    if config.symmetrize_unit_cell:
-        unit_cell, input_space_group = mbe_automation.structure.crystal.symmetrize(
-            config.crystal
-        )
-    else:
-        input_space_group, _ = mbe_automation.structure.crystal.check_symmetry(
-            config.crystal
-        )
-        unit_cell = config.crystal.copy()
+    input_space_group, _ = mbe_automation.structure.crystal.check_symmetry(
+        config.crystal
+    )
+    unit_cell = config.crystal.copy()
 
     if mace_available:
         if isinstance(config.calculator, MACECalculator):

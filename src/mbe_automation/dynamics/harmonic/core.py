@@ -38,17 +38,19 @@ def _assert_primitive_consistency(
     is exactly equal to the input cell without any
     permutations of atoms.
     """
-    assert (
-        (unit_cell.numbers == ph.primitive.numbers).all() and
-        np.max(np.abs(unit_cell.positions - ph.primitive.positions)) < 1.0E-8 and
-        np.max(np.abs(unit_cell.get_masses() - ph.primitive.masses)) < 1.0E-8
-    ), "Phonopy primitive cell differs from the input cell."
-    
+    assert (unit_cell.numbers == ph.primitive.numbers).all(), \
+        "Inconsistent arrays of atomic numbers."
+    assert np.max(np.abs(unit_cell.get_masses() - ph.primitive.masses)) < 1.0E-8, \
+        "Inconsistent arrays of atomic masses."
+    max_abs_diff = np.max(np.abs(unit_cell.positions - ph.primitive.positions))
+    assert max_abs_diff < 1.0E-8, \
+        f"Inconsistent arrays of atomic positions (max_abs_diff={max_abs_diff:.2e})."
+
     
 def _assert_supercell_consistency(
     phonopy_instance: phonopy.Phonopy,
     unit_cell: Atoms,
-    supercell_matrix: np.ndarray,
+    supercell_matrix: npt.NDArray[np.integer]
 ):
     """
     Assert that ASE and Phonopy supercells are identical.
@@ -123,7 +125,7 @@ def phonons(
         numbers=unit_cell.numbers,
         cell=unit_cell.cell.array,
         masses=unit_cell.get_masses(),
-        scaled_positions=unit_cell.get_scaled_positions()
+        positions=unit_cell.positions
     )
     #    
     # Note regarding the use of primitive cells in phonopy.
@@ -139,7 +141,8 @@ def phonons(
     #
     # variant 2:
     # units kJ∕K∕mol∕unit cell, kJ∕mol∕unit cell, J∕K∕mol∕unit cell
-    # if the primitive cell matrix is set to None during initialization.
+    # if the primitive cell matrix is set to None or the unit matrix
+    # during initialization.
     #
     phonons = phonopy.Phonopy(
         phonopy_struct,
@@ -150,7 +153,7 @@ def phonons(
         # where supercell_matrix is nondiagonal.
         #
         supercell_matrix=supercell_matrix.T, 
-        primitive_matrix=None
+        primitive_matrix=np.eye(3)
     )
     _assert_primitive_consistency(
         ph=phonons,
