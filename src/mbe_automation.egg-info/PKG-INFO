@@ -1,0 +1,35 @@
+Metadata-Version: 2.4
+Name: mbe-automation
+Version: 0.1.0
+Requires-Dist: torch>=2.8.0
+Requires-Dist: numpy
+Requires-Dist: networkx
+Requires-Dist: scipy
+Requires-Dist: ase>=3.26.0
+Requires-Dist: dscribe
+Requires-Dist: mace-torch>=0.3.14
+Requires-Dist: matplotlib
+Requires-Dist: pymatgen
+Requires-Dist: pyscf
+Requires-Dist: scikit-learn
+Requires-Dist: spglib
+Requires-Dist: seekpath
+Requires-Dist: phonopy>=2.43.1
+Requires-Dist: tqdm
+Requires-Dist: joblib
+Requires-Dist: h5py
+Requires-Dist: pandas
+Requires-Dist: ipi
+Requires-Dist: doped
+Requires-Dist: dynasor
+Requires-Dist: nglview
+Requires-Dist: pymatviz
+Requires-Dist: chemiscope
+Provides-Extra: gpu-cuda11
+Requires-Dist: cuequivariance; extra == "gpu-cuda11"
+Requires-Dist: cuequivariance-torch; extra == "gpu-cuda11"
+Requires-Dist: cuequivariance-ops-torch-cu11; extra == "gpu-cuda11"
+Provides-Extra: gpu-cuda12
+Requires-Dist: cuequivariance; extra == "gpu-cuda12"
+Requires-Dist: cuequivariance-torch; extra == "gpu-cuda12"
+Requires-Dist: cuequivariance-ops-torch-cu12; extra == "gpu-cuda12"

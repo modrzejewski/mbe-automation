@@ -1,0 +1,72 @@
+
+Molecular Dynamics
+==================
+
+This document describes how to perform a molecular dynamics simulation using the mbe-automation program.
+
+.. toctree::
+   :maxdepth: 2
+
+.. code-block:: python
+
+   import numpy as np
+   import os.path
+   import mace.calculators
+   import torch
+
+   import mbe_automation.configs
+   import mbe_automation.workflows
+   from mbe_automation.storage import from_xyz_file
+
+   xyz_solid = "{xyz_solid}"
+   xyz_molecule = "{xyz_molecule}"
+   work_dir = os.path.abspath(os.path.dirname(__file__))
+
+   mace_calc = mace.calculators.MACECalculator(
+       model_paths=os.path.expanduser("{mlip_parameters}"),
+       default_dtype="float64",
+       device=("cuda" if torch.cuda.is_available() else "cpu")
+   )
+
+   md_config = mbe_automation.configs.md.Enthalpy(
+       molecule = from_xyz_file(os.path.join(work_dir, xyz_molecule)),
+       crystal = from_xyz_file(os.path.join(work_dir, xyz_solid)),
+       calculator = mace_calc,
+       temperature_K = 298.15,
+       pressure_GPa = 1.0E-4,
+       work_dir = os.path.join(work_dir, "properties"),
+       dataset = os.path.join(work_dir, "properties.hdf5"),
+
+       md_molecule = mbe_automation.configs.md.ClassicalMD(
+           ensemble = "NVT",
+           time_total_fs = 50000.0,
+           time_step_fs = 1.0,
+           sampling_interval_fs = 50.0,
+           time_equilibration_fs = 5000.0
+       ),
+
+       md_crystal = mbe_automation.configs.md.ClassicalMD(
+           ensemble = "NPT",
+           time_total_fs = 50000.0,
+           time_step_fs = 1.0,
+           sampling_interval_fs = 50.0,
+           time_equilibration_fs = 5000.0,
+           supercell_radius = 15.0,
+           supercell_diagonal = True
+       )
+   )
+
+   mbe_automation.workflows.md.run(md_config)
+
+
+**Configuration Options**
+
+* ``molecule``: The molecule structure in XYZ format.
+* ``crystal``: The crystal structure in XYZ format.
+* ``calculator``: The MACE calculator object.
+* ``temperature_K``: The temperature of the simulation in Kelvin.
+* ``pressure_GPa``: The pressure of the simulation in GigaPascals.
+* ``work_dir``: The directory where the calculation results will be stored.
+* ``dataset``: The path to the output HDF5 dataset file.
+* ``md_molecule``: A configuration object for the molecular dynamics simulation of the molecule.
+* ``md_crystal``: A configuration object for the molecular dynamics simulation of the crystal.
