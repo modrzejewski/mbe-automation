@@ -1,5 +1,12 @@
 # Quasi-Harmonic Calculation
 
+- [Setup](#setup)
+- [Configuration](#configuration)
+- [Execution](#execution)
+- [Details](#details)
+- [Computational Bottlenecks](#computational-bottlenecks)
+- [Complete Input Files](#complete-input-files)
+
 This workflow performs a quasi-harmonic calculation of thermodynamic properties, including the free energy, heat capacities, and equilibrium volume as a function of temperature.
 
 ## Setup

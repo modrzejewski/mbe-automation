@@ -1,5 +1,13 @@
 # Training Set Creation
 
+- [Setup](#setup)
+- [Step 1: MD Sampling](#step-1-md-sampling)
+- [Step 2: Quasi-Harmonic Calculation](#step-2-quasi-harmonic-calculation)
+- [Step 3: Phonon Sampling](#step-3-phonon-sampling)
+- [Details](#details)
+- [Computational Bottlenecks](#computational-bottlenecks)
+- [Complete Input Files](#complete-input-files)
+
 This workflow generates a diverse set of configurations for delta-learning a machine learning interatomic potential. The process is divided into three stages: MD sampling, quasi-harmonic calculations, and phonon sampling.
 
 ## Setup

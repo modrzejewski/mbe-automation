@@ -1,5 +1,12 @@
 # Molecular Dynamics
 
+- [Setup](#setup)
+- [Configuration](#configuration)
+- [Execution](#execution)
+- [Details](#details)
+- [Computational Bottlenecks](#computational-bottlenecks)
+- [Complete Input Files](#complete-input-files)
+
 This workflow is designed for performing molecular dynamics (MD) simulations to compute properties such as the sublimation energy of a molecular crystal.
 
 ## Setup
