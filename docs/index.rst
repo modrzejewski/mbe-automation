@@ -14,4 +14,3 @@ This documentation provides a comprehensive guide to using the program, includin
    quasi_harmonic
    molecular_dynamics
    training_set
-   analysis
