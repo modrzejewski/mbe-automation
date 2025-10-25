@@ -1,15 +1,7 @@
-```
-  __  __  ____  ____         _   _   _   _   _   ____ ___ _   _  ____
- |  \/  |/ ___|| __ )       / \ | | | | | \ | | |  _ \_ _| \ | |/ ___|
- | |\/| | |  _ |  _ \ _____/ _ \| | | | |  \| | | | | | ||  \| | |
- | |  | | |_| || |_) |____/ ___ \ |_| | | |\  | | |_| | || |\  | |___
- |_|  |_|\____||____/    /_/   \_\___/  |_| \_| |____/___|_| \_|\____|
+# `mbe-automation`
 
-```
-
-`mbe-automation` is a program for modeling the thermodynamic properties of molecular crystals using machine-learning interatomic potentials (MLIPs). It provides automated, "black-box" workflows for complex computational tasks that are essential in the study of molecular crystals.
-
-The general computational scheme facilitated by this program is an automation of the following process applied to molecular crystals:
+Automate the modeling of thermodynamic properties in organic molecular crystals using machine-learning interatomic potentials (MLIPs). 
+The general computational scheme facilitated by this program involves the following steps:
 
 ```
 +-------------------------------------------------------------+
@@ -42,12 +34,13 @@ The general computational scheme facilitated by this program is an automation of
 +-------------------------------------------------------------+
 ```
 
-The program integrates several powerful scientific libraries into a unified workflow, including:
+The program integrates several scientific libraries into a unified workflow, including:
 
-*   **ASE (Atomic Simulation Environment):** For handling atomic structures and running simulations.
 *   **MACE (Multi-ACE):** As the primary MLIP model for calculating energies and forces.
 *   **phonopy:** For phonon calculations and the analysis of vibrational properties.
 *   **pymatgen:** For crystal structure analysis and manipulation.
+*   **ASE:** For geometry relaxation and molecular dynamics simulations.
+*   Quantum-chemical programs for correlated electronic structure calculations.
 
 ## Installation
 
