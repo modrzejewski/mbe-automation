@@ -63,8 +63,14 @@ mbe_automation.workflows.training.run(md_sampling_config)
 
 ### Key Parameters for `MDSampling`:
 
-*   `finite_subsystem_filter`: Defines how finite molecular clusters are extracted from the periodic simulation. In this example, clusters containing 1 to 8 molecules closest to a central molecule are selected.
-*   `md_crystal`: An instance of `ClassicalMD` that configures the MD simulation parameters.
+| Parameter                 | Description                                                                                             | Default Value                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `crystal`                 | The initial crystal structure.                                                                          | -                                  |
+| `calculator`              | The MLIP calculator.                                                                                    | -                                  |
+| `temperature_K`           | The target temperature (in Kelvin) for the MD simulation.                                               | `298.15`                           |
+| `pressure_GPa`            | The target pressure (in GPa) for the MD simulation.                                                     | `1.0E-4`                           |
+| `finite_subsystem_filter` | Defines how finite molecular clusters are extracted from the periodic simulation.                       | `closest_to_central_molecule`      |
+| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters.                              | -                                  |
 
 ## Step 2: Quasi-Harmonic Calculation
 
@@ -82,8 +88,6 @@ free_energy_config = FreeEnergy(
 )
 mbe_automation.workflows.quasi_harmonic.run(free_energy_config)
 ```
-
-For this step, `thermal_expansion` is set to `False` to compute the harmonic force constants at a single volume.
 
 ## Step 3: Phonon Sampling
 
@@ -115,8 +119,28 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 
 ### Key Parameters for `PhononSampling`:
 
-*   `phonon_filter`: Specifies which phonon modes to sample. Here, we sample from the gamma point with frequencies in the range of 0.1 to 8.0 THz.
-*   `force_constants_dataset` and `force_constants_key`: These parameters specify the location of the force constants computed in the quasi-harmonic step.
-*   `n_frames`: The number of frames to generate for each selected phonon mode.
+| Parameter                 | Description                                                                          | Default Value |
+| ------------------------- | ------------------------------------------------------------------------------------ | ----------------- |
+| `calculator`              | The MLIP calculator.                                                                 | -                 |
+| `temperature_K`           | The temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
+| `phonon_filter`           | Specifies which phonon modes to sample from.                                         | `gamma` point     |
+| `force_constants_dataset` | The path to the HDF5 file containing the force constants from the quasi-harmonic step. | `./properties.hdf5` |
+| `force_constants_key`     | The key within the HDF5 file where the force constants are stored.                     | -                 |
+| `time_step_fs`            | The time step for the trajectory generation.                                         | `100.0`           |
+| `n_frames`                | The number of frames to generate for each selected phonon mode.                        | `20`              |
 
-Upon completion of these three stages, the `training_set.hdf5` file will contain a diverse set of configurations suitable for delta-learning an MLIP.
+## Programming Aspects
+
+The `run` function in `mbe_automation/workflows/training.py` serves as a dispatcher for the two main sampling methods:
+
+1.  **MD Sampling (`md_sampling`):**
+    *   This function is called for `MDSampling` configurations.
+    *   It runs an MD simulation using `mbe_automation.dynamics.md.core.run`.
+    *   If a `finite_subsystem_filter` is provided, it extracts finite clusters by detecting molecules (`detect_molecules`) and then extracting the subsystems (`extract_finite_subsystem`).
+    *   It saves all results to the HDF5 `dataset`.
+
+2.  **Phonon Sampling (`phonon_sampling`):**
+    *   This function is called for `PhononSampling` configurations.
+    *   It generates a trajectory from phonon modes using `mbe_automation.dynamics.harmonic.modes.trajectory`.
+    *   It then detects molecules and extracts finite subsystems from the generated trajectory.
+    *   All data is saved to the HDF5 `dataset`.

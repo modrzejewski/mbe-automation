@@ -27,8 +27,6 @@ mace_calc = mace.calculators.MACECalculator(
 )
 ```
 
-This block defines the paths to the input structures and initializes the MACE calculator.
-
 ## Configuration
 
 The MD workflow is configured using the `Enthalpy` and `ClassicalMD` classes from `mbe_automation.configs.md`.
@@ -47,7 +45,6 @@ md_config = mbe_automation.configs.md.Enthalpy(
         ensemble="NVT",
         time_total_fs=50000.0,
         time_step_fs=1.0,
-        sampling_interval_fs=50.0,
         time_equilibration_fs=5000.0
     ),
 
@@ -55,24 +52,28 @@ md_config = mbe_automation.configs.md.Enthalpy(
         ensemble="NPT",
         time_total_fs=50000.0,
         time_step_fs=1.0,
-        sampling_interval_fs=50.0,
         time_equilibration_fs=5000.0,
         supercell_radius=15.0,
-        supercell_diagonal=True
     )
 )
 ```
 
-The `Enthalpy` class configures the overall simulation, while separate `ClassicalMD` instances define the parameters for the individual MD runs for the molecule and the crystal.
+The `Enthalpy` class configures the overall simulation, while separate `ClassicalMD` instances define the parameters for the individual MD runs.
 
 ### Key Parameters for `ClassicalMD`:
 
-*   `ensemble`: The thermodynamic ensemble for the simulation. The "NVT" ensemble (constant number of particles, volume, and temperature) is used for the isolated molecule. The "NPT" ensemble (constant number of particles, pressure, and temperature) is used for the crystal to allow the cell volume to fluctuate.
-*   `time_total_fs`: The total simulation time in femtoseconds. For robust results, a total simulation time of 50 ps (50,000 fs) is recommended.
-*   `time_step_fs`: The time step for the integration algorithm. A value of 0.5 fs is a safe choice, especially for PIMD calculations.
-*   `time_equilibration_fs`: The initial period of the simulation that is discarded to allow the system to reach thermal equilibrium. A value of 5,000 fs (5 ps) is a typical choice.
-*   `nvt_algo`: The thermostat algorithm for NVT simulations. The "csvr" (Canonical Sampling Through Velocity Rescaling) thermostat is recommended as it is robust and suitable for isolated molecules.
-*   `npt_algo`: The barostat/thermostat algorithm for NPT simulations. "mtk_full" is a common choice.
+| Parameter               | Description                                                                                                                              | Default Value     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `ensemble`              | The thermodynamic ensemble for the simulation ("NVT" or "NPT").                                                                          | "NVT"                 |
+| `time_total_fs`         | The total simulation time in femtoseconds.                                                                                               | `50000.0`             |
+| `time_step_fs`          | The time step for the integration algorithm.                                                                                             | `0.5`                 |
+| `sampling_interval_fs`  | The interval for trajectory sampling.                                                                                                   | `50.0`                |
+| `time_equilibration_fs` | The initial period of the simulation that is discarded to allow the system to reach equilibrium.                                         | `5000.0`              |
+| `nvt_algo`              | The thermostat algorithm for NVT simulations. "csvr" (Canonical Sampling Through Velocity Rescaling) is robust for isolated molecules. | "csvr"                |
+| `npt_algo`              | The barostat/thermostat algorithm for NPT simulations.                                                                                   | "mtk_full"            |
+| `thermostat_time_fs`    | The thermostat relaxation time.                                                                                                          | `100.0`               |
+| `barostat_time_fs`      | The barostat relaxation time.                                                                                                            | `1000.0`              |
+| `supercell_radius`      | The minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
 
 ## Execution
 
@@ -82,4 +83,21 @@ The MD workflow is executed by passing the configuration object to the `run` fun
 mbe_automation.workflows.md.run(md_config)
 ```
 
-This command will run the MD simulations, and the results will be saved to the specified HDF5 dataset file.
+## Programming Aspects
+
+The `run` function in `mbe_automation/workflows/md.py` executes the following sequence of operations:
+
+1.  **Molecule Simulation (NVT):**
+    *   A molecular dynamics simulation is performed on the isolated `molecule` in the NVT ensemble using `mbe_automation.dynamics.md.core.run`.
+    *   The trajectory data is processed by `mbe_automation.dynamics.md.data.molecule` to extract thermodynamic properties.
+
+2.  **Crystal Simulation (NPT):**
+    *   The supercell matrix for the `crystal` is determined using `mbe_automation.structure.crystal.supercell_matrix`.
+    *   An MD simulation is performed on the crystal supercell in the NPT ensemble, again using `mbe_automation.dynamics.md.core.run`.
+    *   The crystal's trajectory data is processed by `mbe_automation.dynamics.md.data.crystal`.
+
+3.  **Sublimation Enthalpy Calculation:**
+    *   The sublimation enthalpy is calculated by `mbe_automation.dynamics.md.data.sublimation`, which combines the results from the molecule and crystal simulations.
+
+4.  **Data Storage:**
+    *   All final results are compiled into a pandas DataFrame and saved to the HDF5 `dataset` file.
