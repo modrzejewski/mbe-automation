@@ -1,7 +1,6 @@
-# mbe-automation Documentation
+# mbe-automation
 
-`mbe-automation` is a program for modeling the thermodynamic properties of molecular crystals using machine-learning interatomic potentials (MLIPs). It provides automated, "black-box" workflows for complex computational tasks that are essential in the study of molecular crystals.
-
+`mbe-automation` is a program for modeling the thermodynamic properties of molecular crystals using machine-learning interatomic potentials (MLIPs). 
 The general computational scheme facilitated by this program is an automation of the following process applied to molecular crystals:
 
 1.  Generate training set configurations for a periodic system using a baseline MLIP (e.g., MACE).
