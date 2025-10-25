@@ -9,12 +9,11 @@ The general computational scheme facilitated by this program is an automation of
 4.  Perform training of a delta-learning layer on top of the baseline model.
 5.  Carry out the final calculation (e.g., quasi-harmonic thermodynamics or molecular dynamics) using the newly trained model.
 
-The program integrates several powerful scientific libraries into a unified workflow, including:
+The program integrates several scientific libraries into an automated workflow customized for molecular crystals:
 
-*   **ASE (Atomic Simulation Environment):** For handling atomic structures and running simulations.
-*   **MACE (Multi-ACE):** As the primary MLIP model for calculating energies and forces.
+*   **pymatgen, ASE:** For handling atomic structures and running simulations.
+*   **MACE:** As the primary MLIP model for calculating energies and forces.
 *   **phonopy:** For phonon calculations and the analysis of vibrational properties.
-*   **pymatgen:** For crystal structure analysis and manipulation.
 
 ## Installation
 
