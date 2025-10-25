@@ -189,8 +189,8 @@ import os.path
 import sys
 import subprocess
 
-InpScript = "{inp_script}"
-LogFile = "{log_file}"
+InpScript = "md.py"
+LogFile = "md.log"
 
 os.environ["OMP_NUM_THREADS"] = "8"
 os.environ["MKL_NUM_THREADS"] = "8"
@@ -198,7 +198,7 @@ os.environ["MKL_NUM_THREADS"] = "8"
 virtual_environment = os.path.expanduser("~/.virtualenvs/compute-env")
 virtual_environment = os.path.realpath(virtual_environment)
 activate_env = os.path.realpath(os.path.join(virtual_environment, "bin", "activate"))
-cmd = f"module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10 && . {{activate_env}} && python {{InpScript}}"
+cmd = f"module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10 && . {activate_env} && python {InpScript}"
 
 with open(LogFile, "w") as log_file:
     process = subprocess.Popen(cmd, shell=True, stdout=log_file,

@@ -1,19 +1,53 @@
-# mbe-automation
+```
+  __  __  ____  ____         _   _   _   _   _   ____ ___ _   _  ____
+ |  \/  |/ ___|| __ )       / \ | | | | | \ | | |  _ \_ _| \ | |/ ___|
+ | |\/| | |  _ |  _ \ _____/ _ \| | | | |  \| | | | | | ||  \| | |
+ | |  | | |_| || |_) |____/ ___ \ |_| | | |\  | | |_| | || |\  | |___
+ |_|  |_|\____||____/    /_/   \_\___/  |_| \_| |____/___|_| \_|\____|
 
-`mbe-automation` is a program for modeling the thermodynamic properties of molecular crystals using machine-learning interatomic potentials (MLIPs). 
+```
+
+`mbe-automation` is a program for modeling the thermodynamic properties of molecular crystals using machine-learning interatomic potentials (MLIPs). It provides automated, "black-box" workflows for complex computational tasks that are essential in the study of molecular crystals.
+
 The general computational scheme facilitated by this program is an automation of the following process applied to molecular crystals:
 
-1.  Generate training set configurations for a periodic system using a baseline MLIP (e.g., MACE).
-2.  Extract finite subsystems composed of one or more molecules.
-3.  Use these finite subsystems to generate high-accuracy data points using quantum chemical wave function methods.
-4.  Perform training of a delta-learning layer on top of the baseline model.
-5.  Carry out the final calculation (e.g., quasi-harmonic thermodynamics or molecular dynamics) using the newly trained model.
+```
++-------------------------------------------------------------+
+| Generate training set configurations for a periodic system  |
+| using a baseline MLIP (e.g., MACE).                         |
++--------------------------+----------------------------------+
+                           |
+                           v
++--------------------------+----------------------------------+
+| Extract finite subsystems composed of one or more molecules.|
++--------------------------+----------------------------------+
+                           |
+                           v
++--------------------------+----------------------------------+
+| Use these finite subsystems to generate high-accuracy data  |
+| points using quantum chemical wave function methods.        |
++--------------------------+----------------------------------+
+                           |
+                           v
++--------------------------+----------------------------------+
+| Perform training of a delta-learning layer on top of the    |
+| baseline model.                                             |
++--------------------------+----------------------------------+
+                           |
+                           v
++--------------------------+----------------------------------+
+| Carry out the final calculation (e.g., quasi-harmonic       |
+| thermodynamics or molecular dynamics) using the newly       |
+| trained model.                                              |
++-------------------------------------------------------------+
+```
 
-The program integrates several scientific libraries into an automated workflow customized for molecular crystals:
+The program integrates several powerful scientific libraries into a unified workflow, including:
 
-*   **pymatgen, ASE:** For handling atomic structures and running simulations.
-*   **MACE:** As the primary MLIP model for calculating energies and forces.
+*   **ASE (Atomic Simulation Environment):** For handling atomic structures and running simulations.
+*   **MACE (Multi-ACE):** As the primary MLIP model for calculating energies and forces.
 *   **phonopy:** For phonon calculations and the analysis of vibrational properties.
+*   **pymatgen:** For crystal structure analysis and manipulation.
 
 ## Installation
 
