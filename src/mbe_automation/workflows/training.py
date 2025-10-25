@@ -168,14 +168,9 @@ def md_sampling(
             filter=config.finite_subsystem_filter
         )
 
-        for i, s in enumerate(finite_subsystems):
-            if config.finite_subsystem_filter.selection_rule in mbe_automation.structure.clusters.NUMBER_SELECTION:
-                key = f"{config.root_key}/{system_label}/finite_subsystems/n={s.n_molecules}"
-                
-            elif config.finite_subsystem_filter.selection_rule in mbe_automation.structure.clusters.DISTANCE_SELECTION:
-                distance = config.finite_subsystem_filter.distances[i]
-                key = f"{config.root_key}/{system_label}/finite_subsystems/r={distance:.2f}"
-
+        for s in finite_subsystems:
+            key = f"{config.root_key}/{system_label}/finite_subsystems/n={s.n_molecules}"
+            
             if mace_available:
                 if isinstance(config.calculator, MACECalculator):
                     mace_output = mbe_automation.ml.mace.inference(

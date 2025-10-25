@@ -5,6 +5,11 @@ import numpy.typing as npt
 import scipy
 import sklearn
 
+SUBSAMPLING_ALGOS = [
+    "farthest_point_sampling",
+    "kmeans"
+]
+
 def _average_over_atoms(
     feature_vectors: npt.NDArray[np.floating]
 ) -> npt.NDArray[np.floating]:
@@ -63,7 +68,7 @@ def _kmeans_sampling(
 def subsample(
         feature_vectors: npt.NDArray[np.floating],
         n_samples: int,
-        algorithm: Literal["farthest_point_sampling", "kmeans"] = "farthest_point_sampling"
+        algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
 ) -> npt.NDArray[np.integer]:
     """
     Subsample feature vectors using farthest point sampling or
@@ -76,6 +81,7 @@ def subsample(
     features_averaged = _average_over_atoms(feature_vectors.reshape(n_frames, n_atoms, n_features))
     
     assert n_frames >= n_samples
+    assert algorithm in SUBSAMPLING_ALGOS
 
     if n_samples == n_frames:
         return np.arange(n_frames, dtype=int)
@@ -93,8 +99,6 @@ def subsample(
             feature_vectors=scaled_features,
             n_samples=n_samples
         )
-    else:
-        raise ValueError("Unknown algorithm selected for subsampling.")
 
     return selected_frames
 
