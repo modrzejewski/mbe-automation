@@ -4,7 +4,6 @@
 - [Step 1: MD Sampling](#step-1-md-sampling)
 - [Step 2: Force Constants Model](#step-2-force-constants-model)
 - [Step 3: Phonon Sampling](#step-3-phonon-sampling)
-- [Execution](#execution)
 - [Configuration](#configuration)
   - [`MDSampling`](#mdsampling-class)
   - [`PhononSampling`](#phononsampling-class)
@@ -75,6 +74,7 @@ md_sampling_config = MDSampling(
     dataset=dataset,
     root_key="training/md_sampling"
 )
+mbe_automation.workflows.training.run(md_sampling_config)
 ```
 
 ## Step 2: Force Constants Model
@@ -91,6 +91,7 @@ free_energy_config = FreeEnergy(
     dataset=dataset,
     root_key="training/quasi_harmonic"
 )
+mbe_automation.workflows.quasi_harmonic.run(free_energy_config)
 ```
 
 ## Step 3: Phonon Sampling
@@ -118,15 +119,6 @@ phonon_sampling_config = PhononSampling(
     dataset=dataset,
     root_key="training/phonon_sampling"
 )
-```
-
-## Execution
-
-The workflow is executed by passing the configuration objects to the `run` function.
-
-```python
-mbe_automation.workflows.training.run(md_sampling_config)
-mbe_automation.workflows.quasi_harmonic.run(free_energy_config)
 mbe_automation.workflows.training.run(phonon_sampling_config)
 ```
 
