@@ -1,11 +1,16 @@
 # Training Set Creation
 
 - [Setup](#setup)
+- [Step 1: MD Sampling](#step-1-md-sampling)
+- [Step 2: Force Constants Model](#step-2-force-constants-model)
+- [Step 3: Phonon Sampling](#step-3-phonon-sampling)
 - [Configuration](#configuration)
-  - [MD Sampling](#md-sampling)
-  - [Force Constants](#force-constants)
-  - [Finite Subsystem Extraction](#finite-subsystem-extraction)
-  - [Phonon Filtering](#phonon-filtering)
+  - [`MDSampling`](#mdsampling-class)
+  - [`PhononSampling`](#phononsampling-class)
+  - [`ClassicalMD`](#classicalmd-class)
+  - [`FreeEnergy`](#freeenergy-class)
+  - [`FiniteSubsystemFilter`](#finitesubsystemfilter-class)
+  - [`PhononFilter`](#phononfilter-class)
 - [Execution](#execution)
 - [Details](#details)
 - [Function Call Overview](#function-call-overview)
@@ -45,9 +50,7 @@ mace_calc = mace.calculators.MACECalculator(
 )
 ```
 
-## Configuration
-
-### MD Sampling
+## Step 1: MD Sampling
 
 The first stage generates configurations by running a short molecular dynamics simulation.
 
@@ -74,31 +77,7 @@ md_sampling_config = MDSampling(
 )
 ```
 
-| Parameter                 | Description                                                                                             | Default Value                  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `crystal`                 | Initial crystal structure.                                                                          | -                                  |
-| `calculator`              | MLIP calculator.                                                                                    | -                                  |
-| `temperature_K`           | Target temperature (in Kelvin) for the MD simulation.                                               | `298.15`                           |
-| `pressure_GPa`            | Target pressure (in GPa) for the MD simulation.                                                     | `1.0E-4`                           |
-| `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
-| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters.                              | -                                  |
-
-#### `ClassicalMD` Parameters
-
-| Parameter               | Description                                                                                                                              | Default Value     |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `ensemble`              | Thermodynamic ensemble for the simulation ("NVT" or "NPT").                                                                          | "NVT"                 |
-| `time_total_fs`         | Total simulation time in femtoseconds.                                                                                               | `50000.0`             |
-| `time_step_fs`          | Time step for the integration algorithm.                                                                                             | `0.5`                 |
-| `sampling_interval_fs`  | Interval for trajectory sampling.                                                                                                   | `50.0`                |
-| `time_equilibration_fs` | Initial period of the simulation discarded to allow the system to reach equilibrium.                                         | `5000.0`              |
-| `nvt_algo`              | Thermostat algorithm for NVT simulations. "csvr" (Canonical Sampling Through Velocity Rescaling) is robust for isolated molecules. | "csvr"                |
-| `npt_algo`              | Barostat/thermostat algorithm for NPT simulations.                                                                                   | "mtk_full"            |
-| `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |
-| `barostat_time_fs`      | Barostat relaxation time.                                                                                                            | `1000.0`              |
-| `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
-
-### Force Constants
+## Step 2: Force Constants Model
 
 A quasi-harmonic calculation is performed to obtain the force constants required for the phonon sampling stage.
 
@@ -114,26 +93,7 @@ free_energy_config = FreeEnergy(
 )
 ```
 
-| Parameter                       | Description                                                                                                                                                                                            | Default Value                                   |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| `crystal`                       | Initial, non-relaxed crystal structure.                                                                                                                                                            | -                                               |
-| `calculator`                    | MLIP calculator for energies and forces.                                                                                                                                                           | -                                               |
-| `thermal_expansion`             | If `True`, performs volumetric thermal expansion calculations. If `False`, uses the harmonic approximation.                                                                                            | `True`                                          |
-| `supercell_radius`              | Minimum point-periodic image distance in the supercell for phonon calculations (Å).                                                                                                               | `25.0`                                          |
-| `relax_input_cell`              | Relaxation of the input structure: "full", "constant_volume", or "only_atoms".                                                                                                               | `"constant_volume"`                             |
-
-### Finite Subsystem Extraction
-
-This class defines the criteria for extracting finite molecular clusters from a periodic trajectory.
-
-| Parameter                       | Description                                                                                                                                                             | Default Value                               |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `selection_rule`                | The rule for selecting molecules. Options include: `closest_to_center_of_mass`, `closest_to_central_molecule`, `max_min_distance_to_central_molecule`, and `max_max_distance_to_central_molecule`. | `closest_to_central_molecule`               |
-| `n_molecules`                   | An array of integers specifying the number of molecules to include in each cluster. Used with `closest_to_center_of_mass` and `closest_to_central_molecule` selection rules. | `np.array([1, 2, ..., 8])`                  |
-| `distances`                     | An array of floating-point numbers specifying the cutoff distances (in Å) for molecule selection. Used with `max_min_distance_to_central_molecule` and `max_max_distance_to_central_molecule` rules. | `None`                                      |
-| `assert_identical_composition`  | If `True`, the workflow will raise an error if it detects that not all molecules in the periodic structure have the same elemental composition.                            | `True`                                      |
-
-### Phonon Filtering
+## Step 3: Phonon Sampling
 
 The final stage generates configurations by sampling from the phonon modes of the crystal.
 
@@ -160,6 +120,25 @@ phonon_sampling_config = PhononSampling(
 )
 ```
 
+## Configuration
+
+### `MDSampling` Class
+
+**Module:** `mbe_automation.configs.training.MDSampling`
+
+| Parameter                 | Description                                                                                             | Default Value                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `crystal`                 | Initial crystal structure.                                                                          | -                                  |
+| `calculator`              | MLIP calculator.                                                                                    | -                                  |
+| `temperature_K`           | Target temperature (in Kelvin) for the MD simulation.                                               | `298.15`                           |
+| `pressure_GPa`            | Target pressure (in GPa) for the MD simulation.                                                     | `1.0E-4`                           |
+| `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
+| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters.                              | -                                  |
+
+### `PhononSampling` Class
+
+**Module:** `mbe_automation.configs.training.PhononSampling`
+
 | Parameter                 | Description                                                                          | Default Value |
 | ------------------------- | ------------------------------------------------------------------------------------ | ----------------- |
 | `calculator`              | MLIP calculator.                                                                 | -                 |
@@ -170,7 +149,49 @@ phonon_sampling_config = PhononSampling(
 | `time_step_fs`            | Time step for the trajectory generation.                                         | `100.0`           |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
 
-#### `PhononFilter`
+### `ClassicalMD` Class
+
+**Module:** `mbe_automation.configs.md.ClassicalMD`
+
+| Parameter               | Description                                                                                                                              | Default Value     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `ensemble`              | Thermodynamic ensemble for the simulation ("NVT" or "NPT").                                                                          | "NVT"                 |
+| `time_total_fs`         | Total simulation time in femtoseconds.                                                                                               | `50000.0`             |
+| `time_step_fs`          | Time step for the integration algorithm.                                                                                             | `0.5`                 |
+| `sampling_interval_fs`  | Interval for trajectory sampling.                                                                                                   | `50.0`                |
+| `time_equilibration_fs` | Initial period of the simulation discarded to allow the system to reach equilibrium.                                         | `5000.0`              |
+| `nvt_algo`              | Thermostat algorithm for NVT simulations. "csvr" (Canonical Sampling Through Velocity Rescaling) is robust for isolated molecules. | "csvr"                |
+| `npt_algo`              | Barostat/thermostat algorithm for NPT simulations.                                                                                   | "mtk_full"            |
+| `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |
+| `barostat_time_fs`      | Barostat relaxation time.                                                                                                            | `1000.0`              |
+| `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
+
+### `FreeEnergy` Class
+
+**Module:** `mbe_automation.configs.quasi_harmonic.FreeEnergy`
+
+| Parameter                       | Description                                                                                                                                                                                            | Default Value                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| `crystal`                       | Initial, non-relaxed crystal structure.                                                                                                                                                            | -                                               |
+| `calculator`                    | MLIP calculator for energies and forces.                                                                                                                                                           | -                                               |
+| `thermal_expansion`             | If `True`, performs volumetric thermal expansion calculations. If `False`, uses the harmonic approximation.                                                                                            | `True`                                          |
+| `supercell_radius`              | Minimum point-periodic image distance in the supercell for phonon calculations (Å).                                                                                                               | `25.0`                                          |
+| `relax_input_cell`              | Relaxation of the input structure: "full", "constant_volume", or "only_atoms".                                                                                                               | `"constant_volume"`                             |
+
+### `FiniteSubsystemFilter` Class
+
+**Module:** `mbe_automation.structure.clusters.FiniteSubsystemFilter`
+
+| Parameter                       | Description                                                                                                                                                             | Default Value                               |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `selection_rule`                | The rule for selecting molecules. Options include: `closest_to_center_of_mass`, `closest_to_central_molecule`, `max_min_distance_to_central_molecule`, and `max_max_distance_to_central_molecule`. | `closest_to_central_molecule`               |
+| `n_molecules`                   | An array of integers specifying the number of molecules to include in each cluster. Used with `closest_to_center_of_mass` and `closest_to_central_molecule` selection rules. | `np.array([1, 2, ..., 8])`                  |
+| `distances`                     | An array of floating-point numbers specifying the cutoff distances (in Å) for molecule selection. Used with `max_min_distance_to_central_molecule` and `max_max_distance_to_central_molecule` rules. | `None`                                      |
+| `assert_identical_composition`  | If `True`, the workflow will raise an error if it detects that not all molecules in the periodic structure have the same elemental composition.                            | `True`                                      |
+
+### `PhononFilter` Class
+
+**Module:** `mbe_automation.dynamics.harmonic.modes.PhononFilter`
 
 | Parameter          | Description                                                                                                                                                                                                                                                          | Default Value |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
