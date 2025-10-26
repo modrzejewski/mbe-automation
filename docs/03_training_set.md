@@ -5,6 +5,7 @@
 - [Step 2: Quasi-Harmonic Calculation](#step-2-quasi-harmonic-calculation)
 - [Step 3: Phonon Sampling](#step-3-phonon-sampling)
 - [Details](#details)
+- [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
 
@@ -139,17 +140,86 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 
 ## Details
 
-The `run` function in `mbe_automation/workflows/training.py` dispatches to one of two functions based on the configuration type:
+The `run` function in `mbe_automation/workflows/training.py` dispatches to one of two functions based on the configuration type, each designed to generate a diverse set of atomic configurations for training a delta-learning model.
 
 1.  **MD Sampling (`md_sampling`):**
-    *   This function runs a molecular dynamics simulation using `mbe_automation.dynamics.md.core.run`.
-    *   It then extracts finite clusters from the resulting trajectory by detecting molecules (`detect_molecules`) and then extracting the specified subsystems (`extract_finite_subsystem`).
+    *   This function runs a molecular dynamics simulation in the NPT ensemble using `mbe_automation.dynamics.md.core.run`. The trajectory provides a set of thermally-accessible configurations at a given temperature and pressure.
+    *   From this periodic trajectory, the workflow extracts finite, non-periodic clusters. This is a two-step process:
+        1.  **Molecule Detection:** The `detect_molecules` function identifies individual molecules within the periodic supercell. It uses a graph-based algorithm on a reference frame to find connected components of atoms, unwraps the periodic boundary conditions for these molecules, and tracks them across the entire trajectory.
+        2.  **Subsystem Extraction:** The `extract_finite_subsystem` function then selects molecules from the unwrapped trajectory based on the criteria defined in the `FiniteSubsystemFilter`.
 
 2.  **Phonon Sampling (`phonon_sampling`):**
-    *   This function generates a trajectory from phonon modes using `mbe_automation.dynamics.harmonic.modes.trajectory`.
-    *   It then detects molecules and extracts finite subsystems from the generated trajectory.
+    *   This function generates a trajectory by displacing atoms along the normal modes (phonons) of the crystal, using `mbe_automation.dynamics.harmonic.modes.trajectory`. This method is particularly effective at generating distorted geometries that may be energetically unfavorable but are important for teaching the MLIP about repulsive interactions.
+    *   The extraction of finite subsystems from the resulting trajectory follows the same two-step process of molecule detection and subsystem extraction as in the MD sampling workflow.
 
-In both cases, if a MACE calculator is used, the workflow performs inference to compute energies, forces, and feature vectors for the subsystems, and all results are saved to the HDF5 `dataset`.
+### Finite Subsystem Extraction
+
+The `FiniteSubsystemFilter` provides several `selection_rule` options for how to extract the clusters:
+
+*   **`closest_to_center_of_mass`**: Selects a specified number of molecules (`n_molecules`) whose centers of mass are closest to the center of mass of the entire system.
+*   **`closest_to_central_molecule`**: Identifies a "central" molecule (the one closest to the origin) and then selects a specified number of molecules (`n_molecules`) whose centers of mass are closest to that central molecule.
+*   **`max_min_distance_to_central_molecule`**: Selects all molecules where the minimum interatomic distance to the central molecule is less than a given `distance`.
+*   **`max_max_distance_to_central_molecule`**: Selects all molecules where the maximum interatomic distance to the central molecule is less than a given `distance`.
+
+After the finite subsystems are extracted, if a MACE calculator is provided, the workflow performs an inference calculation to obtain the energies, forces, and feature vectors for each configuration in the subsystem. All data is then saved to the specified HDF5 `dataset`.
+
+## Function Call Overview
+
+### MD Sampling
+
+```
++------------------------------------+
+|         workflows.training         |
+|            md_sampling             |
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|          dynamics.md.core          |   Runs a molecular dynamics
+|                run                 |   simulation.
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|         structure.clusters         |   Identifies molecules within
+|           detect_molecules         |   the crystal structure.
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|         structure.clusters         |   Extracts finite molecular clusters
+|      extract_finite_subsystem      |   from the periodic trajectory.
++------------------------------------+
+
+```
+
+### Phonon Sampling
+
+```
++------------------------------------+
+|         workflows.training         |
+|          phonon_sampling           |
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|      dynamics.harmonic.modes       |   Generates a trajectory by
+|             trajectory             |   sampling from phonon modes.
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|         structure.clusters         |   Identifies molecules within
+|           detect_molecules         |   the crystal structure.
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|         structure.clusters         |   Extracts finite molecular clusters
+|      extract_finite_subsystem      |   from the periodic trajectory.
++------------------------------------+
+
+```
 
 ## Computational Bottlenecks
 
