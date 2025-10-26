@@ -4,6 +4,7 @@
 - [Configuration](#configuration)
 - [Execution](#execution)
 - [Details](#details)
+- [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
 
@@ -82,22 +83,121 @@ mbe_automation.workflows.quasi_harmonic.run(properties_config)
 
 ## Details
 
-The `run` function in `mbe_automation/workflows/quasi_harmonic.py` orchestrates the calculation through the following sequence of operations:
+The `run` function in `mbe_automation/workflows/quasi_harmonic.py` orchestrates the calculation. The process begins with structural optimizations, followed by harmonic analysis at a fixed reference volume, and optionally, a more advanced quasi-harmonic analysis that accounts for volumetric thermal expansion.
 
 1.  **Initial Relaxation:**
-    *   If a `molecule` is provided, it is relaxed using `mbe_automation.structure.relax.isolated_molecule`.
-    *   The `crystal` unit cell is relaxed using `mbe_automation.structure.relax.crystal` to find the reference volume, V0.
+    *   If a `molecule` is provided, its geometry is optimized in isolation using `mbe_automation.structure.relax.isolated_molecule`. This step provides a baseline for calculating properties like sublimation energy.
+    *   The `crystal` unit cell is relaxed using `mbe_automation.structure.relax.crystal`. The `relax_input_cell` parameter controls the nature of this relaxation:
+        *   `"full"`: Optimizes atomic positions, cell shape, and cell volume. This finds the athermal equilibrium structure at 0 K (V0), neglecting zero-point vibrational effects.
+        *   `"constant_volume"`: Optimizes atomic positions and cell shape, but keeps the volume fixed.
+        *   `"only_atoms"`: Optimizes only the atomic positions within the fixed unit cell.
+    The resulting relaxed structure serves as the reference for subsequent calculations.
 
 2.  **Harmonic Approximation (at V0):**
-    *   Supercell matrix is determined based on `supercell_radius` using `mbe_automation.structure.crystal.supercell_matrix`.
-    *   Phonon properties of the relaxed cell are computed using `mbe_automation.dynamics.harmonic.core.phonons`.
+    *   A supercell is constructed based on the `supercell_radius` using `mbe_automation.structure.crystal.supercell_matrix`.
+    *   Phonon properties of the relaxed cell are computed using `mbe_automation.dynamics.harmonic.core.phonons`. This involves calculating the Hessian (force constants) by numerically differentiating the forces with respect to atomic displacements. The resulting force constants are then used to compute phonon frequencies and thermodynamic properties within the harmonic approximation. All thermodynamic quantities are reported per unit cell, not per primitive cell.
 
 3.  **Thermal Expansion (if `thermal_expansion=True`):**
-    *   The equation of state (EOS) curve is determined by calling `mbe_automation.dynamics.harmonic.core.equilibrium_curve`.
-    *   For each temperature, the workflow finds the equilibrium volume, creates a new unit cell, relaxes its geometry, and re-calculates the phonon properties.
+    *   This part of the workflow refines the harmonic approximation by accounting for the fact that the crystal's volume changes with temperature.
+    *   An equation of state (EOS) curve is determined by calling `mbe_automation.dynamics.harmonic.core.equilibrium_curve`. This function samples a range of volumes (or pressures) around the reference volume V0, calculates the total free energy (electronic + vibrational) at each volume for each target temperature, and then fits the F(V) data to a chosen equation of state (e.g., Birch-Murnaghan, Vinet, or polynomial).
+    *   The minimum of the F(V) curve at a given temperature T gives the equilibrium volume V(T) at that temperature.
+    *   For each temperature, the workflow creates a new unit cell at the corresponding equilibrium volume V(T), relaxes its geometry, and re-calculates the phonon properties. This yields thermodynamic properties that are corrected for thermal expansion.
+    *   An important concept here is the *thermal pressure*. The change in vibrational free energy with volume (dFvib/dV) acts as an internal pressure that drives thermal expansion. The workflow calculates this thermal pressure, which can be used to find the equilibrium volume by performing a structure relaxation at 0K with an external pressure equal to the thermal pressure. [1]
 
 4.  **Data Storage:**
-    *   All results are saved to the HDF5 file specified by the `dataset` parameter.
+    *   All results, including thermodynamic properties at both fixed volume (harmonic) and equilibrium volume (quasi-harmonic), are saved to the HDF5 file specified by the `dataset` parameter.
+
+## Function Call Overview
+
+```
++----------------------------------------+
+|      workflows.quasi_harmonic          |
+|                 run                    |
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|           structure.relax              |   Relaxes the geometry of the
+|    isolated_molecule (optional)        |   isolated gas-phase molecule.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|         dynamics.harmonic.core         |   Computes the vibrational
+|          molecular_vibrations          |   frequencies of the molecule.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|           structure.relax              |   Relaxes the crystal structure
+|                crystal                 |   to find the equilibrium volume.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|          structure.crystal             |   Determines the supercell matrix
+|            supercell_matrix            |   for phonon calculations.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|         dynamics.harmonic.core         |   Computes phonon frequencies and
+|                phonons                 |   thermodynamic properties.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|         dynamics.harmonic.core         |   Determines the equilibrium volume
+|           equilibrium_curve            |   at each temperature.
++----------------------------------------+
+
+```
+
+## Function Call Overview
+
+```
++----------------------------------------+
+|      workflows.quasi_harmonic          |
+|                 run                    |
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|           structure.relax              |   Relaxes the geometry of the
+|    isolated_molecule (optional)        |   isolated gas-phase molecule.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|         dynamics.harmonic.core         |   Computes the vibrational
+|          molecular_vibrations          |   frequencies of the molecule.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|           structure.relax              |   Relaxes the crystal structure
+|                crystal                 |   to find the equilibrium volume.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|          structure.crystal             |   Determines the supercell matrix
+|            supercell_matrix            |   for phonon calculations.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|         dynamics.harmonic.core         |   Computes phonon frequencies and
+|                phonons                 |   thermodynamic properties.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|         dynamics.harmonic.core         |   Determines the equilibrium volume
+|           equilibrium_curve            |   at each temperature.
++----------------------------------------+
+
+```
 
 ## Computational Bottlenecks
 
@@ -181,3 +281,7 @@ with open(LogFile, "w") as log_file:
                                universal_newlines=True)
     process.communicate()
 ```
+
+## Literature
+
+[1] A. Otero-de-la-Roza and Erin R. Johnson, A benchmark for non-covalent interactions in solids, J. Chem. Phys. 137, 054103 (2012); doi: 10.1063/1.4738961
