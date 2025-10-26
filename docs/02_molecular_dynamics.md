@@ -4,6 +4,7 @@
 - [Configuration](#configuration)
 - [Execution](#execution)
 - [Details](#details)
+- [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
 
@@ -106,6 +107,52 @@ The `run` function in `mbe_automation/workflows/md.py` executes the following se
 
 4.  **Data Storage:**
     *   All final results are compiled into a pandas DataFrame and saved to the HDF5 `dataset` file.
+
+## Function Call Overview
+
+```
++--------------------------------------+
+|             workflows.md             |
+|                 run                  |
++--------------------------------------+
+                   |
+                   |
++--------------------------------------+
+|           dynamics.md.core           |   Runs a molecular dynamics
+|             run (molecule)           |   simulation for the isolated molecule.
++--------------------------------------+
+                   |
+                   |
++--------------------------------------+
+|           dynamics.md.data           |   Processes the molecule's trajectory
+|               molecule               |   to extract thermodynamic properties.
++--------------------------------------+
+                   |
+                   |
++--------------------------------------+
+|         structure.crystal            |   Determines the supercell matrix
+|            supercell_matrix          |   for the crystal simulation.
++--------------------------------------+
+                   |
+                   |
++--------------------------------------+
+|           dynamics.md.core           |   Runs a molecular dynamics
+|             run (crystal)            |   simulation for the crystal supercell.
++--------------------------------------+
+                   |
+                   |
++--------------------------------------+
+|           dynamics.md.data           |   Processes the crystal's trajectory
+|                crystal               |   to extract thermodynamic properties.
++--------------------------------------+
+                   |
+                   |
++--------------------------------------+
+|           dynamics.md.data           |   Calculates the sublimation enthalpy
+|              sublimation             |   from the molecule and crystal data.
++--------------------------------------+
+
+```
 
 ## Computational Bottlenecks
 
