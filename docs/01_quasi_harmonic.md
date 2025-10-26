@@ -4,6 +4,7 @@
 - [Configuration](#configuration)
 - [Execution](#execution)
 - [Details](#details)
+- [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
 
@@ -98,6 +99,52 @@ The `run` function in `mbe_automation/workflows/quasi_harmonic.py` orchestrates 
 
 4.  **Data Storage:**
     *   All results are saved to the HDF5 file specified by the `dataset` parameter.
+
+## Function Call Overview
+
+```
++----------------------------------------+
+|      workflows.quasi_harmonic          |
+|                 run                    |
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|           structure.relax              |   Relaxes the geometry of the
+|    isolated_molecule (optional)        |   isolated gas-phase molecule.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|         dynamics.harmonic.core         |   Computes the vibrational
+|          molecular_vibrations          |   frequencies of the molecule.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|           structure.relax              |   Relaxes the crystal structure
+|                crystal                 |   to find the equilibrium volume.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|          structure.crystal             |   Determines the supercell matrix
+|            supercell_matrix            |   for phonon calculations.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|         dynamics.harmonic.core         |   Computes phonon frequencies and
+|                phonons                 |   thermodynamic properties.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
+|         dynamics.harmonic.core         |   Determines the equilibrium volume
+|           equilibrium_curve            |   at each temperature.
++----------------------------------------+
+
+```
 
 ## Computational Bottlenecks
 

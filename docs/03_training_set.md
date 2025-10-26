@@ -5,6 +5,7 @@
 - [Step 2: Quasi-Harmonic Calculation](#step-2-quasi-harmonic-calculation)
 - [Step 3: Phonon Sampling](#step-3-phonon-sampling)
 - [Details](#details)
+- [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
 
@@ -150,6 +151,64 @@ The `run` function in `mbe_automation/workflows/training.py` dispatches to one o
     *   It then detects molecules and extracts finite subsystems from the generated trajectory.
 
 In both cases, if a MACE calculator is used, the workflow performs inference to compute energies, forces, and feature vectors for the subsystems, and all results are saved to the HDF5 `dataset`.
+
+## Function Call Overview
+
+### MD Sampling
+
+```
++------------------------------------+
+|         workflows.training         |
+|            md_sampling             |
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|          dynamics.md.core          |   Runs a molecular dynamics
+|                run                 |   simulation.
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|         structure.clusters         |   Identifies molecules within
+|           detect_molecules         |   the crystal structure.
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|         structure.clusters         |   Extracts finite molecular clusters
+|      extract_finite_subsystem      |   from the periodic trajectory.
++------------------------------------+
+
+```
+
+### Phonon Sampling
+
+```
++------------------------------------+
+|         workflows.training         |
+|          phonon_sampling           |
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|      dynamics.harmonic.modes       |   Generates a trajectory by
+|             trajectory             |   sampling from phonon modes.
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|         structure.clusters         |   Identifies molecules within
+|           detect_molecules         |   the crystal structure.
++------------------------------------+
+                    |
+                    |
++------------------------------------+
+|         structure.clusters         |   Extracts finite molecular clusters
+|      extract_finite_subsystem      |   from the periodic trajectory.
++------------------------------------+
+
+```
 
 ## Computational Bottlenecks
 
