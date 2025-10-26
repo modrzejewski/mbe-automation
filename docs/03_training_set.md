@@ -4,6 +4,7 @@
 - [Step 1: MD Sampling](#step-1-md-sampling)
 - [Step 2: Force Constants Model](#step-2-force-constants-model)
 - [Step 3: Phonon Sampling](#step-3-phonon-sampling)
+- [Execution](#execution)
 - [Configuration](#configuration)
   - [`MDSampling`](#mdsampling-class)
   - [`PhononSampling`](#phononsampling-class)
@@ -11,7 +12,6 @@
   - [`FreeEnergy`](#freeenergy-class)
   - [`FiniteSubsystemFilter`](#finitesubsystemfilter-class)
   - [`PhononFilter`](#phononfilter-class)
-- [Execution](#execution)
 - [Details](#details)
 - [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
@@ -120,6 +120,16 @@ phonon_sampling_config = PhononSampling(
 )
 ```
 
+## Execution
+
+The workflow is executed by passing the configuration objects to the `run` function.
+
+```python
+mbe_automation.workflows.training.run(md_sampling_config)
+mbe_automation.workflows.quasi_harmonic.run(free_energy_config)
+mbe_automation.workflows.training.run(phonon_sampling_config)
+```
+
 ## Configuration
 
 ### `MDSampling` Class
@@ -199,16 +209,6 @@ phonon_sampling_config = PhononSampling(
 | `selected_modes`   | An array of 1-based indices for selecting specific phonon modes at each k-point. If this is specified, `freq_min_THz` and `freq_max_THz` are ignored.                                                                                                                   | `None`        |
 | `freq_min_THz`     | The minimum phonon frequency (in THz) to be included in the sampling.                                                                                                                                                                                              | `0.1`         |
 | `freq_max_THz`     | The maximum phonon frequency (in THz) to be included in the sampling. If `None`, all frequencies above `freq_min_THz` are included.                                                                                                                                   | `8.0`         |
-
-## Execution
-
-The workflow is executed by passing the configuration objects to the `run` function.
-
-```python
-mbe_automation.workflows.training.run(md_sampling_config)
-mbe_automation.workflows.quasi_harmonic.run(free_energy_config)
-mbe_automation.workflows.training.run(phonon_sampling_config)
-```
 
 ## Details
 
