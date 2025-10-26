@@ -108,10 +108,6 @@ The `run` function in `mbe_automation/workflows/md.py` executes a sequence of mo
 4.  **Data Storage:**
     *   All final results are compiled into a pandas DataFrame and saved to the HDF5 `dataset` file.
 
-5.  **Optional Analyses:**
-    *   **Reblocking Analysis**: This technique is used to estimate the statistical uncertainty of the calculated averages. By systematically grouping the time-series data into blocks of increasing size, it is possible to identify the correlation time in the data and obtain a reliable estimate of the standard error of the mean. This method is implemented in `mbe_automation.dynamics.md.data.reblocking` and is based on the work of Flyvbjerg and Petersen [2].
-    *   **Velocity Autocorrelation Function (VACF)**: The VACF measures how the velocity of a particle at a certain time is correlated with its velocity at a later time. The Fourier transform of the VACF is the vibrational density of states. The VACF is computed using a block-averaging approach for error estimation in `mbe_automation.dynamics.md.data.velocity_autocorrelation`.
-
 ## Function Call Overview
 
 ```
