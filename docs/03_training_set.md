@@ -78,8 +78,17 @@ mbe_automation.workflows.training.run(md_sampling_config)
 | `calculator`              | MLIP calculator.                                                                                    | -                                  |
 | `temperature_K`           | Target temperature (in Kelvin) for the MD simulation.                                               | `298.15`                           |
 | `pressure_GPa`            | Target pressure (in GPa) for the MD simulation.                                                     | `1.0E-4`                           |
-| `finite_subsystem_filter` | Defines how finite molecular clusters are extracted from the periodic simulation.                       | `closest_to_central_molecule`      |
+| `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
 | `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters.                              | -                                  |
+
+#### `FiniteSubsystemFilter`
+
+| Parameter                       | Description                                                                                                                                                             | Default Value                               |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `selection_rule`                | The rule for selecting molecules. Options include: `closest_to_center_of_mass`, `closest_to_central_molecule`, `max_min_distance_to_central_molecule`, and `max_max_distance_to_central_molecule`. | `closest_to_central_molecule`               |
+| `n_molecules`                   | An array of integers specifying the number of molecules to include in each cluster. Used with `closest_to_center_of_mass` and `closest_to_central_molecule` selection rules. | `np.array([1, 2, ..., 8])`                  |
+| `distances`                     | An array of floating-point numbers specifying the cutoff distances (in Å) for molecule selection. Used with `max_min_distance_to_central_molecule` and `max_max_distance_to_central_molecule` rules. | `None`                                      |
+| `assert_identical_composition`  | If `True`, the workflow will raise an error if it detects that not all molecules in the periodic structure have the same elemental composition.                            | `True`                                      |
 
 ## Step 2: Quasi-Harmonic Calculation
 
@@ -132,11 +141,20 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | ------------------------- | ------------------------------------------------------------------------------------ | ----------------- |
 | `calculator`              | MLIP calculator.                                                                 | -                 |
 | `temperature_K`           | Temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
-| `phonon_filter`           | Specifies which phonon modes to sample from.                                         | `gamma` point     |
+| `phonon_filter`           | An instance of `PhononFilter` that specifies which phonon modes to sample from.        | `PhononFilter()`  |
 | `force_constants_dataset` | Path to the HDF5 file containing the force constants. | `./properties.hdf5` |
 | `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | -                 |
 | `time_step_fs`            | Time step for the trajectory generation.                                         | `100.0`           |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
+
+#### `PhononFilter`
+
+| Parameter          | Description                                                                                                                                                                                                                                                          | Default Value |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| `k_point_mesh`     | The k-points for sampling the Brillouin zone. Can be `"gamma"` (for the Γ point only), a float (for a Monkhorst-Pack grid defined by a radius), or a 3-element array (for an explicit Monkhorst-Pack mesh).                                                               | `"gamma"`     |
+| `selected_modes`   | An array of 1-based indices for selecting specific phonon modes at each k-point. If this is specified, `freq_min_THz` and `freq_max_THz` are ignored.                                                                                                                   | `None`        |
+| `freq_min_THz`     | The minimum phonon frequency (in THz) to be included in the sampling.                                                                                                                                                                                              | `0.1`         |
+| `freq_max_THz`     | The maximum phonon frequency (in THz) to be included in the sampling. If `None`, all frequencies above `freq_min_THz` are included.                                                                                                                                   | `8.0`         |
 
 ## Details
 
