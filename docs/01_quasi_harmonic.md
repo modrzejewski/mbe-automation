@@ -119,10 +119,8 @@ mbe_automation.workflows.quasi_harmonic.run(properties_config)
 |         dynamics.harmonic.core         |   Computes phonon frequencies and
 |                phonons                 |   thermodynamic properties.
 +----------------------------------------+
-                    ^
                     |
-                    |   <----------------+
-                    |                    |
+                    |
 +----------------------------------------+
 |         dynamics.harmonic.core         |   Determines the equilibrium volume
 |           equilibrium_curve            |   at each temperature.
