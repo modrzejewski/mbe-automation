@@ -152,11 +152,7 @@ mbe_automation.workflows.md.run(md_config)
 
 ## Computational Bottlenecks
 
-The primary factors influencing the computational cost of this workflow are:
-
-*   **`time_total_fs`**: The total simulation time directly determines the number of integration steps, leading to a linear scaling of the computational cost.
-*   **`supercell_radius`**: For the crystal simulation, the number of atoms in the supercell scales with the cube of this radius, significantly impacting the cost of each MD step.
-*   **`time_step_fs`**: A smaller time step will increase the total number of steps required for a given `time_total_fs`, thus increasing the computational cost.
+For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
 
 ## Complete Input Files
 

@@ -261,11 +261,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 
 ## Computational Bottlenecks
 
-The computational cost of this workflow is a combination of its three stages:
-
-*   **MD Sampling**: The cost is primarily determined by the `time_total_fs` and `supercell_radius` parameters of the `md_crystal` configuration.
-*   **Quasi-Harmonic Calculation**: This step is generally less expensive than the others, but its cost is influenced by the `supercell_radius` used for the force constant calculation.
-*   **Phonon Sampling**: The number of frames (`n_frames`) and the number of phonon modes selected by the `phonon_filter` are the main drivers of the computational cost in this final stage.
+For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
 
 ## Complete Input Files
 
