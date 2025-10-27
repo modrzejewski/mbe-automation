@@ -130,11 +130,7 @@ mbe_automation.workflows.quasi_harmonic.run(properties_config)
 
 ## Computational Bottlenecks
 
-The computational cost of this workflow is primarily determined by the following parameters:
-
-*   **`supercell_radius`**: This parameter controls the size of the supercell used for phonon calculations. The number of atoms in the supercell, and thus the computational cost, scales with the cube of this radius.
-*   **Number of temperatures**: The phonon calculations are repeated for each temperature in the `temperatures_K` array, leading to a linear scaling of the computational cost with the number of temperature points.
-*   **`volume_range` / `pressure_range`**: The number of points in these arrays determines how many volumes are sampled to construct the equation of state, adding another linear scaling factor to the overall cost.
+For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
 
 ## Complete Input Files
 
