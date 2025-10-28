@@ -45,8 +45,6 @@ class Structure:
     forces: npt.NDArray[np.floating] | None = None
     feature_vectors: npt.NDArray[np.floating] | None = None
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "none"
-
-    ] = "none"
     
     def __post_init__(self):
         self.periodic = (self.cell_vectors is not None)
@@ -64,7 +62,7 @@ class Structure:
             forces=(self.forces.copy() if self.forces is not None else None),
             feature_vectors=(
                 self.feature_vectors.copy() 
-                if self.feature_vectors_type is not "none" else None
+                if self.feature_vectors_type != "none" else None
             ),
             feature_vectors_type=self.feature_vectors_type,
         )

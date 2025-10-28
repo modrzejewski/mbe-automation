@@ -306,7 +306,7 @@ def run(
 
     if md.feature_vectors_type != "none":
         traj.run_neural_network(
-            calculator=calculator
+            calculator=calculator,
             feature_vectors_type=md.feature_vectors_type,
             potential_energies=False,
             forces=False,

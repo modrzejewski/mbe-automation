@@ -47,12 +47,12 @@ def inference(
             
             if i == 0:
                 if average_over_atoms:
-                    features_out = np.zeros((structure.n_frames, structure.n_atoms, n_features))
-                else:
                     features_out = np.zeros((structure.n_frames, n_features))
+                else:
+                    features_out = np.zeros((structure.n_frames, structure.n_atoms, n_features))
 
             if average_over_atoms:
-                features_out[i] = np.average(features, axis=1)
+                features_out[i] = np.average(features, axis=0)
             else:
                 features_out[i] = features            
                 

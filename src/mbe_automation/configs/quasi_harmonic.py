@@ -215,7 +215,7 @@ class FreeEnergy:
                                    #
                                    # Recommendation from the literature:
                                    #
-                                   # -0.4 kbar ... +0.4 kbar
+                                   # -0.4 GPa ... +0.4 GPa
                                    #
                                    # is used in
                                    #
@@ -284,6 +284,11 @@ class FreeEnergy:
     save_plots: bool = True
     save_csv: bool = True
     save_xyz: bool = True
+
+    def __post_init__(self):
+        if self.thermal_expansion and relax_input_cell == "only_atoms":
+            raise ValueError("Calculations with thermal expansion require "
+                             "relaxed_input_cell set to 'full' or 'constant_volume'")
                                    
     @classmethod
     def from_template(cls,
