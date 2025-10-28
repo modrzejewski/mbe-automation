@@ -11,6 +11,7 @@
   - [`FreeEnergy`](#freeenergy-class)
   - [`FiniteSubsystemFilter`](#finitesubsystemfilter-class)
   - [`PhononFilter`](#phononfilter-class)
+- [Subsampling](#subsampling)
 - [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
@@ -205,16 +206,16 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 
 ## Subsampling
 
-Once a dataset with a large number of frames has been generated, it is often useful to select a smaller, representative subset of these frames for further analysis or training. The `subsample` method, available for `Structure`, `Trajectory`, `MolecularCrystal`, and `FiniteSubsystem` objects, provides a way to do this.
+The purpose of subsampling is to select a diverse set of configurations for training a machine learning potential. By choosing a smaller, representative subset of frames from a larger dataset, you can reduce the computational cost of training while ensuring that the model is exposed to a wide range of atomic environments. The `subsample` method, available for `Structure`, `Trajectory`, `MolecularCrystal`, and `FiniteSubsystem` objects, provides a way to do this.
 
-The subsampling process is based on feature vectors, which are numerical representations of the atomic environments in each frame. By default, the method uses farthest point sampling to select a diverse set of frames that cover the feature space as broadly as possible.
+The subsampling process is based on feature vectors, which are numerical representations of the atomic environments in each frame. The method uses algorithms like farthest point sampling to select a diverse set of frames that cover the feature space as broadly as possible.
 
 ### `subsample` Method Parameters
 
 | Parameter   | Description                                                                                                                                       | Default Value                |
 |-------------|---------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
 | `n`         | The number of frames to select from the dataset.                                                                                                  | -                            |
-| `algorithm` | The algorithm to use for subsampling. Options are `"farthest_point_sampling"` and `"K-means_sampling"`. Both methods aim to select a diverse subset of frames by analyzing their feature vectors. | `"farthest_point_sampling"`  |
+| `algorithm` | The algorithm to use for subsampling. Options are `"farthest_point_sampling"` and `"kmeans"`. Both methods aim to select a diverse subset of frames by analyzing their feature vectors. | `"farthest_point_sampling"`  |
 
 ### Example Usage
 
