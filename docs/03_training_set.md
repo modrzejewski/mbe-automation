@@ -169,6 +169,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |
 | `barostat_time_fs`      | Barostat relaxation time.                                                                                                            | `1000.0`              |
 | `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
+| `save_feature_vectors`  | If `True`, save feature vectors to the dataset. This is required for subsampling.                                                    | `False`               |
 
 ### `FreeEnergy` Class
 
@@ -208,14 +209,14 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 
 The purpose of subsampling is to select a diverse set of configurations for training a machine learning potential. By choosing a smaller, representative subset of frames from a larger dataset, you can reduce the computational cost of training while ensuring that the model is exposed to a wide range of atomic environments. The `subsample` method, available for `Structure`, `Trajectory`, `MolecularCrystal`, and `FiniteSubsystem` objects, provides a way to do this.
 
-Subsampling is only available if feature vectors have been computed and stored for a given object. See the `save_feature_vectors` parameter of the ClassicalMD class. 
+The subsampling process is based on feature vectors, which are numerical representations of the atomic environments in each frame. The method uses algorithms like farthest point sampling to select a diverse set of frames that cover the feature space as broadly as possible. To enable subsampling, you must first save the feature vectors to the dataset by setting the [`save_feature_vectors`](#classicalmd-class) parameter to `True` in the `ClassicalMD` configuration.
 
 ### `subsample` Method Parameters
 
 | Parameter   | Description                                                                                                                                       | Default Value                |
 |-------------|---------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
 | `n`         | The number of frames to select from the dataset.                                                                                                  | -                            |
-| `algorithm` | The algorithm to use for subsampling. Options are `"farthest_point_sampling"` and `"kmeans"`. Both methods aim to select a diverse subset of frames by computing distances in the feature space. | `"farthest_point_sampling"`  |
+| `algorithm` | The algorithm to use for subsampling. Options are `"farthest_point_sampling"` and `"kmeans"`. Both methods aim to select a diverse subset of frames by analyzing their feature vectors. | `"farthest_point_sampling"`  |
 
 ### Example Usage
 

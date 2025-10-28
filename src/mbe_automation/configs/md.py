@@ -144,7 +144,16 @@ class ClassicalMD:
                                    # Ignored if supercell_matrix is provided explicitly.
                                    #
     supercell_diagonal: bool = False
-                                   
+                                   #
+                                   # Save feature vectors as a part of the Trajectory
+                                   # object in the dataset. Feature vectors are required
+                                   # if you want to subsample the MD frames based on the
+                                   # distances in the feature space, e.g., to generate a
+                                   # diverse training set.
+                                   #
+                                   # Works only for calculations with the MACE model.
+                                   #
+    save_feature_vectors: bool = False
 
 @dataclass
 class Enthalpy:

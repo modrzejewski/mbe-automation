@@ -777,8 +777,8 @@ def save_trajectory(
                 name="feature_vectors",
                 data=traj.feature_vectors
             )
-            
-            
+
+
 def read_trajectory(dataset: str, key: str) -> Trajectory:
     
     with h5py.File(dataset, "r") as f:

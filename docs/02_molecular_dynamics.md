@@ -104,6 +104,7 @@ mbe_automation.workflows.md.run(md_config)
 | `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |
 | `barostat_time_fs`      | Barostat relaxation time.                                                                                                            | `1000.0`              |
 | `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
+| `save_feature_vectors`  | If `True`, save feature vectors to the dataset. This is required for subsampling.                                                    | `False`               |
 
 ## Function Call Overview
 
