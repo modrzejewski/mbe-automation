@@ -46,4 +46,7 @@ pip install -e .
 
 This command will read the `pyproject.toml` file and install all the required dependencies. The installation process may take several minutes.
 
+> **Note on Editable Mode**
+> The `-e` flag installs the package in "editable" mode. This means that any changes you make to the source code will be immediately available without needing to reinstall the package. If you pull the latest changes from the GitHub repository, you will have access to the newest version of the program. However, if the required libraries in `pyproject.toml` have changed, you will need to re-run `pip install -e .` in your virtual environment to ensure all dependencies are up to date.
+
 Once the installation is complete, the `mbe-automation` program is ready to use.
