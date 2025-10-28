@@ -138,6 +138,6 @@ class MDSampling:
 
     def __post_init__(self):
         if self.md_crystal.feature_vectors_type == "none":
-            raise ValueError("Training configurations require presence of feature vectors. "
-                             "Set an appropriate feature_vectors_type.")
+            raise ValueError("MD sampling must generate feature vectors for all sampled configurations. "
+                             "Specify a proper feature_vectors_type in ClassicalMD.")
 
