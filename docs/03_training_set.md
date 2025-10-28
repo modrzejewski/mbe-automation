@@ -137,6 +137,11 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `root_key`                | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                      | `"training/md_sampling"`           |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
 | `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters.                              | -                                  |
+| `work_dir`                | Directory where files are stored at runtime.                                                            | `"./"`                             |
+| `dataset`                 | The main HDF5 file with all data computed for the physical system.                                      | `"./properties.hdf5"`              |
+| `verbose`                 | Verbosity of the program's output. `0` suppresses warnings.                                             | `0`                                |
+| `save_plots`              | If `True`, save plots of the simulation results.                                                        | `True`                             |
+| `save_csv`                | If `True`, save CSV files of the simulation results.                                                    | `True`                             |
 
 ### `PhononSampling` Class
 
@@ -152,6 +157,11 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `root_key`                | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                     | `"training/phonon_sampling"` |
 | `time_step_fs`            | Time step for the trajectory generation.                                         | `100.0`           |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
+| `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
+| `feature_vectors_type`    | Type of feature vectors to save. Required for subsampling based on feature space distances. Works only with MACE models. | `"averaged_environments"` |
+| `work_dir`                | Directory where files are stored at runtime.                                                            | `"./"`                             |
+| `dataset`                 | The main HDF5 file with all data computed for the physical system.                                      | `"./properties.hdf5"`              |
+| `verbose`                 | Verbosity of the program's output. `0` suppresses warnings.                                             | `0`                                |
 
 ### `ClassicalMD` Class
 
@@ -169,7 +179,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |
 | `barostat_time_fs`      | Barostat relaxation time.                                                                                                            | `1000.0`              |
 | `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
-| `save_feature_vectors`  | If `True`, save feature vectors to the dataset. This is required for subsampling.                                                    | `False`               |
+| `feature_vectors_type`  | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Works only with MACE models. | "none"                |
 
 ### `FreeEnergy` Class
 
@@ -209,7 +219,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 
 The purpose of subsampling is to select a diverse set of configurations for training a machine learning potential. By choosing a smaller, representative subset of frames from a larger dataset, you can reduce the computational cost of training while ensuring that the model is exposed to a wide range of atomic environments. The `subsample` method, available for `Structure`, `Trajectory`, `MolecularCrystal`, and `FiniteSubsystem` objects, provides a way to do this.
 
-The subsampling process is based on feature vectors, which are numerical representations of the atomic environments in each frame. The method uses algorithms like farthest point sampling to select a diverse set of frames that cover the feature space as broadly as possible. To enable subsampling, you must first save the feature vectors to the dataset by setting the [`save_feature_vectors`](#classicalmd-class) parameter to `True` in the `ClassicalMD` configuration.
+The subsampling process is based on feature vectors, which are numerical representations of the atomic environments in each frame. The method uses algorithms like farthest point sampling to select a diverse set of frames that cover the feature space as broadly as possible. To enable subsampling, you must first save the feature vectors to the dataset by setting the [`feature_vectors_type`](#classicalmd-class) parameter to `"atomic_environments"` or `"averaged_environments"` in the `ClassicalMD` or `PhononSampling` configurations.
 
 ### `subsample` Method Parameters
 
