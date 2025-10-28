@@ -20,7 +20,8 @@ def inference(
         structure: mbe_automation.storage.Structure,
         energies: bool = True,
         forces: bool = False,
-        feature_vectors: bool = True
+        feature_vectors: bool = True,
+        average_over_atoms: bool = False
 ) -> MACEOutput:
 
     energies_out = None
@@ -41,12 +42,20 @@ def inference(
         if forces:
             forces_out[i] = atoms.get_forces()
         if feature_vectors:
-            features = calculator.get_descriptors(atoms)
+            features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
+            n_features = features.shape[-1]
+            
             if i == 0:
-                n_features = features.size // structure.n_atoms
-                features_out = np.zeros((structure.n_frames, *features.shape))
-            features_out[i] = features
+                if average_over_atoms:
+                    features_out = np.zeros((structure.n_frames, structure.n_atoms, n_features))
+                else:
+                    features_out = np.zeros((structure.n_frames, n_features))
 
+            if average_over_atoms:
+                features_out[i] = np.average(features, axis=1)
+            else:
+                features_out[i] = features            
+                
     return MACEOutput(
         n_frames=structure.n_frames,        
         n_atoms=structure.n_atoms,

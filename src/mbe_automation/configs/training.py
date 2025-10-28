@@ -1,3 +1,4 @@
+from __futures__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, List
 import numpy as np
@@ -9,6 +10,7 @@ from ase.calculators.calculator import Calculator as ASECalculator
 from mbe_automation.configs.md import ClassicalMD
 from mbe_automation.structure.clusters import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter
+from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
 
 @dataclass(kw_only=True)
 class PhononSampling:
@@ -32,6 +34,16 @@ class PhononSampling:
     finite_subsystem_filter: FiniteSubsystemFilter = field(
         default_factory = lambda: FiniteSubsystemFilter()
     )
+                                   #
+                                   # Type of the feature vectors for each frame
+                                   # of sampled periodic or finite system.
+                                   # Feature vectors are required for subsampling
+                                   # based on the distances in the feature space.
+                                   #
+                                   # Limitation: This setting is ignored unless
+                                   # the calculator corresponds to a MACE model.
+                                   #
+    feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "averaged_environments"
     
     temperature_K: float = 298.15
     
@@ -59,7 +71,12 @@ class PhononSampling:
                                    #
     verbose: int = 0
 
-    
+    def __post_init__(self):
+        if self.feature_vectors_type == "none":
+            raise ValueError("Training configurations require presence of feature vectors. "
+                             "Set an appropriate feature_vectors_type.")
+            
+
 @dataclass(kw_only=True)
 class MDSampling:
                                    #
@@ -82,7 +99,7 @@ class MDSampling:
             time_equilibration_fs=1000.0,
             sampling_interval_fs=1000.0,
             supercell_radius=15.0,
-            save_feature_vectors=True,
+            feature_vectors_type="averaged_environments",
         )
     )
 
@@ -118,4 +135,9 @@ class MDSampling:
     verbose: int = 0
     save_plots: bool = True
     save_csv: bool = True
+
+    def __post_init__(self):
+        if self.md_crystal.feature_vectors_type == "none":
+            raise ValueError("Training configurations require presence of feature vectors. "
+                             "Set an appropriate feature_vectors_type.")
 

@@ -62,15 +62,12 @@ def phonon_sampling(
         if isinstance(config.calculator, MACECalculator):
             structures = [molecular_crystal.supercell] + [s.cluster_of_molecules for s in finite_subsystems]
             for s in structures:
-                mace_output = mbe_automation.ml.mace.inference(
+                s.run_neural_network(
                     calculator=config.calculator,
-                    structure=s,
-                    energies=True,
+                    feature_vectors_type=feature_vectors_type,
+                    potential_energies=True,
                     forces=False,
-                    feature_vectors=True
                 )
-                s.E_pot = mace_output.E_pot
-                s.feature_vectors = mace_output.feature_vectors
 
     mbe_automation.storage.save_molecular_crystal(
         dataset=config.dataset,

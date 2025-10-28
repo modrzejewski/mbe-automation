@@ -7,9 +7,11 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 import os
+from mace.calculators import MACECalculator
 
 import mbe_automation.ml.core
-from mbe_automation.ml.core import SUBSAMPLING_ALGOS
+import mbe_automation.ml.mace
+from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 
 @dataclass
 class BrillouinZonePath:
@@ -42,8 +44,13 @@ class Structure:
     E_pot: npt.NDArray[np.floating] | None = None
     forces: npt.NDArray[np.floating] | None = None
     feature_vectors: npt.NDArray[np.floating] | None = None
+    feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "none"
+
+    ] = "none"
+    
     def __post_init__(self):
         self.periodic = (self.cell_vectors is not None)
+        
     def copy(self) -> Structure:
         return Structure(
             positions=self.positions.copy(),
@@ -57,9 +64,44 @@ class Structure:
             forces=(self.forces.copy() if self.forces is not None else None),
             feature_vectors=(
                 self.feature_vectors.copy() 
-                if self.feature_vectors is not None else None
-            )
+                if self.feature_vectors_type is not "none" else None
+            ),
+            feature_vectors_type=self.feature_vectors_type,
         )
+    
+    def run_neural_network(
+            self,
+            calculator: MACECalculator,
+            feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="atomic_environments",
+            potential_energies: bool=False,
+            forces: bool=False,
+    ):
+        if not isinstance(calculator, MACECalculator):
+            print("Skipping run_neural_network: can be done only for MACE models.")
+            return
+
+        assert feature_vectors_type in FEATURE_VECTOR_TYPES
+
+        if feature_vectors_type == "none":
+            compute_feature_vectors = False
+        else:
+            compute_feature_vectors = True
+
+        mace_output = mbe_automation.ml.mace.inference(
+            calculator=calculator,
+            structure=self,
+            energies=potential_energies,
+            forces=forces,
+            feature_vectors=compute_feature_vectors,
+            average_over_atoms=(feature_vectors_type == "averaged_environments"),
+        )
+        
+        if compute_feature_vectors:
+            self.feature_vectors = mace_output.feature_vectors
+            self.feature_vectors_type = feature_vectors_type
+        if potential_energies: self.E_pot = mace_output.E_pot
+        if forces: self.forces = mace_output.forces
+        
     def subsample(
         self,
         n: int,
@@ -73,17 +115,19 @@ class Structure:
         space are averaged over atoms and normalized.
         """
 
-        if self.feature_vectors is None:
+        if self.feature_vectors_type == "none":
             raise ValueError(
-                "subsample requires the Structure to have feature_vectors."
+                "Subsampling requires precomputed feature vectors. "
+                "Execute run_neural_network on your Structure before subsampling."
             )
         if self.masses.ndim == 2 or self.atomic_numbers.ndim == 2:
             raise ValueError(
-                "subsample cannot work on a structure where atoms"
+                "subsample cannot work on a structure where atoms "
                 "are permuted between frames."
             )
         selected_indices = mbe_automation.ml.core.subsample(
             feature_vectors=self.feature_vectors,
+            feature_vectors_type=self.feature_vectors_type,
             n_samples=n,
             algorithm=algorithm,
         )
@@ -93,6 +137,7 @@ class Structure:
                 selected_cell_vectors = self.cell_vectors[selected_indices]
             else:
                 selected_cell_vectors = self.cell_vectors
+                
         return Structure(
             positions=self.positions[selected_indices],
             atomic_numbers=self.atomic_numbers,
@@ -109,7 +154,8 @@ class Structure:
                 if self.forces is not None
                 else None
             ),
-            feature_vectors=self.feature_vectors[selected_indices]
+            feature_vectors=self.feature_vectors[selected_indices],
+            feature_vectors_type=self.feature_vectors_type
         )
 
 @dataclass
@@ -189,10 +235,12 @@ class Trajectory(Structure):
         selected based on the distances in the feature
         vector space.
         """
-        if self.feature_vectors is None:
+        if self.feature_vectors_type == "none":
             raise ValueError(
-                "subsample requires the Trajectory to have feature_vectors."
+                "Subsampling requires precomputed feature vectors. "
+                "Execute run_neural_network on your Structure before subsampling."
             )
+        
         if self.masses.ndim == 2 or self.atomic_numbers.ndim == 2:
             raise ValueError(
                 "subsample cannot work on a trajectory where atoms"
@@ -201,6 +249,7 @@ class Trajectory(Structure):
                 
         selected_indices = mbe_automation.ml.core.subsample(
             feature_vectors=self.feature_vectors,
+            feature_vectors_type=self.feature_vectors_type,
             n_samples=n,
             algorithm=algorithm,
         )
@@ -237,6 +286,7 @@ class Trajectory(Structure):
                 if self.forces is not None else None
             ),
             feature_vectors=self.feature_vectors[selected_indices],
+            feature_vectors_type=self.feature_vectors_type,
             pressure=(
                 self.pressure[selected_indices] 
                 if self.pressure is not None else None
@@ -536,7 +586,8 @@ def _save_structure(
         cell_vectors: npt.NDArray[np.floating] | None=None,
         E_pot: npt.NDArray[np.floating] | None=None,
         forces: npt.NDArray[np.floating] | None=None,
-        feature_vectors: npt.NDArray[np.floating] | None=None
+        feature_vectors: npt.NDArray[np.floating] | None=None,
+        feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
 ):
     if positions.ndim == 2:
         n_frames = 1
@@ -572,7 +623,7 @@ def _save_structure(
                 name="cell_vectors (Å)",
                 data=cell_vectors
             )
-        if feature_vectors is not None:
+        if feature_vectors_type != "none":
             group.create_dataset(
                 name="feature_vectors",
                 data=feature_vectors
@@ -590,7 +641,7 @@ def _save_structure(
         group.attrs["n_frames"] = n_frames
         group.attrs["n_atoms"] = n_atoms
         group.attrs["periodic"] = is_periodic
-
+        group.attrs["feature_vectors_type"] = feature_vectors_type
 
 @overload
 def save_structure(*, dataset: str, key: str, structure: Structure) -> None: ...
@@ -606,7 +657,8 @@ def save_structure(
     cell_vectors: npt.NDArray[np.floating] | None = None,
     E_pot: npt.NDArray[np.floating] | None = None,
     forces: npt.NDArray[np.floating] | None = None,
-    feature_vectors: npt.NDArray[np.floating] | None = None
+    feature_vectors: npt.NDArray[np.floating] | None = None,
+    feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
 ) -> None: ...
 
 def save_structure(*, dataset: str, key: str, **kwargs):
@@ -638,7 +690,8 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             cell_vectors=structure.cell_vectors,
             E_pot=structure.E_pot,
             forces=structure.forces,
-            feature_vectors=structure.feature_vectors
+            feature_vectors=structure.feature_vectors,
+            feature_vectors_type=structure.feature_vectors_type,
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -651,7 +704,8 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             cell_vectors=kwargs.get("cell_vectors"),
             E_pot=kwargs.get("E_pot"),
             forces=kwargs.get("forces"),
-            feature_vectors=kwargs.get("feature_vectors")
+            feature_vectors=kwargs.get("feature_vectors"),
+            feature_vectors_type=kwargs.get("feature_vectors_type"),
         )
     else:
         raise ValueError(
@@ -664,6 +718,7 @@ def read_structure(dataset, key):
     with h5py.File(dataset, "r") as f:
         group = f[key]
         is_periodic = group.attrs["periodic"]
+        feature_vectors_type = group.attrs["feature_vectors_type"]
         structure = Structure(
             positions=group["positions (Å)"][...],
             atomic_numbers=group["atomic_numbers"][...],
@@ -675,9 +730,10 @@ def read_structure(dataset, key):
             n_frames=group.attrs["n_frames"],
             n_atoms=group.attrs["n_atoms"],
             periodic=is_periodic,
+            feature_vectors_type=feature_vectors_type,
             feature_vectors=(
                 group["feature_vectors"][...]
-                if "feature_vectors" in group else None
+                if feature_vectors_type != "none" else None
             ),
             E_pot=(
                 group["E_pot (eV∕atom)"][...]
@@ -706,6 +762,7 @@ def save_trajectory(
         group.attrs["n_frames"] = traj.n_frames
         group.attrs["n_atoms"] = traj.n_atoms
         group.attrs["periodic"] = traj.periodic
+        group.attrs["feature_vectors_type"] = traj.feature_vectors_type
         group.attrs["target_temperature (K)"] = traj.target_temperature
         group.attrs["time_equilibration (fs)"] = traj.time_equilibration
         group.attrs["n_removed_trans_dof"] = traj.n_removed_trans_dof
@@ -772,7 +829,7 @@ def save_trajectory(
                 name="cell_vectors (Å)",
                 data=traj.cell_vectors
             )
-        if traj.feature_vectors is not None:
+        if traj.feature_vectors_type != "none":
             group.create_dataset(
                 name="feature_vectors",
                 data=traj.feature_vectors
@@ -784,6 +841,7 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
     with h5py.File(dataset, "r") as f:
         group = f[key]
         is_periodic = group.attrs["periodic"]
+        feature_vectors_type = group.attrs["feature_vectors_type"]
         ensemble = group.attrs["ensemble"]
         traj = Trajectory(
             ensemble=ensemble,
@@ -804,9 +862,10 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             E_pot=group["E_pot (eV∕atom)"][...],
             E_trans_drift=group["E_trans_drift (eV∕atom)"][...],
             E_rot_drift=(group["E_rot_drift (eV∕atom)"][...] if not is_periodic else None),
+            feature_vectors_type=feature_vectors_type,
             feature_vectors=(
                 group["feature_vectors"][...]
-                if "feature_vectors" in group else None
+                if feature_vectors_type != "none" else None
             ),
             target_temperature=group.attrs["target_temperature (K)"],
             target_pressure=(group.attrs["target_pressure (GPa)"] if ensemble=="NPT" else None),

@@ -1,9 +1,12 @@
+from __future__ import annotations
 from typing import Any, Literal
 from dataclasses import dataclass, field
 from ase import Atoms
 from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
 import numpy.typing as npt
+
+from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
 
 @dataclass
 class ClassicalMD:
@@ -145,15 +148,21 @@ class ClassicalMD:
                                    #
     supercell_diagonal: bool = False
                                    #
-                                   # Save feature vectors as a part of the Trajectory
-                                   # object in the dataset. Feature vectors are required
-                                   # if you want to subsample the MD frames based on the
-                                   # distances in the feature space, e.g., to generate a
-                                   # diverse training set.
+                                   # Type of feature vectors to be saved as a part
+                                   # of the Trajectory object:
                                    #
-                                   # Works only for calculations with the MACE model.
+                                   # (1) none: do not save any feature vectors
+                                   # (2) atomic_environments: feature vectors for every atom
+                                   # (3) averaged_environments: feature vectors
+                                   #     averaged over all atoms
                                    #
-    save_feature_vectors: bool = False
+                                   # Options (2) or (3) enable subsampling of MD frames
+                                   # based on the distances in the feature space.
+                                   #
+                                   # Limitation: options (2) and (3) work only with
+                                   # MACE models.
+                                   #
+    feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "none"
 
 @dataclass
 class Enthalpy:
