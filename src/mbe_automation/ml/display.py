@@ -14,18 +14,14 @@ def to_chemiscope(
     Create an interactive Chemiscope widget from a Structure object,
     including its first two principal components, for display in a notebook.
     """
-    if chemiscope is None:
-        raise ImportError(
-            "chemiscope is not installed. Please install it with "
-            "'pip install chemiscope' to use this functionality."
-        )
-
-    if structure.feature_vectors is None:
-        raise ValueError("structure instance must contain feature_vectors.")
+    if structure.feature_vectors_type == "none":
+        raise ValueError("Your Structure does not contain feature vectors. "
+                         "Execute run_neural_network.")
 
     n_components_chemiscope = 2
     pca_vecs, explained_variance_ratio = mbe_automation.ml.core.pca(
         feature_vectors=structure.feature_vectors,
+        feature_vectors_type=structure.feature_vectors_type,
         n_components=n_components_chemiscope
     )
 
@@ -75,8 +71,9 @@ def pca(
     on the scatter plot.
     """
 
-    if structure.feature_vectors is None:
-        raise ValueError("structure instance must contain feature_vectors.")
+    if structure.feature_vectors_type == "none":
+        raise ValueError("Your Structure does not contain feature vectors. "
+                         "Execute run_neural_network.")
 
     min_components_for_plot = 3 if plot_type == "3d" else 2
     if n_vectors < min_components_for_plot:
@@ -84,15 +81,17 @@ def pca(
             f"n_vectors must be at least {min_components_for_plot} for a '{plot_type}' plot."
         )
 
+    n_features = structure.feature_vectors.shape[-1]
     max_components = min(
         structure.n_frames,
-        structure.feature_vectors.reshape(structure.n_frames, structure.n_atoms, -1).shape[2]
+        n_features
     )
     if n_vectors > max_components:
         n_vectors = max_components
     
     pca_vecs, explained_variance_ratio = mbe_automation.ml.core.pca(
         feature_vectors=structure.feature_vectors,
+        feature_vectors_type=structure.feature_vectors_type,
         n_components=n_vectors
     )
 
@@ -107,6 +106,7 @@ def pca(
         else:
             subsample_indices = mbe_automation.ml.core.subsample(
                 feature_vectors=structure.feature_vectors,
+                feature_vectors_type=structure.feature_vectors_type,
                 n_samples=subset_size,
                 algorithm=subsample_algorithm
             )
