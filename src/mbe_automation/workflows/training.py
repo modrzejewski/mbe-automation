@@ -58,16 +58,14 @@ def phonon_sampling(
         filter=config.finite_subsystem_filter
     )
     
-    if mace_available:
-        if isinstance(config.calculator, MACECalculator):
-            structures = [molecular_crystal.supercell] + [s.cluster_of_molecules for s in finite_subsystems]
-            for s in structures:
-                s.run_neural_network(
-                    calculator=config.calculator,
-                    feature_vectors_type=configs.feature_vectors_type,
-                    potential_energies=True,
-                    forces=False,
-                )
+    all_structures = [molecular_crystal.supercell] + [s.cluster_of_molecules for s in finite_subsystems]
+    for s in all_structures:
+        s.run_neural_network(
+            calculator=config.calculator,
+            feature_vectors_type=config.feature_vectors_type,
+            potential_energies=True,
+            forces=False,
+        )
 
     mbe_automation.storage.save_molecular_crystal(
         dataset=config.dataset,
