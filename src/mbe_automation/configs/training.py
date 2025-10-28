@@ -82,6 +82,7 @@ class MDSampling:
             time_equilibration_fs=1000.0,
             sampling_interval_fs=1000.0,
             supercell_radius=15.0,
+            save_feature_vectors=True,
         )
     )
 

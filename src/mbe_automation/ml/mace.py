@@ -48,7 +48,7 @@ def inference(
             features_out[i] = features
 
     return MACEOutput(
-        n_frames=structure.n_frames,
+        n_frames=structure.n_frames,        
         n_atoms=structure.n_atoms,
         n_features=n_features,
         E_pot=energies_out,

@@ -242,6 +242,7 @@ def run(
     print(f"time_step             {md.time_step_fs} fs")
     print(f"n_total_steps         {n_total_steps}")
     print(f"n_samples             {n_samples}")
+    print(f"save_feature_vectors  {md.save_feature_vectors}")
     print(f"n_removed_rot_dof     {n_removed_rot_dof}")
     print(f"n_removed_trans_dof   {n_removed_trans_dof}")
     if is_periodic:
@@ -257,7 +258,13 @@ def run(
         nonlocal sample_idx
 
         E_pot = dyn.atoms.get_potential_energy() / n_atoms # eV/atom
-
+        
+        if md.save_feature_vectors:
+            if isinstance(dyn.atoms.calc, MACECalculator):
+                features = dyn.atoms.calc.get_descriptors()
+                if sample_idx == 0: traj.feature_vectors = np.zeros((n_samples, *features.shape))
+                traj.feature_vectors[sample_idx] = features
+                
         E_trans_drift, E_rot_drift, velocities = get_velocities(
             system=dyn.atoms,
             remove_drift_translation=True,
@@ -304,8 +311,7 @@ def run(
     t0 = time.time()
     print("Time propagation...", flush=True)
     dyn.run(steps=n_total_steps)
-    t1 = time.time()
-
+    t1 = time.time()    
     mbe_automation.storage.save_trajectory(
         dataset=dataset,
         key=key,
