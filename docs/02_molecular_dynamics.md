@@ -2,7 +2,7 @@
 
 - [Setup](#setup)
 - [NPT/NVT Propagation](#nptnvt-propagation)
-- [Configuration details](#configuration-details)
+- [Adjustable parameters](#adjustable-parameters)
 - [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
@@ -71,7 +71,7 @@ The MD workflow is executed by passing the configuration object to the `run` fun
 mbe_automation.workflows.md.run(md_config)
 ```
 
-## Configuration details
+## Adjustable parameters
 
 ### `Enthalpy` Class
 
@@ -84,6 +84,7 @@ mbe_automation.workflows.md.run(md_config)
 | `calculator` | MLIP calculator for energies and forces. | - |
 | `temperature_K` | Target temperature (in Kelvin) for the MD simulation. | `298.15` |
 | `pressure_GPa` | Target pressure (in GPa) for the MD simulation. | `1.0E-4` |
+| `root_key` | Specifies the root path in the HDF5 dataset where the workflow's output is stored. | `"md"` |
 | `md_molecule` | An instance of `ClassicalMD` that configures the MD simulation for the isolated molecule. | `ClassicalMD()` |
 | `md_crystal` | An instance of `ClassicalMD` that configures the MD simulation for the crystal. | `ClassicalMD()` |
 
@@ -103,6 +104,7 @@ mbe_automation.workflows.md.run(md_config)
 | `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |
 | `barostat_time_fs`      | Barostat relaxation time.                                                                                                            | `1000.0`              |
 | `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
+| `save_feature_vectors`  | If `True`, save feature vectors to the dataset. This is required for subsampling.                                                    | `False`               |
 
 ## Function Call Overview
 

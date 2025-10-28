@@ -2,7 +2,7 @@
 
 - [Setup](#setup)
 - [Phonon calculation](#phonon-calculation)
-- [Configuration details](#configuration-details)
+- [Adjustable parameters](#adjustable-parameters)
 - [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
@@ -57,7 +57,7 @@ The workflow is executed by passing the configuration object to the `run` functi
 mbe_automation.workflows.quasi_harmonic.run(properties_config)
 ```
 
-## Configuration details
+## Adjustable parameters
 
 ### `FreeEnergy` Class
 
@@ -77,6 +77,7 @@ mbe_automation.workflows.quasi_harmonic.run(properties_config)
 | `supercell_displacement`        | Displacement length (in Å) used for numerical differentiation in phonon calculations.                                                                                                             | `0.01`                                          |
 | `volume_range`                  | Scaling factors applied to the reference volume (V0) to sample the F(V) curve.                                                                                                                         | `np.array([0.96, ..., 1.08])`                   |
 | `pressure_range`                | External isotropic pressures (in GPa) used to sample cell volumes for the equation of state.                                                                                                            | `np.array([0.2, ..., -0.6])`                    |
+| `root_key`                      | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                                                                                                                       | `"quasi_harmonic"`                              |
 | `relax_input_cell`              | Relaxation of the input structure: "full" (optimizes atomic positions, cell shape, and volume), "constant_volume" (optimizes atomic positions and cell shape at fixed volume), or "only_atoms" (optimizes only atomic positions).                                                                                                               | `"constant_volume"`                             |
 | `equation_of_state`             | Equation of state used to fit the energy/free energy vs. volume curve: "birch_murnaghan", "vinet", or "polynomial".                                                                                   | `"polynomial"`                                  |
 | `eos_sampling`                  | Algorithm for generating points on the equilibrium curve: "pressure" or "volume".                                                                                                                  | `"volume"`                                      |

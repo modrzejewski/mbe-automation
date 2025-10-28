@@ -4,13 +4,14 @@
 - [Step 1: MD Sampling](#step-1-md-sampling)
 - [Step 2: Force Constants Model](#step-2-force-constants-model)
 - [Step 3: Phonon Sampling](#step-3-phonon-sampling)
-- [Configuration details](#configuration-details)
+- [Adjustable parameters](#adjustable-parameters)
   - [`MDSampling`](#mdsampling-class)
   - [`PhononSampling`](#phononsampling-class)
   - [`ClassicalMD`](#classicalmd-class)
   - [`FreeEnergy`](#freeenergy-class)
   - [`FiniteSubsystemFilter`](#finitesubsystemfilter-class)
   - [`PhononFilter`](#phononfilter-class)
+- [Subsampling](#subsampling)
 - [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
@@ -121,7 +122,7 @@ phonon_sampling_config = PhononSampling(
 mbe_automation.workflows.training.run(phonon_sampling_config)
 ```
 
-## Configuration details
+## Adjustable parameters
 
 ### `MDSampling` Class
 
@@ -133,6 +134,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `calculator`              | MLIP calculator.                                                                                    | -                                  |
 | `temperature_K`           | Target temperature (in Kelvin) for the MD simulation.                                               | `298.15`                           |
 | `pressure_GPa`            | Target pressure (in GPa) for the MD simulation.                                                     | `1.0E-4`                           |
+| `root_key`                | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                      | `"training/md_sampling"`           |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
 | `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters.                              | -                                  |
 
@@ -147,6 +149,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `phonon_filter`           | An instance of `PhononFilter` that specifies which phonon modes to sample from. This method is particularly effective at generating distorted geometries that may be energetically unfavorable but are important for teaching the MLIP about repulsive interactions.       | `PhononFilter()`  |
 | `force_constants_dataset` | Path to the HDF5 file containing the force constants. | `./properties.hdf5` |
 | `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | -                 |
+| `root_key`                | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                     | `"training/phonon_sampling"` |
 | `time_step_fs`            | Time step for the trajectory generation.                                         | `100.0`           |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
 
@@ -166,6 +169,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |
 | `barostat_time_fs`      | Barostat relaxation time.                                                                                                            | `1000.0`              |
 | `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
+| `save_feature_vectors`  | If `True`, save feature vectors to the dataset. This is required for subsampling.                                                    | `False`               |
 
 ### `FreeEnergy` Class
 
@@ -200,6 +204,43 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `selected_modes`   | An array of 1-based indices for selecting specific phonon modes at each k-point. If this is specified, `freq_min_THz` and `freq_max_THz` are ignored.                                                                                                                   | `None`        |
 | `freq_min_THz`     | The minimum phonon frequency (in THz) to be included in the sampling.                                                                                                                                                                                              | `0.1`         |
 | `freq_max_THz`     | The maximum phonon frequency (in THz) to be included in the sampling. If `None`, all frequencies above `freq_min_THz` are included.                                                                                                                                   | `8.0`         |
+
+## Subsampling
+
+The purpose of subsampling is to select a diverse set of configurations for training a machine learning potential. By choosing a smaller, representative subset of frames from a larger dataset, you can reduce the computational cost of training while ensuring that the model is exposed to a wide range of atomic environments. The `subsample` method, available for `Structure`, `Trajectory`, `MolecularCrystal`, and `FiniteSubsystem` objects, provides a way to do this.
+
+The subsampling process is based on feature vectors, which are numerical representations of the atomic environments in each frame. The method uses algorithms like farthest point sampling to select a diverse set of frames that cover the feature space as broadly as possible. To enable subsampling, you must first save the feature vectors to the dataset by setting the [`save_feature_vectors`](#classicalmd-class) parameter to `True` in the `ClassicalMD` configuration.
+
+### `subsample` Method Parameters
+
+| Parameter   | Description                                                                                                                                       | Default Value                |
+|-------------|---------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
+| `n`         | The number of frames to select from the dataset.                                                                                                  | -                            |
+| `algorithm` | The algorithm to use for subsampling. Options are `"farthest_point_sampling"` and `"kmeans"`. Both methods aim to select a diverse subset of frames by analyzing their feature vectors. | `"farthest_point_sampling"`  |
+
+### Example Usage
+
+The following example demonstrates how to read a `Trajectory` from a dataset, and then use the `subsample` method to select a smaller number of frames.
+
+```python
+from mbe_automation.storage import read_trajectory, save_trajectory
+
+# Read the full trajectory from the dataset
+full_trajectory = read_trajectory(
+    dataset="training_set.hdf5",
+    key="training/md_sampling/trajectory"
+)
+
+# Subsample the trajectory to select 100 frames
+subsampled_trajectory = full_trajectory.subsample(n=100)
+
+# Save the subsampled trajectory to a new key in the dataset
+save_trajectory(
+    dataset="training_set.hdf5",
+    key="training/md_sampling/trajectory_subsampled",
+    traj=subsampled_trajectory
+)
+```
 
 ## Function Call Overview
 
