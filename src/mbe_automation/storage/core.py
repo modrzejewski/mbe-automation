@@ -703,7 +703,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             E_pot=kwargs.get("E_pot"),
             forces=kwargs.get("forces"),
             feature_vectors=kwargs.get("feature_vectors"),
-            feature_vectors_type=kwargs.get("feature_vectors_type"),
+            feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
         )
     else:
         raise ValueError(
