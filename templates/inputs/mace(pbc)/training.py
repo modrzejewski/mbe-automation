@@ -41,6 +41,7 @@ md_sampling_config = MDSampling(
         time_equilibration_fs=1000.0,
         sampling_interval_fs=1000.0,
         supercell_radius = 10.0,
+        feature_vectors_type="averaged_environments",
     ),    
     work_dir=os.path.join(work_dir, "md_sampling"),
     dataset=dataset,

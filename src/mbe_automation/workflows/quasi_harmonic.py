@@ -65,6 +65,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             config.calculator
         )
 
+    if config.thermal_expansion:
+        assert config.relax_input_cell in ["full", "constant_volume"]
+
     if config.relax_input_cell == "full":
         relaxed_crystal_label = "crystal[opt:atoms,shape,V]"
     elif config.relax_input_cell == "constant_volume":

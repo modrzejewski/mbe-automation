@@ -10,6 +10,12 @@ SUBSAMPLING_ALGOS = [
     "kmeans"
 ]
 
+FEATURE_VECTOR_TYPES = [
+    "none",
+    "averaged_environments",
+    "atomic_environments"
+]
+
 def _average_over_atoms(
     feature_vectors: npt.NDArray[np.floating]
 ) -> npt.NDArray[np.floating]:
@@ -67,6 +73,7 @@ def _kmeans_sampling(
 
 def subsample(
         feature_vectors: npt.NDArray[np.floating],
+        feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES],
         n_samples: int,
         algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
 ) -> npt.NDArray[np.integer]:
@@ -74,12 +81,18 @@ def subsample(
     Subsample feature vectors using farthest point sampling or
     K-means clustering (kmeans).
     """
+    assert feature_vectors_type != "none"
     
     n_frames = feature_vectors.shape[0]
-    n_atoms = feature_vectors.shape[1]
-    n_features = feature_vectors.reshape(n_frames, n_atoms, -1).shape[2]
-    features_averaged = _average_over_atoms(feature_vectors.reshape(n_frames, n_atoms, n_features))
     
+    if feature_vectors_type == "atomic_environments":
+        n_atoms = feature_vectors.shape[1]
+        n_features = feature_vectors.shape[2]
+        features_averaged = _average_over_atoms(feature_vectors)
+        
+    elif feature_vectors_type == "averaged_environments":
+        features_averaged = feature_vectors
+
     assert n_frames >= n_samples
     assert algorithm in SUBSAMPLING_ALGOS
 
@@ -105,6 +118,7 @@ def subsample(
 
 def pca(
         feature_vectors: npt.NDArray[np.floating],
+        feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES],
         n_components
 ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.floating]]:
     """
@@ -115,11 +129,19 @@ def pca(
     - The explained variance ratio for each component.
     """
 
+    assert feature_vectors_type != "none"
+    
     n_frames = feature_vectors.shape[0]
-    n_atoms = feature_vectors.shape[1]
-    n_features = feature_vectors.reshape(n_frames, n_atoms, -1).shape[2]
-    features_averaged = _average_over_atoms(feature_vectors.reshape(n_frames, n_atoms, n_features))
 
+    if feature_vectors_type == "atomic_environments":
+        n_atoms = feature_vectors.shape[1]
+        n_features = feature_vectors.shape[2]
+        features_averaged = _average_over_atoms(feature_vectors)
+        
+    elif feature_vectors_type == "averaged_environments":
+        n_features = feature_vectors.shape[1]
+        features_averaged = feature_vectors
+    
     assert n_components > 0
     assert n_components <= min(n_features, n_frames)
 

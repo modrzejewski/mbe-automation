@@ -58,19 +58,14 @@ def phonon_sampling(
         filter=config.finite_subsystem_filter
     )
     
-    if mace_available:
-        if isinstance(config.calculator, MACECalculator):
-            structures = [molecular_crystal.supercell] + [s.cluster_of_molecules for s in finite_subsystems]
-            for s in structures:
-                mace_output = mbe_automation.ml.mace.inference(
-                    calculator=config.calculator,
-                    structure=s,
-                    energies=True,
-                    forces=False,
-                    feature_vectors=True
-                )
-                s.E_pot = mace_output.E_pot
-                s.feature_vectors = mace_output.feature_vectors
+    all_structures = [molecular_crystal.supercell] + [s.cluster_of_molecules for s in finite_subsystems]
+    for s in all_structures:
+        s.run_neural_network(
+            calculator=config.calculator,
+            feature_vectors_type=config.feature_vectors_type,
+            potential_energies=True,
+            forces=False,
+        )
 
     mbe_automation.storage.save_molecular_crystal(
         dataset=config.dataset,
@@ -171,18 +166,12 @@ def md_sampling(
         for s in finite_subsystems:
             key = f"{config.root_key}/{system_label}/finite_subsystems/n={s.n_molecules}"
             
-            if mace_available:
-                if isinstance(config.calculator, MACECalculator):
-                    mace_output = mbe_automation.ml.mace.inference(
-                        calculator=config.calculator,
-                        structure=s.cluster_of_molecules,
-                        energies=True,
-                        forces=True,
-                        feature_vectors=True
-                    )
-                    s.cluster_of_molecules.E_pot = mace_output.E_pot
-                    s.cluster_of_molecules.forces = mace_output.forces
-                    s.cluster_of_molecules.feature_vectors = mace_output.feature_vectors
+            s.cluster_of_molecules.run_neural_network(
+                calculator=config.calculator,
+                feature_vectors_type=config.md_crystal.feature_vectors_type,
+                potential_energies=True,
+                forces=True
+            )
 
             mbe_automation.storage.save_finite_subsystem(
                 dataset=config.dataset,
