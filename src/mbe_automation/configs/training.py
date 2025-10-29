@@ -81,17 +81,17 @@ class PhononSampling:
                                    #    There are n_frames independent random points
                                    #    for each (j,k).
                                    #
-    coordinate_scan: Literal["time_propagation", "random"] = "random"
+    amplitude_scan: Literal["time_propagation", "random"] = "random"
                                    #
                                    # Distance between time points
-                                   # (referenced only if coordinate_scan=="time_propagation")
+                                   # (referenced only if amplitude_scan=="time_propagation")
                                    #
     time_step_fs: float = 100.0
                                    #
                                    # Random number generator for randomized
                                    # amplitude sampling
                                    #
-                                   # (referenced only if coordinate_scan=="random")
+                                   # (referenced only if amplitude_scan=="random")
                                    #
     rng: np.random.Generator = field(default_factory=lambda: np.random.default_rng(seed=42))
                                    #

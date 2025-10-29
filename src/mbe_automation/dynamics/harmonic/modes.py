@@ -477,7 +477,7 @@ def thermal_displacements(
     print(f"k_points_mesh       {nx}×{ny}×{nz}")
     print(f"amplitude_scan      {amplitude_scan}")
     if amplitude_scan == "random":
-        print(f"n_random_samples    {n_random_samples")
+        print(f"n_random_samples    {n_random_samples}")
     elif amplitude_scan == "time_propagation":
         print(f"n_time_points       {len(time_points_fs)}")
     print("Diagonalization of dynamic matrix at each k point...", flush=True)
