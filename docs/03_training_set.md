@@ -130,15 +130,15 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 
 | Parameter                 | Description                                                                                             | Default Value                  |
 | ------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `crystal`                 | Initial crystal structure. From this periodic trajectory, the workflow extracts finite, non-periodic clusters.                                                                          | -                                  |
+| `crystal`                 | Initial crystal structure. From this periodic trajectory, the workflow extracts finite, non-periodic clusters. | - |
 | `calculator`              | MLIP calculator.                                                                                    | -                                  |
+| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters.                              | -                                  |
 | `temperature_K`           | Target temperature (in Kelvin) for the MD simulation.                                               | `298.15`                           |
 | `pressure_GPa`            | Target pressure (in GPa) for the MD simulation.                                                     | `1.0E-4`                           |
-| `root_key`                | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                      | `"training/md_sampling"`           |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
-| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters.                              | -                                  |
 | `work_dir`                | Directory where files are stored at runtime.                                                            | `"./"`                             |
 | `dataset`                 | The main HDF5 file with all data computed for the physical system.                                      | `"./properties.hdf5"`              |
+| `root_key`                | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                      | `"training/md_sampling"`           |
 | `verbose`                 | Verbosity of the program's output. `0` suppresses warnings.                                             | `0`                                |
 | `save_plots`              | If `True`, save plots of the simulation results.                                                        | `True`                             |
 | `save_csv`                | If `True`, save CSV files of the simulation results.                                                    | `True`                             |
@@ -150,17 +150,17 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | Parameter                 | Description                                                                          | Default Value |
 | ------------------------- | ------------------------------------------------------------------------------------ | ----------------- |
 | `calculator`              | MLIP calculator.                                                                 | -                 |
+| `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | -                 |
 | `temperature_K`           | Temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
 | `phonon_filter`           | An instance of `PhononFilter` that specifies which phonon modes to sample from. This method is particularly effective at generating distorted geometries that may be energetically unfavorable but are important for teaching the MLIP about repulsive interactions.       | `PhononFilter()`  |
+| `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
 | `force_constants_dataset` | Path to the HDF5 file containing the force constants. | `./properties.hdf5` |
-| `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | -                 |
-| `root_key`                | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                     | `"training/phonon_sampling"` |
 | `time_step_fs`            | Time step for the trajectory generation.                                         | `100.0`           |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
-| `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
 | `feature_vectors_type`    | Type of feature vectors to save. Required for subsampling based on feature space distances. Works only with MACE models. | `"averaged_environments"` |
 | `work_dir`                | Directory where files are stored at runtime.                                                            | `"./"`                             |
 | `dataset`                 | The main HDF5 file with all data computed for the physical system.                                      | `"./properties.hdf5"`              |
+| `root_key`                | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                     | `"training/phonon_sampling"` |
 | `verbose`                 | Verbosity of the program's output. `0` suppresses warnings.                                             | `0`                                |
 
 ### `ClassicalMD` Class
@@ -169,17 +169,21 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 
 | Parameter               | Description                                                                                                                              | Default Value     |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `ensemble`              | Thermodynamic ensemble for the simulation ("NVT" or "NPT").                                                                          | "NVT"                 |
 | `time_total_fs`         | Total simulation time in femtoseconds.                                                                                               | `50000.0`             |
 | `time_step_fs`          | Time step for the integration algorithm.                                                                                             | `0.5`                 |
 | `sampling_interval_fs`  | Interval for trajectory sampling.                                                                                                   | `50.0`                |
 | `time_equilibration_fs` | Initial period of the simulation discarded to allow the system to reach equilibrium.                                         | `5000.0`              |
+| `ensemble`              | Thermodynamic ensemble for the simulation ("NVT" or "NPT").                                                                          | "NVT"                 |
 | `nvt_algo`              | Thermostat algorithm for NVT simulations. "csvr" (Canonical Sampling Through Velocity Rescaling) is robust for isolated molecules. | "csvr"                |
 | `npt_algo`              | Barostat/thermostat algorithm for NPT simulations.                                                                                   | "mtk_full"            |
 | `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |
 | `barostat_time_fs`      | Barostat relaxation time.                                                                                                            | `1000.0`              |
+| `tchain`                | Number of thermostats in the Nosé-Hoover chain.                                                                                      | `3`                   |
+| `pchain`                | Number of barostats in the Martyna-Tuckerman-Klein chain.                                                                            | `3`                   |
 | `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
-| `feature_vectors_type`  | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Works only with MACE models. | "none"                |
+| `supercell_matrix`      | Supercell transformation matrix. If specified, `supercell_radius` is ignored.                                                        | `None`                |
+| `supercell_diagonal`    | If `True`, create a diagonal supercell. Ignored if `supercell_matrix` is provided.                                                   | `False`               |
+| `feature_vectors_type`  | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Works only with MACE models. | `"averaged_environments"` |
 
 ### `FreeEnergy` Class
 
@@ -431,7 +435,7 @@ activate_env = os.path.realpath(os.path.join(virtual_environment, "bin", "activa
 cmd = f"module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10 && . {activate_env} && python {InpScript}"
 
 with open(LogFile, "w") as log_file:
-    process = subprocess.Popen(cmd, shell=True, stdout=log_file,
+    process = subprocess.Popen(cmd, shell=true, stdout=log_file,
                                stderr=subprocess.STDOUT, bufsize=1,
                                universal_newlines=True)
     process.communicate()
