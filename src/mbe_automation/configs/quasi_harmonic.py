@@ -286,7 +286,7 @@ class FreeEnergy:
     save_xyz: bool = True
 
     def __post_init__(self):
-        if self.thermal_expansion and relax_input_cell == "only_atoms":
+        if self.thermal_expansion and self.relax_input_cell == "only_atoms":
             raise ValueError("Calculations with thermal expansion require "
                              "relaxed_input_cell set to 'full' or 'constant_volume'")
                                    
