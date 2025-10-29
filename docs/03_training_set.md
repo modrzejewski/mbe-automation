@@ -113,6 +113,7 @@ phonon_sampling_config = PhononSampling(
     ),
     force_constants_dataset=dataset,
     force_constants_key="training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants",
+    amplitude_scan="random",
     time_step_fs=100.0,
     n_frames=20,
     work_dir=os.path.join(work_dir, "phonon_sampling"),
@@ -155,7 +156,9 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `temperature_K`           | Temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
 | `phonon_filter`           | An instance of `PhononFilter` that specifies which phonon modes to sample from. This method is particularly effective at generating distorted geometries that may be energetically unfavorable but are important for teaching the MLIP about repulsive interactions.       | `PhononFilter()`  |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
-| `time_step_fs`            | Time step for the trajectory generation.                                         | `100.0`           |
+| `amplitude_scan`          | Method for sampling normal-mode coordinates. `"random"` multiplies eigenvectors by a random number on (-1, 1). `"time_propagation"` uses a time-dependent phase factor. | `"random"`                         |
+| `time_step_fs`            | Time step for trajectory generation (used only if `amplitude_scan` is `"time_propagation"`).            | `100.0`           |
+| `rng`                     | Random number generator for randomized amplitude sampling (used only if `amplitude_scan` is `"random"`). | `np.random.default_rng(seed=42)`   |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
 | `feature_vectors_type`    | Type of feature vectors to save. Required for subsampling based on feature space distances. Works only with MACE models. | `"averaged_environments"` |
 | `work_dir`                | Directory where files are stored at runtime.                                                            | `"./"`                             |
@@ -395,6 +398,7 @@ phonon_sampling_config = PhononSampling(
     ),
     force_constants_dataset=dataset,
     force_constants_key="training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants",
+    amplitude_scan="random",
     time_step_fs=100.0,
     n_frames=20,
     work_dir=os.path.join(work_dir, "phonon_sampling"),
