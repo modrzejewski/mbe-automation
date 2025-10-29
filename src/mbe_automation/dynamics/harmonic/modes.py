@@ -143,11 +143,14 @@ def _thermal_displacements(
         dynamical_matrix: phonopy.DynamicalMatrix,
         qpoints: npt.NDArray, # rank (n_qpoints, 3), scaled coordinates of sampling points in the FBZ        
         temperatures_K: npt.NDArray[np.floating], # temperature points in K, rank (n_temperatures, )
-        time_points_fs: npt.NDArray[np.floating] | None, # time points in fs, rank (n_time_points, )
+        time_points_fs: npt.NDArray[np.floating] = np.array([0.0]), # time points in fs, rank (n_time_points, )
         selected_modes: npt.NDArray[np.integer] | None = None,
         freq_min_THz: float = 0.0,
         freq_max_THz: float | None = None,
-        cell_type: Literal["primitive", "supercell"] = "primitive"
+        cell_type: Literal["primitive", "supercell"] = "primitive",
+        amplitude_scan: Literal["time_propagation", "random"] = "time_propagation",
+        n_random_samples: int = 1, # ignored unless random_scan=="random"
+        rng: np.random.Generator | None = None,
 ) -> ThermalDisplacements:
     """
     Compute thermal displacement vectors of atoms
@@ -182,9 +185,20 @@ def _thermal_displacements(
         raise ValueError("qpoints array cannot be empty")
     if np.any(temperatures_K <= 0):
         raise ValueError("All temperatures must be positive")
-    
+
     n_temperatures = len(temperatures_K)
-    n_time_points = (len(time_points_fs) if time_points_fs is not None else 0)
+
+    assert amplitude_scan in ["time_propagation", "random"]
+    
+    if amplitude_scan == "time_propagation":
+        n_time_points = (len(time_points_fs) if time_points_fs is not None else 0)
+    elif amplitude_scan == "random":
+        n_time_points = n_random_samples
+        if rng is None:
+            rng = np.random.default_rng(seed=42)
+
+    assert n_time_points > 0
+
     n_atoms_primitive = len(dynamical_matrix.primitive)
     n_atoms_supercell = len(dynamical_matrix.supercell)
     n_modes = n_atoms_primitive * 3
@@ -276,47 +290,62 @@ def _thermal_displacements(
         )
         mean_sq_disp += U_q
 
-        if n_time_points > 0:
+        if coordinate_scan == "time_propagation":
             #
             # Time-dependent part of the phase factor
             # Exp(-i * omega * t)
+            # The factor of 2Pi used to convert freqs to angular freqs
             #
             omega_t = 2.0 * math.pi * 1.0E-3 * np.outer(time_points_fs, freqs_THz)
             exp_iomegat = np.exp(-1j * omega_t) # rank (n_time_points, n_freqs)
             
-            if cell_type == "supercell":
-                ejk = ejk_primitive[:, primitive_to_supercell_coords]
-                Ajk = Ajk_primitive[:, :, primitive_to_supercell_coords]
-                scaled_positions = dynamical_matrix.supercell.scaled_positions
-                supercell_matrix = dynamical_matrix.supercell.supercell_matrix
-                #
-                # Position-dependent part of the phase factor
-                # Exp(i * q * r)
-                #
-                exp_iqr = np.repeat(
-                    np.exp(2j * np.pi * np.dot(np.dot(scaled_positions, supercell_matrix.T), q)),
-                    3
-                ) # rank (n_atoms_supercell*3, )                
-
-            if cell_type == "primitive":
-                ejk, Ajk = ejk_primitive, Ajk_primitive
-                scaled_positions = dynamical_matrix.primitive.scaled_positions
-                exp_iqr = np.repeat(
-                    np.exp(2j * np.pi * np.dot(scaled_positions, q)),
-                    3
-                ) # rank (n_atoms_primitive*3, )                
-
-            Ajk_ejk = Ajk * ejk # rank (n_temperatures, n_freqs, n_atoms * 3)
+        elif coordinate_scan == "random":
             #
-            # u(k,t) from eq 2 in ref 1,
-            # except the 1/Sqrt(N) normalization factor is
-            # added at a later stage
+            # Random coordinate sampling between -Akj and +Akj
+            # Construct a fake phase factor by drawing a random
+            # number between -1 and 1. This is done for each
+            # phonon frequency separately. The resulting phonon
+            # coordinates will reside at random locations
+            # on (-Akj, Akj).
             #
-            u_q = np.einsum(
-                "Tjk,tj,k->Ttk",
-                Ajk_ejk, exp_iomegat, exp_iqr
-            ) # rank (n_temperatures, n_time_points, n_atoms * 3)
-            instant_disp += u_q
+            exp_iomegat = rng.uniform(
+                low=-1.0, high=1.0,
+                size=(n_time_points, n_freqs)
+            )
+
+        if cell_type == "supercell":
+            ejk = ejk_primitive[:, primitive_to_supercell_coords]
+            Ajk = Ajk_primitive[:, :, primitive_to_supercell_coords]
+            scaled_positions = dynamical_matrix.supercell.scaled_positions
+            supercell_matrix = dynamical_matrix.supercell.supercell_matrix
+            #
+            # Position-dependent part of the phase factor
+            # Exp(i * q * r)
+            #
+            exp_iqr = np.repeat(
+                np.exp(2j * np.pi * np.dot(np.dot(scaled_positions, supercell_matrix.T), q)),
+                3
+            ) # rank (n_atoms_supercell*3, )                
+
+        if cell_type == "primitive":
+            ejk, Ajk = ejk_primitive, Ajk_primitive
+            scaled_positions = dynamical_matrix.primitive.scaled_positions
+            exp_iqr = np.repeat(
+                np.exp(2j * np.pi * np.dot(scaled_positions, q)),
+                3
+            ) # rank (n_atoms_primitive*3, )                
+
+        Ajk_ejk = Ajk * ejk # rank (n_temperatures, n_freqs, n_atoms * 3)
+        #
+        # u(k,t) from eq 2 in ref 1,
+        # except the 1/Sqrt(N) normalization factor is
+        # added at a later stage
+        #
+        u_q = np.einsum(
+            "Tjk,tj,k->Ttk",
+            Ajk_ejk, exp_iomegat, exp_iqr
+        ) # rank (n_temperatures, n_time_points, n_atoms * 3)
+        instant_disp += u_q
     #
     # Take into account the normalization factors related
     # to the averaging over the Brillouin zone:
@@ -361,8 +390,11 @@ def thermal_displacements(
         key: str,
         temperatures_K: npt.NDArray[np.floating],
         phonon_filter: PhononFilter,
-        time_points_fs: npt.NDArray | None = None,
-        cell_type: Literal["primitive", "supercell"] = "supercell"
+        time_points_fs: npt.NDArray = np.array([0.0]),
+        cell_type: Literal["primitive", "supercell"] = "supercell",
+        amplitude_scan: Literal["time_propagation", "random"] = "time_propagation",
+        n_random_samples: int = 1, # ignored unless random_scan=="random"
+        rng: np.random.Generator | None = None,
 ) -> ThermalDisplacements:
     """
     Compute thermal displacement properties of atoms in a crystal lattice.
@@ -443,6 +475,11 @@ def thermal_displacements(
         print(f"freq_max            unlimited")
     nx, ny, nz = ph.mesh.mesh_numbers
     print(f"k_points_mesh       {nx}×{ny}×{nz}")
+    print(f"amplitude_scan      {amplitude_scan}")
+    if amplitude_scan == "random":
+        print(f"n_random_samples    {n_random_samples")
+    elif amplitude_scan == "time_propagation":
+        print(f"n_time_points       {len(time_points_fs)}")
     print("Diagonalization of dynamic matrix at each k point...", flush=True)
     
     disp = _thermal_displacements(
@@ -453,7 +490,10 @@ def thermal_displacements(
         selected_modes=phonon_filter.selected_modes,
         freq_min_THz=phonon_filter.freq_min_THz,
         freq_max_THz=phonon_filter.freq_max_THz,
-        cell_type=cell_type
+        cell_type=cell_type,
+        amplitude_scan=amplitude_scan,
+        n_random_samples=n_random_samples,
+        rng=rng,
     )
     
     print("Thermal displacements completed", flush=True)
@@ -467,17 +507,32 @@ def trajectory(
         phonon_filter: PhononFilter = PhononFilter(),
         time_step_fs: float = 100.0,
         n_frames: int = 20,
+        amplitude_scan: Literal["time_propagation", "random"] = "time_propagation",
+        rng: np.random.Generator | None = None,
 ) -> mbe_automation.storage.Structure:
+
+    assert amplitude_scan in ["time_propagation", "random"]
     
-    time_points_fs = np.linspace(0.0, time_step_fs * (n_frames - 1), n_frames)
+    if amplitude_scan == "time_propagation":    
+        time_points_fs = np.linspace(0.0, time_step_fs * (n_frames - 1), n_frames)
+        n_random_samples = 0
+        
+    elif amplitude_scan == "random":
+        time_points_fs = np.array([])
+        n_random_samples = n_frames
+        
     disp = thermal_displacements(
         dataset=dataset,
         key=key,
         temperatures_K=np.array([temperature_K]),
         phonon_filter=phonon_filter,
         time_points_fs=time_points_fs,
-        cell_type="supercell"
+        cell_type="supercell",
+        amplitude_scan=amplitude_scan,
+        n_random_samples=n_random_samples,
+        rng=rng,
     )
+        
     ph = mbe_automation.storage.to_phonopy(
         dataset=dataset,
         key=key

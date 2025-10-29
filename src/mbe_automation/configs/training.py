@@ -44,11 +44,60 @@ class PhononSampling:
                                    # the calculator corresponds to a MACE model.
                                    #
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "averaged_environments"
-    
+                                   #
+                                   # Temperature controls the maximum
+                                   # amplitude of normal-mode displacements.
+                                   # The classical amplitude at a given
+                                   # temperature, Ajk(T), is found by forcing
+                                   # the classical oscillator to have the same
+                                   # average energy as the corresponding quantum
+                                   # harmonic oscillator.
+                                   #
     temperature_K: float = 298.15
-    
+                                   #
+                                   # Method for scanning (probing) the normal-mode
+                                   # coordinates.
+                                   #
+                                   # random: Dynamical matrix eigenvectors are
+                                   # multiplied by
+                                   #
+                                   # ξ_jk * Exp(i*k*r) * A_jk
+                                   #
+                                   # time_propagation: Dynamical matrix eigenvectors are
+                                   # multiplied by
+                                   #
+                                   # Exp(-i*omega_jk*t) * Exp(i*k*r) * A_jk
+                                   #
+                                   # ---
+                                   #
+                                   # j, k: phonon branch and crystal momentum (k point)
+                                   # Ajk: max amplitude
+                                   # omega_jk: angular frequency
+                                   # r: position in the crystal lattice
+                                   # t: series of time steps. The time dependent phase factor
+                                   #    of each eigenvector is evaluated at n_frames time
+                                   #    points.
+                                   # ξ_jk: random number from uniform distribution on (-1, 1)
+                                   #    There are n_frames independent random points
+                                   #    for each (j,k).
+                                   #
+    coordinate_scan: Literal["time_propagation", "random"] = "random"
+                                   #
+                                   # Distance between time points
+                                   # (referenced only if coordinate_scan=="time_propagation")
+                                   #
     time_step_fs: float = 100.0
-    
+                                   #
+                                   # Random number generator for randomized
+                                   # amplitude sampling
+                                   #
+                                   # (referenced only if coordinate_scan=="random")
+                                   #
+    rng: np.random.Generator = field(default_factory=lambda: np.random.default_rng(seed=42))
+                                   #
+                                   # Number of periodic system frames
+                                   # to generate by phonon sampling
+                                   #
     n_frames: int = 20
                                    #
                                    # Directory where files are stored
@@ -109,10 +158,6 @@ class MDSampling:
 
     temperature_K: float = 298.15
     pressure_GPa: float = 1.0E-4
-                                   #
-                                   #
-                                   #
-    
                                    #
                                    # Directory where files are stored
                                    # at runtime

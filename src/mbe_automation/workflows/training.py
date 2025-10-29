@@ -39,8 +39,10 @@ def phonon_sampling(
         temperature_K=config.temperature_K,
         phonon_filter=config.phonon_filter,
         time_step_fs=config.time_step_fs,
-        n_frames=config.n_frames
-    )    
+        n_frames=config.n_frames,
+        amplitude_scan=config.amplitude_scan,
+        rng=config.rng,
+    )
     #
     # Extract a finite molecular cluster by filtering
     # whole molecules out of the supercell structure.
