@@ -151,10 +151,10 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | ------------------------- | ------------------------------------------------------------------------------------ | ----------------- |
 | `calculator`              | MLIP calculator.                                                                 | -                 |
 | `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | -                 |
+| `force_constants_dataset` | Path to the HDF5 file containing the force constants. | `./properties.hdf5` |
 | `temperature_K`           | Temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
 | `phonon_filter`           | An instance of `PhononFilter` that specifies which phonon modes to sample from. This method is particularly effective at generating distorted geometries that may be energetically unfavorable but are important for teaching the MLIP about repulsive interactions.       | `PhononFilter()`  |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
-| `force_constants_dataset` | Path to the HDF5 file containing the force constants. | `./properties.hdf5` |
 | `time_step_fs`            | Time step for the trajectory generation.                                         | `100.0`           |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
 | `feature_vectors_type`    | Type of feature vectors to save. Required for subsampling based on feature space distances. Works only with MACE models. | `"averaged_environments"` |
