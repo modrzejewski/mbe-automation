@@ -435,7 +435,7 @@ activate_env = os.path.realpath(os.path.join(virtual_environment, "bin", "activa
 cmd = f"module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10 && . {activate_env} && python {InpScript}"
 
 with open(LogFile, "w") as log_file:
-    process = subprocess.Popen(cmd, shell=true, stdout=log_file,
+    process = subprocess.Popen(cmd, shell=True, stdout=log_file,
                                stderr=subprocess.STDOUT, bufsize=1,
                                universal_newlines=True)
     process.communicate()
