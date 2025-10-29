@@ -191,7 +191,7 @@ def _thermal_displacements(
     assert amplitude_scan in ["time_propagation", "random"]
     
     if amplitude_scan == "time_propagation":
-        n_time_points = (len(time_points_fs) if time_points_fs is not None else 0)
+        n_time_points = len(time_points_fs)
     elif amplitude_scan == "random":
         n_time_points = n_random_samples
         if rng is None:
