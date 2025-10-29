@@ -149,7 +149,7 @@ def _thermal_displacements(
         freq_max_THz: float | None = None,
         cell_type: Literal["primitive", "supercell"] = "primitive",
         amplitude_scan: Literal["time_propagation", "random"] = "time_propagation",
-        n_random_samples: int = 1, # ignored unless random_scan=="random"
+        n_random_samples: int = 1, # ignored unless amplitude_scan=="random"
         rng: np.random.Generator | None = None,
 ) -> ThermalDisplacements:
     """
