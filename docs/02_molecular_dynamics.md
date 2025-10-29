@@ -82,11 +82,16 @@ mbe_automation.workflows.md.run(md_config)
 | `molecule` | Initial, non-relaxed structure of the isolated molecule. An MD simulation is performed in the NVT ensemble to compute the average potential and kinetic energies. | - |
 | `crystal` | Initial, non-relaxed crystal structure. An MD simulation is performed in the NPT ensemble to compute the average potential and kinetic energies, and the average volume. | - |
 | `calculator` | MLIP calculator for energies and forces. | - |
+| `md_molecule` | An instance of `ClassicalMD` that configures the MD simulation for the isolated molecule. | - |
+| `md_crystal` | An instance of `ClassicalMD` that configures the MD simulation for the crystal. | - |
 | `temperature_K` | Target temperature (in Kelvin) for the MD simulation. | `298.15` |
 | `pressure_GPa` | Target pressure (in GPa) for the MD simulation. | `1.0E-4` |
+| `work_dir` | Directory where files are stored at runtime. | `"./"` |
+| `dataset` | The main HDF5 file with all data computed for the physical system. | `"./properties.hdf5"` |
 | `root_key` | Specifies the root path in the HDF5 dataset where the workflow's output is stored. | `"md"` |
-| `md_molecule` | An instance of `ClassicalMD` that configures the MD simulation for the isolated molecule. | `ClassicalMD()` |
-| `md_crystal` | An instance of `ClassicalMD` that configures the MD simulation for the crystal. | `ClassicalMD()` |
+| `verbose` | Verbosity of the program's output. `0` suppresses warnings. | `0` |
+| `save_plots` | If `True`, save plots of the simulation results. | `True` |
+| `save_csv` | If `True`, save CSV files of the simulation results. | `True` |
 
 ### `ClassicalMD` Class
 
@@ -94,17 +99,21 @@ mbe_automation.workflows.md.run(md_config)
 
 | Parameter               | Description                                                                                                                              | Default Value     |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `ensemble`              | Thermodynamic ensemble for the simulation ("NVT" or "NPT").                                                                          | "NVT"                 |
 | `time_total_fs`         | Total simulation time in femtoseconds.                                                                                               | `50000.0`             |
 | `time_step_fs`          | Time step for the integration algorithm.                                                                                             | `0.5`                 |
 | `sampling_interval_fs`  | Interval for trajectory sampling.                                                                                                   | `50.0`                |
 | `time_equilibration_fs` | Initial period of the simulation discarded to allow the system to reach equilibrium.                                         | `5000.0`              |
+| `ensemble`              | Thermodynamic ensemble for the simulation ("NVT" or "NPT").                                                                          | "NVT"                 |
 | `nvt_algo`              | Thermostat algorithm for NVT simulations. "csvr" (Canonical Sampling Through Velocity Rescaling) is robust for isolated molecules. | "csvr"                |
 | `npt_algo`              | Barostat/thermostat algorithm for NPT simulations.                                                                                   | "mtk_full"            |
 | `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |
 | `barostat_time_fs`      | Barostat relaxation time.                                                                                                            | `1000.0`              |
+| `tchain`                | Number of thermostats in the Nosé-Hoover chain.                                                                                      | `3`                   |
+| `pchain`                | Number of barostats in the Martyna-Tuckerman-Klein chain.                                                                            | `3`                   |
 | `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
-| `save_feature_vectors`  | If `True`, save feature vectors to the dataset. This is required for subsampling.                                                    | `False`               |
+| `supercell_matrix`      | Supercell transformation matrix. If specified, `supercell_radius` is ignored.                                                        | `None`                |
+| `supercell_diagonal`    | If `True`, create a diagonal supercell. Ignored if `supercell_matrix` is provided.                                                   | `False`               |
+| `feature_vectors_type`  | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Works only with MACE models. | "none"                |
 
 ## Function Call Overview
 
