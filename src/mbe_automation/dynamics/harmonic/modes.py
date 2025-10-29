@@ -290,7 +290,7 @@ def _thermal_displacements(
         )
         mean_sq_disp += U_q
 
-        if coordinate_scan == "time_propagation":
+        if amplitude_scan == "time_propagation":
             #
             # Time-dependent part of the phase factor
             # Exp(-i * omega * t)
@@ -299,7 +299,7 @@ def _thermal_displacements(
             omega_t = 2.0 * math.pi * 1.0E-3 * np.outer(time_points_fs, freqs_THz)
             exp_iomegat = np.exp(-1j * omega_t) # rank (n_time_points, n_freqs)
             
-        elif coordinate_scan == "random":
+        elif amplitude_scan == "random":
             #
             # Random coordinate sampling between -Akj and +Akj
             # Construct a fake phase factor by drawing a random
@@ -418,6 +418,12 @@ def thermal_displacements(
             for which to calculate the instantaneous atomic displacements.
         cell_type: Type of cell used to express the instantaneous atomic
             displacements. Defaults to supercell.
+        amplitude_scan: Method for sampling normal-mode coordinates.
+            "random" multiplies eigenvectors by a random number on (-1, 1).
+            "time_propagation" uses a time-dependent phase factor.
+        n_random_samples: Number of random samples to generate if
+            `amplitude_scan` is "random".
+        rng: Random number generator for randomized amplitude sampling.
 
     Returns:
         A `ThermalDisplacements` object containing the following attributes:
