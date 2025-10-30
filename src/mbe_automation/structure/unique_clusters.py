@@ -36,16 +36,17 @@ class UniqueClusters:
 def unique_clusters(
     molecular_crystal: MolecularCrystal,
     unique_cluster_filter: UniqueClusterFilter,
+    frame_index: int = 0,
 ) -> Dict[str, UniqueClusters]:
 
-    def _get_cluster_molecule(molecular_crystal: MolecularCrystal, indices: npt.NDArray[np.integer]) -> pymatgen.core.Molecule:
+    if molecular_crystal.supercell.positions.ndim == 3:
+        positions__supercell = molecular_crystal.supercell.positions[frame_index]
+    else:
+        positions_supercell = molecular_crystal.supercell.positions
+
+    def _get_cluster_molecule(indices: npt.NDArray[np.integer]) -> pymatgen.core.Molecule:
         atom_indices = np.concatenate([molecular_crystal.index_map[i] for i in indices])
-
-        if molecular_crystal.supercell.positions.ndim == 3:
-            positions = molecular_crystal.supercell.positions[0, atom_indices, :]
-        else:
-            positions = molecular_crystal.supercell.positions[atom_indices, :]
-
+        positions = positions_supercell[atom_indices, :]
         atomic_numbers = molecular_crystal.supercell.atomic_numbers[atom_indices]
         return pymatgen.core.Molecule(species=atomic_numbers, coords=positions)
 
@@ -78,10 +79,7 @@ def unique_clusters(
 
         for mol_idx in candidate_molecule_indices:
             atom_indices = molecular_crystal.index_map[mol_idx]
-            if molecular_crystal.supercell.positions.ndim == 3:
-                positions = molecular_crystal.supercell.positions[0, atom_indices, :]
-            else:
-                positions = molecular_crystal.supercell.positions[atom_indices, :]
+            positions = positions_supercell[atom_indices, :]
             all_positions.append(positions)
             mol_slices.append(mol_slices[-1] + len(atom_indices))
 
@@ -145,13 +143,13 @@ def unique_clusters(
         unique_matchers_list = []
 
         for indices in filtered_clusters_indices:
-            cluster_mol = _get_cluster_molecule(molecular_crystal, indices)
+            cluster_mol = _get_cluster_molecule(indices)
 
             is_unique = True
             for i, unique_matcher in enumerate(unique_matchers_list):
 
                 if unique_cluster_filter.match_algo == "RMSD":
-                    unique_cluster_mol = _get_cluster_molecule(molecular_crystal, unique_indices_list[i])
+                    unique_cluster_mol = _get_cluster_molecule(unique_indices_list[i])
                     _, dist = unique_matcher.fit(cluster_mol)
 
                     if dist > unique_cluster_filter.alignment_thresh and unique_cluster_filter.align_mirror_images:
