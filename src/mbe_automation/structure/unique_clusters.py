@@ -94,20 +94,29 @@ def unique_clusters(
         # Calculate all atom-atom distances at once
         dist_matrix = scipy.spatial.distance.cdist(all_positions, all_positions)
 
-        # Now, extract the minimum distance for each pair of molecules
-        for i, mol_idx1 in enumerate(candidate_molecule_indices):
-            for j, mol_idx2 in enumerate(candidate_molecule_indices):
-                if i >= j:
-                    continue
+        # Vectorized extraction of minimum distances between molecule pairs
+        n_cand = len(candidate_molecule_indices)
 
-                start1, end1 = mol_slices[i], mol_slices[i+1]
-                start2, end2 = mol_slices[j], mol_slices[j+1]
+        # Create a 1D array mapping each atom to its local molecule index
+        atom_mol_map = np.repeat(np.arange(n_cand), np.diff(mol_slices))
 
-                sub_matrix = dist_matrix[start1:end1, start2:end2]
-                min_dist = np.min(sub_matrix)
+        # Create a 2D matrix where each element (i, j) is a unique ID
+        # for the molecule pair corresponding to atom i and atom j.
+        pair_labels = atom_mol_map[:, np.newaxis] * n_cand + atom_mol_map
 
-                min_rij[mol_idx1, mol_idx2] = min_dist
-                min_rij[mol_idx2, mol_idx1] = min_dist
+        # Get the indices and labels for the upper triangle of the molecule-pair matrix
+        mol_indices_1, mol_indices_2 = np.triu_indices(n_cand, k=1)
+        labels_to_find = mol_indices_1 * n_cand + mol_indices_2
+
+        # Calculate the minimum distance for each label (molecule pair) in a single operation
+        min_dists_flat = scipy.ndimage.minimum(dist_matrix, labels=pair_labels, index=labels_to_find)
+
+        # Map the results back to the global min_rij matrix using fancy indexing
+        global_mol_indices_1 = candidate_molecule_indices[mol_indices_1]
+        global_mol_indices_2 = candidate_molecule_indices[mol_indices_2]
+
+        min_rij[global_mol_indices_1, global_mol_indices_2] = min_dists_flat
+        min_rij[global_mol_indices_2, global_mol_indices_1] = min_dists_flat
 
     all_unique_clusters = []
 
