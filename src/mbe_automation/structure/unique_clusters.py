@@ -55,21 +55,59 @@ def unique_clusters(
 
     cluster_size_map = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
 
-    n_molecules = molecular_crystal.n_molecules
-    min_rij = np.zeros((n_molecules, n_molecules))
+    max_cutoff = 0.0
+    if unique_cluster_filter.cutoffs:
+        max_cutoff = max(unique_cluster_filter.cutoffs.values())
 
-    ase_molecules = []
-    for i in range(n_molecules):
-        ase_molecules.append(_get_cluster_atoms(molecular_crystal, np.array([i])))
+    central_molecule_idx = molecular_crystal.central_molecule_index
 
-    for i in range(n_molecules):
-        for j in range(i + 1, n_molecules):
-            pos_a = ase_molecules[i].get_positions()
-            pos_b = ase_molecules[j].get_positions()
-            dist_matrix = scipy.spatial.distance.cdist(pos_a, pos_b)
-            min_dist = np.min(dist_matrix)
-            min_rij[i, j] = min_dist
-            min_rij[j, i] = min_dist
+    # Pre-filter molecules based on the largest cutoff radius.
+    candidate_molecule_indices = np.where(
+        molecular_crystal.min_distances_to_central_molecule < max_cutoff
+    )[0]
+
+    # Ensure the central molecule is included.
+    if central_molecule_idx not in candidate_molecule_indices:
+        candidate_molecule_indices = np.append(candidate_molecule_indices, central_molecule_idx)
+
+    # Efficiently calculate the distance matrix for the candidate molecules.
+    min_rij = np.full((molecular_crystal.n_molecules, molecular_crystal.n_molecules), np.inf)
+
+    if len(candidate_molecule_indices) > 1:
+
+        # Extract all atomic positions for candidate molecules into a single array
+        all_positions = []
+        # Keep track of which atoms belong to which molecule
+        mol_slices = [0]
+
+        for mol_idx in candidate_molecule_indices:
+            atom_indices = molecular_crystal.index_map[mol_idx]
+            if molecular_crystal.supercell.positions.ndim == 3:
+                positions = molecular_crystal.supercell.positions[0, atom_indices, :]
+            else:
+                positions = molecular_crystal.supercell.positions[atom_indices, :]
+            all_positions.append(positions)
+            mol_slices.append(mol_slices[-1] + len(atom_indices))
+
+        all_positions = np.concatenate(all_positions, axis=0)
+
+        # Calculate all atom-atom distances at once
+        dist_matrix = scipy.spatial.distance.cdist(all_positions, all_positions)
+
+        # Now, extract the minimum distance for each pair of molecules
+        for i, mol_idx1 in enumerate(candidate_molecule_indices):
+            for j, mol_idx2 in enumerate(candidate_molecule_indices):
+                if i >= j:
+                    continue
+
+                start1, end1 = mol_slices[i], mol_slices[i+1]
+                start2, end2 = mol_slices[j], mol_slices[j+1]
+
+                sub_matrix = dist_matrix[start1:end1, start2:end2]
+                min_dist = np.min(sub_matrix)
+
+                min_rij[mol_idx1, mol_idx2] = min_dist
+                min_rij[mol_idx2, mol_idx1] = min_dist
 
     all_unique_clusters = []
 
@@ -78,15 +116,14 @@ def unique_clusters(
         n = cluster_size_map[cluster_type]
 
         #
-        # Create a list of all possible clusters of size n
+        # Create a list of all possible clusters of size n using only the pre-filtered candidate molecules.
         #
-        molecules_in_supercell = molecular_crystal.n_molecules
         central_molecule = molecular_crystal.central_molecule_index
 
-        other_molecules = [i for i in range(molecules_in_supercell) if i != central_molecule]
+        other_candidate_molecules = [i for i in candidate_molecule_indices if i != central_molecule]
 
         all_clusters_indices = []
-        for combo in itertools.combinations(other_molecules, n - 1):
+        for combo in itertools.combinations(other_candidate_molecules, n - 1):
             all_clusters_indices.append(np.array([central_molecule] + list(combo)))
 
         #
