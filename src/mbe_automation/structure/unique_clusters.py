@@ -55,6 +55,22 @@ def unique_clusters(
 
     cluster_size_map = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
 
+    n_molecules = molecular_crystal.n_molecules
+    min_rij = np.zeros((n_molecules, n_molecules))
+
+    ase_molecules = []
+    for i in range(n_molecules):
+        ase_molecules.append(_get_cluster_atoms(molecular_crystal, np.array([i])))
+
+    for i in range(n_molecules):
+        for j in range(i + 1, n_molecules):
+            pos_a = ase_molecules[i].get_positions()
+            pos_b = ase_molecules[j].get_positions()
+            dist_matrix = scipy.spatial.distance.cdist(pos_a, pos_b)
+            min_dist = np.min(dist_matrix)
+            min_rij[i, j] = min_dist
+            min_rij[j, i] = min_dist
+
     all_unique_clusters = []
 
     for cluster_type in unique_cluster_filter.cluster_types:
@@ -80,7 +96,7 @@ def unique_clusters(
         for indices in all_clusters_indices:
             within_cutoff = True
             for i, j in itertools.combinations(indices, 2):
-                if molecular_crystal.min_distances_to_central_molecule[j] >= cutoff:
+                if min_rij[i, j] >= cutoff:
                     within_cutoff = False
                     break
             if within_cutoff:
@@ -100,11 +116,6 @@ def unique_clusters(
                 if unique_cluster_filter.match_algo == "RMSD":
                     dist = compare.AlignMolecules_RMSD(cluster_atoms, unique_cluster_atoms.copy())
 
-                    if dist < unique_cluster_filter.alignment_thresh:
-                        is_unique = False
-                        unique_cluster.weight += 1
-                        break
-
                     if unique_cluster_filter.align_mirror_images:
                         mirrored_cluster_atoms = unique_cluster_atoms.copy()
                         coords2 = mirrored_cluster_atoms.get_positions()
@@ -113,10 +124,10 @@ def unique_clusters(
                         dist2 = compare.AlignMolecules_RMSD(cluster_atoms, mirrored_cluster_atoms)
                         dist = min(dist, dist2)
 
-                        if dist < unique_cluster_filter.alignment_thresh:
-                            is_unique = False
-                            unique_cluster.weight += 1
-                            break
+                    if dist < unique_cluster_filter.alignment_thresh:
+                        is_unique = False
+                        unique_cluster.weight += 1
+                        break
 
                 elif unique_cluster_filter.match_algo == "MBTR":
                     raise NotImplementedError("MBTR matching is not yet implemented.")
