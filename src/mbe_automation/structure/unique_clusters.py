@@ -23,24 +23,19 @@ class UniqueClusterFilter:
     align_mirror_images: bool = True
 
 @dataclass(kw_only=True)
-class UniqueCluster:
-    """
-    Represents a single unique cluster.
-    """
-    molecule_indices: npt.NDArray[np.integer]
-    weight: int
-
-@dataclass(kw_only=True)
 class UniqueClusters:
     """
-    Contains a list of unique molecular clusters.
+    Contains arrays of unique molecular clusters and their properties.
     """
-    unique_clusters: List[UniqueCluster]
+    molecule_indices: npt.NDArray[np.integer]
+    weights: npt.NDArray[np.integer]
+    min_distances: npt.NDArray[np.floating]
+    max_distances: npt.NDArray[np.floating]
 
 def unique_clusters(
     molecular_crystal: MolecularCrystal,
     unique_cluster_filter: UniqueClusterFilter,
-) -> UniqueClusters:
+) -> Dict[str, UniqueClusters]:
 
     def _get_cluster_atoms(molecular_crystal: MolecularCrystal, indices: npt.NDArray[np.integer]) -> Atoms:
         atom_indices = np.concatenate([molecular_crystal.index_map[i] for i in indices])
@@ -70,14 +65,14 @@ def unique_clusters(
     if central_molecule_idx not in candidate_molecule_indices:
         candidate_molecule_indices = np.append(candidate_molecule_indices, central_molecule_idx)
 
-    # Efficiently calculate the distance matrix for the candidate molecules.
-    min_rij = np.full((molecular_crystal.n_molecules, molecular_crystal.n_molecules), np.inf)
+    # Hybrid distance calculation
+    n_mols = molecular_crystal.n_molecules
+    min_rij = np.full((n_mols, n_mols), np.inf)
+    max_rij = np.full((n_mols, n_mols), np.inf)
 
     if len(candidate_molecule_indices) > 1:
-
         # Extract all atomic positions for candidate molecules into a single array
         all_positions = []
-        # Keep track of which atoms belong to which molecule
         mol_slices = [0]
 
         for mol_idx in candidate_molecule_indices:
@@ -94,31 +89,25 @@ def unique_clusters(
         # Calculate all atom-atom distances at once
         dist_matrix = scipy.spatial.distance.cdist(all_positions, all_positions)
 
-        # Vectorized extraction of minimum distances between molecule pairs
-        n_cand = len(candidate_molecule_indices)
+        # Now, extract the min and max distances for each pair of molecules using a simple loop
+        for i in range(len(candidate_molecule_indices)):
+            for j in range(i + 1, len(candidate_molecule_indices)):
+                mol_idx1 = candidate_molecule_indices[i]
+                mol_idx2 = candidate_molecule_indices[j]
 
-        # Create a 1D array mapping each atom to its local molecule index
-        atom_mol_map = np.repeat(np.arange(n_cand), np.diff(mol_slices))
+                start1, end1 = mol_slices[i], mol_slices[i+1]
+                start2, end2 = mol_slices[j], mol_slices[j+1]
 
-        # Create a 2D matrix where each element (i, j) is a unique ID
-        # for the molecule pair corresponding to atom i and atom j.
-        pair_labels = atom_mol_map[:, np.newaxis] * n_cand + atom_mol_map
+                sub_matrix = dist_matrix[start1:end1, start2:end2]
+                min_dist = np.min(sub_matrix)
+                max_dist = np.max(sub_matrix)
 
-        # Get the indices and labels for the upper triangle of the molecule-pair matrix
-        mol_indices_1, mol_indices_2 = np.triu_indices(n_cand, k=1)
-        labels_to_find = mol_indices_1 * n_cand + mol_indices_2
+                min_rij[mol_idx1, mol_idx2] = min_dist
+                min_rij[mol_idx2, mol_idx1] = min_dist
+                max_rij[mol_idx1, mol_idx2] = max_dist
+                max_rij[mol_idx2, mol_idx1] = max_dist
 
-        # Calculate the minimum distance for each label (molecule pair) in a single operation
-        min_dists_flat = scipy.ndimage.minimum(dist_matrix, labels=pair_labels, index=labels_to_find)
-
-        # Map the results back to the global min_rij matrix using fancy indexing
-        global_mol_indices_1 = candidate_molecule_indices[mol_indices_1]
-        global_mol_indices_2 = candidate_molecule_indices[mol_indices_2]
-
-        min_rij[global_mol_indices_1, global_mol_indices_2] = min_dists_flat
-        min_rij[global_mol_indices_2, global_mol_indices_1] = min_dists_flat
-
-    all_unique_clusters = []
+    results = {}
 
     for cluster_type in unique_cluster_filter.cluster_types:
         cutoff = unique_cluster_filter.cutoffs[cluster_type]
@@ -148,16 +137,16 @@ def unique_clusters(
             if within_cutoff:
                 filtered_clusters_indices.append(indices)
 
-        unique_clusters_for_type = []
+        # Aggregate results for the current cluster type
+        unique_indices_list = []
+        unique_weights_list = []
 
         for indices in filtered_clusters_indices:
-
             cluster_atoms = _get_cluster_atoms(molecular_crystal, indices)
 
             is_unique = True
-            for unique_cluster in unique_clusters_for_type:
-
-                unique_cluster_atoms = _get_cluster_atoms(molecular_crystal, unique_cluster.molecule_indices)
+            for i, unique_indices in enumerate(unique_indices_list):
+                unique_cluster_atoms = _get_cluster_atoms(molecular_crystal, unique_indices)
 
                 if unique_cluster_filter.match_algo == "RMSD":
                     dist = compare.AlignMolecules_RMSD(cluster_atoms, unique_cluster_atoms.copy())
@@ -172,20 +161,39 @@ def unique_clusters(
 
                     if dist < unique_cluster_filter.alignment_thresh:
                         is_unique = False
-                        unique_cluster.weight += 1
+                        unique_weights_list[i] += 1
                         break
 
                 elif unique_cluster_filter.match_algo == "MBTR":
                     raise NotImplementedError("MBTR matching is not yet implemented.")
 
             if is_unique:
-                unique_clusters_for_type.append(
-                    UniqueCluster(
-                        molecule_indices=indices,
-                        weight=1,
-                    )
-                )
+                unique_indices_list.append(indices)
+                unique_weights_list.append(1)
 
-        all_unique_clusters.extend(unique_clusters_for_type)
+        if not unique_indices_list:
+            continue
 
-    return UniqueClusters(unique_clusters=all_unique_clusters)
+        # Convert lists to NumPy arrays
+        molecule_indices_arr = np.array(unique_indices_list)
+        weights_arr = np.array(unique_weights_list)
+
+        # Calculate min and max distances for each unique cluster
+        n_unique = len(unique_indices_list)
+        min_dists_arr = np.zeros(n_unique)
+        max_dists_arr = np.zeros(n_unique)
+
+        for i, indices in enumerate(unique_indices_list):
+            min_dists = [min_rij[p1, p2] for p1, p2 in itertools.combinations(indices, 2)]
+            max_dists = [max_rij[p1, p2] for p1, p2 in itertools.combinations(indices, 2)]
+            min_dists_arr[i] = np.max(min_dists) if min_dists else 0
+            max_dists_arr[i] = np.max(max_dists) if max_dists else 0
+
+        results[cluster_type] = UniqueClusters(
+            molecule_indices=molecule_indices_arr,
+            weights=weights_arr,
+            min_distances=min_dists_arr,
+            max_distances=max_dists_arr
+        )
+
+    return results
