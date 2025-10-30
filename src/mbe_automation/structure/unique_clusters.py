@@ -7,8 +7,8 @@ import itertools
 import scipy
 import pymatgen.core
 import pymatgen.core.operations
+import pymatgen.analysis.molecule_matcher
 from . import crystal
-from . import compare
 from ..storage import MolecularCrystal
 
 
@@ -30,8 +30,8 @@ class UniqueClusters:
     """
     molecule_indices: npt.NDArray[np.integer]
     weights: npt.NDArray[np.integer]
-    min_distances: npt.NDArray[np.floating]
-    max_distances: npt.NDArray[np.floating]
+    min_distances: npt.NDArray[np.floating]  # Shape: (n_unique_clusters, n_pairs)
+    max_distances: npt.NDArray[np.floating]  # Shape: (n_unique_clusters, n_pairs)
 
 def unique_clusters(
     molecular_crystal: MolecularCrystal,
@@ -85,6 +85,7 @@ def unique_clusters(
             all_positions.append(positions)
             mol_slices.append(mol_slices[-1] + len(atom_indices))
 
+        mol_slices = np.array(mol_slices)
         all_positions = np.concatenate(all_positions, axis=0)
 
         # Calculate all atom-atom distances at once
@@ -141,24 +142,24 @@ def unique_clusters(
         # Aggregate results for the current cluster type
         unique_indices_list = []
         unique_weights_list = []
+        unique_matchers_list = []
 
         for indices in filtered_clusters_indices:
             cluster_mol = _get_cluster_molecule(molecular_crystal, indices)
 
             is_unique = True
-            for i, unique_indices in enumerate(unique_indices_list):
-                unique_cluster_mol = _get_cluster_molecule(molecular_crystal, unique_indices)
+            for i, unique_matcher in enumerate(unique_matchers_list):
 
                 if unique_cluster_filter.match_algo == "RMSD":
-                    dist = compare.get_rmsd(cluster_mol, unique_cluster_mol.copy())
+                    unique_cluster_mol = _get_cluster_molecule(molecular_crystal, unique_indices_list[i])
+                    _, dist = unique_matcher.fit(cluster_mol)
 
-                    if unique_cluster_filter.align_mirror_images:
-                        mirrored_cluster_mol = unique_cluster_mol.copy()
+                    if dist > unique_cluster_filter.alignment_thresh and unique_cluster_filter.align_mirror_images:
+                        mirrored_cluster_mol = cluster_mol.copy()
                         mirrored_cluster_mol.apply_operation(
-                            pymatgen.core.operations.SymmOp.from_reflection([0, 1, 0])
+                            pymatgen.core.operations.SymmOp.inversion()
                         )
-                        dist2 = compare.get_rmsd(cluster_mol, mirrored_cluster_mol)
-                        dist = min(dist, dist2)
+                        _, dist = unique_matcher.fit(mirrored_cluster_mol)
 
                     if dist < unique_cluster_filter.alignment_thresh:
                         is_unique = False
@@ -171,6 +172,10 @@ def unique_clusters(
             if is_unique:
                 unique_indices_list.append(indices)
                 unique_weights_list.append(1)
+                if unique_cluster_filter.match_algo == "RMSD":
+                    unique_matchers_list.append(
+                        pymatgen.analysis.molecule_matcher.HungarianOrderMatcher(cluster_mol)
+                    )
 
         if not unique_indices_list:
             continue
@@ -180,21 +185,20 @@ def unique_clusters(
         weights_arr = np.array(unique_weights_list)
 
         # Calculate min and max distances for each unique cluster
-        n_unique = len(unique_indices_list)
-        min_dists_arr = np.zeros(n_unique)
-        max_dists_arr = np.zeros(n_unique)
+        min_dists_list = []
+        max_dists_list = []
 
-        for i, indices in enumerate(unique_indices_list):
+        for indices in unique_indices_list:
             min_dists = [min_rij[p1, p2] for p1, p2 in itertools.combinations(indices, 2)]
             max_dists = [max_rij[p1, p2] for p1, p2 in itertools.combinations(indices, 2)]
-            min_dists_arr[i] = np.max(min_dists) if min_dists else 0
-            max_dists_arr[i] = np.max(max_dists) if max_dists else 0
+            min_dists_list.append(min_dists if min_dists else [0])
+            max_dists_list.append(max_dists if max_dists else [0])
 
         results[cluster_type] = UniqueClusters(
             molecule_indices=molecule_indices_arr,
             weights=weights_arr,
-            min_distances=min_dists_arr,
-            max_distances=max_dists_arr
+            min_distances=np.array(min_dists_list),
+            max_distances=np.array(max_dists_list)
         )
 
     return results
