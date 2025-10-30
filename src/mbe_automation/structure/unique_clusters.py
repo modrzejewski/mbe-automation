@@ -4,8 +4,9 @@ from typing import List, Literal, Dict
 import numpy as np
 import numpy.typing as npt
 import itertools
-from ase import Atoms
 import scipy
+import pymatgen.core
+import pymatgen.core.operations
 from . import crystal
 from . import compare
 from ..storage import MolecularCrystal
@@ -37,7 +38,7 @@ def unique_clusters(
     unique_cluster_filter: UniqueClusterFilter,
 ) -> Dict[str, UniqueClusters]:
 
-    def _get_cluster_atoms(molecular_crystal: MolecularCrystal, indices: npt.NDArray[np.integer]) -> Atoms:
+    def _get_cluster_molecule(molecular_crystal: MolecularCrystal, indices: npt.NDArray[np.integer]) -> pymatgen.core.Molecule:
         atom_indices = np.concatenate([molecular_crystal.index_map[i] for i in indices])
 
         if molecular_crystal.supercell.positions.ndim == 3:
@@ -46,7 +47,7 @@ def unique_clusters(
             positions = molecular_crystal.supercell.positions[atom_indices, :]
 
         atomic_numbers = molecular_crystal.supercell.atomic_numbers[atom_indices]
-        return Atoms(positions=positions, numbers=atomic_numbers)
+        return pymatgen.core.Molecule(species=atomic_numbers, coords=positions)
 
     cluster_size_map = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
 
@@ -142,21 +143,21 @@ def unique_clusters(
         unique_weights_list = []
 
         for indices in filtered_clusters_indices:
-            cluster_atoms = _get_cluster_atoms(molecular_crystal, indices)
+            cluster_mol = _get_cluster_molecule(molecular_crystal, indices)
 
             is_unique = True
             for i, unique_indices in enumerate(unique_indices_list):
-                unique_cluster_atoms = _get_cluster_atoms(molecular_crystal, unique_indices)
+                unique_cluster_mol = _get_cluster_molecule(molecular_crystal, unique_indices)
 
                 if unique_cluster_filter.match_algo == "RMSD":
-                    dist = compare.AlignMolecules_RMSD(cluster_atoms, unique_cluster_atoms.copy())
+                    dist = compare.get_rmsd(cluster_mol, unique_cluster_mol.copy())
 
                     if unique_cluster_filter.align_mirror_images:
-                        mirrored_cluster_atoms = unique_cluster_atoms.copy()
-                        coords2 = mirrored_cluster_atoms.get_positions()
-                        coords2[:, 1] *= -1
-                        mirrored_cluster_atoms.set_positions(coords2)
-                        dist2 = compare.AlignMolecules_RMSD(cluster_atoms, mirrored_cluster_atoms)
+                        mirrored_cluster_mol = unique_cluster_mol.copy()
+                        mirrored_cluster_mol.apply_operation(
+                            pymatgen.core.operations.SymmOp.from_reflection([0, 1, 0])
+                        )
+                        dist2 = compare.get_rmsd(cluster_mol, mirrored_cluster_mol)
                         dist = min(dist, dist2)
 
                     if dist < unique_cluster_filter.alignment_thresh:
