@@ -155,9 +155,11 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             df_crystal,
             df_molecule
         )
-        del df_crystal["T (K)"]
-        del df_molecule["T (K)"]
-        df_harmonic = pd.concat([df_sublimation, df_crystal, df_molecule], axis=1)
+        df_harmonic = pd.concat([
+            df_sublimation,
+            df_crystal.drop(columns=["T (K)"]),
+            df_molecule.drop(columns=["T (K)"]),
+        ], axis=1)
         
     else:
         df_harmonic = df_crystal
@@ -304,19 +306,18 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             df_crystal_qha,
             df_molecule
         )
-        del df_crystal_qha["T (K)"]
-        del df_crystal_eos["T (K)"]
         df_quasi_harmonic = pd.concat([
             df_sublimation_qha,
-            df_crystal_qha,
-            df_crystal_eos,
-            df_molecule], axis=1)
+            df_crystal_qha.drop(columns=["T (K)"]),
+            df_crystal_eos.drop(columns=["T (K)"]),
+            df_molecule.drop(columns=["T (K)"]),
+        ], axis=1)
 
     else:
-        del df_crystal_eos["T (K)"]
         df_quasi_harmonic = pd.concat([
             df_crystal_qha,
-            df_crystal_eos], axis=1)
+            df_crystal_eos.drop(columns=["T (K)"]),
+        ], axis=1)
         
     mbe_automation.storage.save_data_frame(
         df=df_quasi_harmonic,
