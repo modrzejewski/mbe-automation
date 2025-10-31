@@ -58,7 +58,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             algo_primary=config.relax_algo_primary,
             algo_fallback=config.relax_algo_fallback,
             log=os.path.join(geom_opt_dir, f"{relaxed_molecule_label}.txt"),
-            key=f"{config.root_key}/structures/{relaxed_molecule_label}"
+            key=f"{config.root_key}/relaxation/{relaxed_molecule_label}"
         )
         vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
             molecule,
@@ -99,13 +99,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         algo_primary=config.relax_algo_primary,
         algo_fallback=config.relax_algo_fallback,
         log=os.path.join(geom_opt_dir, f"{relaxed_crystal_label}.txt"),
-        key=f"{config.root_key}/structures/{relaxed_crystal_label}"
+        key=f"{config.root_key}/relaxation/{relaxed_crystal_label}"
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
     mbe_automation.structure.crystal.display(
         unit_cell=unit_cell_V0,
-        key=f"{config.root_key}/structures/{relaxed_crystal_label}"
+        key=f"{config.root_key}/relaxation/{relaxed_crystal_label}"
     )
     #
     # The supercell transformation is computed once and kept
@@ -250,7 +250,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 symmetrize_final_structure=config.symmetrize_unit_cell,
                 max_force_on_atom=config.max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
-                key=f"{config.root_key}/structures/{label_crystal}"
+                key=f"{config.root_key}/relaxation/{label_crystal}"
             )
         elif config.eos_sampling == "volume":
             #
@@ -266,7 +266,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 symmetrize_final_structure=config.symmetrize_unit_cell,
                 max_force_on_atom=config.max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
-                key=f"{config.root_key}/structures/{label_crystal}"
+                key=f"{config.root_key}/relaxation/{label_crystal}"
             )
         phonons = mbe_automation.dynamics.harmonic.core.phonons(
             unit_cell_T,

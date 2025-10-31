@@ -228,7 +228,7 @@ def crystal(
     )
     mbe_automation.storage.save_structure(
         dataset=dataset,
-        key=f"{root_key}/structures/{system_label}",
+        key=f"{root_key}/relaxation/{system_label}",
         positions=unit_cell.get_positions(),
         atomic_numbers=unit_cell.get_atomic_numbers(),
         masses=unit_cell.get_masses(),
