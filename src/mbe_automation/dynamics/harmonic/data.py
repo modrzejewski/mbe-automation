@@ -314,7 +314,7 @@ def sublimation(df_crystal, df_molecule):
     ) # J/K/mol/molecule
 
     df = pd.DataFrame({
-        "T (K)": df_molecule["T (K)"],
+        "T (K)": df_crystal["T (K)"],
         "E_latt (kJ∕mol∕molecule)": E_latt,
         "ΔE_vib (kJ∕mol∕molecule)": ΔE_vib,
         "ΔH_sub (kJ∕mol∕molecule)": ΔH_sub,
