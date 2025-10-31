@@ -187,35 +187,31 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # 4. bulk moduli B(T)
     #
     interp_mesh = phonons.mesh.mesh_numbers # enforce the same mesh for all systems
-    try:
-        df_crystal_eos = mbe_automation.dynamics.harmonic.core.equilibrium_curve(
-            unit_cell_V0,
-            space_group_V0,
-            config.calculator,
-            config.temperatures_K,
-            supercell_matrix,
-            interp_mesh,
-            config.max_force_on_atom,
-            config.relax_algo_primary,
-            config.relax_algo_fallback,
-            config.supercell_displacement,
-            config.work_dir,
-            config.pressure_range,
-            config.volume_range,
-            config.equation_of_state,
-            config.eos_sampling,
-            config.symmetrize_unit_cell,
-            config.imaginary_mode_threshold,
-            config.filter_out_imaginary_acoustic,
-            config.filter_out_imaginary_optical,
-            config.filter_out_broken_symmetry,
-            config.dataset,
-            config.root_key
-        )
-    except RuntimeError as e:
-        print(f"An error occurred: {e}")
-        print("Cannot continue thermal expansion calculations")
-        return
+
+    df_crystal_eos = mbe_automation.dynamics.harmonic.core.equilibrium_curve(
+        unit_cell_V0,
+        space_group_V0,
+        config.calculator,
+        config.temperatures_K,
+        supercell_matrix,
+        interp_mesh,
+        config.max_force_on_atom,
+        config.relax_algo_primary,
+        config.relax_algo_fallback,
+        config.supercell_displacement,
+        config.work_dir,
+        config.pressure_range,
+        config.volume_range,
+        config.equation_of_state,
+        config.eos_sampling,
+        config.symmetrize_unit_cell,
+        config.imaginary_mode_threshold,
+        config.filter_out_imaginary_acoustic,
+        config.filter_out_imaginary_optical,
+        config.filter_out_broken_symmetry,
+        config.dataset,
+        config.root_key
+    )
     #
     # Harmonic properties for unit cells with temperature-dependent
     # equilibrium volumes V(T). Data points where eos fit failed
