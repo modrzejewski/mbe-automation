@@ -54,8 +54,4 @@ The program is organized into three main workflows:
 2.  [Molecular Dynamics](./02_molecular_dynamics.md)
 3.  [Training Set Creation](./03_training_set.md)
 
-## Reading the Results
-
-For instructions on how to read and analyze the data produced by these workflows, please see the guide on [How to read the results](./05_results.md).
-
 For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
