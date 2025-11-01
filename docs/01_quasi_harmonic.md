@@ -203,14 +203,14 @@ The thermodynamic properties can be read into a `pandas` DataFrame. The final re
 import mbe_automation
 
 # Read the thermodynamic data with thermal expansion
-df_expansion = mbe_automation.storage.core.read_data_frame(
+df_expansion = mbe_automation.storage.read_data_frame(
     dataset="qha.hdf5",
     key="quasi_harmonic/thermodynamics_equilibrium_volume"
 )
 print(df_expansion.head())
 
 # Read the thermodynamic data at a fixed volume
-df_fixed = mbe_automation.storage.core.read_data_frame(
+df_fixed = mbe_automation.storage.read_data_frame(
     dataset="qha.hdf5",
     key="quasi_harmonic/thermodynamics_fixed_volume"
 )
