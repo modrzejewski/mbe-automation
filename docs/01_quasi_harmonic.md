@@ -5,6 +5,7 @@
 - [Adjustable parameters](#adjustable-parameters)
 - [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
+- [How to read the results](#how-to-read-the-results)
 - [Complete Input Files](#complete-input-files)
 
 This workflow performs a quasi-harmonic calculation of thermodynamic properties, including the free energy, heat capacities, and equilibrium volume as a function of temperature.
@@ -146,6 +147,90 @@ mbe_automation.workflows.quasi_harmonic.run(properties_config)
 ## Computational Bottlenecks
 
 For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
+
+## How to read the results
+
+### HDF5 Datasets
+
+The `mbe-automation` program uses the Hierarchical Data Format version 5 (HDF5) for storing large amounts of numerical data. The HDF5 file produced by a workflow contains all the raw and processed data in a hierarchical structure, similar to a file system with folders and files.
+
+### File Structure
+
+You can visualize the structure of the output file using `mbe_automation.storage.tree`.
+
+```python
+import mbe_automation
+
+mbe_automation.storage.tree("qha.hdf5")
+```
+
+A quasi-harmonic calculation with thermal expansion enabled will produce a file with the following structure:
+
+```
+qha.hdf5
+└── quasi_harmonic
+    ├── eos_interpolated
+    ├── eos_sampled
+    ├── phonons
+    │   ├── crystal[eos:V=1.0000]
+    │   ├── crystal[eq:T=300.00]
+    │   └── ... (other structures)
+    ├── relaxation
+    │   ├── crystal[eos:V=1.0000]
+    │   ├── crystal[eq:T=300.00]
+    │   └── ... (other structures)
+    ├── thermodynamics_equilibrium_volume
+    └── thermodynamics_fixed_volume
+```
+
+- **`eos_sampled`**: Contains the raw data from the equation of state (EOS) calculations at various cell volumes.
+- **`eos_interpolated`**: Stores the fitted EOS curves and the calculated free energy minima at each temperature.
+- **`phonons`**: Group containing phonon calculations for each structure.
+- **`relaxation`**: Group containing the relaxed crystal structures.
+- **`thermodynamics_fixed_volume`**: Contains thermodynamic properties calculated at a single, fixed volume.
+- **`thermodynamics_equilibrium_volume`**: Contains the final thermodynamic properties calculated at the equilibrium volume for each temperature.
+
+The structures under the `phonons` and `relaxation` groups follow a specific naming scheme:
+- **`crystal[opt:...]`**: The relaxed input structure. The keywords after `opt:` indicate which degrees of freedom were included in the minimization of the static electronic energy (e.g., atomic positions, cell shape, cell volume), as determined by the `relax_input_cell` keyword.
+- **`crystal[eos:V=...]`**: Structures used to sample the equation of state curve, obtained by relaxing the crystal at a fixed volume.
+- **`crystal[eq:T=...]`**: Relaxed structures at the equilibrium volume for a given temperature.
+
+### Reading Thermodynamic Properties
+
+The thermodynamic properties can be read into a `pandas` DataFrame. The final results, including thermal expansion effects, are in the `thermodynamics_equilibrium_volume` group.
+
+```python
+import mbe_automation
+
+# Read the thermodynamic data with thermal expansion
+df_expansion = mbe_automation.storage.core.read_data_frame(
+    dataset="qha.hdf5",
+    key="quasi_harmonic/thermodynamics_equilibrium_volume"
+)
+print(df_expansion.head())
+
+# Read the thermodynamic data at a fixed volume
+df_fixed = mbe_automation.storage.core.read_data_frame(
+    dataset="qha.hdf5",
+    key="quasi_harmonic/thermodynamics_fixed_volume"
+)
+print(df_fixed.head())
+```
+
+### Plotting Phonon Band Structure
+
+The phonon band structure for any calculated structure can be plotted using the `band_structure` function.
+
+```python
+import mbe_automation
+
+# Plot the phonon band structure for the equilibrium structure at 300 K
+mbe_automation.dynamics.harmonic.display.band_structure(
+    dataset="qha.hdf5",
+    key="quasi_harmonic/phonons/crystal[eq:T=300.00]/brillouin_zone_path",
+    save_path="band_structure_300K.png"
+)
+```
 
 ## Complete Input Files
 
