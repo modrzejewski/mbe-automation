@@ -169,7 +169,7 @@ def unique_clusters(
                     if dist > unique_cluster_filter.alignment_thresh and unique_cluster_filter.align_mirror_images:
                         mirrored_cluster_mol = cluster_mol.copy()
                         mirrored_cluster_mol.apply_operation(
-                            pymatgen.core.operations.SymmOp.inversion()
+                            pymatgen.core.operations.SymmOp.from_reflection((0, 1, 0))
                         )
                         _, dist = unique_matcher.fit(mirrored_cluster_mol)
 
