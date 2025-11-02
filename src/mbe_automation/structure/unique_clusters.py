@@ -4,6 +4,7 @@ from typing import List, Literal, Dict
 import numpy as np
 import numpy.typing as npt
 import itertools
+import time
 import scipy
 import pymatgen.core
 import pymatgen.core.operations
@@ -40,7 +41,7 @@ def unique_clusters(
 ) -> Dict[str, UniqueClusters]:
 
     if molecular_crystal.supercell.positions.ndim == 3:
-        positions__supercell = molecular_crystal.supercell.positions[frame_index]
+        positions_supercell = molecular_crystal.supercell.positions[frame_index]
     else:
         positions_supercell = molecular_crystal.supercell.positions
 
@@ -142,14 +143,27 @@ def unique_clusters(
         unique_weights_list = []
         unique_matchers_list = []
 
+        total_clusters = len(filtered_clusters_indices)
+        processed_clusters = 0
+        jobs_done = 0
+
+        print(f"Computing unique {cluster_type}s with cutoff < {cutoff:.2f} Å")
+        block_start_time = time.time()
+
         for indices in filtered_clusters_indices:
+            if total_clusters > 0 and 10 * int(np.floor(10 * (processed_clusters / total_clusters))) > jobs_done:
+                jobs_done = 10 * int(np.floor(10 * (processed_clusters / total_clusters)))
+                block_end_time = time.time()
+                print(f"{jobs_done:3d}% {cluster_type}s completed ({block_end_time - block_start_time:.1E} seconds)")
+                block_start_time = block_end_time
+            processed_clusters += 1
+
             cluster_mol = _get_cluster_molecule(indices)
 
             is_unique = True
             for i, unique_matcher in enumerate(unique_matchers_list):
 
                 if unique_cluster_filter.match_algo == "RMSD":
-                    unique_cluster_mol = _get_cluster_molecule(unique_indices_list[i])
                     _, dist = unique_matcher.fit(cluster_mol)
 
                     if dist > unique_cluster_filter.alignment_thresh and unique_cluster_filter.align_mirror_images:
