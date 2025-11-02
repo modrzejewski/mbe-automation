@@ -58,7 +58,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             algo_primary=config.relax_algo_primary,
             algo_fallback=config.relax_algo_fallback,
             log=os.path.join(geom_opt_dir, f"{relaxed_molecule_label}.txt"),
-            key=f"{config.root_key}/structures/{relaxed_molecule_label}"
+            key=f"{config.root_key}/relaxation/{relaxed_molecule_label}"
         )
         vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
             molecule,
@@ -99,13 +99,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         algo_primary=config.relax_algo_primary,
         algo_fallback=config.relax_algo_fallback,
         log=os.path.join(geom_opt_dir, f"{relaxed_crystal_label}.txt"),
-        key=f"{config.root_key}/structures/{relaxed_crystal_label}"
+        key=f"{config.root_key}/relaxation/{relaxed_crystal_label}"
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
     mbe_automation.structure.crystal.display(
         unit_cell=unit_cell_V0,
-        key=f"{config.root_key}/structures/{relaxed_crystal_label}"
+        key=f"{config.root_key}/relaxation/{relaxed_crystal_label}"
     )
     #
     # The supercell transformation is computed once and kept
@@ -155,9 +155,11 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             df_crystal,
             df_molecule
         )
-        del df_crystal["T (K)"]
-        del df_molecule["T (K)"]
-        df_harmonic = pd.concat([df_sublimation, df_crystal, df_molecule], axis=1)
+        df_harmonic = pd.concat([
+            df_sublimation,
+            df_crystal.drop(columns=["T (K)"]),
+            df_molecule.drop(columns=["T (K)"]),
+        ], axis=1)
         
     else:
         df_harmonic = df_crystal
@@ -187,35 +189,31 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # 4. bulk moduli B(T)
     #
     interp_mesh = phonons.mesh.mesh_numbers # enforce the same mesh for all systems
-    try:
-        df_crystal_eos = mbe_automation.dynamics.harmonic.core.equilibrium_curve(
-            unit_cell_V0,
-            space_group_V0,
-            config.calculator,
-            config.temperatures_K,
-            supercell_matrix,
-            interp_mesh,
-            config.max_force_on_atom,
-            config.relax_algo_primary,
-            config.relax_algo_fallback,
-            config.supercell_displacement,
-            config.work_dir,
-            config.pressure_range,
-            config.volume_range,
-            config.equation_of_state,
-            config.eos_sampling,
-            config.symmetrize_unit_cell,
-            config.imaginary_mode_threshold,
-            config.filter_out_imaginary_acoustic,
-            config.filter_out_imaginary_optical,
-            config.filter_out_broken_symmetry,
-            config.dataset,
-            config.root_key
-        )
-    except RuntimeError as e:
-        print(f"An error occurred: {e}")
-        print("Cannot continue thermal expansion calculations")
-        return
+
+    df_crystal_eos = mbe_automation.dynamics.harmonic.core.equilibrium_curve(
+        unit_cell_V0,
+        space_group_V0,
+        config.calculator,
+        config.temperatures_K,
+        supercell_matrix,
+        interp_mesh,
+        config.max_force_on_atom,
+        config.relax_algo_primary,
+        config.relax_algo_fallback,
+        config.supercell_displacement,
+        config.work_dir,
+        config.pressure_range,
+        config.volume_range,
+        config.equation_of_state,
+        config.eos_sampling,
+        config.symmetrize_unit_cell,
+        config.imaginary_mode_threshold,
+        config.filter_out_imaginary_acoustic,
+        config.filter_out_imaginary_optical,
+        config.filter_out_broken_symmetry,
+        config.dataset,
+        config.root_key
+    )
     #
     # Harmonic properties for unit cells with temperature-dependent
     # equilibrium volumes V(T). Data points where eos fit failed
@@ -250,7 +248,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 symmetrize_final_structure=config.symmetrize_unit_cell,
                 max_force_on_atom=config.max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
-                key=f"{config.root_key}/structures/{label_crystal}"
+                key=f"{config.root_key}/relaxation/{label_crystal}"
             )
         elif config.eos_sampling == "volume":
             #
@@ -266,7 +264,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 symmetrize_final_structure=config.symmetrize_unit_cell,
                 max_force_on_atom=config.max_force_on_atom,
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
-                key=f"{config.root_key}/structures/{label_crystal}"
+                key=f"{config.root_key}/relaxation/{label_crystal}"
             )
         phonons = mbe_automation.dynamics.harmonic.core.phonons(
             unit_cell_T,
@@ -308,19 +306,18 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             df_crystal_qha,
             df_molecule
         )
-        del df_crystal_qha["T (K)"]
-        del df_crystal_eos["T (K)"]
         df_quasi_harmonic = pd.concat([
             df_sublimation_qha,
-            df_crystal_qha,
-            df_crystal_eos,
-            df_molecule], axis=1)
+            df_crystal_qha.drop(columns=["T (K)"]),
+            df_crystal_eos.drop(columns=["T (K)"]),
+            df_molecule.drop(columns=["T (K)"]),
+        ], axis=1)
 
     else:
-        del df_crystal_eos["T (K)"]
         df_quasi_harmonic = pd.concat([
             df_crystal_qha,
-            df_crystal_eos], axis=1)
+            df_crystal_eos.drop(columns=["T (K)"]),
+        ], axis=1)
         
     mbe_automation.storage.save_data_frame(
         df=df_quasi_harmonic,

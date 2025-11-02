@@ -34,13 +34,13 @@ The general computational scheme facilitated by this program involves the follow
 +-------------------------------------------------------------+
 ```
 
-The program integrates several scientific libraries into a unified workflow, including:
+The program integrates several scientific codes into a unified workflow, including:
 
-*   **MACE (Multi-ACE):** As the primary MLIP model for calculating energies and forces.
+*   **MACE:** As the primary MLIP model for calculating energies and forces.
 *   **phonopy:** For phonon calculations and the analysis of vibrational properties.
 *   **pymatgen:** For crystal structure analysis and manipulation.
 *   **ASE:** For geometry relaxation and molecular dynamics simulations.
-*   Quantum-chemical programs for correlated electronic structure calculations.
+*   **MRCC** and **beyond-rpa**: High-fidelity data points from correlated wave-function theory.
 
 ## Installation
 
