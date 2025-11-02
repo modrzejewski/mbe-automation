@@ -21,7 +21,6 @@ class UniqueClusterFilter:
     """
     cluster_types: List[str] = field(default_factory=lambda: ["dimers"])
     cutoffs: Dict[str, float] = field(default_factory=lambda: {"dimers": 5.0})
-    match_algo: Literal["RMSD", "MBTR"] = "RMSD"
     alignment_thresh: float = 1.0e-4
     align_mirror_images: bool = True
 
@@ -51,6 +50,11 @@ def unique_clusters(
         positions = positions_supercell[atom_indices, :]
         atomic_numbers = molecular_crystal.supercell.atomic_numbers[atom_indices]
         return pymatgen.core.Molecule(species=atomic_numbers, coords=positions)
+
+    def _are_distances_similar(dists1: np.ndarray, dists2: np.ndarray, threshold: float) -> bool:
+        if len(dists1) != len(dists2):
+            return False
+        return np.max(np.abs(dists1 - dists2)) < threshold
 
     cluster_size_map = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
 
@@ -119,45 +123,46 @@ def unique_clusters(
         # Create a list of all possible clusters of size n using only the pre-filtered candidate molecules.
         #
         central_molecule = molecular_crystal.central_molecule_index
-
         other_candidate_molecules = [i for i in candidate_molecule_indices if i != central_molecule]
 
-        all_clusters_indices = []
-        for combo in itertools.combinations(other_candidate_molecules, n - 1):
-            all_clusters_indices.append(np.array([central_molecule] + list(combo)))
+        total_combinations = scipy.special.comb(len(other_candidate_molecules), n - 1, exact=True)
 
-        #
-        # Filter clusters based on the cutoff distance
-        #
-        filtered_clusters_indices = []
-        for indices in all_clusters_indices:
+        combinations_iterator = itertools.combinations(other_candidate_molecules, n - 1)
+
+        print(f"Computing unique {cluster_type}s with cutoff < {cutoff:.2f} Å")
+        progress_iterable = Progress(
+            combinations_iterator,
+            n_total_steps=total_combinations,
+            label=f"{cluster_type}s"
+        )
+
+        unique_indices_list = []
+        unique_weights_list = []
+        unique_matchers_list = []
+        unique_min_dists_list = []
+        unique_max_dists_list = []
+
+        for combo in progress_iterable:
+            indices = np.array([central_molecule] + list(combo))
+
+            # Filter clusters based on the cutoff distance
             within_cutoff = True
             for i, j in itertools.combinations(indices, 2):
                 if min_rij[i, j] >= cutoff:
                     within_cutoff = False
                     break
-            if within_cutoff:
-                filtered_clusters_indices.append(indices)
+            if not within_cutoff:
+                continue
 
-        # Aggregate results for the current cluster type
-        unique_indices_list = []
-        unique_weights_list = []
-        unique_matchers_list = []
-
-        print(f"Computing unique {cluster_type}s with cutoff < {cutoff:.2f} Å")
-        progress_iterable = Progress(
-            filtered_clusters_indices,
-            n_total_steps=len(filtered_clusters_indices),
-            label=f"{cluster_type}s"
-        )
-
-        for indices in progress_iterable:
-            cluster_mol = _get_cluster_molecule(indices)
+            min_dists = np.sort([min_rij[p1, p2] for p1, p2 in itertools.combinations(indices, 2)])
+            max_dists = np.sort([max_rij[p1, p2] for p1, p2 in itertools.combinations(indices, 2)])
 
             is_unique = True
             for i, unique_matcher in enumerate(unique_matchers_list):
+                if _are_distances_similar(min_dists, unique_min_dists_list[i], unique_cluster_filter.alignment_thresh) and \
+                   _are_distances_similar(max_dists, unique_max_dists_list[i], unique_cluster_filter.alignment_thresh):
 
-                if unique_cluster_filter.match_algo == "RMSD":
+                    cluster_mol = _get_cluster_molecule(indices)
                     _, dist = unique_matcher.fit(cluster_mol)
 
                     if dist > unique_cluster_filter.alignment_thresh and unique_cluster_filter.align_mirror_images:
@@ -172,16 +177,15 @@ def unique_clusters(
                         unique_weights_list[i] += 1
                         break
 
-                elif unique_cluster_filter.match_algo == "MBTR":
-                    raise NotImplementedError("MBTR matching is not yet implemented.")
-
             if is_unique:
                 unique_indices_list.append(indices)
                 unique_weights_list.append(1)
-                if unique_cluster_filter.match_algo == "RMSD":
-                    unique_matchers_list.append(
-                        pymatgen.analysis.molecule_matcher.HungarianOrderMatcher(cluster_mol)
-                    )
+                unique_min_dists_list.append(min_dists)
+                unique_max_dists_list.append(max_dists)
+                cluster_mol = _get_cluster_molecule(indices)
+                unique_matchers_list.append(
+                    pymatgen.analysis.molecule_matcher.HungarianOrderMatcher(cluster_mol)
+                )
 
         if not unique_indices_list:
             continue
@@ -190,21 +194,16 @@ def unique_clusters(
         molecule_indices_arr = np.array(unique_indices_list)
         weights_arr = np.array(unique_weights_list)
 
-        # Calculate min and max distances for each unique cluster
-        min_dists_list = []
-        max_dists_list = []
-
-        for indices in unique_indices_list:
-            min_dists = [min_rij[p1, p2] for p1, p2 in itertools.combinations(indices, 2)]
-            max_dists = [max_rij[p1, p2] for p1, p2 in itertools.combinations(indices, 2)]
-            min_dists_list.append(min_dists if min_dists else [0])
-            max_dists_list.append(max_dists if max_dists else [0])
+        # Handle cases with no internal distances (monomers)
+        if n == 1:
+            unique_min_dists_list = [[0]] * len(unique_indices_list)
+            unique_max_dists_list = [[0]] * len(unique_indices_list)
 
         results[cluster_type] = UniqueClusters(
             molecule_indices=molecule_indices_arr,
             weights=weights_arr,
-            min_distances=np.array(min_dists_list),
-            max_distances=np.array(max_dists_list)
+            min_distances=np.array(unique_min_dists_list),
+            max_distances=np.array(unique_max_dists_list)
         )
 
     return results
