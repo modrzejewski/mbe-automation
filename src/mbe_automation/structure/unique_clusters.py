@@ -11,6 +11,7 @@ import pymatgen.core.operations
 import pymatgen.analysis.molecule_matcher
 from . import crystal
 from ..storage import MolecularCrystal
+from ..common.display import Progress
 
 
 @dataclass(kw_only=True)
@@ -143,21 +144,14 @@ def unique_clusters(
         unique_weights_list = []
         unique_matchers_list = []
 
-        total_clusters = len(filtered_clusters_indices)
-        processed_clusters = 0
-        jobs_done = 0
-
         print(f"Computing unique {cluster_type}s with cutoff < {cutoff:.2f} Å")
-        block_start_time = time.time()
+        progress_iterable = Progress(
+            filtered_clusters_indices,
+            n_total_steps=len(filtered_clusters_indices),
+            label=f"{cluster_type}s"
+        )
 
-        for indices in filtered_clusters_indices:
-            if total_clusters > 0 and 10 * int(np.floor(10 * (processed_clusters / total_clusters))) > jobs_done:
-                jobs_done = 10 * int(np.floor(10 * (processed_clusters / total_clusters)))
-                block_end_time = time.time()
-                print(f"{jobs_done:3d}% {cluster_type}s completed ({block_end_time - block_start_time:.1E} seconds)")
-                block_start_time = block_end_time
-            processed_clusters += 1
-
+        for indices in progress_iterable:
             cluster_mol = _get_cluster_molecule(indices)
 
             is_unique = True

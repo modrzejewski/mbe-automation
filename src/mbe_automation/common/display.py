@@ -21,10 +21,10 @@ class Progress:
     Prints progress at specified percentage increments (default 10%)
     and logs time per block.
     """
-    
+
     def __init__(self, iterable, n_total_steps, label, percent_increment=10):
         """Initialize the progress monitor.
-        
+
         Args:
             iterable: The iterable to wrap.
             n_total_steps: The total number of items in the iterable.
@@ -32,7 +32,7 @@ class Progress:
             percent_increment: The percentage interval to print progress (default: 10).
         """
         assert percent_increment > 0 and percent_increment <= 100
-        
+
         self.iterable = iterable
         self.n_total_steps = int(n_total_steps)
         self.label = label
@@ -56,19 +56,19 @@ class Progress:
         try:
             current_index = self.processed_count
             item = next(self.iterator)
-            self.processed_count += 1 
+            self.processed_count += 1
 
             if self.n_total_steps > 0:
                 frac_done = current_index / float(self.n_total_steps)
                 current_percent_block = int(math.floor(frac_done * self.n_blocks)) * self.percent_increment
-                
+
                 if current_percent_block > self.jobs_done:
                     self.jobs_done = current_percent_block
                     block_end_time = time.time()
                     elapsed = block_end_time - self.block_start_time
                     print(f"{self.jobs_done:3d}% {self.label} completed (Δτ={elapsed:.1E} s)")
                     self.block_start_time = block_end_time
-            
+
             return item
 
         except StopIteration:
