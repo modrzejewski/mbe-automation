@@ -325,6 +325,16 @@ class MolecularCrystal:
             max_distances_to_central_molecule=self.max_distances_to_central_molecule
         )
 
+@dataclass(kw_only=True)
+class UniqueClusters:
+    """
+    Symmetry-unique molecular clusters within a MolecularCrystal.
+    """
+    molecule_indices: npt.NDArray[np.integer] # Shape (n_unique_clusters, n_cluster_size)
+    weights: npt.NDArray[np.integer]
+    min_distances: npt.NDArray[np.floating]  # Shape: (n_unique_clusters, n_pairs)
+    max_distances: npt.NDArray[np.floating]  # Shape: (n_unique_clusters, n_pairs)
+
 @dataclass
 class FiniteSubsystem:
     cluster_of_molecules: Structure
