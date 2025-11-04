@@ -22,7 +22,13 @@ class Progress:
     and logs time per block.
     """
 
-    def __init__(self, iterable, n_total_steps, label, percent_increment=10):
+    def __init__(
+            self,
+            iterable,
+            n_total_steps,
+            label: str="",
+            percent_increment=10
+    ):
         """Initialize the progress monitor.
 
         Args:
@@ -189,7 +195,8 @@ def mace_summary(calculator: MACECalculator) -> None:
 
 
 def matrix_3x3(matrix: np.ndarray, decimal_places: int = 3) -> None:
-    """Print a 3x3 NumPy array with parentheses and aligned columns.
+    """
+    Print a 3x3 NumPy array with parentheses and aligned columns.
 
     The function formats floats to a specified number of decimal places
     and dynamically calculates column widths to ensure alignment.

@@ -579,6 +579,7 @@ def extract_unique_clusters(
     molecular_crystal: MolecularCrystal,
     unique_cluster_filter: UniqueClustersFilter,
     frame_index: int = 0,
+    key: str | None = None, # dataset key (only to display a message)
 ) -> Dict[str, UniqueClusters]:
 
     if not (0 <= frame_index < molecular_crystal.supercell.n_frames):
@@ -592,11 +593,14 @@ def extract_unique_clusters(
         positions_supercell = molecular_crystal.supercell.positions
 
     def _pymatgen_molecule(
-            indices: npt.NDArray[np.integer]
+            indices: npt.NDArray[np.integer],
+            mirror_image=False,
     ) -> pymatgen.core.Molecule:
         
         atom_indices = np.concatenate([molecular_crystal.index_map[i] for i in indices])
         positions = positions_supercell[atom_indices, :]
+        if mirror_image:
+            positions[:, 1] = -1
         atomic_numbers = molecular_crystal.supercell.atomic_numbers[atom_indices]
         return pymatgen.core.Molecule(
             species=atomic_numbers,
@@ -614,6 +618,21 @@ def extract_unique_clusters(
         return np.max(np.abs(dists1 - dists2)) < threshold
 
     cluster_size_map = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
+
+    if key is not None:
+        mbe_automation.common.display.framed([
+            "Symmetry-unique molecular clusters",
+            key
+        ])
+    else:
+        mbe_automation.common.display.framed(
+            "Symmetry-unique molecular clusters"
+        )
+
+    print(f"cluster_types        {unique_cluster_filter.cluster_types}")
+    print(f"alignment_thresh     {unique_cluster_filter.alignment_thresh} Å")
+    print(f"align_mirror_images  {unique_cluster_filter.align_mirror_images}")
+    print(f"algorithm            {'Hungarian'}")
 
     max_cutoff = 0.0
     if unique_cluster_filter.cutoffs:
@@ -685,12 +704,12 @@ def extract_unique_clusters(
         #
         central_molecule = molecular_crystal.central_molecule_index
         other_candidate_molecules = [i for i in candidate_molecule_indices if i != central_molecule]
-        print(f"Computing unique {cluster_type}s with cutoff < {cutoff:.2f} Å")
+        print(f"{cluster_type} with cutoff < {cutoff:.2f} Å...")
         
         progress = Progress(
             iterable=itertools.combinations(other_candidate_molecules, n - 1),
             n_total_steps=scipy.special.comb(len(other_candidate_molecules), n - 1, exact=True),
-            label=f"{cluster_type}s",
+            label=cluster_type,
         )
 
         unique_indices_list = []
@@ -736,26 +755,14 @@ def extract_unique_clusters(
                     unique_cluster_filter.alignment_thresh
                 ):
 
-                    cluster_mol = _pymatgen_molecule(indices)
-                    _, dist = unique_matcher.fit(cluster_mol)
+                    cluster = _pymatgen_molecule(indices)
+                    _, dist = unique_matcher.fit(cluster)
 
                     if (dist > unique_cluster_filter.alignment_thresh
                         and unique_cluster_filter.align_mirror_images):
-                        #
-                        # Define reflection matrix for a mirror plane with normal (0, 1, 0)
-                        #
-                        mirrored_cluster_mol = cluster_mol.copy()
-                        reflection_matrix = np.array([
-                            [1,  0,  0],
-                            [0, -1,  0],
-                            [0,  0,  1]
-                        ])
-                        mirrored_cluster_mol.apply_operation(
-                            pymatgen.core.operations.SymmOp.from_rotation_and_translation(
-                                reflection_matrix, (0, 0, 0)
-                            )
-                        )
-                        _, dist = unique_matcher.fit(mirrored_cluster_mol)
+
+                        cluster_mirror = _pymatgen_molecule(indices, mirror_image=True)
+                        _, dist = unique_matcher.fit(cluster_mirror)
 
                     if dist < unique_cluster_filter.alignment_thresh:
                         is_unique = False
@@ -767,10 +774,10 @@ def extract_unique_clusters(
                 unique_weights_list.append(1)
                 unique_min_dists_list.append(min_dists)
                 unique_max_dists_list.append(max_dists)
-                cluster_mol = _pymatgen_molecule(indices)
+                cluster = _pymatgen_molecule(indices)
                 unique_matchers_list.append(
                     pymatgen.analysis.molecule_matcher.HungarianOrderMatcher(
-                        cluster_mol
+                        cluster
                     )
                 )
 
@@ -788,7 +795,6 @@ def extract_unique_clusters(
             max_distances=(np.array(unique_max_dists_list) if n > 1 else np.array([])),
         )
 
-        print(f"Generated {results[cluster_type].n_clusters} unique {cluster_type} with "
-              f"max min Rij < {unique_cluster_filter.cutoffs[cluster_type]:.2f} Å")
+        print(f"Found {results[cluster_type].n_clusters} symmetry-unique {cluster_type}")
 
     return results
