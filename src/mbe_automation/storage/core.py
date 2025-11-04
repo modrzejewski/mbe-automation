@@ -330,6 +330,7 @@ class UniqueClusters:
     """
     Symmetry-unique molecular clusters within a MolecularCrystal.
     """
+    n_clusters: int
     molecule_indices: npt.NDArray[np.integer] # Shape (n_unique_clusters, n_cluster_size)
     weights: npt.NDArray[np.integer]
     min_distances: npt.NDArray[np.floating]  # Shape: (n_unique_clusters, n_pairs)
@@ -1101,3 +1102,31 @@ def read_finite_subsystem(dataset: str, key: str) -> FiniteSubsystem:
     )
 
 
+def save_unique_clusters(
+        dataset: str,
+        key: str,
+        clusters: UniqueClusters
+) -> None:
+    """Save a UniqueClusters object to a dataset."""
+    with h5py.File(dataset, "a") as f:
+        if key in f:
+            del f[key]
+        group = f.create_group(key)
+        group.attrs["n_clusters"] = clusters.n_clusters
+        group.create_dataset("molecule_indices", data=clusters.molecule_indices)
+        group.create_dataset("weights", data=clusters.weights)
+        group.create_dataset("min_distances (Å)", data=clusters.min_distances)
+        group.create_dataset("max_distances (Å)", data=clusters.max_distances)
+
+
+def read_unique_clusters(dataset: str, key: str) -> UniqueClusters:
+    """Read a UniqueClusters object from a dataset."""
+    with h5py.File(dataset, "r") as f:
+        group = f[key]
+        return UniqueClusters(
+            n_clusters=group.attrs["n_clusters"],
+            molecule_indices=group["molecule_indices"][...],
+            weights=group["weights"][...],
+            min_distances=group["min_distances (Å)"][...],
+            max_distances=group["max_distances (Å)"][...],
+        )

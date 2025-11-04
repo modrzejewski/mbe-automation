@@ -603,8 +603,8 @@ def extract_unique_clusters(
 
     def _are_distances_similar(
             dists1: npt.NDArray[np.floating],
-            dists2: npt.NDArray[np.floating]
-            threshold: float
+            dists2: npt.NDArray[np.floating],
+            threshold: float,
     ) -> bool:
         
         if len(dists1) != len(dists2):
@@ -686,9 +686,9 @@ def extract_unique_clusters(
         print(f"Computing unique {cluster_type}s with cutoff < {cutoff:.2f} Å")
         
         progress = Progress(
-            iterable=itertools.combinations(other_candidate_molecules, n - 1)
-            n_total_steps=scipy.special.comb(len(other_candidate_molecules), n - 1, exact=True)
-            label=f"{cluster_type}s"
+            iterable=itertools.combinations(other_candidate_molecules, n - 1),
+            n_total_steps=scipy.special.comb(len(other_candidate_molecules), n - 1, exact=True),
+            label=f"{cluster_type}s",
         )
 
         unique_indices_list = []
@@ -739,10 +739,19 @@ def extract_unique_clusters(
 
                     if (dist > unique_cluster_filter.alignment_thresh
                         and unique_cluster_filter.align_mirror_images):
-                        
+                        #
+                        # Define reflection matrix for a mirror plane with normal (0, 1, 0)
+                        #
                         mirrored_cluster_mol = cluster_mol.copy()
+                        reflection_matrix = np.array([
+                            [1,  0,  0],
+                            [0, -1,  0],
+                            [0,  0,  1]
+                        ])
                         mirrored_cluster_mol.apply_operation(
-                            pymatgen.core.operations.SymmOp.from_reflection((0, 1, 0))
+                            pymatgen.core.operations.SymmOp.from_rotation_and_translation(
+                                reflection_matrix, (0, 0, 0)
+                            )
                         )
                         _, dist = unique_matcher.fit(mirrored_cluster_mol)
 
@@ -756,7 +765,7 @@ def extract_unique_clusters(
                 unique_weights_list.append(1)
                 unique_min_dists_list.append(min_dists)
                 unique_max_dists_list.append(max_dists)
-                cluster_mol = _get_cluster_molecule(indices)
+                cluster_mol = _pymatgen_molecule(indices)
                 unique_matchers_list.append(
                     pymatgen.analysis.molecule_matcher.HungarianOrderMatcher(
                         cluster_mol
@@ -770,10 +779,14 @@ def extract_unique_clusters(
         weights_arr = np.array(unique_weights_list)
 
         results[cluster_type] = UniqueClusters(
+            n_clusters=len(molecule_indices_arr),
             molecule_indices=molecule_indices_arr,
             weights=weights_arr,
             min_distances=(np.array(unique_min_dists_list) if n > 1 else np.array([])),
             max_distances=(np.array(unique_max_dists_list) if n > 1 else np.array([])),
         )
+
+        print(f"Generated {results[cluster_type].n_clusters} unique {cluster_type} with "
+              f"max min Rij < {unique_cluster_filter.cutoffs[cluster_type]:.2f} Å")
 
     return results
