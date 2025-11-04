@@ -3,6 +3,8 @@ import datetime
 from datetime import timezone
 import platform
 import getpass
+import time
+import math
 
 import numpy as np
 
@@ -13,7 +15,76 @@ except ImportError:
     MACECalculator = None
     mace_available = False
 
+class Progress:
+    """Wrap an iterable to print progress updates.
     
+    Prints progress at specified percentage increments (default 10%)
+    and logs time per block.
+    """
+
+    def __init__(self, iterable, n_total_steps, label, percent_increment=10):
+        """Initialize the progress monitor.
+
+        Args:
+            iterable: The iterable to wrap.
+            n_total_steps: The total number of items in the iterable.
+            label: Short description for progress lines (e.g., "supercells").
+            percent_increment: The percentage interval to print progress (default: 10).
+        """
+        assert percent_increment > 0 and percent_increment <= 100
+
+        self.iterable = iterable
+        self.n_total_steps = int(n_total_steps)
+        self.label = label
+        self.percent_increment = int(percent_increment)
+        self.n_blocks = 100.0 / float(self.percent_increment)
+        self.iterator = None
+        self.processed_count = 0
+        self.jobs_done = 0
+        self.block_start_time = 0.0
+        self.total_start_time = 0.0
+
+    def __iter__(self):
+        self.iterator = iter(self.iterable)
+        self.processed_count = 0
+        self.jobs_done = 0
+        self.block_start_time = time.time()
+        self.total_start_time = time.time()
+        return self
+
+    def __next__(self):
+        try:
+            current_index = self.processed_count
+            item = next(self.iterator)
+            self.processed_count += 1
+
+            if self.n_total_steps > 0:
+                frac_done = current_index / float(self.n_total_steps)
+                current_percent_block = int(math.floor(frac_done * self.n_blocks)) * self.percent_increment
+
+                if current_percent_block > self.jobs_done:
+                    self.jobs_done = current_percent_block
+                    block_end_time = time.time()
+                    elapsed = block_end_time - self.block_start_time
+                    print(f"{self.jobs_done:3d}% {self.label} completed (Δτ={elapsed:.1E} s)")
+                    self.block_start_time = block_end_time
+
+            return item
+
+        except StopIteration:
+            total_end_time = time.time()
+            #
+            # Print final block if 100% wasn't hit on the last item
+            #
+            if self.jobs_done < 100 and self.n_total_steps > 0 and self.processed_count == self.n_total_steps:
+                block_elapsed = total_end_time - self.block_start_time
+                print(f"100% {self.label} completed (Δτ={block_elapsed:.1E} s)")
+
+            total_elapsed = total_end_time - self.total_start_time
+            print(f"Complete task performed in τ={total_elapsed:.1E} s")
+            raise StopIteration
+
+
 class ReplicatedOutput:
     def __init__(self, filename):
         self.file = open(filename, 'w', encoding='utf-8')

@@ -7,6 +7,7 @@ from mbe_automation.storage.core import (
     Structure,
     Trajectory,
     MolecularCrystal,
+    UniqueClusters,
     FiniteSubsystem,
 
     save_data_frame,
@@ -54,6 +55,7 @@ __all__ = [
     "Structure",
     "Trajectory",
     "MolecularCrystal",
+    "UniqueClusters",
     "FiniteSubsystem",
     
     # Core I/O functions
