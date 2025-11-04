@@ -583,7 +583,8 @@ def extract_unique_clusters(
 
     if not (0 <= frame_index < molecular_crystal.supercell.n_frames):
         raise ValueError(f"frame_index ({frame_index}) is out of bounds for supercell with {molecular_crystal.supercell.n_frames} frames.")
-    assert molecular_crystal.supercell.atomic_numbers.ndim == 1
+    if molecular_crystal.supercell.atomic_numbers.ndim != 1:
+        raise ValueError("molecular_crystal.supercell.atomic_numbers must be a 1D array.")
     
     if molecular_crystal.supercell.positions.ndim == 3:
         positions_supercell = molecular_crystal.supercell.positions[frame_index]
