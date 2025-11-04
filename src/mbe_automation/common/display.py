@@ -76,7 +76,7 @@ class Progress:
             #
             # Print final block if 100% wasn't hit on the last item
             #
-            if self.jobs_done < 100 and self.n_total_steps > 0 and self.processed_count == self.n_total_steps:
+            if self.jobs_done < 100 and self.processed_count == self.n_total_steps:
                 block_elapsed = total_end_time - self.block_start_time
                 print(f"100% {self.label} completed (Δτ={block_elapsed:.1E} s)")
 
