@@ -581,7 +581,8 @@ def extract_unique_clusters(
     frame_index: int = 0,
 ) -> Dict[str, UniqueClusters]:
 
-    assert (frame_index < molecular_crystal.supercell.n_frames) and (frame_index >= 0)
+    if not (0 <= frame_index < molecular_crystal.supercell.n_frames):
+        raise ValueError(f"frame_index ({frame_index}) is out of bounds for supercell with {molecular_crystal.supercell.n_frames} frames.")
     assert molecular_crystal.supercell.atomic_numbers.ndim == 1
     
     if molecular_crystal.supercell.positions.ndim == 3:
