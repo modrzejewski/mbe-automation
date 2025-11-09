@@ -19,6 +19,12 @@ import mbe_automation.common
 import mbe_automation.storage
 import mbe_automation.structure
 
+AMPLITUDE_SCAN_MODES = [
+    "time_propagation",
+    "random",
+    "equidistant"
+]
+
 @dataclass(kw_only=True)
 class PhononFilter:
     """
@@ -148,8 +154,8 @@ def _thermal_displacements(
         freq_min_THz: float = 0.0,
         freq_max_THz: float | None = None,
         cell_type: Literal["primitive", "supercell"] = "primitive",
-        amplitude_scan: Literal["time_propagation", "random"] = "time_propagation",
-        n_random_samples: int = 1, # ignored unless amplitude_scan=="random"
+        amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
+        n_random_samples: int = 1, # ignored unless amplitude_scan=="random" or amplitude_scan=="equidistant"
         rng: np.random.Generator | None = None,
 ) -> ThermalDisplacements:
     """
@@ -188,11 +194,9 @@ def _thermal_displacements(
 
     n_temperatures = len(temperatures_K)
 
-    assert amplitude_scan in ["time_propagation", "random"]
-    
     if amplitude_scan == "time_propagation":
         n_time_points = len(time_points_fs)
-    elif amplitude_scan == "random":
+    elif amplitude_scan in ["random", "equidistant"]:
         n_time_points = n_random_samples
         if rng is None:
             rng = np.random.default_rng(seed=42)
@@ -266,6 +270,12 @@ def _thermal_displacements(
         n_freqs = len(freqs_THz)
         if n_freqs == 0:
             continue
+
+        if amplitude_scan == "equidistant" and n_freqs > 1:
+            raise ValueError(
+                f"Equidistant scan is only supported for a single phonon mode. "
+                f"The current filter selects {n_freqs} modes at q-point {q}."
+            )
             
         Ajk_primitive = np.zeros(
             (n_temperatures, n_freqs, n_atoms_primitive*3),
@@ -313,6 +323,22 @@ def _thermal_displacements(
                 size=(n_time_points, n_freqs)
             )
 
+        elif amplitude_scan == "equidistant":
+            #
+            # Equidistant points between -1 and +1.
+            # The resulting phonon coordinates will
+            # distributed uniformly between -Akj
+            # and +Akj.
+            #
+            # This type of mode scanning is designed
+            # to probe the potential energy surface
+            # of a selected mode.
+            #
+            exp_iomegat = np.tile(
+                np.linspace(-1, 1, n_time_points).reshape(-1, 1),
+                (1, n_freqs)
+            ) # rank (n_time_points, n_freqs)
+            
         if cell_type == "supercell":
             ejk = ejk_primitive[:, primitive_to_supercell_coords]
             Ajk = Ajk_primitive[:, :, primitive_to_supercell_coords]
@@ -392,8 +418,8 @@ def thermal_displacements(
         phonon_filter: PhononFilter,
         time_points_fs: npt.NDArray = np.array([0.0]),
         cell_type: Literal["primitive", "supercell"] = "supercell",
-        amplitude_scan: Literal["time_propagation", "random"] = "time_propagation",
-        n_random_samples: int = 1, # ignored unless random_scan=="random"
+        amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
+        n_random_samples: int = 1, # ignored unless random_scan=="random" or random_scan=="equidistant"
         rng: np.random.Generator | None = None,
 ) -> ThermalDisplacements:
     """
@@ -419,6 +445,8 @@ def thermal_displacements(
         cell_type: Type of cell used to express the instantaneous atomic
             displacements. Defaults to supercell.
         amplitude_scan: Method for sampling normal-mode coordinates.
+            "equidistant" multiplies eigenvectors by a series
+            of equidistant points on (-1, 1).
             "random" multiplies eigenvectors by a random number on (-1, 1).
             "time_propagation" uses a time-dependent phase factor.
         n_random_samples: Number of random samples to generate if
@@ -510,23 +538,24 @@ def trajectory(
         dataset: str,
         key: str,
         temperature_K: float,
-        phonon_filter: PhononFilter = PhononFilter(),
+        phonon_filter: PhononFilter | None = None,
         time_step_fs: float = 100.0,
         n_frames: int = 20,
-        amplitude_scan: Literal["time_propagation", "random"] = "time_propagation",
+        amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
         rng: np.random.Generator | None = None,
 ) -> mbe_automation.storage.Structure:
 
-    assert amplitude_scan in ["time_propagation", "random"]
+    if phonon_filter is None:
+        phonon_filter = PhononFilter()
     
     if amplitude_scan == "time_propagation":    
         time_points_fs = np.linspace(0.0, time_step_fs * (n_frames - 1), n_frames)
         n_random_samples = 0
         
-    elif amplitude_scan == "random":
+    elif amplitude_scan in ["random", "equidistant"] :
         time_points_fs = np.array([])
         n_random_samples = n_frames
-        
+
     disp = thermal_displacements(
         dataset=dataset,
         key=key,
