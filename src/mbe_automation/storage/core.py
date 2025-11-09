@@ -309,6 +309,29 @@ class MolecularCrystal:
     central_molecule_index: int
     min_distances_to_central_molecule: npt.NDArray[np.floating]
     max_distances_to_central_molecule: npt.NDArray[np.floating]
+
+    def atomic_numbers(
+            self,
+            molecule_indices: npt.NDArray[np.integer]
+    ) -> npt.NDArray[np.integer]:
+        
+        atom_indices = np.concatenate([self.index_map[i] for i in molecule_indices])
+        return self.supercell.atomic_numbers[atom_indices]
+
+    def positions(
+            self,
+            molecule_indices: npt.NDArray[np.integer],
+            frame_index: int = 0
+    ) -> npt.NDArray[np.floating]:
+        
+        atom_indices = np.concatenate([self.index_map[i] for i in molecule_indices])
+        if self.supercell.positions.ndim == 3:
+            selected_positions = self.supercell.positions[frame_index, atom_indices, :]
+        else:
+            selected_positions = self.supercell.positions[atom_indices, :]
+            
+        return selected_positions
+        
     def subsample(
             self,
             n: int,
@@ -889,10 +912,17 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
 def save_force_constants(
     dataset: str,
     key: str,
-    phonons: Phonopy
+    phonons: phonopy.Phonopy
 ):
     """Save force constants with their primitive and supercell structures."""
 
+    assert isinstance(phonons.force_constants, np.ndarray)
+    assert np.issubdtype(phonons.force_constants.dtype, np.floating)
+    assert isinstance(phonons.supercell_matrix, np.ndarray)
+    assert np.issubdtype(phonons.supercell_matrix, np.integer)
+    assert isinstance(phonons.supercell, phonopy.structure.atoms.PhonopyAtoms)
+    assert isinstance(phonons.primitive, phonopy.structure.atoms.PhonopyAtoms)
+    
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]
