@@ -74,7 +74,7 @@ class Structure:
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="atomic_environments",
             potential_energies: bool=False,
             forces: bool=False,
-    ):
+    ) -> None:
         if not isinstance(calculator, MACECalculator):
             print("Skipping run_neural_network: can be done only for MACE models.")
             return
@@ -100,6 +100,18 @@ class Structure:
             self.feature_vectors_type = feature_vectors_type
         if potential_energies: self.E_pot = mace_output.E_pot
         if forces: self.forces = mace_output.forces
+
+    def to_dataset(
+            self,
+            dataset: str,
+            key: str,
+    ) -> None:
+
+        save_structure(
+            dataset=dataset,
+            key=key,
+            structure=self,
+        )
         
     def subsample(
         self,
