@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Tuple, Literal, overload
 import pandas as pd
+import phonopy
 from phonopy import Phonopy
 import h5py
 import numpy as np
