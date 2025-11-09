@@ -919,7 +919,7 @@ def save_force_constants(
     assert isinstance(phonons.force_constants, np.ndarray)
     assert np.issubdtype(phonons.force_constants.dtype, np.floating)
     assert isinstance(phonons.supercell_matrix, np.ndarray)
-    assert np.issubdtype(phonons.supercell_matrix, np.integer)
+    assert np.issubdtype(phonons.supercell_matrix.dtype, np.integer)
     assert isinstance(phonons.supercell, phonopy.structure.atoms.PhonopyAtoms)
     assert isinstance(phonons.primitive, phonopy.structure.atoms.PhonopyAtoms)
     
