@@ -106,12 +106,23 @@ class Structure:
             dataset: str,
             key: str,
     ) -> None:
+        """Save the structure to a dataset."""
 
         save_structure(
             dataset=dataset,
             key=key,
             structure=self,
         )
+
+    @classmethod
+    def from_dataset(
+            cls,
+            dataset: str,
+            key: str,
+    ) -> Structure:
+        """Load a structure from a dataset."""
+        
+        return read_structure(dataset, key)
         
     def subsample(
         self,
