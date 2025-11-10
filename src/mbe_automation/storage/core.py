@@ -75,6 +75,11 @@ class Structure:
             potential_energies: bool=False,
             forces: bool=False,
     ) -> None:
+        """
+        Run MACE inference to compute energies, forces, and feature vectors.
+
+        Updates the object's E_pot, forces, and feature_vectors fields.
+        """
         if not isinstance(calculator, MACECalculator):
             print("Skipping run_neural_network: can be done only for MACE models.")
             return
@@ -101,7 +106,7 @@ class Structure:
         if potential_energies: self.E_pot = mace_output.E_pot
         if forces: self.forces = mace_output.forces
 
-    def to_dataset(
+    def save(
             self,
             dataset: str,
             key: str,
@@ -115,7 +120,7 @@ class Structure:
         )
 
     @classmethod
-    def from_dataset(
+    def read(
             cls,
             dataset: str,
             key: str,
@@ -323,11 +328,41 @@ class Trajectory(Structure):
             ),
         )
 
+    def save(
+            self,
+            dataset: str,
+            key: str,
+    ) -> None:
+        """Save the trajectory to a dataset."""
+
+        save_trajectory(
+            dataset=dataset,
+            key=key,
+            traj=self,
+        )
+
+    @classmethod
+    def read(
+            cls,
+            dataset: str,
+            key: str,
+    ) -> Trajectory:
+        """Load a trajectory from a dataset."""
+        
+        return read_trajectory(dataset, key)
+
 @dataclass
 class MolecularCrystal:
     supercell: Structure
     index_map: List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
-    centers_of_mass: npt.NDArray[np.floating]
+    #
+    # COM locations for molecules *in the reference frame*
+    # which was used in a call to structure.clusters.detect_molecules.
+    # Note that the reference frame may no longer be present as
+    # one of the frames in a MoleculeCrystal object returned
+    # by MolecularCrystal.subsample.
+    #
+    centers_of_mass: npt.NDArray[np.floating] 
     identical_composition: bool
     n_molecules: int
     central_molecule_index: int
