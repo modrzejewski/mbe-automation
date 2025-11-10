@@ -511,9 +511,11 @@ def thermal_displacements(
     print(f"k_points_mesh       {nx}×{ny}×{nz}")
     print(f"amplitude_scan      {amplitude_scan}")
     if amplitude_scan == "random":
-        print(f"n_random_samples    {n_random_samples}")
+        print(f"n_frames            {n_random_samples}")
     elif amplitude_scan == "time_propagation":
-        print(f"n_time_points       {len(time_points_fs)}")
+        print(f"n_frames            {len(time_points_fs)}")
+    elif amplitude_scan == "equidistant":
+        print(f"n_frames            {n_random_samples}")
     print("Diagonalization of dynamic matrix at each k point...", flush=True)
     
     disp = _thermal_displacements(
@@ -542,6 +544,7 @@ def trajectory(
         time_step_fs: float = 100.0,
         n_frames: int = 20,
         amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
+        cell_type: Literal["primitive", "supercell"] = "supercell",
         rng: np.random.Generator | None = None,
 ) -> mbe_automation.storage.Structure:
 
@@ -562,7 +565,7 @@ def trajectory(
         temperatures_K=np.array([temperature_K]),
         phonon_filter=phonon_filter,
         time_points_fs=time_points_fs,
-        cell_type="supercell",
+        cell_type=cell_type,
         amplitude_scan=amplitude_scan,
         n_random_samples=n_random_samples,
         rng=rng,
@@ -572,7 +575,12 @@ def trajectory(
         dataset=dataset,
         key=key
     )
-    equilibrium_cell = ph.supercell
+
+    if cell_type == "supercell":
+        equilibrium_cell = ph.supercell
+    else:
+        equilibrium_cell = ph.primitive
+        
     positions = (equilibrium_cell.positions[np.newaxis, :, :]
                  + disp.instantaneous_displacements[0])
 
