@@ -80,8 +80,9 @@ def _Ejq_eq_3(
     Average anergy of a quantum harmonic oscillator E_j(q)
     at temperature T (eq 3 in Ref. 1). Computed for a series
     of frequencies in a single batch. E_j(q) is required
-    to obtain the temperature-dependent amplitude of atomic
-    displacements.
+    to obtain the temperature-dependent average displacement.
+
+    The result is in the units of eV per single vibrational mode.
 
     1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
        multi-temperature anisotropic displacement parameters. I. Theory
@@ -100,9 +101,32 @@ def _absolute_amplitude_eq_2(
         masses_AMU: npt.NDArray[np.floating] # rank (n_atoms_primitive, )
 ) -> npt.NDArray[np.floating]: # Angs, rank (n_freqs, n_atoms_primitive * 3)
     """
-    Absolute amplitude (maximum amplitude) of mode jq
-    ( E_j(q)**(1/2)/omega_j(q) in eq 2 of Ref. 1).
-    The returned values are in Angstroms.
+    Amplitude Ajk needed to compute the average thermal displacement
+    vector u for mode jk at temperature T.
+
+    u_jq(r_k) = 1/Sqrt(N) A_jq * e_jq(r_k)
+
+    k:    index of the atom, depending on the definition of e_jq,
+          can be one of the atoms in the unit cell or in the supercell
+    r_k:  position of kth atom
+    u_jq: contribution of vibrational mode jq to the average displacement
+          vector at position r_k
+    A_jq: amplitude of the displacement
+    e_jq: eigenvector of the dynamical matrix, D e_jq = omega_jq**2 * e_jq
+    N:    normalization of e_jq, <e_jq|e_j'q'> = delta(jq,j'q') * N.
+          If e_jq is constructed for a supercell by repeating the smaller
+          dimension vector normalized within the primitive cell, N must
+          reflect that.
+          
+    The amplitude Ajq at temperature T is computed accoring to eq 2 of Ref. 1:
+    
+    A_jq = 1/Sqrt(m_k) * Sqrt(E_jq) / omega_j(q)
+
+    Note that the 1/Sqrt(N) factor in eq 2 of Ref. 1 is excluded from
+    the definition of A_jq, but should be incuded later depending on
+    the definition of e_jq.
+
+    The result is in the units of Angstrom.
 
     1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
        multi-temperature anisotropic displacement parameters. I. Theory
