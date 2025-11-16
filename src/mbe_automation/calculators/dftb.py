@@ -90,12 +90,13 @@ def params_dir_3ob_3_1():
     
     return skfiles_dir
 
-def GFN2_xTB():
+
+def _GFN_xTB(method):
     kpts = [1, 1, 1]
     scc_tolerance = SCC_TOLERANCE
     calc = Dftb(
         Hamiltonian_="xTB",
-        Hamiltonian_Method="GFN2-xTB",
+        Hamiltonian_Method=method,
         Hamiltonian_SCCTolerance=scc_tolerance,
         Hamiltonian_MaxSCCIterations=250,
         ParserOptions_ = "",
@@ -106,6 +107,11 @@ def GFN2_xTB():
     )
     return calc
 
+def GFN1_xTB():
+    return _GFN_xTB("GFN1-xTB")
+
+def GFN2_xTB():
+    return _GFN_xTB("GFN2-xTB")
 
 def DFTB_Plus_MBD(elements):
 

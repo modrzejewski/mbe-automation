@@ -117,14 +117,27 @@ def crystal(unit_cell,
                     steps=max_steps
                 )
             max_force = np.abs(system_to_optimize.get_forces()).max()
+            
             if max_force < max_force_on_atom:
+                
                 print(f"Converged with max residual force = {max_force:.1e} eV/Å", flush=True)
                 break
+            
             else:
-                warnings.warn(f"{algo} finished but did not converge (max force = {max_force:.1e} eV/Å)")
+
+                msg = (
+                    f"{algo} finished but did not converge "
+                    f"(max force = {max_force:.1e} eV/Å > {max_force_on_atom:.1e} eV/Å)"
+                )
+                print(msg, flush=True)
+                
         except Exception as e:
-            warnings.warn(f"{algo} failed with an error: {e}")
+
+            msg = f"{algo} failed with an exception: {e}"
+            print(msg, flush=True)
+
     else:
+        
         raise RuntimeError("All optimization algorithms failed")
 
     if symmetrize_final_structure:
@@ -208,12 +221,23 @@ def isolated_molecule(molecule,
             
             max_force = np.abs(system_to_optimize.get_forces()).max()
             if max_force < max_force_on_atom:
+                
                 print(f"Converged with max residual force = {max_force:.1e} eV/Å", flush=True)
                 break
+            
             else:
-                warnings.warn(f"{algo} finished but did not converge (max force = {max_force:.1e} eV/Å)")
+
+                msg = (
+                    f"{algo} finished but did not converge "
+                    f"(max force = {max_force:.1e} eV/Å > {max_force_on_atom:.1e} eV/Å)"
+                )
+                print(msg, flush=True)
+                
         except Exception as e:
-            warnings.warn(f"{algo} failed with an error: {e}")
+
+            msg = f"{algo} failed with an exception: {e}"
+            print(msg, flush=True)
+            
     else:
         raise RuntimeError("All optimization algorithms failed")
     

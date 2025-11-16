@@ -15,11 +15,11 @@
 # | Wavefunction convergence / e | 3.0e-3      | 1.0e-4     | 2.0e-5       |
 # +------------------------------+-------------+------------+--------------+
 #
-TIGHT_ACCURACY_GFN2_XTB = 0.01
+TIGHT_ACCURACY_GFN_XTB = 0.01
 
-def GFN2_xTB(verbose=False):
+def _GFN_xTB(method, verbose=False):
     """
-    Get a calculator for GFN2-xTB with tight accuracy
+    Get a calculator for GFN-xTB with tight accuracy
     settings.
     
     Checks for 'tblite' availability only when called.
@@ -30,11 +30,19 @@ def GFN2_xTB(verbose=False):
     except ImportError:
         raise ImportError(
             "The 'tblite' package is not installed. "
-            "GFN2_xTB calculator cannot be created."
+            "GFN-xTB calculator cannot be created."
         )
         
     return tblite.ase.TBLite(
-        method="GFN2-xTB",
+        method=method,
         verbosity=(1 if verbose else 0),
-        accuracy=TIGHT_ACCURACY_GFN2_XTB,
+        accuracy=TIGHT_ACCURACY_GFN_XTB,
     )
+
+def GFN2_xTB(verbose=False):
+    """Get a calculator for GFN2-xTB."""
+    return _GFN_xTB("GFN2-xTB", verbose)
+        
+def GFN1_xTB(verbose=False):
+    """Get a calculator for GFN1-xTB."""
+    return _GFN_xTB("GFN1-xTB", verbose)
