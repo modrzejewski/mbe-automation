@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Tuple, Literal, overload
 import pandas as pd
+import phonopy
 from phonopy import Phonopy
 import h5py
 import numpy as np
@@ -73,7 +74,12 @@ class Structure:
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="atomic_environments",
             potential_energies: bool=False,
             forces: bool=False,
-    ):
+    ) -> None:
+        """
+        Run MACE inference to compute energies, forces, and feature vectors.
+
+        Updates the object's E_pot, forces, and feature_vectors fields.
+        """
         if not isinstance(calculator, MACECalculator):
             print("Skipping run_neural_network: can be done only for MACE models.")
             return
@@ -99,6 +105,29 @@ class Structure:
             self.feature_vectors_type = feature_vectors_type
         if potential_energies: self.E_pot = mace_output.E_pot
         if forces: self.forces = mace_output.forces
+
+    def save(
+            self,
+            dataset: str,
+            key: str,
+    ) -> None:
+        """Save the structure to a dataset."""
+
+        save_structure(
+            dataset=dataset,
+            key=key,
+            structure=self,
+        )
+
+    @classmethod
+    def read(
+            cls,
+            dataset: str,
+            key: str,
+    ) -> Structure:
+        """Load a structure from a dataset."""
+        
+        return read_structure(dataset, key)
         
     def subsample(
         self,
@@ -299,16 +328,69 @@ class Trajectory(Structure):
             ),
         )
 
+    def save(
+            self,
+            dataset: str,
+            key: str,
+    ) -> None:
+        """Save the trajectory to a dataset."""
+
+        save_trajectory(
+            dataset=dataset,
+            key=key,
+            traj=self,
+        )
+
+    @classmethod
+    def read(
+            cls,
+            dataset: str,
+            key: str,
+    ) -> Trajectory:
+        """Load a trajectory from a dataset."""
+        
+        return read_trajectory(dataset, key)
+
 @dataclass
 class MolecularCrystal:
     supercell: Structure
     index_map: List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
-    centers_of_mass: npt.NDArray[np.floating]
+    #
+    # COM locations for molecules *in the reference frame*
+    # which was used in a call to structure.clusters.detect_molecules.
+    # Note that the reference frame may no longer be present as
+    # one of the frames in a MoleculeCrystal object returned
+    # by MolecularCrystal.subsample.
+    #
+    centers_of_mass: npt.NDArray[np.floating] 
     identical_composition: bool
     n_molecules: int
     central_molecule_index: int
     min_distances_to_central_molecule: npt.NDArray[np.floating]
     max_distances_to_central_molecule: npt.NDArray[np.floating]
+
+    def atomic_numbers(
+            self,
+            molecule_indices: npt.NDArray[np.integer]
+    ) -> npt.NDArray[np.integer]:
+        
+        atom_indices = np.concatenate([self.index_map[i] for i in molecule_indices])
+        return self.supercell.atomic_numbers[atom_indices]
+
+    def positions(
+            self,
+            molecule_indices: npt.NDArray[np.integer],
+            frame_index: int = 0
+    ) -> npt.NDArray[np.floating]:
+        
+        atom_indices = np.concatenate([self.index_map[i] for i in molecule_indices])
+        if self.supercell.positions.ndim == 3:
+            selected_positions = self.supercell.positions[frame_index, atom_indices, :]
+        else:
+            selected_positions = self.supercell.positions[atom_indices, :]
+            
+        return selected_positions
+        
     def subsample(
             self,
             n: int,
@@ -889,10 +971,17 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
 def save_force_constants(
     dataset: str,
     key: str,
-    phonons: Phonopy
+    phonons: phonopy.Phonopy
 ):
     """Save force constants with their primitive and supercell structures."""
 
+    assert isinstance(phonons.force_constants, np.ndarray)
+    assert np.issubdtype(phonons.force_constants.dtype, np.floating)
+    assert isinstance(phonons.supercell_matrix, np.ndarray)
+    assert np.issubdtype(phonons.supercell_matrix.dtype, np.integer)
+    assert isinstance(phonons.supercell, phonopy.structure.atoms.PhonopyAtoms)
+    assert isinstance(phonons.primitive, phonopy.structure.atoms.PhonopyAtoms)
+    
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]

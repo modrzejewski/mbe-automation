@@ -28,9 +28,9 @@ import pymatgen.analysis.molecule_matcher
 
 import mbe_automation.storage
 import mbe_automation.structure.crystal
+import mbe_automation.structure.molecule
 import mbe_automation.common.display
 from mbe_automation.storage.core import MolecularCrystal, UniqueClusters
-from mbe_automation.common.display import Progress
 
 NUMBER_SELECTION = [
     "closest_to_center_of_mass",
@@ -89,13 +89,18 @@ class FiniteSubsystemFilter:
 @dataclass(kw_only=True)
 class UniqueClustersFilter:
     """
-    Filter for finding unique molecular clusters.
+    Filtering settings for finding symmetry-unique molecular clusters in
+    a MolecularCrystal.
     """
-    cluster_types: List[str] = field(default_factory=lambda: ["dimers"])
-    cutoffs: Dict[str, float] = field(default_factory=lambda: {"dimers": 30.0})
+    cluster_types: List[str] = field(
+        default_factory=lambda: ["monomers", "dimers", "trimers"]
+    )
+    cutoffs: Dict[str, float] = field(
+        default_factory=lambda: {"monomers": 30.0, "dimers": 15.0, "trimers": 10.0}
+    )
     alignment_thresh: float = 1.0e-4 # Å
     align_mirror_images: bool = True
-    
+    algorithm: Literal["ase", "pymatgen"] = "ase"
 
 def Label(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
@@ -523,7 +528,9 @@ def extract_finite_subsystem(
         system: mbe_automation.storage.MolecularCrystal,
         filter: FiniteSubsystemFilter=FiniteSubsystemFilter()
 ) -> List[mbe_automation.storage.FiniteSubsystem]:
-
+    """
+    Extract symmetry-unique clusters from a MolecularCrystal.
+    """
     mbe_automation.common.display.framed("Finite subsystem")
     finite_subsystems = []
     
@@ -579,41 +586,33 @@ def extract_unique_clusters(
     molecular_crystal: MolecularCrystal,
     unique_cluster_filter: UniqueClustersFilter,
     frame_index: int = 0,
+    key: str | None = None, # dataset key (only to display a message)
 ) -> Dict[str, UniqueClusters]:
 
-    if not (0 <= frame_index < molecular_crystal.supercell.n_frames):
-        raise ValueError(f"frame_index ({frame_index}) is out of bounds for supercell with {molecular_crystal.supercell.n_frames} frames.")
-    if molecular_crystal.supercell.atomic_numbers.ndim != 1:
-        raise ValueError("molecular_crystal.supercell.atomic_numbers must be a 1D array.")
+    assert (0 <= frame_index < molecular_crystal.supercell.n_frames)
+    assert molecular_crystal.supercell.atomic_numbers.ndim == 1
     
     if molecular_crystal.supercell.positions.ndim == 3:
         positions_supercell = molecular_crystal.supercell.positions[frame_index]
     else:
         positions_supercell = molecular_crystal.supercell.positions
 
-    def _pymatgen_molecule(
-            indices: npt.NDArray[np.integer]
-    ) -> pymatgen.core.Molecule:
-        
-        atom_indices = np.concatenate([molecular_crystal.index_map[i] for i in indices])
-        positions = positions_supercell[atom_indices, :]
-        atomic_numbers = molecular_crystal.supercell.atomic_numbers[atom_indices]
-        return pymatgen.core.Molecule(
-            species=atomic_numbers,
-            coords=positions
+    cluster_size_map = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
+
+    if key is not None:
+        mbe_automation.common.display.framed([
+            "Symmetry-unique molecular clusters",
+            key
+        ])
+    else:
+        mbe_automation.common.display.framed(
+            "Symmetry-unique molecular clusters"
         )
 
-    def _are_distances_similar(
-            dists1: npt.NDArray[np.floating],
-            dists2: npt.NDArray[np.floating],
-            threshold: float,
-    ) -> bool:
-        
-        if len(dists1) != len(dists2):
-            return False
-        return np.max(np.abs(dists1 - dists2)) < threshold
-
-    cluster_size_map = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
+    print(f"cluster_types        {unique_cluster_filter.cluster_types}")
+    print(f"alignment_thresh     {unique_cluster_filter.alignment_thresh} Å")
+    print(f"align_mirror_images  {unique_cluster_filter.align_mirror_images}")
+    print(f"algorithm            {unique_cluster_filter.algorithm}")
 
     max_cutoff = 0.0
     if unique_cluster_filter.cutoffs:
@@ -627,8 +626,11 @@ def extract_unique_clusters(
         molecular_crystal.min_distances_to_central_molecule < max_cutoff
     )[0]
 
-    if central_molecule_idx not in candidate_molecule_indices:
-        candidate_molecule_indices = np.append(candidate_molecule_indices, central_molecule_idx)
+    if molecular_crystal.central_molecule_index not in candidate_molecule_indices:
+        candidate_molecule_indices = np.append(
+            candidate_molecule_indices,
+            molecular_crystal.central_molecule_index
+        )
 
     n_mols = molecular_crystal.n_molecules
     min_rij = np.full((n_mols, n_mols), np.inf)
@@ -681,98 +683,105 @@ def extract_unique_clusters(
         cutoff = unique_cluster_filter.cutoffs[cluster_type]
         n = cluster_size_map[cluster_type]
         #
-        # Create a list of all possible clusters of size n using only the pre-filtered candidate molecules.
+        # Filter neighbors according to distance to the center
         #
-        central_molecule = molecular_crystal.central_molecule_index
-        other_candidate_molecules = [i for i in candidate_molecule_indices if i != central_molecule]
-        print(f"Computing unique {cluster_type}s with cutoff < {cutoff:.2f} Å")
+        filtered_neighbors = [
+            i for i in candidate_molecule_indices if (
+                i != molecular_crystal.central_molecule_index and
+                min_rij[molecular_crystal.central_molecule_index, i] < cutoff
+            )
+        ]
+        print(f"{cluster_type} with cutoff < {cutoff:.2f} Å...")
         
-        progress = Progress(
-            iterable=itertools.combinations(other_candidate_molecules, n - 1),
-            n_total_steps=scipy.special.comb(len(other_candidate_molecules), n - 1, exact=True),
-            label=f"{cluster_type}s",
+        progress = mbe_automation.common.display.Progress(
+            iterable=itertools.combinations(filtered_neighbors, n - 1),
+            n_total_steps=scipy.special.comb(len(filtered_neighbors), n - 1, exact=True),
+            label="",
         )
 
         unique_indices_list = []
         unique_weights_list = []
-        unique_matchers_list = []
         unique_min_dists_list = []
         unique_max_dists_list = []
 
         for combo in progress:
-            indices = np.array([central_molecule] + list(combo))
+            indices_current = np.array([
+                molecular_crystal.central_molecule_index
+            ] + list(combo))
             #            
-            # Filter clusters based on the cutoff distance
+            # Filter neighbors according to the remaining
+            # molecule-molecule distances
             #
             within_cutoff = True
-            for i, j in itertools.combinations(indices, 2):
-                if min_rij[i, j] >= cutoff:
-                    within_cutoff = False
-                    break
-                
+            if n > 2:
+                for i, j in itertools.combinations(combo, 2):
+                    if min_rij[i, j] >= cutoff:
+                        within_cutoff = False
+                        break
+
             if not within_cutoff:
                 continue
-            #
-            # Now we are looking if the current cluster is symmetry-unique
-            # or is it equivalent to some of the already accepted clusters
-            #
-            min_dists = np.sort([min_rij[p1, p2] for p1, p2 in itertools.combinations(indices, 2)])
-            max_dists = np.sort([max_rij[p1, p2] for p1, p2 in itertools.combinations(indices, 2)])
 
+            min_dists_current = np.sort(
+                [min_rij[p1, p2] for p1, p2 in itertools.combinations(indices_current, 2)]
+            )
+            max_dists_current = np.sort(
+                [max_rij[p1, p2] for p1, p2 in itertools.combinations(indices_current, 2)]
+            )
+            positions_current = molecular_crystal.positions(
+                molecule_indices=indices_current,
+                frame_index=frame_index,
+            )
+            atomic_numbers_current = molecular_crystal.atomic_numbers(
+                molecule_indices=indices_current,
+            )
             is_unique = True
-            for i, unique_matcher in enumerate(unique_matchers_list):
+            #
+            # Run a loop over all previously accepted clusters to check
+            # if the current cluster is symmetry-unique
+            #
+            for i, indices_ref in enumerate(unique_indices_list):
+                # 
+                # Quick, distance-only test here is design to avoid
+                # unnecessary expensive tests using RMSD.
                 #
-                # First, we do a simple test by comparing sorted min and max
-                # atom-atom distances between pairs of molecules. A quick test
-                # here is design to avoid unnecessary expensive tests using RMSD.
-                #
-                if _are_distances_similar(
-                        min_dists,
-                        unique_min_dists_list[i],
-                        unique_cluster_filter.alignment_thresh
-                ) and _are_distances_similar(
-                    max_dists,
-                    unique_max_dists_list[i],
-                    unique_cluster_filter.alignment_thresh
-                ):
+                min_dists_ref = unique_min_dists_list[i]                
+                if (np.max(np.abs(min_dists_current - min_dists_ref)) <
+                    unique_cluster_filter.alignment_thresh):
 
-                    cluster_mol = _pymatgen_molecule(indices)
-                    _, dist = unique_matcher.fit(cluster_mol)
-
-                    if (dist > unique_cluster_filter.alignment_thresh
-                        and unique_cluster_filter.align_mirror_images):
+                    positions_ref = molecular_crystal.positions(
+                        molecule_indices=indices_ref,
+                        frame_index=frame_index,
+                    )
+                    atomic_numbers_ref = molecular_crystal.atomic_numbers(
+                        molecule_indices=indices_ref,
+                    )
+                    rmsd = mbe_automation.structure.molecule.match(
+                        positions_a=positions_current,
+                        atomic_numbers_a=atomic_numbers_current,
+                        positions_b=positions_ref,
+                        atomic_numbers_b=atomic_numbers_ref,
+                        thresh_for_mirror_check=(
+                            unique_cluster_filter.alignment_thresh
+                            if unique_cluster_filter.align_mirror_images else None
+                        ),
+                        algorithm=unique_cluster_filter.algorithm,
+                    )
+                    if rmsd < unique_cluster_filter.alignment_thresh:
                         #
-                        # Define reflection matrix for a mirror plane with normal (0, 1, 0)
+                        # At this point, the expensive check has confirmed
+                        # that we have found an equivalent cluster which
+                        # is already on the accepted list.
                         #
-                        mirrored_cluster_mol = cluster_mol.copy()
-                        reflection_matrix = np.array([
-                            [1,  0,  0],
-                            [0, -1,  0],
-                            [0,  0,  1]
-                        ])
-                        mirrored_cluster_mol.apply_operation(
-                            pymatgen.core.operations.SymmOp.from_rotation_and_translation(
-                                reflection_matrix, (0, 0, 0)
-                            )
-                        )
-                        _, dist = unique_matcher.fit(mirrored_cluster_mol)
-
-                    if dist < unique_cluster_filter.alignment_thresh:
                         is_unique = False
                         unique_weights_list[i] += 1
                         break
 
             if is_unique:
-                unique_indices_list.append(indices)
+                unique_indices_list.append(indices_current)
                 unique_weights_list.append(1)
-                unique_min_dists_list.append(min_dists)
-                unique_max_dists_list.append(max_dists)
-                cluster_mol = _pymatgen_molecule(indices)
-                unique_matchers_list.append(
-                    pymatgen.analysis.molecule_matcher.HungarianOrderMatcher(
-                        cluster_mol
-                    )
-                )
+                unique_min_dists_list.append(min_dists_current)
+                unique_max_dists_list.append(max_dists_current)
 
         if not unique_indices_list:
             continue
@@ -788,7 +797,6 @@ def extract_unique_clusters(
             max_distances=(np.array(unique_max_dists_list) if n > 1 else np.array([])),
         )
 
-        print(f"Generated {results[cluster_type].n_clusters} unique {cluster_type} with "
-              f"max min Rij < {unique_cluster_filter.cutoffs[cluster_type]:.2f} Å")
+        print(f"Found {results[cluster_type].n_clusters} symmetry-unique {cluster_type}")
 
     return results

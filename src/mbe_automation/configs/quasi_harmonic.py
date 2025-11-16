@@ -10,7 +10,8 @@ class FreeEnergy:
     """
     Default parameters for free energy calculations
     in the quasi-harmonic approximation.
-    """                            #
+    """
+                                   #
                                    # Initial, nonrelaxed structures of crystal
                                    # and isolated molecule
                                    #
@@ -292,7 +293,7 @@ class FreeEnergy:
                                    
     @classmethod
     def from_template(cls,
-                  model_name: Literal["default", "MACE", "UMA"],
+                  model_name: Literal["default", "MACE", "UMA", "gfn2-xtb"],
                   crystal: Atoms,
                   molecule: Atoms,
                   calculator: Any,

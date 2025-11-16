@@ -9,7 +9,7 @@ from ase.calculators.calculator import Calculator as ASECalculator
 
 from mbe_automation.configs.md import ClassicalMD
 from mbe_automation.structure.clusters import FiniteSubsystemFilter
-from mbe_automation.dynamics.harmonic.modes import PhononFilter
+from mbe_automation.dynamics.harmonic.modes import PhononFilter, AMPLITUDE_SCAN_MODES
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
 
 @dataclass(kw_only=True)
@@ -58,12 +58,29 @@ class PhononSampling:
                                    # Method for scanning (probing) the normal-mode
                                    # coordinates.
                                    #
-                                   # random: Dynamical matrix eigenvectors are
+                                   # equidistant
+                                   # -----------
+                                   # Dynamical matrix eigenvectors
+                                   # are multiplied by
+                                   #
+                                   # ζ * Exp(i*k*r) * A_jk
+                                   #
+                                   # where ζ represents a series of equidistant points
+                                   # on the interval (-1, 1). This scanning mode
+                                   # should be used to get the projection of the
+                                   # potential energy surface onto a selected normal
+                                   # coordinate.
+                                   #
+                                   # random
+                                   # ------
+                                   # Dynamical matrix eigenvectors are
                                    # multiplied by
                                    #
                                    # ξ_jk * Exp(i*k*r) * A_jk
                                    #
-                                   # time_propagation: Dynamical matrix eigenvectors are
+                                   # time_propagation
+                                   # ----------------
+                                   # Dynamical matrix eigenvectors are
                                    # multiplied by
                                    #
                                    # Exp(-i*omega_jk*t) * Exp(i*k*r) * A_jk
@@ -81,7 +98,7 @@ class PhononSampling:
                                    #    There are n_frames independent random points
                                    #    for each (j,k).
                                    #
-    amplitude_scan: Literal["time_propagation", "random"] = "random"
+    amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "random"
                                    #
                                    # Distance between time points
                                    # (referenced only if amplitude_scan=="time_propagation")

@@ -27,6 +27,8 @@ from mbe_automation.storage.core import (
     read_trajectory,
     save_molecular_crystal,
     read_molecular_crystal,
+    save_unique_clusters,
+    read_unique_clusters,
     save_finite_subsystem,
     read_finite_subsystem,
     
@@ -73,6 +75,8 @@ __all__ = [
     "read_trajectory",
     "save_molecular_crystal",
     "read_molecular_crystal",
+    "save_unique_clusters",
+    "read_unique_clusters",
     "save_finite_subsystem",
     "read_finite_subsystem",
     "read_gamma_point_eigenvecs",
