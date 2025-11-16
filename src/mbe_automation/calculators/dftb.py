@@ -103,6 +103,7 @@ def GFN2_xTB():
         Parallel_UseOmpThreads = "Yes",
         kpts=kpts
     )
+    return calc
 
 
 def DFTB_Plus_MBD(elements):
