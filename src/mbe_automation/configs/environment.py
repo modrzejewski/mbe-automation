@@ -39,7 +39,7 @@ class ParallelCPU:
     @classmethod
     def recommended(
             cls,
-            model: Literal["beyond-rpa", "gfn2-xtb"],
+            model_name: Literal["rpa", "gfn2-xtb"],
             **kwargs
     ):
         modified_params = {}
@@ -60,10 +60,10 @@ class ParallelCPU:
         # tblite (GFN2-xTB): 4 GB stack for large systems
         # is recommended in the documentation of tblite.
         #
-        if model == "beyond-rpa":
+        if model_name == "rpa":
             modified_params["stack_size_threads"] = 64
         
-        elif model == "gfn2-xtb":
+        elif model_name == "gfn2-xtb":
             modified_params["stack_size_threads"] = 4 * 1024
 
         modified_params.update(kwargs)
