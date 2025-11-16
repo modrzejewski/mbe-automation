@@ -96,7 +96,8 @@ def GFN2_xTB():
     calc = Dftb(
         Hamiltonian_="xTB",
         Hamiltonian_Method="GFN2-xTB",
-        Hamiltonian_SCCTolerance=scc_tolerance, 
+        Hamiltonian_SCCTolerance=scc_tolerance,
+        Hamiltonian_MaxSCCIterations=250,
         ParserOptions_ = "",
         ParserOptions_ParserVersion = 10,
         Parallel_ = "",
