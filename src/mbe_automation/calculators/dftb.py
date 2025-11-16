@@ -188,7 +188,7 @@ def DFTB3_D4(elements):
     # Create max_angular_momentum parameters dynamically
     max_angular_momentum_params = {}
     hubbard_params = {}
-    for element in elements:
+    for element in unique_elements:
         if element in MAX_ANGULAR_MOMENTA_3OB_3_1:
             key = f'Hamiltonian_MaxAngularMomentum_{element}'
             max_angular_momentum_params[key] = MAX_ANGULAR_MOMENTA_3OB_3_1[element]
