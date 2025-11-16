@@ -7,7 +7,7 @@ xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
 work_dir = os.path.abspath(os.path.dirname(__file__))
 
-env_config = mbe_automation.configs.environment.recommended(model_name="gfn2-xtb")
+env_config = mbe_automation.configs.execution.recommended(model_name="gfn2-xtb")
 env_config.set()
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.from_template(
