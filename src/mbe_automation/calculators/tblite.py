@@ -26,6 +26,7 @@ def GFN2_xTB(verbose=False):
     """
     try:
         import tblite
+        import tblite.ase
     except ImportError:
         raise ImportError(
             "The 'tblite' package is not installed. "
