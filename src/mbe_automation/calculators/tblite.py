@@ -51,6 +51,7 @@ def _GFN_xTB(method, verbose=False):
         method=method,
         verbosity=(1 if verbose else 0),
         accuracy=TIGHT_ACCURACY_GFN_XTB,
+        electronic_temperature=0.0,
     )
 
 def GFN2_xTB(verbose=False):
