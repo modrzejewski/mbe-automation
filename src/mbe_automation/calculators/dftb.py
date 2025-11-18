@@ -217,13 +217,11 @@ def DFTB3_D4(elements):
         Hamiltonian_Dispersion_s9 = 1.0,       # enables 3-body disp
         Hamiltonian_Dispersion_a1 = 0.5523240,
         Hamiltonian_Dispersion_a2 = 4.3537076,
-        Analysis_ = "",
-        Analysis_Printforces = "Yes",
         Parallel_ = "",
         Parallel_UseOmpThreads = "Yes",
         kpts=kpts,
         ParserOptions_ = "",
-        ParserOptions_ParserVersion = 14,
+        ParserOptions_ParserVersion = 12,
     )
     
     return calc
