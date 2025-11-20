@@ -96,11 +96,9 @@ class DFTBCustom(Dftb):
         pressure_Pa = pressure_GPa * 1.0E9
 
         driver_config = {
-            "Driver_": "GeometryOptimisation",
-            "Driver_Optimiser": "LBFGS {}",
+            "Driver_": "LBFGS",
             "Driver_MovedAtoms": "1:-1",
-            "Driver_Convergence_": "",
-            "Driver_Convergence_GradElem [eV/Angstrom]": max_force_on_atom,
+            "Driver_MaxForceComponent [eV/Angstrom]": max_force_on_atom,
             "Driver_MaxSteps": max_steps,
             "Driver_LatticeOpt": "Yes" if optimize_lattice_vectors else "No",
             "Driver_AppendGeometries": "No"
@@ -249,10 +247,10 @@ def DFTB3_D4(elements):
         Hamiltonian_SCC='Yes',
         Hamiltonian_HCorrection_='Damping',
         Hamiltonian_HCorrection_Exponent = HCORRECTION_EXPONENT_3OB_3_1,
-        Hamiltonian_SlaterKosterFiles_Type='Type2FileNames',
-        Hamiltonian_SlaterKosterFiles_Prefix=params_dir_str,
-        Hamiltonian_SlaterKosterFiles_Separator='-',
-        Hamiltonian_SlaterKosterFiles_Suffix='.skf',
+        Hamiltonian_SlaterKosterFiles_='Type2FileNames',
+        Hamiltonian_Prefix=params_dir_str,
+        Hamiltonian_Separator='-',
+        Hamiltonian_Suffix='.skf',
         Hamiltonian_SCCTolerance=scc_tolerance,    
         Hamiltonian_Dispersion_='DFTD4',
         Hamiltonian_Dispersion_s6 = 1.0,
