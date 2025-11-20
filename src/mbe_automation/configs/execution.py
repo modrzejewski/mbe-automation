@@ -32,9 +32,9 @@ class ParallelCPU:
             print(f"Warning: Could not set RLIMIT_STACK: {e}")
 
         os.environ["OMP_NUM_THREADS"] = f"{self.n_cores},1"
+        os.environ["MKL_NUM_THREADS"] = f"{self.n_cores}"
         os.environ["OMP_MAX_ACTIVE_LEVELS"] = "1"
         os.environ["OMP_STACKSIZE"] = f"{self.stack_size_threads}M"
-        os.environ["MKL_NUM_THREADS"] = f"{self.n_cores}"
     
     @classmethod
     def recommended(

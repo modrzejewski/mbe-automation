@@ -1,11 +1,7 @@
-from __future__ import annotations
-from pathlib import Path
-import ase
 from ase.calculators.dftb import Dftb
 import os.path
 import numpy as np
-
-import mbe_automation.storage
+from pathlib import Path
 
 SCC_TOLERANCE = 1.0E-8
 #
@@ -77,46 +73,6 @@ HUBBARD_DERIVATIVES_3OB_3_1 = {
 #
 HCORRECTION_EXPONENT_3OB_3_1 = 4.00
 
-class DFTBCustom(Dftb):
-    """
-    Extended DFTB+ calculator with support for internal geometry relaxation.
-    """
-
-    def for_relaxation(
-            self,
-            optimize_lattice_vectors=True,
-            pressure_GPa=0.0,
-            max_force_on_atom=1.0E-3,
-            max_steps=500,
-            work_dir: Path = Path("./"),
-    ):
-        """
-        Return a calculator copy configured for internal geometry relaxation.
-        """
-        pressure_Pa = pressure_GPa * 1.0E9
-
-        driver_config = {
-            "Driver_": "GeometryOptimisation",
-            "Driver_GeometryOptimisation_Optimiser": "Rational {}",
-            "Driver_GeometryOptimisation_MovedAtoms": "1:-1",
-            "Driver_GeometryOptimisation_MaxForceComponent [eV/Angstrom]": max_force_on_atom,
-            "Driver_GeometryOptimisation_MaxSteps": max_steps,
-            "Driver_GeometryOptimisation_LatticeOpt": "Yes" if optimize_lattice_vectors else "No",
-            "Driver_GeometryOptimisation_AppendGeometries": "No"
-        }
-
-        if optimize_lattice_vectors:
-            driver_config["Driver_GeometryOptimisation_Pressure [Pa]"] = pressure_Pa
-
-        new_parameters = self.parameters.copy()
-        new_parameters.update(driver_config)
-
-        return DFTBCustom(
-            atoms=self.atoms,
-            kpts=self.kpts,
-            directory=work_dir,
-            **new_parameters
-        )
 
 def params_dir_3ob_3_1():
     """Get the absolute path to the skfiles parameter directory."""
@@ -138,7 +94,7 @@ def params_dir_3ob_3_1():
 def _GFN_xTB(method):
     kpts = [1, 1, 1]
     scc_tolerance = SCC_TOLERANCE
-    return DFTBCustom(
+    calc = Dftb(
         Hamiltonian_="xTB",
         Hamiltonian_Method=method,
         Hamiltonian_SCCTolerance=scc_tolerance,
@@ -149,7 +105,7 @@ def _GFN_xTB(method):
         Parallel_UseOmpThreads = "Yes",
         kpts=kpts
     )
-
+    return calc
 
 def GFN1_xTB():
     return _GFN_xTB("GFN1-xTB")
@@ -180,7 +136,7 @@ def DFTB_Plus_MBD(elements):
         else:
             print(f"Warning: No predefined MaxAngularMomentum/HubbardDerivs params for element {element}. Please add it manually.")
 
-    return DFTBCustom(
+    calc = Dftb(
         Hamiltonian_ThirdOrderFull='Yes',
         Hamiltonian_MaxAngularMomentum_="",
         **max_angular_momentum_params,
@@ -203,6 +159,8 @@ def DFTB_Plus_MBD(elements):
         Parallel_UseOmpThreads = "Yes",
         kpts=kpts
     )
+
+    return calc
 
 
 def DFTB3_D4(elements):
@@ -239,7 +197,7 @@ def DFTB3_D4(elements):
         else:
             print(f"Warning: No predefined MaxAngularMomentum/HubbardDerivs params for element {element}. Please add it manually.")
 
-    return DFTBCustom(
+    calc = Dftb(
         Hamiltonian_ThirdOrderFull='Yes',
         Hamiltonian_MaxAngularMomentum_="",
         **max_angular_momentum_params,
@@ -259,47 +217,11 @@ def DFTB3_D4(elements):
         Hamiltonian_Dispersion_s9 = 1.0,       # enables 3-body disp
         Hamiltonian_Dispersion_a1 = 0.5523240,
         Hamiltonian_Dispersion_a2 = 4.3537076,
-        Parallel_ = "",
-        Parallel_UseOmpThreads = "Yes",
-        kpts=kpts,
         ParserOptions_ = "",
         ParserOptions_ParserVersion = 12,
-    )
-
-
-def relax(
-        system: ase.Atoms,
-        calculator: DFTBCustom,
-        pressure_GPa: float = 0.0,
-        optimize_lattice_vectors: bool = True,
-        max_force_on_atom: float = 1.0E-3,
-        max_steps: int = 500,
-        work_dir: Path | str = Path("./")
-):
-    """
-    Relax coordinates/cell using DFTB+ internal driver.
-    """
-    work_dir = Path(work_dir)
-    work_dir.mkdir(parents=True, exist_ok=True)
-
-    calc = calculator.for_relaxation(
-        optimize_lattice_vectors=optimize_lattice_vectors,
-        pressure_GPa=pressure_GPa,
-        max_force_on_atom=max_force_on_atom,
-        max_steps=max_steps,
-        work_dir=work_dir,
+        Parallel_ = "",
+        Parallel_UseOmpThreads = "Yes",
+        kpts=kpts
     )
     
-    calc.calculate(system)
-
-    output_file = work_dir / "geo_end.gen"
-    if output_file.exists():
-        #
-        # from_xyz_file automatically detects
-        # the DFTB+ gen format from ".gen" extension
-        #
-        relaxed_system = mbe_automation.storage.from_xyz_file(str(output_file))
-    else:
-        raise RuntimeError("Relaxation with dftb+ failed. No output geometry was generated.")
-        
-    return relaxed_system
+    return calc

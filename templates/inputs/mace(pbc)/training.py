@@ -49,8 +49,7 @@ md_sampling_config = MDSampling(
 )
 mbe_automation.workflows.training.run(md_sampling_config)
 
-free_energy_config = FreeEnergy.recommended(
-    model_name="mace",
+free_energy_config = FreeEnergy(
     crystal=from_xyz_file(xyz_solid),
     calculator=mace_calc,
     thermal_expansion=False,
