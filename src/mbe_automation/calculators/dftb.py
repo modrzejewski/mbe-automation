@@ -97,16 +97,16 @@ class DFTBCustom(Dftb):
 
         driver_config = {
             "Driver_": "GeometryOptimisation",
-            "Driver_GeometryOptimisation_Optimiser": "Rational {}",
-            "Driver_GeometryOptimisation_MovedAtoms": "1:-1",
-            "Driver_GeometryOptimisation_MaxForceComponent [eV/Angstrom]": max_force_on_atom,
-            "Driver_GeometryOptimisation_MaxSteps": max_steps,
-            "Driver_GeometryOptimisation_LatticeOpt": "Yes" if optimize_lattice_vectors else "No",
-            "Driver_GeometryOptimisation_AppendGeometries": "No"
+            "Driver_Optimiser": "Rational {}",
+            "Driver_MovedAtoms": "1:-1",
+            "Driver_MaxForceComponent [eV/Angstrom]": max_force_on_atom,
+            "Driver_MaxSteps": max_steps,
+            "Driver_LatticeOpt": "Yes" if optimize_lattice_vectors else "No",
+            "Driver_AppendGeometries": "No"
         }
 
         if optimize_lattice_vectors:
-            driver_config["Driver_GeometryOptimisation_Pressure [Pa]"] = pressure_Pa
+            driver_config["Driver_Pressure [Pa]"] = pressure_Pa
 
         new_parameters = self.parameters.copy()
         new_parameters.update(driver_config)
