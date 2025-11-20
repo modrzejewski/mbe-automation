@@ -65,28 +65,28 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         )
 
     if config.thermal_expansion:
-        assert config.relax_input_cell in ["full", "constant_volume"]
+        assert config.relaxation.cell_relaxation in ["full", "constant_volume"]
 
-    if config.relax_input_cell == "full":
+    if config.relaxation.cell_relaxation == "full":
         relaxed_crystal_label = "crystal[opt:atoms,shape,V]"
-    elif config.relax_input_cell == "constant_volume":
+    elif config.relaxation.cell_relaxation == "constant_volume":
         relaxed_crystal_label = "crystal[opt:atoms,shape]"
-    elif config.relax_input_cell == "only_atoms":
+    elif config.relaxation.cell_relaxation == "only_atoms":
         relaxed_crystal_label = "crystal[opt:atoms]"
     #
-    # Reference cell relaxation:
-    # (1) reference cell volume (V0) if relax_input_cell=full
-    # (2) reference cell shape (lattice vectors) if relax_input_cell=full or constant_volume
-    # (3) atomic positions always
+    # Volume relaxation will be carried out only if
+    # config.relaxation.cell_relaxation=full.
+    # Otherwise, the reference volume (V0) will be equal
+    # to the input cell volume.
     #
     # Volume relaxation gives a periodic cell at T=0K
-    # without the effect of zero-point vibrations.
+    # without the effect of zero-point vibrations unless
+    # user provides effective thermal pressure
+    # as the input parameter.
     #
     # In thermal expansion calculations, the points on
     # the volume axis will be determined by applying
-    # scaling factors with respect to V0. If no volume
-    # relaxation is performed here, V0 is equal to the
-    # input volume.
+    # scaling factors with respect to V0.
     #
     unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
         unit_cell=unit_cell,
