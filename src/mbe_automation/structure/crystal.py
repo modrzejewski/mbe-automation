@@ -17,7 +17,7 @@ import pymatgen
 
 import mbe_automation.storage
 import mbe_automation.common
-from mbe_automation.configs.structure.import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 try:
     from doped.generation import get_ideal_supercell_matrix
