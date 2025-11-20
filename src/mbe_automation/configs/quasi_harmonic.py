@@ -144,7 +144,7 @@ class FreeEnergy:
                                    #
                                    # Scaling factors used to sample volumes w.r.t.
                                    # the reference cell volume V0 obtained by relaxing
-                                   # the input structure (see relax_input_cell).
+                                   # the input structure (see relaxation.cell_relaxation).
                                    #
                                    # Recommendations from the literature:
                                    #
@@ -187,15 +187,6 @@ class FreeEnergy:
                                    #
     pressure_range: npt.NDArray[np.floating] = field(default_factory=lambda:
                                                      np.array([0.2, 0.0, -0.2, -0.3, -0.4, -0.5, -0.6]))
-                                   #
-                                   # Relaxation of the input structure
-                                   #
-                                   # (1) for thermal expansion calculations
-                                   #     must be either full or constant_volume.
-                                   # (2) for harmonic calculations without thermal
-                                   #     expansion all three settings are allowed.
-                                   #
-    relax_input_cell: Literal["full", "constant_volume", "only_atoms"] = "constant_volume"
                                    #
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.
@@ -247,7 +238,10 @@ class FreeEnergy:
     save_xyz: bool = True
 
     def __post_init__(self):
-        if self.thermal_expansion and self.relax_input_cell == "only_atoms":
+        if (
+                self.thermal_expansion and
+                self.relaxation.cell_relaxation == "only_atoms"
+        ):
             raise ValueError("Calculations with thermal expansion require "
                              "relaxed_input_cell set to 'full' or 'constant_volume'")
 
