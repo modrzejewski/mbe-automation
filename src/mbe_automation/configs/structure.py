@@ -2,8 +2,19 @@ from __future__ import annotations
 from typing import Literal, Tuple, List
 from dataclasses import dataclass
 
-import mbe_automation.structure.crystal
 from mbe_automation.configs.recommended import SEMIEMPIRICAL_DFTB, KNOWN_MODELS
+#
+# Tolerances for symmetry detection and refinement
+#
+# (1) Strict tolerance: recommended for phonon calculations.
+#     1.0E-05 is the default value used in phonopy.
+# (2) Loose tolerance: recommended for symmetry refinement
+#     of a structure after coordinate relaxation.
+#     1.0E-2 is the default value in pymatgen for
+#     symmetry refinement.
+#
+SYMMETRY_TOLERANCE_STRICT = 1.0E-5
+SYMMETRY_TOLERANCE_LOOSE = 1.0E-2
 
 @dataclass(kw_only=True)
 class Minimum:
@@ -71,12 +82,12 @@ class Minimum:
                                    # for imperfect structures after relaxation with a finite
                                    # convergence threshold.
                                    #
-    symmetry_tolerance_loose: float = mbe_automation.structure.crystal.SYMMETRY_TOLERANCE_LOOSE
+    symmetry_tolerance_loose: float = SYMMETRY_TOLERANCE_LOOSE
                                    #
                                    # Tolerance (in Angstrom) used for definite
                                    # symmetry detection after symmetrization.
                                    #
-    symmetry_tolerance_strict: float = mbe_automation.structure.crystal.SYMMETRY_TOLERANCE_STRICT
+    symmetry_tolerance_strict: float = SYMMETRY_TOLERANCE_STRICT
                                    #
                                    # External isotropic pressure (GPa) applied during
                                    # lattice relaxation.

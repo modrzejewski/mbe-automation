@@ -17,6 +17,7 @@ import pymatgen
 
 import mbe_automation.storage
 import mbe_automation.common
+from mbe_automation.configs.structure.import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 try:
     from doped.generation import get_ideal_supercell_matrix
@@ -26,18 +27,6 @@ except ImportError:
     get_ideal_supercell_matrix = None
     get_min_image_distance = None
     doped_available = False
-#
-# Tolerances for symmetry detection and refinement
-#
-# (1) Strict tolerance: recommended for phonon calculations.
-#     1.0E-05 is the default value used in phonopy.
-# (2) Loose tolerance: recommended for symmetry refinement
-#     of a structure after coordinate relaxation.
-#     1.0E-2 is the default value in pymatgen for
-#     symmetry refinement.
-#
-SYMMETRY_TOLERANCE_STRICT = 1.0E-5
-SYMMETRY_TOLERANCE_LOOSE = 1.0E-2
 
 def display(unit_cell: ase.Atoms, key: str | None=None) -> None:
     """
