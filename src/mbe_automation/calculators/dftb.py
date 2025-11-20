@@ -100,7 +100,7 @@ class DFTBCustom(Dftb):
             "Driver_Optimizer": "LBFGS {}",
             "Driver_MovedAtoms": "1:-1",
             "Driver_Convergence_": "",
-            "Driver_GradElem [eV/Angstrom]": max_force_on_atom,
+            "Driver_Convergence_GradElem [eV/Angstrom]": max_force_on_atom,
             "Driver_MaxSteps": max_steps,
             "Driver_LatticeOpt": "Yes" if optimize_lattice_vectors else "No",
             "Driver_AppendGeometries": "No"
