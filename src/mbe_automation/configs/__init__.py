@@ -2,9 +2,5 @@ from . import quasi_harmonic
 from . import md
 from . import training
 from . import execution
-
-__all__ = [
-    "quasi_harmonic",
-    "md",
-    "training",
-]
+from . import structure
+from . import recommended

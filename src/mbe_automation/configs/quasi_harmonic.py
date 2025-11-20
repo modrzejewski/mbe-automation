@@ -1,9 +1,14 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, List, Literal, Union
+import ase
 from ase import Atoms
 from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
 import numpy.typing as npt
+
+from mbe_automation.configs.recommended import KNOWN_MODELS
+from mbe_automation.configs.structure import Minimum
 
 @dataclass(kw_only=True)
 class FreeEnergy:
@@ -15,8 +20,8 @@ class FreeEnergy:
                                    # Initial, nonrelaxed structures of crystal
                                    # and isolated molecule
                                    #
-    crystal: Atoms
-    molecule: Atoms | None = None
+    crystal: ase.Atoms
+    molecule: ase.Atoms | None = None
                                    #
                                    # Calculator of energies and forces
                                    #
@@ -52,54 +57,9 @@ class FreeEnergy:
                                    #
     temperatures_K: npt.NDArray[np.floating] = field(default_factory=lambda: np.array([298.15]))
                                    #
-                                   # Refine the space group symmetry after
-                                   # each geometry relaxation of the unit cell.
+                                   # Parameters controlling geometry relaxation
                                    #
-                                   # This works well if the threshold for
-                                   # geometry optimization is tight. Otherwise,
-                                   # symmetrization may introduce significant
-                                   # residual forces on atoms.
-                                   #
-    symmetrize_unit_cell: bool = True
-                                   #
-                                   # Threshold for maximum resudual force
-                                   # after geometry relaxation (eV/Angs).
-                                   #
-                                   # Should be extra tight if:
-                                   # (1) you run space group recognition with tight threshold (symprec=1.0E-5)
-                                   # (2) supercell_displacement is small
-                                   #
-                                   # Recommendations from literature:
-                                   #
-                                   # (1) 5 * 10**(-3) eV/Angs in
-                                   #     Dolgonos, Hoja, Boese, Revised values for the X23 benchmark
-                                   #     set of molecular crystals,
-                                   #     Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
-                                   # (2) 10**(-4) eV/Angs in
-                                   #     Hoja, Reilly, Tkatchenko, WIREs Comput Mol Sci 2016;
-                                   #     doi: 10.1002/wcms.1294 
-                                   # (3) 5 * 10**(-3) eV/Angs for MLIPs in
-                                   #     Loew et al., Universal machine learning interatomic potentials
-                                   #     are ready for phonons, npj Comput Mater 11, 178 (2025);
-                                   #     doi: 10.1038/s41524-025-01650-1
-                                   # (4) 5 * 10**(-3) eV/Angs for MLIPs in
-                                   #     Cameron J. Nickersona and Erin R. Johnson, Assessment of a foundational
-                                   #     machine-learned potential for energy ranking of molecular crystal polymorphs,
-                                   #     Phys. Chem. Chem. Phys. 27, 11930 (2025); doi: 10.1039/d5cp00593k
-                                   # (5) 0.01 eV/Angs for UMA MLIP and 0.001 eV/Angs for DFT in
-                                   #     Gharakhanyan et al.
-                                   #     FastCSP: Accelerated Molecular Crystal Structure
-                                   #     Prediction with Universal Model for Atoms;
-                                   #     arXiv:2508.02641
-                                   #
-    max_force_on_atom: float = 1.0E-4
-                                   #
-                                   # Algorithms applied for structure
-                                   # relaxation. If relax_algo_primary
-                                   # fails, relax_algo_fallback is used.
-                                   #
-    relax_algo_primary: Literal["PreconLBFGS", "PreconFIRE"] = "PreconLBFGS"
-    relax_algo_fallback: Literal["PreconLBFGS", "PreconFIRE"] = "PreconFIRE"
+    relaxation: Minimum = field(default_factory=Minimum)
                                    #
                                    # Directory where files are stored
                                    # at runtime
@@ -292,12 +252,14 @@ class FreeEnergy:
                              "relaxed_input_cell set to 'full' or 'constant_volume'")
                                    
     @classmethod
-    def from_template(cls,
-                  model_name: Literal["default", "MACE", "UMA", "gfn2-xtb"],
-                  crystal: Atoms,
-                  molecule: Atoms,
-                  calculator: Any,
-                  **kwargs):
+    def recommended(
+            cls,
+            model_name: Literal[KNOWN_MODELS],
+            crystal: ase.Atoms,
+            molecule: ase.Atoms,
+            calculator: ASECalculator,
+            **kwargs
+    ):
         """
         Generate a set of configuration parameters for a specific MLIP.
 
@@ -307,13 +269,30 @@ class FreeEnergy:
             **kwargs: Additional parameters to override any value in the preset.
         """
 
+        if "relaxation" in kwargs:
+            relaxation = kwargs.pop("relaxation")
+        else:
+            relaxation = Minimum.recommended(model_name)
+        
         modified_params = {}
-        if model_name == "UMA":
-            modified_params["max_force_on_atom"] = 5.0E-3
+        if model_name == "uma":
             modified_params["filter_out_broken_symmetry"] = False
+
+        if relaxation.backend == "dftb":
+            if "eos_sampling" not in kwargs:
+                #
+                # Set the equation of state sampling to pressure-based
+                # because the DFTB backend cannot perform constant-volume
+                # relaxation of the periodic cell.
+                #
+                modified_params["eos_sampling"] = "pressure"
+        
         modified_params.update(kwargs)
 
-        return cls(crystal=crystal,
-                   molecule=molecule,
-                   calculator=calculator,
-                   **modified_params)
+        return cls(
+            crystal=crystal,
+            molecule=molecule,
+            calculator=calculator,
+            relaxation=relaxation,
+            **modified_params
+        )

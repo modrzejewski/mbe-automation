@@ -1,5 +1,6 @@
 import os
 import os.path
+from copy import deepcopy
 import ase.units
 import numpy as np
 import pandas as pd
@@ -52,11 +53,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         molecule = config.molecule.copy()
         relaxed_molecule_label = "molecule[opt:atoms]"
         molecule = mbe_automation.structure.relax.isolated_molecule(
-            molecule,
-            config.calculator,
-            max_force_on_atom=config.max_force_on_atom,
-            algo_primary=config.relax_algo_primary,
-            algo_fallback=config.relax_algo_fallback,
+            molecule=molecule,
+            calculator=config.calculator,
+            config=config.relaxation,
             log=os.path.join(geom_opt_dir, f"{relaxed_molecule_label}.txt"),
             key=f"{config.root_key}/relaxation/{relaxed_molecule_label}"
         )
@@ -90,14 +89,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # input volume.
     #
     unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
-        unit_cell,
-        config.calculator,
-        optimize_lattice_vectors=(config.relax_input_cell in ["full", "constant_volume"]),
-        optimize_volume=(config.relax_input_cell=="full"),
-        symmetrize_final_structure=config.symmetrize_unit_cell,
-        max_force_on_atom=config.max_force_on_atom,
-        algo_primary=config.relax_algo_primary,
-        algo_fallback=config.relax_algo_fallback,
+        unit_cell=unit_cell,
+        calculator=config.calculator,
+        config=config.relaxation,
         log=os.path.join(geom_opt_dir, f"{relaxed_crystal_label}.txt"),
         key=f"{config.root_key}/relaxation/{relaxed_crystal_label}"
     )
@@ -197,16 +191,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.temperatures_K,
         supercell_matrix,
         interp_mesh,
-        config.max_force_on_atom,
-        config.relax_algo_primary,
-        config.relax_algo_fallback,
+        config.relaxation,
         config.supercell_displacement,
         config.work_dir,
         config.pressure_range,
         config.volume_range,
         config.equation_of_state,
         config.eos_sampling,
-        config.symmetrize_unit_cell,
         config.imaginary_mode_threshold,
         config.filter_out_imaginary_acoustic,
         config.filter_out_imaginary_optical,
@@ -239,14 +230,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             # Relax geometry with an effective pressure which
             # forces QHA equilibrium value
             #
+            optimizer = deepcopy(config.relaxation)
+            optimizer.pressure_GPa = row["p_thermal (GPa)"]
+            optimizer.cell_relaxation = "full"
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
-                unit_cell_T,
-                config.calculator,
-                pressure_GPa=row["p_thermal (GPa)"],
-                optimize_lattice_vectors=True,
-                optimize_volume=True,
-                symmetrize_final_structure=config.symmetrize_unit_cell,
-                max_force_on_atom=config.max_force_on_atom,
+                unit_cell=unit_cell_T,
+                calculator=config.calculator,
+                config=optimizer,
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
                 key=f"{config.root_key}/relaxation/{label_crystal}"
             )
@@ -255,14 +245,12 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             # Relax atomic positions and lattice vectors
             # under the constraint of constant volume
             #
+            optimizer = deepcopy(config.relaxation)
+            optimizer.cell_relaxation = "constant_volume"
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
-                unit_cell_T,
-                config.calculator,                
-                pressure_GPa=0.0,
-                optimize_lattice_vectors=True,
-                optimize_volume=False,
-                symmetrize_final_structure=config.symmetrize_unit_cell,
-                max_force_on_atom=config.max_force_on_atom,
+                unit_cell=unit_cell_T,
+                calculator=config.calculator,
+                config=optimizer,
                 log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
                 key=f"{config.root_key}/relaxation/{label_crystal}"
             )

@@ -1,8 +1,10 @@
+from __future__ import annotations
 from ase.io import read
 from ase.atoms import Atoms
 import phonopy
 from phonopy.structure.atoms import PhonopyAtoms
 import time
+from copy import deepcopy
 import numpy as np
 import numpy.typing as npt
 import torch
@@ -27,7 +29,7 @@ import mbe_automation.structure.crystal
 import mbe_automation.dynamics.harmonic.eos
 import mbe_automation.dynamics.harmonic.data
 import mbe_automation.dynamics.harmonic.display
-
+from mbe_automation.configs.structure import Minimum
 
 def _assert_primitive_consistency(
         ph: phonopy.Phonopy,
@@ -221,16 +223,13 @@ def equilibrium_curve(
         temperatures,
         supercell_matrix,
         interp_mesh,
-        max_force_on_atom,
-        relax_algo_primary,
-        relax_algo_fallback,
+        relaxation: Minimum,
         supercell_displacement,
         work_dir,
         pressure_range,
         volume_range,
         equation_of_state,
         eos_sampling,
-        symmetrize_unit_cell,
         imaginary_mode_threshold,
         filter_out_imaginary_acoustic,
         filter_out_imaginary_optical,
@@ -276,19 +275,17 @@ def equilibrium_curve(
             #
             thermal_pressure = pressure_range[i]
             label = f"crystal[eos:p_thermal={thermal_pressure:.4f}]"
+            optimizer = deepcopy(relaxation)
+            optimizer.cell_relaxation = "full"
+            optimizer.pressure_GPa = thermal_pressure
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
-                unit_cell_V0,
-                calculator,
-                pressure_GPa=thermal_pressure,
-                optimize_lattice_vectors=True,
-                optimize_volume=True,
-                symmetrize_final_structure=symmetrize_unit_cell,
-                max_force_on_atom=max_force_on_atom,
-                algo_primary=relax_algo_primary,
-                algo_fallback=relax_algo_fallback,
+                unit_cell=unit_cell_V0,
+                calculator=calculator,
+                config=optimizer,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 key=f"{root_key}/structures/{label}"
             )
+            
         elif eos_sampling == "volume":
             #
             # Relaxation of atomic positions and lattice
@@ -302,19 +299,16 @@ def equilibrium_curve(
                 scale_atoms=True
             )
             label = f"crystal[eos:V={V/V0:.4f}]"
+            optimizer = deepcopy(relaxation)
+            optimizer.cell_relaxation = "constant_volume"
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
-                unit_cell_V,
-                calculator,                
-                pressure_GPa=0.0,
-                optimize_lattice_vectors=True,
-                optimize_volume=False,
-                symmetrize_final_structure=symmetrize_unit_cell,
-                max_force_on_atom=max_force_on_atom,
-                algo_primary=relax_algo_primary,
-                algo_fallback=relax_algo_fallback,
+                unit_cell=unit_cell_V,
+                calculator=calculator,
+                config=optimizer,
                 log=os.path.join(geom_opt_dir, f"{label}.txt"),
                 key=f"{root_key}/structures/{label}"
             )
+            
         ph = phonons(
             unit_cell_V,
             calculator,

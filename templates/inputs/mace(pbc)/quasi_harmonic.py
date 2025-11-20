@@ -17,7 +17,7 @@ mace_calc = mace.calculators.MACECalculator(
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )
 
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.from_template(
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name = "MACE",
     crystal = from_xyz_file(os.path.join(work_dir, xyz_solid)),
     molecule = from_xyz_file(os.path.join(work_dir, xyz_molecule)),

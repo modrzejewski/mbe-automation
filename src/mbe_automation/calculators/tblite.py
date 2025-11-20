@@ -19,20 +19,8 @@ TIGHT_ACCURACY_GFN_XTB = 0.01
 
 try:
     from tblite.ase import TBLite
-
-    class TBLiteCustom(TBLite):
-        implemented_properties = [
-            "energy",
-            "free_energy",
-            "energies",
-            "forces",
-            "charges",
-            "dipole",
-            "stress",
-        ]
-
 except ImportError:
-    TBLiteCustom = None
+    TBLite = None
 
 def _GFN_xTB(method, verbose=False):
     """
@@ -41,17 +29,16 @@ def _GFN_xTB(method, verbose=False):
     
     Checks for 'tblite' availability only when called.
     """
-    if TBLiteCustom is None:
+    if TBLite is None:
         raise ImportError(
             "The 'tblite' package is not installed. "
             "GFN-xTB calculator cannot be created."
         )
     
-    return TBLiteCustom(
+    return TBLite(
         method=method,
         verbosity=(1 if verbose else 0),
         accuracy=TIGHT_ACCURACY_GFN_XTB,
-        electronic_temperature=0.0,
     )
 
 def GFN2_xTB(verbose=False):
