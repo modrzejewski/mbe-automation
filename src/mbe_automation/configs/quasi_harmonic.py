@@ -250,7 +250,18 @@ class FreeEnergy:
         if self.thermal_expansion and self.relax_input_cell == "only_atoms":
             raise ValueError("Calculations with thermal expansion require "
                              "relaxed_input_cell set to 'full' or 'constant_volume'")
-                                   
+
+        if (
+                self.thermal_expansion and
+                self.eos_sampling == "volume" and
+                self.relaxation.backend == "dftb"
+        ):
+            raise ValueError(
+                "DFTB+ does not support constant volume relaxation of the lattice cell. "
+                "eos_sampling must be set to 'pressure'."
+            )
+
+
     @classmethod
     def recommended(
             cls,

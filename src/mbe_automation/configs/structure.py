@@ -92,10 +92,20 @@ class Minimum:
     algo_primary: Literal["PreconLBFGS", "PreconFIRE"] = "PreconLBFGS"
     algo_fallback: Literal["PreconLBFGS", "PreconFIRE"] = "PreconFIRE"
 
+    def __post_init__(self):
+        if (
+                self.cell_relaxation == "constant_volume" and
+                self.backend == "dftb"
+        ):
+            raise ValueError(
+                "DFTB+ does not support constant volume relaxation of the lattice cell. "
+                "cell_relaxation cannot be set to 'constant_volume'."
+            )
+
     @classmethod
     def recommended(
             cls,
-            model_name: Litaral[KNOWN_MODELS],
+            model_name: Literal[KNOWN_MODELS],
             **kwargs
     ) -> Minimum:
         """
