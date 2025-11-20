@@ -131,13 +131,13 @@ class Minimum:
         Create configuration with recommended defaults for a specific model.
         """
         defaults = {}
-        name = model_name.lower()
 
-        if name == "uma":
+        if model_name == "uma":
             defaults["max_force_on_atom_eV_A"] = 5.0E-3
 
-        if name in SEMIEMPIRICAL_DFTB:
+        if model_name in SEMIEMPIRICAL_DFTB:
             defaults["backend"] = "dftb"
+            defaults["cell_relaxation"] = "full"
 
         defaults.update(kwargs)
         

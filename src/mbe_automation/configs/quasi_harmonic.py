@@ -277,7 +277,7 @@ class FreeEnergy:
         if "relaxation" in kwargs:
             relaxation = kwargs.pop("relaxation")
         else:
-            relaxation = Minimum.recommended(model_name)
+            relaxation = Minimum.recommended(model_name=model_name)
         
         modified_params = {}
         if model_name == "uma":

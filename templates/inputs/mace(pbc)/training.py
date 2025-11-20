@@ -5,7 +5,7 @@ import torch
 
 import mbe_automation
 from mbe_automation.configs.md import ClassicalMD
-from mbe_automation.structure.clusters import FiniteSubsystemFilter
+from mbe_automation.configs.clusters import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter
 from mbe_automation.configs.training import MDSampling, PhononSampling
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
