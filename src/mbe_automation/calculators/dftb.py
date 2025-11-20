@@ -97,7 +97,7 @@ class DFTBCustom(Dftb):
 
         driver_config = {
             "Driver_": "GeometryOptimization",
-            "Driver_Optimizer": "LBFGS",
+            "Driver_Optimizer": "LBFGS {}",
             "Driver_MovedAtoms": "1:-1",
             "Driver_MaxForceComponent [eV/Angstrom]": max_force_on_atom,
             "Driver_MaxSteps": max_steps,
