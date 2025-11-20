@@ -6,7 +6,7 @@ SEMIEMPIRICAL_DFTB = [
     "gfn2-xtb",
     "gfn1-xtb",
     "dftb3-d4",
-    "dftb3+mbd",    
+    "dftb+mbd",    
 ]
 
 NEURAL_NETWORKS = [

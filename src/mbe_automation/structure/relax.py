@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os.path
+from pathlib import Path
 import ase.optimize
 from ase.optimize.fire2 import FIRE2
 from ase.optimize.precon import Exp
@@ -27,7 +28,7 @@ def _crystal_optimizer_ase(
         max_steps: int = 500,
         algo_primary: str = "PreconLBFGS",
         algo_fallback: str = "PreconFIRE",
-        log: str = "geometry_opt.txt",
+        log: Path | str = "geometry_opt.txt",
 ):
     """
     Optimize atomic positions and lattice vectors simultaneously.
@@ -122,9 +123,12 @@ def crystal(
         unit_cell: ase.Atoms,
         calculator: ASECalculator,
         config: mbe_automation.configs.structure.Minimum,
-        log: str = "geometry_opt.txt",
+        work_dir: Path | str = Path("./"),
         key: str | None = None
 ):
+
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
 
     if key:
         mbe_automation.common.display.framed([
@@ -185,7 +189,7 @@ def crystal(
             max_steps=config.max_n_steps,
             algo_primary=config.algo_primary,
             algo_fallback=config.algo_fallback,
-            log=log,
+            log=work_dir/"geometry_opt.txt",
         )
 
     elif config.backend == "dftb":
@@ -196,6 +200,7 @@ def crystal(
             optimize_lattice_vectors=optimize_lattice_vectors,
             max_force_on_atom=config.max_force_on_atom_eV_A,
             max_steps=config.max_n_steps,
+            work_dir=work_dir,
         )
     
     if config.symmetrize_final_structure:
@@ -234,13 +239,13 @@ def crystal(
     
 
 def _isolated_molecule_optimizer_ase(
-        molecule,
-        calculator,
-        max_force_on_atom=1.0E-3, # eV/Angs/atom
-        max_steps=500,
-        algo_primary="PreconLBFGS",
-        algo_fallback="PreconFIRE",
-        log="geometry_opt.txt"
+        molecule: ase.Atoms,
+        calculator: ASECalculator,
+        max_force_on_atom: float = 1.0E-3, # eV/Angs/atom
+        max_steps: int = 500,
+        algo_primary: str = "PreconLBFGS",
+        algo_fallback: str = "PreconFIRE",
+        log: Path | str = "geometry_opt.txt"
 ):
     """
     Optimize atomic coordinates in a gas-phase finite system.
@@ -301,9 +306,11 @@ def isolated_molecule(
         molecule: ase.Atoms,
         calculator: ASECalculator,
         config: mbe_automation.configs.structure.Minimum,
-        log="geometry_opt.txt",
-        key=None
+        work_dir: Path | str = Path("./"),
+        key: str | None = None
 ):
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
     
     if key:
         mbe_automation.common.display.framed([
@@ -321,7 +328,7 @@ def isolated_molecule(
             max_steps=config.max_n_steps,
             algo_primary=config.algo_primary,
             algo_fallback=config.algo_fallback,
-            log=log,
+            log=work_dir/"geometry_opt.txt",
         )
 
     elif config.backend == "dftb":
@@ -332,6 +339,7 @@ def isolated_molecule(
             optimize_lattice_vectors=False,
             max_force_on_atom=config.max_force_on_atom_eV_A,
             max_steps=config.max_n_steps,
+            work_dir=work_dir,
         )
 
     relaxed_molecule.calc = calculator

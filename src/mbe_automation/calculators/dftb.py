@@ -1,9 +1,9 @@
 from __future__ import annotations
+from pathlib import Path
 import ase
 from ase.calculators.dftb import Dftb
 import os.path
 import numpy as np
-from pathlib import Path
 
 import mbe_automation.storage
 
@@ -87,7 +87,8 @@ class DFTBCustom(Dftb):
             optimize_lattice_vectors=True,
             pressure_GPa=0.0,
             max_force_on_atom=1.0E-3,
-            max_steps=500
+            max_steps=500,
+            work_dir: Path = Path("./"),
     ):
         """
         Return a calculator copy configured for internal geometry relaxation.
@@ -113,6 +114,7 @@ class DFTBCustom(Dftb):
         return DFTBCustom(
             atoms=self.atoms,
             kpts=self.kpts,
+            directory=work_dir,
             **new_parameters
         )
 
@@ -271,25 +273,32 @@ def relax(
         pressure_GPa: float = 0.0,
         optimize_lattice_vectors: bool = True,
         max_force_on_atom: float = 1.0E-3,
-        max_steps: int = 500
+        max_steps: int = 500,
+        work_dir: Path | str = Path("./")
 ):
     """
     Relax coordinates/cell using DFTB+ internal driver.
     """
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    
     calc = calculator.for_relaxation(
         optimize_lattice_vectors=optimize_lattice_vectors,
         pressure_GPa=pressure_GPa,
         max_force_on_atom=max_force_on_atom,
-        max_steps=max_steps
-    )    
-    calc.calculate(system)
+        max_steps=max_steps,
+        work_dir=work_dir,
+    )
     
-    if os.path.exists("geo_end.gen"):
+    calc.calculate(system)
+
+    output_file = work_dir / "geo_end.gen"
+    if output_file.exists():
         #
         # from_xyz_file automatically detects
         # the DFTB+ gen format from ".gen" extension
         #
-        relaxed_system = mbe_automation.storage.from_xyz_file("geo_end.gen")
+        relaxed_system = mbe_automation.storage.from_xyz_file(str(output_file))
     else:
         raise RuntimeError("Relaxation with dftb+ failed. No output geometry was generated.")
         
