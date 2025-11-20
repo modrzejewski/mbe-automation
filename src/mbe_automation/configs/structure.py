@@ -47,6 +47,14 @@ class Minimum:
                                    # Relaxed degrees of freedom. Referenced
                                    # only for periodic systems.
                                    #
+                                   # Note on relaxation of cell parameters
+                                   # in quasi-harmonic calculations:
+                                   #
+                                   # (1) for thermal expansion calculations, cell_relaxation
+                                   #     must be set to either full or constant_volume.
+                                   # (2) for harmonic calculations without thermal
+                                   #     expansion all three settings are allowed.
+                                   #
     cell_relaxation: Literal["full", "constant_volume", "only_atoms"] = "constant_volume"
                                    #
                                    # Refine the space group symmetry after
