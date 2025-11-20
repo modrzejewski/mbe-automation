@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 from ase.io import read
 from ase.atoms import Atoms
 import phonopy
@@ -238,7 +239,7 @@ def equilibrium_curve(
         root_key
 ):
 
-    geom_opt_dir = os.path.join(work_dir, "relaxation")
+    geom_opt_dir = Path(work_dir) / "relaxation"
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     V0 = unit_cell_V0.get_volume()
@@ -282,7 +283,7 @@ def equilibrium_curve(
                 unit_cell=unit_cell_V0,
                 calculator=calculator,
                 config=optimizer,
-                log=os.path.join(geom_opt_dir, f"{label}.txt"),
+                work_dir=geom_opt_dir/label,
                 key=f"{root_key}/structures/{label}"
             )
             
@@ -305,7 +306,7 @@ def equilibrium_curve(
                 unit_cell=unit_cell_V,
                 calculator=calculator,
                 config=optimizer,
-                log=os.path.join(geom_opt_dir, f"{label}.txt"),
+                work_dir=geom_opt_dir/label,
                 key=f"{root_key}/structures/{label}"
             )
             

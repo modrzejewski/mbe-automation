@@ -1,6 +1,7 @@
 import os
 import os.path
 from copy import deepcopy
+from pathlib import Path
 import ase.units
 import numpy as np
 import pandas as pd
@@ -37,7 +38,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         mbe_automation.common.display.framed("Harmonic properties")
         
     os.makedirs(config.work_dir, exist_ok=True)
-    geom_opt_dir = os.path.join(config.work_dir, "relaxation")
+    geom_opt_dir = Path(config.work_dir) / "relaxation"
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     input_space_group, _ = mbe_automation.structure.crystal.check_symmetry(
@@ -56,7 +57,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             molecule=molecule,
             calculator=config.calculator,
             config=config.relaxation,
-            log=os.path.join(geom_opt_dir, f"{relaxed_molecule_label}.txt"),
+            work_dir=geom_opt_dir/relaxed_molecule_label,
             key=f"{config.root_key}/relaxation/{relaxed_molecule_label}"
         )
         vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
@@ -92,7 +93,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         unit_cell=unit_cell,
         calculator=config.calculator,
         config=config.relaxation,
-        log=os.path.join(geom_opt_dir, f"{relaxed_crystal_label}.txt"),
+        work_dir=geom_opt_dir/relaxed_crystal_label,
         key=f"{config.root_key}/relaxation/{relaxed_crystal_label}"
     )
     V0 = unit_cell_V0.get_volume()
@@ -237,7 +238,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 unit_cell=unit_cell_T,
                 calculator=config.calculator,
                 config=optimizer,
-                log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
+                work_dir=geom_opt_dir/label_crystal,
                 key=f"{config.root_key}/relaxation/{label_crystal}"
             )
         elif config.eos_sampling == "volume":
@@ -251,7 +252,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 unit_cell=unit_cell_T,
                 calculator=config.calculator,
                 config=optimizer,
-                log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
+                work_dir=geom_opt_dir/label_crystal,
                 key=f"{config.root_key}/relaxation/{label_crystal}"
             )
         phonons = mbe_automation.dynamics.harmonic.core.phonons(
