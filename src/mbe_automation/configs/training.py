@@ -7,15 +7,15 @@ from pathlib import Path
 import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 
-from mbe_automation.configs.md import ClassicalMD
-from mbe_automation.structure.clusters import FiniteSubsystemFilter
+from .md import ClassicalMD
+from .clusters import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, AMPLITUDE_SCAN_MODES
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
 
 @dataclass(kw_only=True)
 class PhononSampling:
     force_constants_dataset: str = "./properties.hdf5"
-    force_constants_key: str = "training/quasi_harmonic/phonons/crystal[opt atoms,shape]/force_constants"
+    force_constants_key: str = "training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"
                                    #
                                    # Energy and forces calculator
                                    #

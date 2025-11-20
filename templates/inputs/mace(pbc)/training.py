@@ -5,7 +5,7 @@ import torch
 
 import mbe_automation
 from mbe_automation.configs.md import ClassicalMD
-from mbe_automation.structure.clusters import FiniteSubsystemFilter
+from mbe_automation.configs.clusters import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter
 from mbe_automation.configs.training import MDSampling, PhononSampling
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
@@ -49,7 +49,8 @@ md_sampling_config = MDSampling(
 )
 mbe_automation.workflows.training.run(md_sampling_config)
 
-free_energy_config = FreeEnergy(
+free_energy_config = FreeEnergy.recommended(
+    model_name="mace",
     crystal=from_xyz_file(xyz_solid),
     calculator=mace_calc,
     thermal_expansion=False,

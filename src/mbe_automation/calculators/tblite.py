@@ -17,6 +17,11 @@
 #
 TIGHT_ACCURACY_GFN_XTB = 0.01
 
+try:
+    from tblite.ase import TBLite
+except ImportError:
+    TBLite = None
+
 def _GFN_xTB(method, verbose=False):
     """
     Get a calculator for GFN-xTB with tight accuracy
@@ -24,16 +29,13 @@ def _GFN_xTB(method, verbose=False):
     
     Checks for 'tblite' availability only when called.
     """
-    try:
-        import tblite
-        import tblite.ase
-    except ImportError:
+    if TBLite is None:
         raise ImportError(
             "The 'tblite' package is not installed. "
             "GFN-xTB calculator cannot be created."
         )
-        
-    return tblite.ase.TBLite(
+    
+    return TBLite(
         method=method,
         verbosity=(1 if verbose else 0),
         accuracy=TIGHT_ACCURACY_GFN_XTB,

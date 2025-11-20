@@ -1,5 +1,7 @@
 import os
 import os.path
+from copy import deepcopy
+from pathlib import Path
 import ase.units
 import numpy as np
 import pandas as pd
@@ -36,7 +38,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         mbe_automation.common.display.framed("Harmonic properties")
         
     os.makedirs(config.work_dir, exist_ok=True)
-    geom_opt_dir = os.path.join(config.work_dir, "relaxation")
+    geom_opt_dir = Path(config.work_dir) / "relaxation"
     os.makedirs(geom_opt_dir, exist_ok=True)
 
     input_space_group, _ = mbe_automation.structure.crystal.check_symmetry(
@@ -52,12 +54,10 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         molecule = config.molecule.copy()
         relaxed_molecule_label = "molecule[opt:atoms]"
         molecule = mbe_automation.structure.relax.isolated_molecule(
-            molecule,
-            config.calculator,
-            max_force_on_atom=config.max_force_on_atom,
-            algo_primary=config.relax_algo_primary,
-            algo_fallback=config.relax_algo_fallback,
-            log=os.path.join(geom_opt_dir, f"{relaxed_molecule_label}.txt"),
+            molecule=molecule,
+            calculator=config.calculator,
+            config=config.relaxation,
+            work_dir=geom_opt_dir/relaxed_molecule_label,
             key=f"{config.root_key}/relaxation/{relaxed_molecule_label}"
         )
         vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
@@ -66,39 +66,34 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         )
 
     if config.thermal_expansion:
-        assert config.relax_input_cell in ["full", "constant_volume"]
+        assert config.relaxation.cell_relaxation in ["full", "constant_volume"]
 
-    if config.relax_input_cell == "full":
+    if config.relaxation.cell_relaxation == "full":
         relaxed_crystal_label = "crystal[opt:atoms,shape,V]"
-    elif config.relax_input_cell == "constant_volume":
+    elif config.relaxation.cell_relaxation == "constant_volume":
         relaxed_crystal_label = "crystal[opt:atoms,shape]"
-    elif config.relax_input_cell == "only_atoms":
+    elif config.relaxation.cell_relaxation == "only_atoms":
         relaxed_crystal_label = "crystal[opt:atoms]"
     #
-    # Reference cell relaxation:
-    # (1) reference cell volume (V0) if relax_input_cell=full
-    # (2) reference cell shape (lattice vectors) if relax_input_cell=full or constant_volume
-    # (3) atomic positions always
+    # Volume relaxation will be carried out only if
+    # config.relaxation.cell_relaxation=full.
+    # Otherwise, the reference volume (V0) will be equal
+    # to the input cell volume.
     #
     # Volume relaxation gives a periodic cell at T=0K
-    # without the effect of zero-point vibrations.
+    # without the effect of zero-point vibrations unless
+    # user provides effective thermal pressure
+    # as the input parameter.
     #
     # In thermal expansion calculations, the points on
     # the volume axis will be determined by applying
-    # scaling factors with respect to V0. If no volume
-    # relaxation is performed here, V0 is equal to the
-    # input volume.
+    # scaling factors with respect to V0.
     #
     unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
-        unit_cell,
-        config.calculator,
-        optimize_lattice_vectors=(config.relax_input_cell in ["full", "constant_volume"]),
-        optimize_volume=(config.relax_input_cell=="full"),
-        symmetrize_final_structure=config.symmetrize_unit_cell,
-        max_force_on_atom=config.max_force_on_atom,
-        algo_primary=config.relax_algo_primary,
-        algo_fallback=config.relax_algo_fallback,
-        log=os.path.join(geom_opt_dir, f"{relaxed_crystal_label}.txt"),
+        unit_cell=unit_cell,
+        calculator=config.calculator,
+        config=config.relaxation,
+        work_dir=geom_opt_dir/relaxed_crystal_label,
         key=f"{config.root_key}/relaxation/{relaxed_crystal_label}"
     )
     V0 = unit_cell_V0.get_volume()
@@ -197,16 +192,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.temperatures_K,
         supercell_matrix,
         interp_mesh,
-        config.max_force_on_atom,
-        config.relax_algo_primary,
-        config.relax_algo_fallback,
+        config.relaxation,
         config.supercell_displacement,
         config.work_dir,
         config.pressure_range,
         config.volume_range,
         config.equation_of_state,
         config.eos_sampling,
-        config.symmetrize_unit_cell,
         config.imaginary_mode_threshold,
         config.filter_out_imaginary_acoustic,
         config.filter_out_imaginary_optical,
@@ -239,15 +231,14 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             # Relax geometry with an effective pressure which
             # forces QHA equilibrium value
             #
+            optimizer = deepcopy(config.relaxation)
+            optimizer.pressure_GPa = row["p_thermal (GPa)"]
+            optimizer.cell_relaxation = "full"
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
-                unit_cell_T,
-                config.calculator,
-                pressure_GPa=row["p_thermal (GPa)"],
-                optimize_lattice_vectors=True,
-                optimize_volume=True,
-                symmetrize_final_structure=config.symmetrize_unit_cell,
-                max_force_on_atom=config.max_force_on_atom,
-                log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
+                unit_cell=unit_cell_T,
+                calculator=config.calculator,
+                config=optimizer,
+                work_dir=geom_opt_dir/label_crystal,
                 key=f"{config.root_key}/relaxation/{label_crystal}"
             )
         elif config.eos_sampling == "volume":
@@ -255,15 +246,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             # Relax atomic positions and lattice vectors
             # under the constraint of constant volume
             #
+            optimizer = deepcopy(config.relaxation)
+            optimizer.cell_relaxation = "constant_volume"
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
-                unit_cell_T,
-                config.calculator,                
-                pressure_GPa=0.0,
-                optimize_lattice_vectors=True,
-                optimize_volume=False,
-                symmetrize_final_structure=config.symmetrize_unit_cell,
-                max_force_on_atom=config.max_force_on_atom,
-                log=os.path.join(geom_opt_dir, f"{label_crystal}.txt"),
+                unit_cell=unit_cell_T,
+                calculator=config.calculator,
+                config=optimizer,
+                work_dir=geom_opt_dir/label_crystal,
                 key=f"{config.root_key}/relaxation/{label_crystal}"
             )
         phonons = mbe_automation.dynamics.harmonic.core.phonons(

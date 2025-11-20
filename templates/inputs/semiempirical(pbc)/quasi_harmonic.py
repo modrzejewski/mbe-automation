@@ -11,7 +11,7 @@ work_dir = os.path.abspath(os.path.dirname(__file__))
 env_config = ParallelCPU.recommended(model_name="gfn2-xtb")
 env_config.set()
 
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.from_template(
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name = "gfn2-xtb",
     crystal = from_xyz_file(os.path.join(work_dir, xyz_solid)),
     molecule = from_xyz_file(os.path.join(work_dir, xyz_molecule)),

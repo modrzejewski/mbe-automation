@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 import mbe_automation.structure
 import mbe_automation.storage.core
 import mbe_automation.storage.views
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 def _cif_with_adps(
         save_path: str,
@@ -188,7 +189,7 @@ def _cif_with_adps(
 def from_xyz_file(
         read_path: str,
         transform_to_symmetrized_primitive: bool = True,
-        symprec: float = mbe_automation.structure.crystal.SYMMETRY_TOLERANCE_LOOSE
+        symprec: float = SYMMETRY_TOLERANCE_LOOSE
 ) -> ase.Atoms:
     
     if read_path.lower().endswith(".cif"):
@@ -212,7 +213,7 @@ def to_xyz_file(
         frame_index: int = 0,
         thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None = None,
         temperature_idx: int = 0,
-        symprec: float = mbe_automation.structure.crystal.SYMMETRY_TOLERANCE_STRICT
+        symprec: float = SYMMETRY_TOLERANCE_STRICT
 ):
     if isinstance(system, mbe_automation.storage.core.Structure):
         system_ase = mbe_automation.storage.views.to_ase(system, frame_index=frame_index)

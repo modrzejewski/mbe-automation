@@ -22,6 +22,8 @@ import torch
 
 import mbe_automation.configs
 import mbe_automation.workflows
+# Import Minimum if you need to customize relaxation parameters
+from mbe_automation.configs.structure import Minimum
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "path/to/your/solid.xyz"
@@ -40,15 +42,22 @@ mace_calc = mace.calculators.MACECalculator(
 The workflow is configured using the `FreeEnergy` class from `mbe_automation.configs.quasi_harmonic`.
 
 ```python
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.from_template(
-    model_name="MACE",
+# Create custom relaxation settings (optional)
+relaxation_config = Minimum(
+    cell_relaxation="constant_volume",
+    max_force_on_atom_eV_A=1.0E-4
+)
+
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
+    model_name="mace",
     crystal=from_xyz_file(xyz_solid),
     molecule=from_xyz_file(xyz_molecule),
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
     work_dir=os.path.join(work_dir, "properties"),
-    dataset=os.path.join(work_dir, "properties.hdf5")
+    dataset=os.path.join(work_dir, "properties.hdf5"),
+    relaxation=relaxation_config
 )
 ```
 
@@ -69,12 +78,8 @@ mbe_automation.workflows.quasi_harmonic.run(properties_config)
 | `crystal`                       | Initial, non-relaxed crystal structure. The geometry of the crystal unit cell is relaxed prior to the calculation of the harmonic properties.                                                                                                                                                            | -                                               |
 | `calculator`                    | MLIP calculator for energies and forces.                                                                                                                                                           | -                                               |
 | `molecule`                      | Initial, non-relaxed structure of the isolated molecule. If set to `None`, sublimation free energy is not computed.                                                                           | `None`                                          |
+| `relaxation`                    | An instance of `Minimum` that configures the geometry relaxation parameters.                                                                                                                       | `Minimum()`                                     |
 | `temperatures_K`                | Array of temperatures (in Kelvin) for the calculation.                                                                                                                                              | `np.array([298.15])`                            |
-| `relax_input_cell`              | Relaxation of the input structure: "full" (optimizes atomic positions, cell shape, and volume), "constant_volume" (optimizes atomic positions and cell shape at fixed volume), or "only_atoms" (optimizes only atomic positions).                                                                                                               | `"constant_volume"`                             |
-| `max_force_on_atom`             | Maximum residual force threshold for geometry relaxation (eV/Å). The default value is rather strict; some MLIPs may require a more relaxed threshold (e.g., `5.0E-3`) for convergence.             | `1.0E-4`                                        |
-| `symmetrize_unit_cell`          | If `True`, refines the space group symmetry after each geometry relaxation.                                                                                                                            | `True`                                          |
-| `relax_algo_primary`            | Primary algorithm for structure relaxation ("PreconLBFGS" or "PreconFIRE").                                                                                                                      | `"PreconLBFGS"`                                 |
-| `relax_algo_fallback`           | Fallback algorithm if the primary relaxation algorithm fails.                                                                                                                                      | `"PreconFIRE"`                                  |
 | `supercell_radius`              | Minimum point-periodic image distance in the supercell for phonon calculations (Å).                                                                                                               | `25.0`                                          |
 | `supercell_matrix`              | Supercell transformation matrix. If specified, `supercell_radius` is ignored.                                                                                                                      | `None`                                          |
 | `supercell_diagonal`            | If `True`, create a diagonal supercell. Ignored if `supercell_matrix` is provided.                                                                                                                 | `False`                                         |
@@ -97,6 +102,23 @@ mbe_automation.workflows.quasi_harmonic.run(properties_config)
 | `save_plots`                    | If `True`, save plots of the simulation results.                                                                                                                                                 | `True`                                          |
 | `save_csv`                      | If `True`, save CSV files of the simulation results.                                                                                                                                             | `True`                                          |
 | `save_xyz`                      | If `True`, save XYZ files of the simulation results.                                                                                                                                             | `True`                                          |
+
+### `Minimum` Class
+
+**Location:** `mbe_automation.configs.structure.Minimum`
+
+| Parameter                    | Description                                                                                                                                                           | Default Value       |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `max_force_on_atom_eV_A`     | Maximum residual force threshold for geometry relaxation (eV/Å).                                                                                                      | `1.0E-4`            |
+| `max_n_steps`                | Maximum number of steps in the geometry relaxation.                                                                                                                   | `500`               |
+| `cell_relaxation`            | Relaxation of the input structure: "full" (optimizes atomic positions, cell shape, and volume), "constant_volume" (optimizes atomic positions and cell shape at fixed volume), or "only_atoms" (optimizes only atomic positions). | `"constant_volume"` |
+| `pressure_GPa`               | External isotropic pressure (in GPa) applied during lattice relaxation.                                                                                               | `0.0`               |
+| `symmetrize_final_structure` | If `True`, refines the space group symmetry after each geometry relaxation.                                                                                           | `True`              |
+| `symmetry_tolerance_loose`   | Tolerance (in Å) used for symmetry detection for imperfect structures after relaxation.                                                                               | `1.0E-2`            |
+| `symmetry_tolerance_strict`  | Tolerance (in Å) used for definite symmetry detection after symmetrization.                                                                                           | `1.0E-5`            |
+| `backend`                    | Software used to perform the geometry relaxation: "ase" or "dftb".                                                                                                    | `"ase"`             |
+| `algo_primary`               | Primary algorithm for structure relaxation ("PreconLBFGS" or "PreconFIRE"). Referenced only if backend="ase".                                                         | `"PreconLBFGS"`     |
+| `algo_fallback`              | Fallback algorithm if the primary relaxation algorithm fails. Referenced only if backend="ase".                                                                       | `"PreconFIRE"`      |
 
 ## Function Call Overview
 
@@ -191,7 +213,7 @@ qha.hdf5
 - **`thermodynamics_equilibrium_volume`**: Contains the final thermodynamic properties calculated at the equilibrium volume for each temperature.
 
 The structures under the `phonons` and `relaxation` groups follow a specific naming scheme:
-- **`crystal[opt:...]`**: The relaxed input structure. The keywords after `opt:` indicate which degrees of freedom were included in the minimization of the static electronic energy (e.g., atomic positions, cell shape, cell volume), as determined by the `relax_input_cell` keyword.
+- **`crystal[opt:...]`**: The relaxed input structure. The keywords after `opt:` indicate which degrees of freedom were included in the minimization of the static electronic energy (e.g., atomic positions, cell shape, cell volume), as determined by the `cell_relaxation` keyword.
 - **`crystal[eos:V=...]`**: Structures used to sample the equation of state curve, obtained by relaxing the crystal at a fixed volume.
 - **`crystal[eq:T=...]`**: Relaxed structures at the equilibrium volume for a given temperature.
 
@@ -244,6 +266,7 @@ import torch
 
 import mbe_automation.configs
 import mbe_automation.workflows
+from mbe_automation.configs.structure import Minimum
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "path/to/your/solid.xyz"
@@ -256,15 +279,22 @@ mace_calc = mace.calculators.MACECalculator(
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )
 
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.from_template(
-    model_name="MACE",
+# Create custom relaxation settings (optional)
+relaxation_config = Minimum(
+    cell_relaxation="constant_volume",
+    max_force_on_atom_eV_A=1.0E-4
+)
+
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
+    model_name="mace",
     crystal=from_xyz_file(xyz_solid),
     molecule=from_xyz_file(xyz_molecule),
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
     work_dir=os.path.join(work_dir, "properties"),
-    dataset=os.path.join(work_dir, "properties.hdf5")
+    dataset=os.path.join(work_dir, "properties.hdf5"),
+    relaxation=relaxation_config
 )
 
 mbe_automation.workflows.quasi_harmonic.run(properties_config)
