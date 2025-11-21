@@ -9,12 +9,13 @@ from mbe_automation.storage import from_xyz_file
 xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
 work_dir = os.path.abspath(os.path.dirname(__file__))
+dataset = os.path.join(work_dir, "properties.hdf5")
 
 env_config = ParallelCPU.recommended(model_name="dftb3-d4")
 env_config.set()
 
-molecule = from_xyz_file(os.path.join(work_dir, xyz_molecule))
-crystal = from_xyz_file(os.path.join(work_dir, xyz_solid))
+molecule = from_xyz_file(xyz_molecule)
+crystal = from_xyz_file(xyz_solid)
 
 md_config = mbe_automation.configs.md.Enthalpy(
     molecule = molecule,
@@ -23,7 +24,7 @@ md_config = mbe_automation.configs.md.Enthalpy(
     temperature_K = 298.15,
     pressure_GPa = 1.0E-4,
     work_dir = work_dir,
-    dataset = os.path.join(work_dir, "properties.hdf5"),
+    dataset = dataset,
     
     md_molecule = mbe_automation.configs.md.ClassicalMD(
         ensemble = "NVT",

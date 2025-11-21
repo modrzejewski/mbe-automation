@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#SBATCH --job-name="GFN2-xTB"
+#SBATCH --job-name="semiempirical"
 #SBATCH -A pl0415-02
 #SBATCH -p altair 
 #SBATCH --nodes 1      
