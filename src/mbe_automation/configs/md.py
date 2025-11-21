@@ -169,11 +169,11 @@ class Enthalpy:
                                    #
                                    # Initial structure of crystal
                                    #
-    crystal: Atoms
+    crystal: Atoms | None = None
                                    #
                                    # Initial structure of molecule
                                    #
-    molecule: Atoms
+    molecule: Atoms | None = None
                                    #
                                    # Energy and forces calculator
                                    #
