@@ -1,21 +1,25 @@
 from __future__ import annotations
-from mace.calculators import MACECalculator
-from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
+from mace.calculators import MACECalculator
+from ase.calculators.calculator import Calculator as ASECalculator
 
-import mbe_automation.storage
+import mbe_automation.storage.views
 
-@dataclass
-class MACEOutput:
+@dataclass(kw_only=True)
+class ModelOutput:
     n_frames: int
     n_atoms: int
-    n_features: int
+    n_features: int | None
     E_pot: npt.NDArray[np.floating] | None # eV/atom
     forces: npt.NDArray[np.floating] | None # eV/Å
     feature_vectors: npt.NDArray[np.floating] | None
 
-def inference(
+
+
+        
+
+    def inference(
         calculator: MACECalculator,
         structure: mbe_automation.storage.Structure,
         energies: bool = True,
@@ -36,11 +40,7 @@ def inference(
 
     ase_traj = mbe_automation.storage.ASETrajectory(structure)
     for i, atoms in enumerate(ase_traj):
-        atoms.calc = calculator
-        if energies:
-            energies_out[i] = atoms.get_potential_energy() / structure.n_atoms
-        if forces:
-            forces_out[i] = atoms.get_forces()
+
         if feature_vectors:
             features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
             n_features = features.shape[-1]
@@ -64,3 +64,4 @@ def inference(
         forces=forces_out,
         feature_vectors=features_out
     )
+    

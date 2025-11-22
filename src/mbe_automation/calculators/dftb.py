@@ -77,7 +77,7 @@ HUBBARD_DERIVATIVES_3OB_3_1 = {
 #
 HCORRECTION_EXPONENT_3OB_3_1 = 4.00
 
-class DFTBCustom(Dftb):
+class DFTBCalculator(Dftb):
     """
     Extended DFTB+ calculator with support for internal geometry relaxation.
     """
@@ -112,7 +112,7 @@ class DFTBCustom(Dftb):
         new_parameters = self.parameters.copy()
         new_parameters.update(driver_config)
 
-        return DFTBCustom(
+        return DFTBCalculator(
             atoms=self.atoms,
             kpts=self.kpts,
             directory=work_dir,
@@ -139,7 +139,7 @@ def params_dir_3ob_3_1():
 def _GFN_xTB(method):
     kpts = [1, 1, 1]
     scc_tolerance = SCC_TOLERANCE
-    return DFTBCustom(
+    return DFTBCalculator(
         Hamiltonian_="xTB",
         Hamiltonian_Method=method,
         Hamiltonian_SCCTolerance=scc_tolerance,
@@ -181,7 +181,7 @@ def DFTB_Plus_MBD(elements):
         else:
             print(f"Warning: No predefined MaxAngularMomentum/HubbardDerivs params for element {element}. Please add it manually.")
 
-    return DFTBCustom(
+    return DFTBCalculator(
         Hamiltonian_ThirdOrderFull='Yes',
         Hamiltonian_MaxAngularMomentum_="",
         **max_angular_momentum_params,
@@ -240,7 +240,7 @@ def DFTB3_D4(elements):
         else:
             print(f"Warning: No predefined MaxAngularMomentum/HubbardDerivs params for element {element}. Please add it manually.")
 
-    return DFTBCustom(
+    return DFTBCalculator(
         Hamiltonian_ThirdOrderFull='Yes',
         Hamiltonian_MaxAngularMomentum_="",
         **max_angular_momentum_params,
@@ -270,7 +270,7 @@ def DFTB3_D4(elements):
 
 def relax(
         system: ase.Atoms,
-        calculator: DFTBCustom,
+        calculator: DFTBCalculator,
         pressure_GPa: float = 0.0,
         optimize_lattice_vectors: bool = True,
         max_force_on_atom: float = 1.0E-3,
@@ -304,3 +304,34 @@ def relax(
         raise RuntimeError("Relaxation with dftb+ failed. No output geometry was generated.")
         
     return relaxed_system
+
+
+def energies_and_forces(
+        calculator: DFTBCalculator,
+        structure: mbe_automation.storage.Structure,
+        energies: bool = True,
+        forces: bool = True,
+) -> SemiempiricalOutput:
+
+    energies_out = None
+    forces_out = None
+
+    if energies:
+        energies_out = np.zeros(structure.n_frames)
+    if forces:
+        forces_out = np.zeros((structure.n_frames, structure.n_atoms, 3))
+
+    ase_traj = mbe_automation.storage.ASETrajectory(structure)
+    for i, atoms in enumerate(ase_traj):
+        atoms.calc = calculator
+        if energies:
+            energies_out[i] = atoms.get_potential_energy() / structure.n_atoms
+        if forces:
+            forces_out[i] = atoms.get_forces()
+
+    return SemiempiricalOutput(
+        n_frames=structure.n_frames,        
+        n_atoms=structure.n_atoms,
+        E_pot=energies_out,
+        forces=forces_out,
+    )

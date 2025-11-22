@@ -147,22 +147,6 @@ class ClassicalMD:
                                    # Ignored if supercell_matrix is provided explicitly.
                                    #
     supercell_diagonal: bool = False
-                                   #
-                                   # Type of feature vectors to be saved as a part
-                                   # of the Trajectory object:
-                                   #
-                                   # (1) none: do not save any feature vectors
-                                   # (2) atomic_environments: feature vectors for every atom
-                                   # (3) averaged_environments: feature vectors
-                                   #     averaged over all atoms
-                                   #
-                                   # Options (2) or (3) enable subsampling of MD frames
-                                   # based on the distances in the feature space.
-                                   #
-                                   # Limitation: options (2) and (3) work only with
-                                   # MACE models.
-                                   #
-    feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "none"
 
 @dataclass(kw_only=True)
 class Enthalpy:

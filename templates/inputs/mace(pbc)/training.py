@@ -26,6 +26,7 @@ mace_calc = mace.calculators.MACECalculator(
 md_sampling_config = MDSampling(
     crystal=from_xyz_file(xyz_solid),
     calculator=mace_calc,
+    features_calculator=mace_calc,
     temperature_K=temperature_K,
     pressure_GPa=1.0E-4,
     finite_subsystem_filter=FiniteSubsystemFilter(
@@ -41,7 +42,6 @@ md_sampling_config = MDSampling(
         time_equilibration_fs=1000.0,
         sampling_interval_fs=1000.0,
         supercell_radius = 10.0,
-        feature_vectors_type="averaged_environments",
     ),    
     work_dir=os.path.join(work_dir, "md_sampling"),
     dataset=dataset,
@@ -63,6 +63,7 @@ mbe_automation.workflows.quasi_harmonic.run(free_energy_config)
 
 phonon_sampling_config = PhononSampling(
     calculator = mace_calc,
+    features_calculator = mace_calc,
     temperature_K = temperature_K,
     finite_subsystem_filter=FiniteSubsystemFilter(
         selection_rule="closest_to_central_molecule",

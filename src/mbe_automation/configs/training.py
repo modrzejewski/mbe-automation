@@ -6,6 +6,7 @@ import numpy.typing as npt
 from pathlib import Path
 import ase
 from ase.calculators.calculator import Calculator as ASECalculator
+from mace.calculators import MACECalculator
 
 from .md import ClassicalMD
 from .clusters import FiniteSubsystemFilter
@@ -17,9 +18,16 @@ class PhononSampling:
     force_constants_dataset: str = "./properties.hdf5"
     force_constants_key: str = "training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"
                                    #
-                                   # Energy and forces calculator
+                                   # Calculators used for
+                                   # (1) energies and forces
+                                   # (2) feature vectors
                                    #
     calculator: ASECalculator
+    features_calculator: MACECalculator | None = None
+                                   #
+                                   # Calculator
+                                   #
+                                   
                                    #
                                    # Rules how to select a subset
                                    # from the full set of phonons
@@ -40,8 +48,8 @@ class PhononSampling:
                                    # Feature vectors are required for subsampling
                                    # based on the distances in the feature space.
                                    #
-                                   # Limitation: This setting is ignored unless
-                                   # the calculator corresponds to a MACE model.
+                                   # This setting is ignored unless
+                                   # features_calculator is present.
                                    #
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "averaged_environments"
                                    #
@@ -150,9 +158,22 @@ class MDSampling:
                                    #
     crystal: ase.Atoms
                                    #
-                                   # Energy and forces calculator
+                                   # Calculators used for
+                                   # (1) energies and forces
+                                   # (2) feature vectors
                                    #
     calculator: ASECalculator
+    features_calculator: MACECalculator | None = None
+                                   #
+                                   # Type of the feature vectors for each frame
+                                   # of sampled periodic or finite system.
+                                   # Feature vectors are required for subsampling
+                                   # based on the distances in the feature space.
+                                   #
+                                   # This setting is ignored unless
+                                   # features_calculator is present.
+                                   #
+    feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "averaged_environments"
                                    #
                                    # Technical details for a short MD sampling of
                                    # configurations for delta learning
@@ -165,7 +186,6 @@ class MDSampling:
             time_equilibration_fs=1000.0,
             sampling_interval_fs=1000.0,
             supercell_radius=15.0,
-            feature_vectors_type="averaged_environments",
         )
     )
 
@@ -198,8 +218,4 @@ class MDSampling:
     save_plots: bool = True
     save_csv: bool = True
 
-    def __post_init__(self):
-        if self.md_crystal.feature_vectors_type == "none":
-            raise ValueError("MD sampling must generate feature vectors for all sampled configurations. "
-                             "Specify a proper feature_vectors_type in ClassicalMD.")
 

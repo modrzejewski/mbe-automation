@@ -62,12 +62,19 @@ def phonon_sampling(
     
     all_structures = [molecular_crystal.supercell] + [s.cluster_of_molecules for s in finite_subsystems]
     for s in all_structures:
-        s.run_neural_network(
+        s.run_model(
             calculator=config.calculator,
-            feature_vectors_type=config.feature_vectors_type,
+            feature_vectors_type="none",
             potential_energies=True,
-            forces=False,
+            forces=True,
         )
+        if config.features_calculator is not None:
+            s.run_model(
+                calculator=config.features_calculator,
+                feature_vectors_type=config.feature_vectors_type,
+                potential_energies=False,
+                forces=False,
+            )
 
     mbe_automation.storage.save_molecular_crystal(
         dataset=config.dataset,
@@ -132,6 +139,7 @@ def md_sampling(
         dataset=config.dataset,
         key=pbc_trajectory_key
     )
+    
     if config.save_plots:
         mbe_automation.dynamics.md.display.trajectory(
             dataset=config.dataset,
@@ -144,11 +152,25 @@ def md_sampling(
             )
         )
 
-    if config.finite_subsystem_filter is not None:
-        pbc_md_frames = mbe_automation.storage.read_structure(
-            dataset=config.dataset,
-            key=pbc_trajectory_key
+    pbc_md_frames = mbe_automation.storage.read_structure(
+        dataset=config.dataset,
+        key=pbc_trajectory_key
+    )
+
+    if config.features_calculator is not None:
+        pbc_md_frames.run_model(
+            calculator=config.features_calculator,
+            feature_vectors_type=config.feature_vectors_type,
+            energies=False,
+            forces=False,
         )
+        pbc_md_frames.save(
+            dataset=config.dataset,
+            key=pbc_trajectory_key,
+            only=["feature_vectors"],
+        )
+
+    if config.finite_subsystem_filter is not None:
         md_molecular_crystal_key = f"{config.root_key}/{system_label}/molecular_crystal"
         md_molecular_crystal = mbe_automation.structure.clusters.detect_molecules(
             system=pbc_md_frames,
@@ -168,12 +190,20 @@ def md_sampling(
         for s in finite_subsystems:
             key = f"{config.root_key}/{system_label}/finite_subsystems/n={s.n_molecules}"
             
-            s.cluster_of_molecules.run_neural_network(
+            s.cluster_of_molecules.run_model(
                 calculator=config.calculator,
-                feature_vectors_type=config.md_crystal.feature_vectors_type,
+                feature_vectors_type="none",
                 potential_energies=True,
                 forces=True
             )
+
+            if config.feautres_calculator is not None:
+                s.cluster_of_molecules.run_model(
+                    calculator=config.feautures_calculator,
+                    feature_vectors_type=config.feature_vectors_type,
+                    potential_energies=False,
+                    forces=False
+                )
 
             mbe_automation.storage.save_finite_subsystem(
                 dataset=config.dataset,

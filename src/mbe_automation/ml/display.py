@@ -16,7 +16,7 @@ def to_chemiscope(
     """
     if structure.feature_vectors_type == "none":
         raise ValueError("Your Structure does not contain feature vectors. "
-                         "Execute run_neural_network.")
+                         "Execute run_model.")
 
     n_components_chemiscope = 2
     pca_vecs, explained_variance_ratio = mbe_automation.ml.core.pca(
@@ -73,7 +73,7 @@ def pca(
 
     if structure.feature_vectors_type == "none":
         raise ValueError("Your Structure does not contain feature vectors. "
-                         "Execute run_neural_network.")
+                         "Execute run_model.")
 
     min_components_for_plot = 3 if plot_type == "3d" else 2
     if n_vectors < min_components_for_plot:

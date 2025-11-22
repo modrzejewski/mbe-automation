@@ -127,7 +127,7 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
         if self._is_file_based and self.storage:
             self.storage.close()
 
-            
+
 @singledispatch
 def to_ase_converter(structure: object, frame_index: int = 0) -> ase.Atoms:
     """Generic converter function. The base implementation raises an error for unsupported types."""
@@ -231,7 +231,7 @@ def to_ase(
 def to_pymatgen(
     structure: core.Structure,
     frame_index: int = 0
-) -> Union[pymatgen.core.Structure, pymatgen.core.Molecule]: ...
+) -> pymatgen.core.Structure | pymatgen.core.Molecule: ...
 
 @overload
 def to_pymatgen(
@@ -239,7 +239,7 @@ def to_pymatgen(
     dataset: str, 
     key: str, 
     frame_index: int = 0
-) -> Union[pymatgen.core.Structure, pymatgen.core.Molecule]: ...
+) -> pymatgen.core.Structure | pymatgen.core.Molecule: ...
 
 def to_pymatgen(
     structure: core.Structure | None = None,
@@ -247,7 +247,7 @@ def to_pymatgen(
     dataset: str | None = None,
     key: str | None = None,
     frame_index: int = 0
-) -> Union[pymatgen.core.Structure, pymatgen.core.Molecule]:
+) -> pymatgen.core.Structure | pymatgen.core.Molecule:
     """Converts a single frame to a Pymatgen object.
 
     - Returns a `pymatgen.core.Structure` for periodic systems.
