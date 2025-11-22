@@ -260,24 +260,24 @@ save_trajectory(
 )
 ```
 
-## Dataset Management
+## Updates to an Existing Dataset
 
-The `Structure` and `Trajectory` classes allow updating an existing dataset with new properties, such as feature vectors, potential energies, or forces. This is particularly useful for active learning workflows where new data needs to be computed for existing geometries.
+The `Structure` and `Trajectory` classes allow updating an existing dataset with new properties, such as feature vectors, potential energies, or forces. This is useful for machine learning workflows where new data needs to be computed for existing geometries.
 
 To update a dataset, first load the structure, run the calculator, and then save the specific properties using the `only` argument in the `save` method.
 
 ```python
-from mbe_automation.storage import read_structure
+from mbe_automation.storage import Trajectory
 # Assuming mace_calc is already initialized
 
 # Load structure
-structure = read_structure(
+traj = Trajectory.read(
     dataset="training_set.hdf5",
     key="training/md_sampling/trajectory"
 )
 
 # Compute new properties (e.g., feature vectors)
-structure.run_neural_network(
+traj.run_neural_network(
     calculator=mace_calc,
     feature_vectors_type="averaged_environments",
     potential_energies=False,
@@ -285,7 +285,7 @@ structure.run_neural_network(
 )
 
 # Save only the new feature vectors
-structure.save(
+traj.save(
     dataset="training_set.hdf5",
     key="training/md_sampling/trajectory",
     only=["feature_vectors"]
