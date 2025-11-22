@@ -4,6 +4,7 @@ import os.path
 import mbe_automation
 import mbe_automation.configs
 import mbe_automation.workflows
+from mbe_automation.configs.execution import ParallelCPU
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "{xyz_solid}"
