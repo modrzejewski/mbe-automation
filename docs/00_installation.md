@@ -58,5 +58,5 @@ The `mbe-automation` package supports several calculation methods. While some de
 | Method | Required Software/Library |
 | :--- | :--- |
 | MACE | `mace-torch` (Python package) |
-| DFTB+, DFTB3-D4 | `dftb+` (Executable) |
+| DFTB+MBD, DFTB3-D4 | `dftb+` (Executable) |
 | GFN1-xTB, GFN2-xTB | `dftb+` (Executable) |
