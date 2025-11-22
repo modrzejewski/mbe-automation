@@ -12,7 +12,6 @@ from mace.calculators import MACECalculator
 from ase.calculators.calculator import Calculator as ASECalculator
 
 import mbe_automation.ml.core
-import mbe_automation.ml.mace
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 
 DATA_FOR_TRAINING = [

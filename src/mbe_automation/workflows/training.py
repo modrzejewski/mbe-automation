@@ -9,7 +9,6 @@ import mbe_automation.structure
 
 try:
     from mace.calculators import MACECalculator
-    import mbe_automation.ml.mace
     mace_available = True
 except ImportError:
     MACECalculator = None
