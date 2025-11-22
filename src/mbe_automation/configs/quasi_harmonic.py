@@ -10,6 +10,9 @@ import numpy.typing as npt
 from mbe_automation.configs.recommended import KNOWN_MODELS
 from mbe_automation.configs.structure import Minimum
 
+EOS_SAMPLING_ALGOS = ["volume", "pressure", "uniform_scaling"]
+EQUATIONS_OF_STATE = ["birch_murnaghan", "vinet", "polynomial", "spline"]
+
 @dataclass(kw_only=True)
 class FreeEnergy:
     """
@@ -191,7 +194,7 @@ class FreeEnergy:
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.
                                    #                                   
-    equation_of_state: Literal["birch_murnaghan", "vinet", "polynomial"] = "polynomial"
+    equation_of_state: Literal[*EQUATIONS_OF_STATE] = "polynomial"
                                    #
                                    # Algorithm used to generate points on
                                    # the equilibrium curve:
@@ -203,7 +206,12 @@ class FreeEnergy:
                                    # 2) volume: cell relaxations are performed with the constant
                                    #    volume constraint.
                                    #
-    eos_sampling: Literal["pressure", "volume"] = "volume"
+                                   # 3) uniform_scaling: simplified volume-based sampling where
+                                   #    cells are obtained by uniform scaling of the lattice
+                                   #    vectors, i.e., without relaxation of the lengths and
+                                   #    angles for a given volume.
+                                   #
+    eos_sampling: Literal[*EOS_SAMPLING_ALGOS] = "volume"
                                    #
                                    # Threshold for detecting imaginary phonon
                                    # frequencies (in THz). A phonon with negative
@@ -238,28 +246,22 @@ class FreeEnergy:
     save_xyz: bool = True
 
     def __post_init__(self):
+        
         if (
                 self.thermal_expansion and
-                self.relaxation.cell_relaxation == "only_atoms"
-        ):
-            raise ValueError("Calculations with thermal expansion require "
-                             "relaxed_input_cell set to 'full' or 'constant_volume'")
-
-        if (
-                self.thermal_expansion and
-                self.eos_sampling == "volume" and
                 self.relaxation.backend == "dftb"
         ):
-            raise ValueError(
-                "DFTB+ does not support constant volume relaxation of the lattice cell. "
-                "eos_sampling must be set to 'pressure'."
-            )
-            
-                      
+
+            if self.eos_sampling != "uniform_scaling":
+                raise ValueError(
+                    f"dftb backend does not support eos_sampling={self.eos_sampling}. "
+                    f"Use eos_sampling=uniform_scaling instead."
+                )
+
     @classmethod
     def recommended(
             cls,
-            model_name: Literal[KNOWN_MODELS],
+            model_name: Literal[*KNOWN_MODELS],
             crystal: ase.Atoms,
             molecule: ase.Atoms,
             calculator: ASECalculator,
@@ -286,11 +288,10 @@ class FreeEnergy:
         if relaxation.backend == "dftb":
             if "eos_sampling" not in kwargs:
                 #
-                # Set the equation of state sampling to pressure-based
-                # because the DFTB backend cannot perform constant-volume
-                # relaxation of the periodic cell.
+                # Set the equation of state sampling to uniform_scaling
+                # to circumvent the limitations of the dftb+ optimizer.
                 #
-                modified_params["eos_sampling"] = "pressure"
+                modified_params["eos_sampling"] = "uniform_scaling"
         
         modified_params.update(kwargs)
 

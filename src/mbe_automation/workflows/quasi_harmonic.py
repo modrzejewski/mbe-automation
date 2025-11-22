@@ -241,13 +241,18 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 work_dir=geom_opt_dir/label_crystal,
                 key=f"{config.root_key}/relaxation/{label_crystal}"
             )
-        elif config.eos_sampling == "volume":
+        elif config.eos_sampling == "volume" or config.eos_sampling == "uniform_scaling":
             #
             # Relax atomic positions and lattice vectors
             # under the constraint of constant volume
             #
             optimizer = deepcopy(config.relaxation)
-            optimizer.cell_relaxation = "constant_volume"
+            
+            if config.eos_sampling == "volume":
+                optimizer.cell_relaxation = "constant_volume"
+            else:
+                optimizer.cell_relaxation = "only_atoms"
+                
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell=unit_cell_T,
                 calculator=config.calculator,
