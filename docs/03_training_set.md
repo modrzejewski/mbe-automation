@@ -135,7 +135,9 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | ------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | `crystal`                 | Initial crystal structure. From this periodic trajectory, the workflow extracts finite, non-periodic clusters. | - |
 | `calculator`              | MLIP calculator.                                                                                    | -                                  |
-| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters. Defaults used in `MDSampling` differ from standard `ClassicalMD` defaults: `time_total_fs=100000.0`, `supercell_radius=15.0`, `feature_vectors_type="averaged_environments"`. | -                                  |
+| `features_calculator`     | Calculator used to compute feature vectors.                                                         | `None`                             |
+| `feature_vectors_type`    | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Ignored unless `features_calculator` is present. | `"averaged_environments"`          |
+| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters. Defaults used in `MDSampling` differ from standard `ClassicalMD` defaults: `time_total_fs=100000.0`, `supercell_radius=15.0`. | -                                  |
 | `temperature_K`           | Target temperature (in Kelvin) for the MD simulation.                                               | `298.15`                           |
 | `pressure_GPa`            | Target pressure (in GPa) for the MD simulation.                                                     | `1.0E-4`                           |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
@@ -155,6 +157,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `force_constants_dataset` | Path to the HDF5 file containing the force constants. | `./properties.hdf5` |
 | `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | `"training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"` |
 | `calculator`              | MLIP calculator.                                                                 | -                 |
+| `features_calculator`     | Calculator used to compute feature vectors.                                      | `None`            |
 | `temperature_K`           | Temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
 | `phonon_filter`           | An instance of `PhononFilter` that specifies which phonon modes to sample from. This method is particularly effective at generating distorted geometries that may be energetically unfavorable but are important for teaching the MLIP about repulsive interactions.       | `PhononFilter()`  |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
@@ -162,7 +165,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `time_step_fs`            | Time step for trajectory generation (used only if `amplitude_scan` is `"time_propagation"`).            | `100.0`           |
 | `rng`                     | Random number generator for randomized amplitude sampling (used only if `amplitude_scan` is `"random"`). | `np.random.default_rng(seed=42)`   |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
-| `feature_vectors_type`    | Type of feature vectors to save. Required for subsampling based on feature space distances. Works only with MACE models. | `"averaged_environments"` |
+| `feature_vectors_type`    | Type of feature vectors to save. Required for subsampling based on feature space distances. Works only with MACE models. Ignored unless `features_calculator` is present. | `"averaged_environments"` |
 | `work_dir`                | Directory where files are stored at runtime.                                                            | `"./"`                             |
 | `dataset`                 | The main HDF5 file with all data computed for the physical system.                                      | `"./properties.hdf5"`              |
 | `root_key`                | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                     | `"training/phonon_sampling"` |
@@ -188,7 +191,6 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
 | `supercell_matrix`      | Supercell transformation matrix. If specified, `supercell_radius` is ignored.                                                        | `None`                |
 | `supercell_diagonal`    | If `True`, create a diagonal supercell. Ignored if `supercell_matrix` is provided.                                                   | `False`               |
-| `feature_vectors_type`  | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Works only with MACE models. | `"none"`                  |
 
 ### `FreeEnergy` Class
 
@@ -401,6 +403,7 @@ mace_calc = mace.calculators.MACECalculator(
 md_sampling_config = MDSampling(
     crystal=from_xyz_file(xyz_solid),
     calculator=mace_calc,
+    features_calculator=mace_calc,
     temperature_K=temperature_K,
     pressure_GPa=1.0E-4,
     finite_subsystem_filter=FiniteSubsystemFilter(
@@ -433,6 +436,7 @@ mbe_automation.workflows.quasi_harmonic.run(free_energy_config)
 
 phonon_sampling_config = PhononSampling(
     calculator=mace_calc,
+    features_calculator=mace_calc,
     temperature_K=temperature_K,
     finite_subsystem_filter=FiniteSubsystemFilter(
         selection_rule="closest_to_central_molecule",
