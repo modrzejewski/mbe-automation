@@ -9,7 +9,6 @@ import phonopy
 from ase.calculators.calculator import Calculator as ASECalculator
 try:
     from mace.calculators import MACECalculator
-    import mbe_automation.ml.mace
     mace_available = True
 except ImportError:
     MACECalculator = None

@@ -113,7 +113,6 @@ mbe_automation.workflows.md.run(md_config)
 | `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
 | `supercell_matrix`      | Supercell transformation matrix. If specified, `supercell_radius` is ignored.                                                        | `None`                |
 | `supercell_diagonal`    | If `True`, create a diagonal supercell. Ignored if `supercell_matrix` is provided.                                                   | `False`               |
-| `feature_vectors_type`  | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Works only with MACE models. | "none"                |
 
 ## Function Call Overview
 

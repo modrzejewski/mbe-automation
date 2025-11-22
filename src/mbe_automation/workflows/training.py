@@ -9,7 +9,6 @@ import mbe_automation.structure
 
 try:
     from mace.calculators import MACECalculator
-    import mbe_automation.ml.mace
     mace_available = True
 except ImportError:
     MACECalculator = None
@@ -197,9 +196,9 @@ def md_sampling(
                 forces=True
             )
 
-            if config.feautres_calculator is not None:
+            if config.features_calculator is not None:
                 s.cluster_of_molecules.run_model(
-                    calculator=config.feautures_calculator,
+                    calculator=config.features_calculator,
                     feature_vectors_type=config.feature_vectors_type,
                     potential_energies=False,
                     forces=False
