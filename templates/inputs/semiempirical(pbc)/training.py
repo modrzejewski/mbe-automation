@@ -50,7 +50,7 @@ free_energy_config = FreeEnergy.recommended(
     crystal=from_xyz_file(xyz_solid),
     calculator=calc,
     thermal_expansion=False,
-    relaxation=Minimium.recommended(
+    relaxation=Minimum.recommended(
         model_name=model_name,
         cell_relaxation="full",
     ),
