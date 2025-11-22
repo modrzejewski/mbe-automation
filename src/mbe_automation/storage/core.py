@@ -129,7 +129,7 @@ class Structure:
         else:
             _save_only(
                 dataset=dataset,
-                key=keyk
+                key=key,
                 structure=self,
                 quantities=only,
             )

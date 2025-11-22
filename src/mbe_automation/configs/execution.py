@@ -41,7 +41,7 @@ class ParallelCPU:
     @classmethod
     def recommended(
             cls,
-            model_name: Literal[KNOWN_MODELS],
+            model_name: Literal[*KNOWN_MODELS],
             **kwargs
     ):
         modified_params = {}

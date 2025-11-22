@@ -17,6 +17,7 @@ dataset = os.path.join(work_dir, "training_set.hdf5")
 crystal = from_xyz_file(xyz_solid)
 
 calc = mbe_automation.calculators.DFTB3_D4(elements=crystal.symbols)
+model_name = "dftb3_d4"
 
 md_sampling_config = MDSampling(
     crystal=crystal,
@@ -45,11 +46,14 @@ md_sampling_config = MDSampling(
 mbe_automation.workflows.training.run(md_sampling_config)
 
 free_energy_config = FreeEnergy.recommended(
-    model_name="mace",
+    model_name=model_name,
     crystal=from_xyz_file(xyz_solid),
     calculator=mace_calc,
     thermal_expansion=False,
-    relax_input_cell="constant_volume",
+    relaxation=Minimium.recommended(
+        model_name=model_name,
+        cell_relaxation="full",
+    ),
     supercell_radius=20.0,
     dataset=dataset,
     root_key="training/quasi_harmonic"
@@ -71,7 +75,7 @@ phonon_sampling_config = PhononSampling(
         freq_max_THz=8.0
     ),
     force_constants_dataset=dataset,
-    force_constants_key="training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants",
+    force_constants_key="training/quasi_harmonic/phonons/crystal[opt:atoms,shape,V]/force_constants",
     time_step_fs = 100.0,
     n_frames = 20,
     work_dir = os.path.join(work_dir, "phonon_sampling"),

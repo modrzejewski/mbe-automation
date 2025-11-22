@@ -167,6 +167,10 @@ class ClassicalMD:
 @dataclass(kw_only=True)
 class Enthalpy:
                                    #
+                                   # Energy and forces calculator
+                                   #
+    calculator: ASECalculator
+                                   #
                                    # Initial structure of crystal
                                    #
     crystal: Atoms | None = None
@@ -174,10 +178,6 @@ class Enthalpy:
                                    # Initial structure of molecule
                                    #
     molecule: Atoms | None = None
-                                   #
-                                   # Energy and forces calculator
-                                   #
-    calculator: ASECalculator
                                    #
                                    # Parameters of the MD propagation
                                    #
