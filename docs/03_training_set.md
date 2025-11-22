@@ -9,6 +9,7 @@
   - [`PhononSampling`](#phononsampling-class)
   - [`ClassicalMD`](#classicalmd-class)
   - [`FreeEnergy`](#freeenergy-class)
+  - [`Minimum`](#minimum-class)
   - [`FiniteSubsystemFilter`](#finitesubsystemfilter-class)
   - [`PhononFilter`](#phononfilter-class)
 - [Subsampling](#subsampling)
@@ -83,11 +84,11 @@ mbe_automation.workflows.training.run(md_sampling_config)
 A quasi-harmonic calculation is performed to obtain the force constants required for the phonon sampling stage.
 
 ```python
-free_energy_config = FreeEnergy(
+free_energy_config = FreeEnergy.recommended(
+    model_name="mace",
     crystal=from_xyz_file(xyz_solid),
     calculator=mace_calc,
     thermal_expansion=False,
-    relax_input_cell="constant_volume",
     supercell_radius=20.0,
     dataset=dataset,
     root_key="training/quasi_harmonic"
@@ -134,7 +135,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | ------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | `crystal`                 | Initial crystal structure. From this periodic trajectory, the workflow extracts finite, non-periodic clusters. | - |
 | `calculator`              | MLIP calculator.                                                                                    | -                                  |
-| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters.                              | -                                  |
+| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters. Defaults used in `MDSampling` differ from standard `ClassicalMD` defaults: `time_total_fs=100000.0`, `supercell_radius=15.0`, `feature_vectors_type="averaged_environments"`. | -                                  |
 | `temperature_K`           | Target temperature (in Kelvin) for the MD simulation.                                               | `298.15`                           |
 | `pressure_GPa`            | Target pressure (in GPa) for the MD simulation.                                                     | `1.0E-4`                           |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
@@ -151,9 +152,9 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 
 | Parameter                 | Description                                                                          | Default Value |
 | ------------------------- | ------------------------------------------------------------------------------------ | ----------------- |
-| `calculator`              | MLIP calculator.                                                                 | -                 |
-| `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | -                 |
 | `force_constants_dataset` | Path to the HDF5 file containing the force constants. | `./properties.hdf5` |
+| `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | `"training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"` |
+| `calculator`              | MLIP calculator.                                                                 | -                 |
 | `temperature_K`           | Temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
 | `phonon_filter`           | An instance of `PhononFilter` that specifies which phonon modes to sample from. This method is particularly effective at generating distorted geometries that may be energetically unfavorable but are important for teaching the MLIP about repulsive interactions.       | `PhononFilter()`  |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
@@ -199,7 +200,20 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `calculator`                    | MLIP calculator for energies and forces.                                                                                                                                                           | -                                               |
 | `thermal_expansion`             | If `True`, performs volumetric thermal expansion calculations. If `False`, uses the harmonic approximation.                                                                                            | `True`                                          |
 | `supercell_radius`              | Minimum point-periodic image distance in the supercell for phonon calculations (Å).                                                                                                               | `25.0`                                          |
-| `relax_input_cell`              | Relaxation of the input structure: "full", "constant_volume", or "only_atoms".                                                                                                               | `"constant_volume"`                             |
+| `relaxation`                    | An instance of `Minimum` that configures the geometry relaxation parameters.                                                                                                                       | `Minimum()`                                     |
+
+### `Minimum` Class
+
+**Location:** `mbe_automation.configs.structure.Minimum`
+
+| Parameter                    | Description                                                                                                                                                           | Default Value       |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `max_force_on_atom_eV_A`     | Maximum residual force threshold for geometry relaxation (eV/Å).                                                                                                      | `1.0E-4`            |
+| `max_n_steps`                | Maximum number of steps in the geometry relaxation.                                                                                                                   | `500`               |
+| `cell_relaxation`            | Relaxation of the input structure: "full" (optimizes atomic positions, cell shape, and volume), "constant_volume" (optimizes atomic positions and cell shape at fixed volume), or "only_atoms" (optimizes only atomic positions). | `"constant_volume"` |
+| `pressure_GPa`               | External isotropic pressure (in GPa) applied during lattice relaxation.                                                                                               | `0.0`               |
+| `symmetrize_final_structure` | If `True`, refines the space group symmetry after each geometry relaxation.                                                                                           | `True`              |
+| `backend`                    | Software used to perform the geometry relaxation: "ase" or "dftb".                                                                                                    | `"ase"`             |
 
 ### `FiniteSubsystemFilter` Class
 
@@ -406,11 +420,11 @@ md_sampling_config = MDSampling(
 )
 mbe_automation.workflows.training.run(md_sampling_config)
 
-free_energy_config = FreeEnergy(
+free_energy_config = FreeEnergy.recommended(
+    model_name="mace",
     crystal=from_xyz_file(xyz_solid),
     calculator=mace_calc,
     thermal_expansion=False,
-    relax_input_cell="constant_volume",
     supercell_radius=20.0,
     dataset=dataset,
     root_key="training/quasi_harmonic"
