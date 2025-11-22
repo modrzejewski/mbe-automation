@@ -12,7 +12,7 @@
   - [`FiniteSubsystemFilter`](#finitesubsystemfilter-class)
   - [`PhononFilter`](#phononfilter-class)
 - [Subsampling](#subsampling)
-- [Dataset Management](#dataset-management)
+- [Updates to and Existing Dataset](#updates-to-an-existing-dataset)
 - [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
