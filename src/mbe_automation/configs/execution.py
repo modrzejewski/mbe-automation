@@ -4,6 +4,8 @@ import resource
 import psutil
 import os
 
+from .recommended import SEMIEMPIRICAL, KNOWN_MODELS
+
 @dataclass(kw_only=True)
 class ParallelCPU:
     """
@@ -39,12 +41,13 @@ class ParallelCPU:
     @classmethod
     def recommended(
             cls,
-            model_name: Literal["rpa", "gfn2-xtb"],
+            model_name: Literal[*KNOWN_MODELS],
             **kwargs
     ):
         modified_params = {}
 
         modified_params["stack_size_main"] = resource.RLIM_INFINITY
+        modified_params["stack_size_threads"] = 64
         modified_params["n_cores"] = len(psutil.Process().cpu_affinity())
         #
         # Stack size for OpenMP threads
@@ -63,8 +66,8 @@ class ParallelCPU:
         if model_name == "rpa":
             modified_params["stack_size_threads"] = 64
         
-        elif model_name == "gfn2-xtb":
-            modified_params["stack_size_threads"] = 4 * 1024
+        elif model_name in SEMIEMPIRICAL:
+            modified_params["stack_size_threads"] = 1024
 
         modified_params.update(kwargs)
 

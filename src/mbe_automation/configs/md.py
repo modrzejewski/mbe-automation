@@ -8,7 +8,7 @@ import numpy.typing as npt
 
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassicalMD:
     ensemble: Literal[
         "NPT",
@@ -164,25 +164,25 @@ class ClassicalMD:
                                    #
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "none"
 
-@dataclass
+@dataclass(kw_only=True)
 class Enthalpy:
-                                   #
-                                   # Initial structure of crystal
-                                   #
-    crystal: Atoms
-                                   #
-                                   # Initial structure of molecule
-                                   #
-    molecule: Atoms
                                    #
                                    # Energy and forces calculator
                                    #
     calculator: ASECalculator
                                    #
+                                   # Initial structure of crystal
+                                   #
+    crystal: Atoms | None = None
+                                   #
+                                   # Initial structure of molecule
+                                   #
+    molecule: Atoms | None = None
+                                   #
                                    # Parameters of the MD propagation
                                    #
-    md_crystal: ClassicalMD
-    md_molecule: ClassicalMD
+    md_crystal: ClassicalMD | None = None
+    md_molecule: ClassicalMD | None = None
                                    #
                                    # Target temperature (K) and pressure (GPa)
                                    #
@@ -207,3 +207,11 @@ class Enthalpy:
     verbose: int = 0
     save_plots: bool = True
     save_csv: bool = True
+
+    def __post_init__(self):
+        if self.crystal is None and self.molecule is None:
+            raise ValueError("Both crystal and molecule undefined.")
+        if self.crystal is not None and self.md_crystal is None:
+            raise ValueError("Crystal structure provided but md_crystal configuration is missing.")
+        if self.molecule is not None and self.md_molecule is None:
+            raise ValueError("Molecule structure provided but md_molecule configuration is missing.")

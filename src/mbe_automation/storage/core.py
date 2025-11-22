@@ -14,6 +14,12 @@ import mbe_automation.ml.core
 import mbe_automation.ml.mace
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 
+DATA_FOR_TRAINING = [
+    "feature_vectors",
+    "potential_energies",
+    "forces"
+]
+
 @dataclass
 class BrillouinZonePath:
     kpoints: List[npt.NDArray[np.floating]]
@@ -110,14 +116,23 @@ class Structure:
             self,
             dataset: str,
             key: str,
+            only: List[Literal[*DATA_FOR_TRAINING]] | None = None,
     ) -> None:
         """Save the structure to a dataset."""
 
-        save_structure(
-            dataset=dataset,
-            key=key,
-            structure=self,
-        )
+        if only is None:
+            save_structure(
+                dataset=dataset,
+                key=key,
+                structure=self,
+            )
+        else:
+            _save_only(
+                dataset=dataset,
+                key=key,
+                structure=self,
+                quantities=only,
+            )
 
     @classmethod
     def read(
@@ -332,14 +347,25 @@ class Trajectory(Structure):
             self,
             dataset: str,
             key: str,
+            only: List[Literal[*DATA_FOR_TRAINING]] | None = None,
     ) -> None:
         """Save the trajectory to a dataset."""
 
-        save_trajectory(
-            dataset=dataset,
-            key=key,
-            traj=self,
-        )
+        if only is None:
+            save_trajectory(
+                dataset=dataset,
+                key=key,
+                traj=self,
+            )
+            
+        else:
+            _save_only(
+                dataset=dataset,
+                key=key,
+                structure=self,
+                quantities=only,
+            )
+            
 
     @classmethod
     def read(
@@ -728,7 +754,7 @@ def _save_structure(
             group.create_dataset(
                 name="forces (eV∕Å)",
                 data=forces
-            )            
+            )
         group.attrs["n_frames"] = n_frames
         group.attrs["n_atoms"] = n_atoms
         group.attrs["periodic"] = is_periodic
@@ -1219,3 +1245,76 @@ def read_unique_clusters(dataset: str, key: str) -> UniqueClusters:
             min_distances=group["min_distances (Å)"][...],
             max_distances=group["max_distances (Å)"][...],
         )
+
+
+def _save_only(
+        dataset: str,
+        key: str,
+        structure: Structure,
+        quantities: List[Literal[*DATA_FOR_TRAINING]],
+) -> None:
+    """
+    Save selected physical quantities from
+    a Structure object into a permanent storage
+    dataset.
+    
+    This function is designed to update the dataset
+    with data needed for training machine learning
+    interatomic potentials.
+    
+    Keeps the rest of the saved Structure object unaltered.
+    """
+
+    with h5py.File(dataset, "a") as f:
+        group = f[key]
+        
+        if "feature_vectors" in quantities:
+            
+            if structure.feature_vectors is None:
+                raise RuntimeError(
+                    "Feature vectors are not present in the Structure object. "
+                    "Execute run_neural_network to compute the required data."
+                )
+
+            if "feature_vectors" in group:
+                    del group["feature_vectors"]
+
+            if structure.feature_vectors_type != "none":
+                group.create_dataset(
+                    name="feature_vectors",
+                    data=structure.feature_vectors
+                )
+                
+            group.attrs["feature_vectors_type"] = structure.feature_vectors_type
+
+        if "potential_energies" in quantities:
+
+            if structure.E_pot is None:
+                raise RuntimeError(
+                    "Potential energies are not present in the Structure object."
+                )
+            
+            if "E_pot (eV∕atom)" in group:
+                del group["E_pot (eV∕atom)"]
+
+            group.create_dataset(
+                name="E_pot (eV∕atom)",
+                data=structure.E_pot
+            )
+
+        if "forces" in quantities:
+
+            if structure.forces is None:
+                raise RuntimeError(
+                    "Forces are not present in the Structure object."
+                )
+
+            if "forces (eV∕Å)" in group:
+                del group["forces (eV∕Å)"]
+
+            group.create_dataset(
+                name="forces (eV∕Å)",
+                data=structure.forces
+            )
+                
+    return

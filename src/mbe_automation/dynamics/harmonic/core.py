@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Literal
 from pathlib import Path
 from ase.io import read
 from ase.atoms import Atoms
@@ -31,6 +32,7 @@ import mbe_automation.dynamics.harmonic.eos
 import mbe_automation.dynamics.harmonic.data
 import mbe_automation.dynamics.harmonic.display
 from mbe_automation.configs.structure import Minimum
+from mbe_automation.configs.quasi_harmonic import EOS_SAMPLING_ALGOS, EQUATIONS_OF_STATE
 
 def _assert_primitive_consistency(
         ph: phonopy.Phonopy,
@@ -229,8 +231,8 @@ def equilibrium_curve(
         work_dir,
         pressure_range,
         volume_range,
-        equation_of_state,
-        eos_sampling,
+        equation_of_state: Literal[*EQUATIONS_OF_STATE],
+        eos_sampling: Literal[*EOS_SAMPLING_ALGOS],
         imaginary_mode_threshold,
         filter_out_imaginary_acoustic,
         filter_out_imaginary_optical,
@@ -246,8 +248,9 @@ def equilibrium_curve(
     
     if eos_sampling == "pressure":
         n_volumes = len(pressure_range)
-    elif eos_sampling == "volume":        
+    elif eos_sampling == "volume" or eos_sampling == "uniform_scaling":
         n_volumes = len(volume_range)
+        
     n_temperatures = len(temperatures)
     
     df_eos_points = []
@@ -257,10 +260,12 @@ def equilibrium_curve(
         f"{root_key}/phonons"
     ])
     print(f"equation_of_state               {equation_of_state}")
+    print(f"eos_sampling                    {eos_sampling}")
     print(f"filter_out_imaginary_acoustic   {filter_out_imaginary_acoustic}")
     print(f"filter_out_imaginary_optical    {filter_out_imaginary_optical}")
     print(f"filter_out_broken_symmetry      {filter_out_broken_symmetry}")
-    if eos_sampling == "volume":
+    
+    if eos_sampling == "volume" or eos_sampling == "uniform_scaling":
         print("volume sampling interval (V∕V₀)")
         print(np.array2string(volume_range, precision=2))
     else:
@@ -287,21 +292,25 @@ def equilibrium_curve(
                 key=f"{root_key}/structures/{label}"
             )
             
-        elif eos_sampling == "volume":
-            #
-            # Relaxation of atomic positions and lattice
-            # vectors under the constraint of constant
-            # volume
-            #
+        elif (
+                eos_sampling == "volume" or
+                eos_sampling == "uniform_scaling"
+        ):
             V = V0 * volume_range[i]
             unit_cell_V = unit_cell_V0.copy()
             unit_cell_V.set_cell(
                 unit_cell_V0.cell * (V/V0)**(1/3),
                 scale_atoms=True
             )
+            
             label = f"crystal[eos:V={V/V0:.4f}]"
             optimizer = deepcopy(relaxation)
-            optimizer.cell_relaxation = "constant_volume"
+            
+            if eos_sampling == "volume":
+                optimizer.cell_relaxation = "constant_volume"
+            else:
+                optimizer.cell_relaxation = "only_atoms"
+                
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell=unit_cell_V,
                 calculator=calculator,
