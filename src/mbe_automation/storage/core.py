@@ -116,7 +116,7 @@ class Structure:
             self,
             dataset: str,
             key: str,
-            only: Literal[List[*DATA_FOR_TRAINING]] | None = None,
+            only: List[Literal[*DATA_FOR_TRAINING]] | None = None,
     ) -> None:
         """Save the structure to a dataset."""
 
