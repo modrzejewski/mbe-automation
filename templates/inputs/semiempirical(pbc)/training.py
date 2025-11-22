@@ -48,7 +48,7 @@ mbe_automation.workflows.training.run(md_sampling_config)
 free_energy_config = FreeEnergy.recommended(
     model_name=model_name,
     crystal=from_xyz_file(xyz_solid),
-    calculator=mace_calc,
+    calculator=calc,
     thermal_expansion=False,
     relaxation=Minimium.recommended(
         model_name=model_name,
