@@ -28,8 +28,6 @@ crystal = ase.io.read("input.xyz")
 
 # Initialize the DFTB3-D4 calculator.
 # We pass the chemical symbols so it can load the appropriate parameters.
-# Note: This assumes the requisite Slater-Koster files are installed in the
-# default location.
 calculator = DFTB3_D4(crystal.get_chemical_symbols())
 
 # 2. Configure and Run MD Workflow
