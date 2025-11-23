@@ -1,6 +1,6 @@
 # Cookbook: Semi-empirical MD + MACE Features
 
-This cookbook demonstrates how to run a Molecular Dynamics (MD) simulation using a semi-empirical Hamiltonian (DFTB3-D4) and subsequently compute MACE feature vectors for the generated trajectory. This workflow is particularly useful for generating training data for machine learning potentials where the sampling is done at a lower cost (semi-empirical) before labeling or feature extraction with a higher-level model.
+This cookbook demonstrates how to run a Molecular Dynamics (MD) simulation using a semi-empirical Hamiltonian (DFTB3-D4) and subsequently compute MACE feature vectors for the generated trajectory.
 
 ## Workflow Overview
 
@@ -105,16 +105,3 @@ trajectory.save(
 print("Workflow completed: MD performed and MACE features added.")
 ```
 
-## Detailed Explanation
-
-### Calculator Setup
-The `DFTB3_D4` function is a factory that configures a `DFTBCalculator` with parameters suitable for organic crystals (3ob-3-1 set) and D4 dispersion correction. It requires the list of elements in the system to load the correct Hubbard derivatives and maximum angular momenta.
-
-### MD Configuration
-The `ClassicalMD` class encapsulates all parameters specific to the propagation (ensemble, time steps, thermostat settings). The `Enthalpy` class binds the physical system (crystal), the calculator, and the MD configuration together. It also defines where output files (`work_dir`) and the final dataset (`dataset`, `root_key`) will be stored.
-
-### Feature Calculation
-The workflow separates the generation of the trajectory (using DFTB+) from the calculation of high-level features (using MACE).
-1.  **Reading**: `read_trajectory` loads the simulation data into a `Trajectory` object (which is a subclass of `Structure`).
-2.  **Running Model**: `run_model` iterates over the frames. When a `MACECalculator` is passed, it automatically detects the capability to compute descriptors.
-3.  **Saving**: The `save` method with the `only=["feature_vectors"]` argument performs a surgical update of the HDF5 file, adding the new dataset without modifying the existing trajectory data.
