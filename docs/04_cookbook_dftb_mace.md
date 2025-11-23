@@ -15,7 +15,7 @@ from pathlib import Path
 import ase.io
 from mace.calculators import MACECalculator
 
-import mbe_automation.workflows.md
+import mbe_automation
 from mbe_automation.storage import Trajectory
 from mbe_automation.configs.md import Enthalpy, ClassicalMD
 from mbe_automation.calculators.dftb import DFTB3_D4
