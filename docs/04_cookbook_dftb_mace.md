@@ -37,11 +37,9 @@ calculator = DFTB3_D4(crystal.get_chemical_symbols())
 # Define the MD parameters for the crystal
 md_config = ClassicalMD(
     ensemble="NPT",
-    time_total_fs=2000.0,    # 2 ps total simulation time
-    time_step_fs=0.5,        # 0.5 fs time step
+    time_total_fs=4000.0,    # 4 ps total simulation time
+    time_step_fs=1.0,        # 0.5 fs time step
     sampling_interval_fs=50.0,
-    thermostat_time_fs=100.0,
-    barostat_time_fs=1000.0,
     supercell_radius=15.0    # Radius for generating the supercell
 )
 
@@ -87,11 +85,14 @@ mace_calc = MACECalculator(
 # Calculate feature vectors for all frames in the trajectory.
 # We disable energy/force calculation since we only want features.
 # 'averaged_environments' calculates the average feature vector over all atoms per frame.
+# Average feature vectors are sufficient to perform subsampling of the most dissimilar
+# MD frames. However, one can also compute 'atomic' feature vectors where each atom in the
+# system gets a full feature vector.
 trajectory.run_model(
     calculator=mace_calc,
     energies=False,
     forces=False,
-    feature_vectors_type="averaged_environments"
+    feature_vectors_type="averaged_environments" # set to 'atomic' to get full feature vectors
 )
 
 # Save the computed feature vectors back to the HDF5 file.
