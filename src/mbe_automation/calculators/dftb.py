@@ -306,32 +306,3 @@ def relax(
     return relaxed_system
 
 
-def energies_and_forces(
-        calculator: DFTBCalculator,
-        structure: mbe_automation.storage.Structure,
-        energies: bool = True,
-        forces: bool = True,
-) -> SemiempiricalOutput:
-
-    energies_out = None
-    forces_out = None
-
-    if energies:
-        energies_out = np.zeros(structure.n_frames)
-    if forces:
-        forces_out = np.zeros((structure.n_frames, structure.n_atoms, 3))
-
-    ase_traj = mbe_automation.storage.ASETrajectory(structure)
-    for i, atoms in enumerate(ase_traj):
-        atoms.calc = calculator
-        if energies:
-            energies_out[i] = atoms.get_potential_energy() / structure.n_atoms
-        if forces:
-            forces_out[i] = atoms.get_forces()
-
-    return SemiempiricalOutput(
-        n_frames=structure.n_frames,        
-        n_atoms=structure.n_atoms,
-        E_pot=energies_out,
-        forces=forces_out,
-    )

@@ -146,9 +146,11 @@ class PhononSampling:
     verbose: int = 0
 
     def __post_init__(self):
-        if self.feature_vectors_type == "none":
-            raise ValueError("Training configurations require presence of feature vectors. "
-                             "Set an appropriate feature_vectors_type.")
+        if self.feature_vectors_type != "none" and self.features_calculator is None:
+            raise ValueError(
+                "A features_calculator must be provided when "
+                "feature_vectors_type is not 'none'."
+            )
             
 
 @dataclass(kw_only=True)
@@ -218,4 +220,9 @@ class MDSampling:
     save_plots: bool = True
     save_csv: bool = True
 
-
+    def __post_init__(self):
+        if self.feature_vectors_type != "none" and self.features_calculator is None:
+            raise ValueError(
+                "A features_calculator must be provided when "
+                "feature_vectors_type is not 'none'."
+            )
