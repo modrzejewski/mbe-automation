@@ -46,8 +46,13 @@ def detect_imaginary_modes(
     band_start_index = 1
     all_imaginary_acoustic = np.where(acoustic_freqs < 0.0)[0] + band_start_index
     significant_imaginary_acoustic = np.where(acoustic_freqs < imaginary_mode_threshold)[0] + band_start_index
-    all_imaginary_optical = np.where(optical_freqs < 0.0)[0] + 3 + band_start_index
-    significant_imaginary_optical = np.where(optical_freqs < imaginary_mode_threshold)[0] + 3 + band_start_index
+
+    if len(optical_freqs) > 0:
+        all_imaginary_optical = np.where(optical_freqs < 0.0)[0] + 3 + band_start_index
+        significant_imaginary_optical = np.where(optical_freqs < imaginary_mode_threshold)[0] + 3 + band_start_index
+    else:
+        all_imaginary_optical = np.array([])
+        significant_imaginary_optical = np.array([])
 
     header = f"{'threshold (THz)':15}   {'type':15} bands"
     line = "-" * 50
@@ -72,7 +77,7 @@ def detect_imaginary_modes(
         acoustic_freqs_real = (len(significant_imaginary_acoustic) == 0),
         optical_freqs_real = (len(significant_imaginary_optical) == 0),
         acoustic_freq_min_thz = np.min(acoustic_freqs),
-        optical_freq_min_thz = np.min(optical_freqs)
+        optical_freq_min_thz = np.min(optical_freqs) if len(optical_freqs) > 0 else np.nan
     )
          
     
@@ -181,6 +186,7 @@ def crystal(
         dataset,
         root_key,
         system_label,
+        pressure_GPa: float = 0.0
 ):
     """
     Physical properties derived from the harmonic model
@@ -202,6 +208,10 @@ def crystal(
     F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
 
     V = unit_cell.get_volume() # Å³/unit cell
+    kJ_mol_Angs3_to_GPa = (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa
+    pV_term_kJ_mol = pressure_GPa * V / kJ_mol_Angs3_to_GPa
+    G_tot_crystal = F_tot_crystal + pV_term_kJ_mol # kJ/mol/unit cell
+
     rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
 
     generate_fbz_path(phonons)
@@ -245,6 +255,7 @@ def crystal(
         "C_V_vib_crystal (J∕K∕mol∕unit cell)": C_V_vib_crystal,
         "E_el_crystal (kJ∕mol∕unit cell)": E_el_crystal,
         "F_tot_crystal (kJ∕mol∕unit cell)": F_tot_crystal,
+        "G_tot_crystal (kJ∕mol∕unit cell)": G_tot_crystal,
         "V_crystal (Å³∕unit cell)": V,
         "ρ_crystal (g∕cm³)": rho,
         "n_atoms_unit_cell": n_atoms_unit_cell,

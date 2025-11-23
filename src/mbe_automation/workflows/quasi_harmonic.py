@@ -204,7 +204,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.filter_out_imaginary_optical,
         config.filter_out_broken_symmetry,
         config.dataset,
-        config.root_key
+        config.root_key,
+        config.pressure_GPa
     )
     #
     # Harmonic properties for unit cells with temperature-dependent
@@ -232,7 +233,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             # forces QHA equilibrium value
             #
             optimizer = deepcopy(config.relaxation)
-            optimizer.pressure_GPa = row["p_thermal (GPa)"]
+            optimizer.pressure_GPa = row["p_thermal (GPa)"] + config.pressure_GPa
             optimizer.cell_relaxation = "full"
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell=unit_cell_T,
@@ -277,7 +278,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             work_dir=config.work_dir,
             dataset=config.dataset,
             root_key=config.root_key,
-            system_label=label_crystal
+            system_label=label_crystal,
+            pressure_GPa=config.pressure_GPa
         )
         df_crystal_T.index = [i] # map current dataframe to temperature T
         data_frames_at_T.append(df_crystal_T)
@@ -321,10 +323,15 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     if config.save_csv:
         df_quasi_harmonic.to_csv(os.path.join(config.work_dir, "thermodynamics_equilibrium_volume.csv"))
 
-    F_tot_diff = (df_crystal_eos["F_tot_crystal_eos (kJ∕mol∕unit cell)"]
-                  - df_crystal_qha["F_tot_crystal (kJ∕mol∕unit cell)"])
+    if config.pressure_GPa == 0.0:
+        F_tot_diff = (df_crystal_eos["F_tot_crystal_eos (kJ∕mol∕unit cell)"]
+                      - df_crystal_qha["F_tot_crystal (kJ∕mol∕unit cell)"])
+    else:
+        F_tot_diff = (df_crystal_eos["G_tot_crystal_eos (kJ∕mol∕unit cell)"]
+                      - df_crystal_qha["G_tot_crystal (kJ∕mol∕unit cell)"])
+
     F_RMSD_per_atom = np.sqrt((F_tot_diff**2).mean()) / len(unit_cell_V0)
-    print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom:.5f} kJ∕mol∕atom")
+    print(f"RMSD(F/G_tot_crystal-F/G_tot_crystal_eos) = {F_RMSD_per_atom:.5f} kJ∕mol∕atom")
         
     print(f"Properties with thermal expansion completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)

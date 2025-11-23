@@ -238,7 +238,8 @@ def equilibrium_curve(
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
         dataset,
-        root_key
+        root_key,
+        pressure_GPa: float = 0.0
 ):
 
     geom_opt_dir = Path(work_dir) / "relaxation"
@@ -336,7 +337,8 @@ def equilibrium_curve(
             work_dir=work_dir,
             dataset=dataset,
             root_key=root_key,
-            system_label=label
+            system_label=label,
+            pressure_GPa=pressure_GPa
         )
         df_eos_points.append(df_crystal_V)
 
@@ -391,6 +393,7 @@ def equilibrium_curve(
     
     V_eos = np.full(n_temperatures, np.nan)
     F_tot_eos = np.full(n_temperatures, np.nan)
+    G_tot_eos = np.full(n_temperatures, np.nan)
     B_eos = np.full(n_temperatures, np.nan)
     p_thermal_eos = np.full(n_temperatures, np.nan)
     min_found = np.zeros(n_temperatures, dtype=bool)
@@ -399,18 +402,41 @@ def equilibrium_curve(
     F_tot_curves = []
         
     for i, T in enumerate(temperatures):
+        if pressure_GPa == 0.0:
+            F_fit_input = df_eos[good_points & select_T[i]]["F_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
+        else:
+            F_fit_input = df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
+
         fit = mbe_automation.dynamics.harmonic.eos.fit(
             V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
-            F=df_eos[good_points & select_T[i]]["F_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
+            F=F_fit_input,
             equation_of_state=equation_of_state
         )
         F_tot_curves.append(fit)
-        F_tot_eos[i] = fit.F_min
+
         V_eos[i] = fit.V_min
         B_eos[i] = fit.B
         min_found[i] = fit.min_found
         min_extrapolated[i] = fit.min_extrapolated
         curve_type.append(fit.curve_type)
+
+        if pressure_GPa == 0.0:
+            F_tot_eos[i] = fit.F_min
+            G_tot_eos[i] = fit.F_min
+        else:
+            #
+            # The EOS fit was performed for G_tot(V)
+            #
+            G_tot_eos[i] = fit.F_min
+
+            #
+            # Reconstruct F_tot(V) at the equilibrium volume
+            # by subtracting the PV term.
+            #
+            kJ_mol_Angs3_to_GPa = (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa
+            pV_term_kJ_mol = pressure_GPa * fit.V_min / kJ_mol_Angs3_to_GPa
+            F_tot_eos[i] = G_tot_eos[i] - pV_term_kJ_mol
+
         #
         # Effective pressure (thermal pressure) which forces
         # the equilibrum volume of the unit cell at
@@ -471,6 +497,7 @@ def equilibrium_curve(
         "V_eos (Å³∕unit cell)": V_eos,
         "p_thermal (GPa)": p_thermal_eos,
         "F_tot_crystal_eos (kJ∕mol∕unit cell)": F_tot_eos,
+        "G_tot_crystal_eos (kJ∕mol∕unit cell)": G_tot_eos,
         "B (GPa)": B_eos,
         "curve_type": curve_type,
         "min_found": min_found,

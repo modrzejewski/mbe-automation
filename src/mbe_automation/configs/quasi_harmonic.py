@@ -191,6 +191,14 @@ class FreeEnergy:
     pressure_range: npt.NDArray[np.floating] = field(default_factory=lambda:
                                                      np.array([0.2, 0.0, -0.2, -0.3, -0.4, -0.5, -0.6]))
                                    #
+                                   # External pressure (in GPa) at which the equilibrium
+                                   # properties are computed.
+                                   #
+                                   # If non-zero, the equilibrium volume is determined by minimizing
+                                   # the Gibbs free energy G(V) = F(V) + p*V.
+                                   #
+    pressure_GPa: float = 0.0
+                                   #
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.
                                    #                                   
