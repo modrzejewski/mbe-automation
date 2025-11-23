@@ -74,7 +74,7 @@ trajectory = Trajectory.read(
 # Using a placeholder model path here.
 mace_calc = MACECalculator(
     model_paths="/path/to/mace.model",
-    device="cuda" # or "cpu"
+    device="cpu"
 )
 
 # Calculate feature vectors for all frames in the trajectory.
