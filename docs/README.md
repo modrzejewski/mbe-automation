@@ -53,5 +53,6 @@ The program is organized into three main workflows:
 1.  [Quasi-Harmonic Calculation](./01_quasi_harmonic.md)
 2.  [Molecular Dynamics](./02_molecular_dynamics.md)
 3.  [Training Set Creation](./03_training_set.md)
+4.  [Cookbook: Semi-empirical MD + MACE Features](./04_cookbook_dftb_mace.md)
 
 For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
