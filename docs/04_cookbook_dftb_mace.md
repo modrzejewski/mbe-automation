@@ -11,8 +11,6 @@ This cookbook demonstrates how to run a Molecular Dynamics (MD) simulation using
 ## Complete Example
 
 ```python
-from pathlib import Path
-import ase.io
 from mace.calculators import MACECalculator
 
 import mbe_automation
