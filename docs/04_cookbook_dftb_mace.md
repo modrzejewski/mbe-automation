@@ -22,9 +22,8 @@ from mbe_automation.calculators.dftb import DFTB3_D4
 
 # 1. Setup Structure and Calculator
 # ---------------------------------
-# Load your initial structure (e.g., a geometry optimized crystal)
-# For this example, we assume 'input.xyz' exists.
-crystal = ase.io.read("input.xyz")
+# Load your initial structure
+crystal = mbe_automation.storage.from_xyz_file("input.xyz")
 
 # Initialize the DFTB3-D4 calculator.
 # We pass the chemical symbols so it can load the appropriate parameters.
