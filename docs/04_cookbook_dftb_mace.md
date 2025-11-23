@@ -37,8 +37,8 @@ calculator = DFTB3_D4(crystal.get_chemical_symbols())
 # Define the MD parameters for the crystal
 md_config = ClassicalMD(
     ensemble="NPT",
-    time_total_fs=4000.0,    # 4 ps total simulation time
-    time_step_fs=1.0,        # 0.5 fs time step
+    time_total_fs=4000.0,  
+    time_step_fs=1.0,        
     sampling_interval_fs=50.0,
     supercell_radius=15.0    # Radius for generating the supercell
 )
