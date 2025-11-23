@@ -16,7 +16,7 @@ import ase.io
 from mace.calculators import MACECalculator
 
 import mbe_automation.workflows.md
-import mbe_automation.storage
+from mbe_automation.storage import Trajectory
 from mbe_automation.configs.md import Enthalpy, ClassicalMD
 from mbe_automation.calculators.dftb import DFTB3_D4
 
@@ -70,7 +70,7 @@ mbe_automation.workflows.md.run(config)
 traj_key = f"md_run/crystal[dyn:T={300.0:.2f},p={0.0001:.5f}]/trajectory"
 
 # Load the trajectory from the HDF5 file
-trajectory = mbe_automation.storage.read_trajectory(
+trajectory = Trajectory.read(
     dataset="dftb_trajectory.hdf5",
     key=traj_key
 )
