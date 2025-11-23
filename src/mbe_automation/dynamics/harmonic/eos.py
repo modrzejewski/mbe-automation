@@ -3,6 +3,7 @@ from typing import Callable
 import numpy.typing as npt
 from numpy.polynomial.polynomial import Polynomial
 import scipy.optimize
+from scipy.interpolate import CubicSpline
 import functools
 import numpy as np
 import ase.units
@@ -119,6 +120,59 @@ def polynomial_fit(V, F, degree=2):
         )
 
     
+def spline_interpolation(V, F):
+    """
+    Interpolate (V, F) using a cubic spline, find equilibrium volume and bulk modulus.
+    """
+
+    # Sort data by V
+    sort_idx = np.argsort(V)
+    V_sorted = V[sort_idx]
+    F_sorted = F[sort_idx]
+
+    # Create CubicSpline
+    cs = CubicSpline(V_sorted, F_sorted)
+
+    # Find roots of the first derivative (dF/dV = 0)
+    dFdV = cs.derivative(1)
+    d2FdV2 = cs.derivative(2)
+
+    crit_points = dFdV.roots()
+    # Filter for real roots (CubicSpline roots should be real, but just in case)
+    crit_points = crit_points[np.isreal(crit_points)].real
+
+    # Filter for minima (d2F/dV2 > 0)
+    crit_points = crit_points[d2FdV2(crit_points) > 0]
+
+    if len(crit_points) > 0:
+        i_min = np.argmin(cs(crit_points))
+        V_min = crit_points[i_min] # Å³/unit cell
+
+        return EOSFitResults(
+            F_min=float(cs(V_min)), # kJ/mol/unit cell
+            V_min=V_min,
+            B=V_min * d2FdV2(V_min) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa, # GPa
+            min_found=True,
+            min_extrapolated=(V_min < np.min(V) or V_min > np.max(V)),
+            curve_type="spline",
+            F_interp=cs,
+            F_sampled=F.copy(),
+            V_sampled=V.copy()
+        )
+    else:
+        return EOSFitResults(
+            F_min=np.nan,
+            V_min=np.nan,
+            B=np.nan,
+            min_found=False,
+            min_extrapolated=False,
+            curve_type="spline",
+            F_interp=cs,
+            F_sampled=F.copy(),
+            V_sampled=V.copy()
+        )
+
+
 def fit(V, F, equation_of_state):
     """
     Fit energy/free energy/Gibbs enthalpy using a specified
@@ -127,11 +181,16 @@ def fit(V, F, equation_of_state):
 
     linear_fit = ["polynomial"]
     nonlinear_fit = ["vinet", "birch_murnaghan"]
+    interpolation = ["spline"]
     
     if (equation_of_state not in linear_fit and
-        equation_of_state not in nonlinear_fit):
+        equation_of_state not in nonlinear_fit and
+        equation_of_state not in interpolation):
         
         raise ValueError(f"Unknown EOS: {equation_of_state}")
+
+    if equation_of_state in interpolation:
+        return spline_interpolation(V, F)
 
     poly_fit = polynomial_fit(V, F)
         
