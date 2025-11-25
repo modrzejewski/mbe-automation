@@ -1,11 +1,7 @@
-import torch
-import ase.io
 from tqdm import tqdm
-import os
 from mace.calculators import MACECalculator
 from ase import Atoms
 from typing import Dict, List
-import mbe_automation
 
 def get_vacuum_energies(calc_mace_off: MACECalculator, calc_mace_mp: MACECalculator, z_list: List[int]) -> Dict[int, float]:
     """Calculates the energy (mace_off) for single, isolated atoms."""
