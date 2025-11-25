@@ -250,7 +250,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             # under the constraint of constant volume
             #
             optimizer = deepcopy(config.relaxation)
-            optimizer._pressure_GPa = 0.0
+            optimizer._pressure_GPa = config.external_pressure_GPa
             if config.eos_sampling == "volume":
                 optimizer.cell_relaxation = "constant_volume"
             else:
@@ -327,9 +327,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
     G_tot_diff = (df_crystal_eos["G_tot_crystal_eos (kJ∕mol∕unit cell)"]
                   - df_crystal_qha["G_tot_crystal (kJ∕mol∕unit cell)"])
-    G_RMSD_per_atom = np.sqrt((F_tot_diff**2).mean()) / len(unit_cell_V0)
+    G_RMSD_per_atom = np.sqrt((G_tot_diff**2).mean()) / len(unit_cell_V0)
     print(f"Accuracy check for the interpolated Gibbs free energy:")
-    print(f"RMSD(interpolated-actual) = {F_RMSD_per_atom:.5f} kJ∕mol∕atom")
+    print(f"RMSD(interpolated-actual) = {G_RMSD_per_atom:.5f} kJ∕mol∕atom")
         
     print(f"Thermal expansion calculations completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)

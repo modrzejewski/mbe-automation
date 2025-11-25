@@ -334,7 +334,7 @@ def equilibrium_curve(
             unit_cell_V,
             ph,
             temperatures,
-            external_pressure_GPa,
+            0.0,
             imaginary_mode_threshold,
             space_group=space_group_V,
             work_dir=work_dir,
@@ -402,9 +402,21 @@ def equilibrium_curve(
     G_tot_curves = []
         
     for i, T in enumerate(temperatures):
+
+        V = df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy()
+        F = df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
+
+        if external_pressure_GPa > 1.0E-8:
+            pV = (external_pressure_GPa * ase.units.GPa
+                  * V * ase.units.Angstrom**3)
+            pV /= (ase.units.kJ / ase.units.mol)
+            G = F + pV
+        else:
+            G = F
+
         fit = mbe_automation.dynamics.harmonic.eos.fit(
-            V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
-            F=df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
+            V=V,
+            F=G,
             equation_of_state=equation_of_state
         )
         G_tot_curves.append(fit)
