@@ -147,9 +147,9 @@ def spline_interpolation(V, G):
     G_sorted = G[sort_idx]
 
     # Create CubicSpline
-    cs = CubicSpline(V_sorted, F_sorted)
+    cs = CubicSpline(V_sorted, G_sorted)
 
-    # Find roots of the first derivative (dF/dV = 0)
+    # Find roots of the first derivative (dG/dV = 0)
     dGdV = cs.derivative(1)
     d2GdV2 = cs.derivative(2)
 
@@ -157,7 +157,7 @@ def spline_interpolation(V, G):
     # Filter for real roots (CubicSpline roots should be real, but just in case)
     crit_points = crit_points[np.isreal(crit_points)].real
 
-    # Filter for minima (d2F/dV2 > 0)
+    # Filter for minima (d2G/dV2 > 0)
     crit_points = crit_points[d2GdV2(crit_points) > 0]
 
     if len(crit_points) > 0:

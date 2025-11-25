@@ -235,7 +235,7 @@ def eos_curves(
     G_min_scaled = eos.G_min * scaling_factor
 
     G_min_global = np.nanmin(G_sampled_scaled)
-    if np.any(~np.isnan(F_min_scaled)):
+    if np.any(~np.isnan(G_min_scaled)):
         G_min_global = min(G_min_global, np.nanmin(G_min_scaled))
 
     fig, ax = plt.subplots(figsize=(8, 6))
