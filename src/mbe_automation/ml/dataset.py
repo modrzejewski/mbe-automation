@@ -21,7 +21,7 @@ def get_vacuum_energies(calc_mace_off: MACECalculator, calc_mace_mp: MACECalcula
         
     return vacuum_energies
 
-def process_trajectory(trajectory, calc_mp0, calc_mace_off, vacuum_energy_shifts, description="Processing"):
+def process_trajectory(trajectory: List[Atoms], calc_mp0: MACECalculator, calc_mace_off: MACECalculator, vacuum_energy_shifts: Dict[int, float], description: str = "Processing") -> List[Atoms]:
     """Helper function to process a trajectory and return a list of atoms objects."""
     processed_atoms = []
     for atoms in tqdm(trajectory, desc=description):
