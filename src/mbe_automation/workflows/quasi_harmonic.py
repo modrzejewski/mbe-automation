@@ -200,7 +200,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.relaxation,
         config.supercell_displacement,
         config.work_dir,
-        config.pressure_range,
+        config.thermal_pressures_GPa,
         config.volume_range,
         config.equation_of_state,
         config.eos_sampling,
