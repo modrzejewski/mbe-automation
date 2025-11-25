@@ -217,23 +217,26 @@ def eos_curves(
     max_temp_ticks: int = 10
 ):
     
-    eos = mbe_automation.storage.read_eos_curves(dataset, key)
+    eos = mbe_automation.storage.read_eos_curves(
+        dataset,
+        key
+    )
     n_temperatures = len(eos.temperatures)
 
     if n_molecules_per_cell:
         scaling_factor = 1.0 / n_molecules_per_cell
-        y_label = "Free energy (kJ∕mol∕molecule)"
+        y_label = "Gibbs free energy (kJ∕mol∕molecule)"
     else:
         scaling_factor = 1.0
-        y_label = "Free energy (kJ∕mol∕unit cell)"
+        y_label = "Gibbs free energy (kJ∕mol∕unit cell)"
 
-    F_sampled_scaled = eos.F_sampled * scaling_factor
-    F_interp_scaled = eos.F_interp * scaling_factor
-    F_min_scaled = eos.F_min * scaling_factor
+    G_sampled_scaled = eos.G_sampled * scaling_factor
+    G_interp_scaled = eos.G_interp * scaling_factor
+    G_min_scaled = eos.G_min * scaling_factor
 
-    F_min_global = np.nanmin(F_sampled_scaled)
+    G_min_global = np.nanmin(G_sampled_scaled)
     if np.any(~np.isnan(F_min_scaled)):
-        F_min_global = min(F_min_global, np.nanmin(F_min_scaled))
+        G_min_global = min(G_min_global, np.nanmin(G_min_scaled))
 
     fig, ax = plt.subplots(figsize=(8, 6))
     cmap = plt.get_cmap("plasma")
@@ -248,26 +251,26 @@ def eos_curves(
 
         ax.scatter(
             eos.V_sampled[i, :],
-            F_sampled_scaled[i, :] - F_min_global,
+            G_sampled_scaled[i, :] - G_min_global,
             color=color,
             marker="o",
             facecolors="none"
         )
         ax.plot(
             eos.V_interp,
-            F_interp_scaled[i, :] - F_min_global,
+            G_interp_scaled[i, :] - G_min_global,
             color=color,
             linestyle="-"
         )
         
-        y_tick_pos = F_sampled_scaled[i, -1] - F_min_global
+        y_tick_pos = G_sampled_scaled[i, -1] - G_min_global
         if not np.isnan(y_tick_pos):
             tick_positions.append(y_tick_pos)
             tick_labels.append(f"{T:.0f} K")
 
     ax.plot(
         eos.V_min,
-        F_min_scaled - F_min_global,
+        G_min_scaled - G_min_global,
         color="black",
         linestyle="--",
         marker="x",

@@ -78,7 +78,7 @@ def polynomial_fit(V, F, degree=2):
             F_interp=None,
             F_sampled=F.copy(),
             V_sampled=V.copy()
-            )
+        )
     weights = proximity_weights(
         V,
         V_min=V[np.argmin(F)] # guess value for the minimum
@@ -125,6 +125,22 @@ def spline_interpolation(V, F):
     Interpolate (V, F) using a cubic spline, find equilibrium volume and bulk modulus.
     """
 
+    if len(V) < 4:
+        #
+        # Not enough points to perform fitting with cubic spline
+        #
+        return EOSFitResults(
+            F_min=np.nan,
+            V_min=np.nan,
+            B=np.nan,
+            min_found=False,
+            min_extrapolated=False,
+            curve_type="spline",
+            F_interp=None,
+            F_sampled=F.copy(),
+            V_sampled=V.copy()
+        )
+    
     # Sort data by V
     sort_idx = np.argsort(V)
     V_sorted = V[sort_idx]
@@ -190,7 +206,8 @@ def fit(V, F, equation_of_state):
         raise ValueError(f"Unknown EOS: {equation_of_state}")
 
     if equation_of_state in interpolation:
-        return spline_interpolation(V, F)
+        spline_fit = spline_interpolation(V, F)
+        return spline_fit
 
     poly_fit = polynomial_fit(V, F)
         

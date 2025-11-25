@@ -33,11 +33,11 @@ class BrillouinZonePath:
 class EOSCurves:
     temperatures: npt.NDArray[np.floating]
     V_sampled: npt.NDArray[np.floating]
-    F_sampled: npt.NDArray[np.floating]
+    G_sampled: npt.NDArray[np.floating]
     V_interp: npt.NDArray[np.floating]
-    F_interp: npt.NDArray[np.floating]
+    G_interp: npt.NDArray[np.floating]
     V_min: npt.NDArray[np.floating]
-    F_min: npt.NDArray[np.floating]
+    G_min: npt.NDArray[np.floating]
 
 @dataclass
 class Structure:
@@ -581,13 +581,13 @@ def read_brillouin_zone_path(
 
 
 def save_eos_curves(
-        F_tot_curves,
+        G_tot_curves,
         temperatures,
         dataset,
         key
 ):
     """
-    Save Helmholtz free energy vs. volume data for multiple temperatures.
+    Save Gibbs free enthalpy vs. volume data for multiple temperatures.
     """
 
     n_temperatures = len(temperatures)
@@ -595,24 +595,24 @@ def save_eos_curves(
     n_interp = 200
 
     V_sampled = np.zeros((n_temperatures, n_volumes))
-    F_sampled = np.zeros((n_temperatures, n_volumes))
+    G_sampled = np.zeros((n_temperatures, n_volumes))
     V_min = np.zeros(n_temperatures) 
-    F_min = np.zeros(n_temperatures)
+    G_min = np.zeros(n_temperatures)
     for i, fit in enumerate(F_tot_curves):
         V_sampled[i, :] = fit.V_sampled[:]
-        F_sampled[i, :] = fit.F_sampled[:]
+        G_sampled[i, :] = fit.G_sampled[:]
         if fit.min_found:
             V_min[i] = fit.V_min
-            F_min[i] = fit.F_min
+            G_min[i] = fit.G_min
         else:
             V_min[i] = np.nan
-            F_min[i] = np.nan
+            G_min[i] = np.nan
 
-    F_interp = np.full((n_temperatures, n_interp), np.nan)
+    G_interp = np.full((n_temperatures, n_interp), np.nan)
     V_interp = np.linspace(np.min(V_sampled), np.max(V_sampled), n_interp)
-    for i, fit in enumerate(F_tot_curves):
-        if fit.F_interp is not None:
-            F_interp[i, :] = fit.F_interp(V_interp)
+    for i, fit in enumerate(G_tot_curves):
+        if fit.G_interp is not None:
+            G_interp[i, :] = fit.G_interp(V_interp)
         
     with h5py.File(dataset, "a") as f:
         if key in f:
@@ -632,15 +632,15 @@ def save_eos_curves(
             data=V_sampled
         )
         group.create_dataset(
-            name="F_sampled (kJ∕mol∕unit cell)",
-            data=F_sampled
+            name="G_sampled (kJ∕mol∕unit cell)",
+            data=G_sampled
         )
         group.create_dataset(
             name="V_interp (Å³∕unit cell)",
             data=V_interp
         )
         group.create_dataset(
-            name="F_interp (kJ∕mol∕unit cell)",
+            name="G_interp (kJ∕mol∕unit cell)",
             data=F_interp
         )
         group.create_dataset(
@@ -648,8 +648,8 @@ def save_eos_curves(
             data=V_min
         )
         group.create_dataset(
-            name="F_min (kJ∕mol∕unit cell)",
-            data=F_min
+            name="G_min (kJ∕mol∕unit cell)",
+            data=G_min
         )
 
 
@@ -663,11 +663,11 @@ def read_eos_curves(
         eos_curves = EOSCurves(
             temperatures=group["T (K)"][...],
             V_sampled=group["V_sampled (Å³∕unit cell)"][...],
-            F_sampled=group["F_sampled (kJ∕mol∕unit cell)"][...],
+            G_sampled=group["G_sampled (kJ∕mol∕unit cell)"][...],
             V_interp=group["V_interp (Å³∕unit cell)"][...],
-            F_interp=group["F_interp (kJ∕mol∕unit cell)"][...],
+            G_interp=group["G_interp (kJ∕mol∕unit cell)"][...],
             V_min=group["V_min (Å³∕unit cell)"][...],
-            F_min=group["F_min (kJ∕mol∕unit cell)"][...]
+            F_min=group["G_min (kJ∕mol∕unit cell)"][...]
         )
 
     return eos_curves

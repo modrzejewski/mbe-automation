@@ -65,9 +65,6 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             config.calculator
         )
 
-    if config.thermal_expansion:
-        assert config.relaxation.cell_relaxation in ["full", "constant_volume"]
-
     if config.relaxation.cell_relaxation == "full":
         relaxed_crystal_label = "crystal[opt:atoms,shape,V]"
     elif config.relaxation.cell_relaxation == "constant_volume":
@@ -89,10 +86,15 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # the volume axis will be determined by applying
     # scaling factors with respect to V0.
     #
+    optimizer = deepcopy(config.relaxation)
+    if config.relaxation.cell_relaxation == "full":
+        optimizer._pressure_GPa = config.external_pressure_GPa
+    else:
+        optimizer._pressure_GPa = 0.0
     unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
         unit_cell=unit_cell,
         calculator=config.calculator,
-        config=config.relaxation,
+        config=optimizer,
         work_dir=geom_opt_dir/relaxed_crystal_label,
         key=f"{config.root_key}/relaxation/{relaxed_crystal_label}"
     )
@@ -130,8 +132,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     df_crystal = mbe_automation.dynamics.harmonic.data.crystal(
         unit_cell_V0,
         phonons,
-        config.temperatures_K,
-        config.imaginary_mode_threshold,
+        temperatures=config.temperatures_K,
+        external_pressure_GPa=config.external_pressure_GPa,
+        imaginary_mode_threshold=config.imaginary_mode_threshold,
         space_group=space_group_V0,
         work_dir=config.work_dir,
         dataset=config.dataset,
@@ -178,10 +181,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # using an analytical form of the equation of state:
     #
     # 1. cell volumes V
-    # 2. total free energies F_tot (electronic energy + vibrational energy)
+    # 2. total Gibbs free energies G_tot_crystal (electronic energy + vibrational free energy + p*V)
     # 3. effective thermal pressures p_thermal, which simulate the effect
     #    of ZPE and thermal motion on the cell relaxation
-    # 4. bulk moduli B(T)
     #
     interp_mesh = phonons.mesh.mesh_numbers # enforce the same mesh for all systems
 
@@ -190,6 +192,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         space_group_V0,
         config.calculator,
         config.temperatures_K,
+        config.external_pressure_GPa,
         supercell_matrix,
         interp_mesh,
         config.relaxation,
@@ -225,14 +228,14 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             unit_cell_V0.cell * (V/V0)**(1/3),
             scale_atoms=True
         )
-        label_crystal = f"crystal[eq:T={T:.2f}]"
+        label_crystal = f"crystal[eq:T={T:.2f},p={config.external_pressure_GPa:.4f}]"
         if config.eos_sampling == "pressure":
             #
             # Relax geometry with an effective pressure which
             # forces QHA equilibrium value
             #
             optimizer = deepcopy(config.relaxation)
-            optimizer.pressure_GPa = row["p_thermal (GPa)"]
+            optimizer._pressure_GPa = row["p_thermal (GPa)"] + config.external_pressure_GPa
             optimizer.cell_relaxation = "full"
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell=unit_cell_T,
@@ -247,7 +250,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             # under the constraint of constant volume
             #
             optimizer = deepcopy(config.relaxation)
-            
+            optimizer._pressure_GPa = 0.0
             if config.eos_sampling == "volume":
                 optimizer.cell_relaxation = "constant_volume"
             else:
@@ -272,6 +275,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             unit_cell_T,
             phonons,
             temperatures=np.array([T]),
+            external_pressure_GPa=config.external_pressure_GPa,
             imaginary_mode_threshold=config.imaginary_mode_threshold, 
             space_group=space_group_T,
             work_dir=config.work_dir,
@@ -321,11 +325,12 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     if config.save_csv:
         df_quasi_harmonic.to_csv(os.path.join(config.work_dir, "thermodynamics_equilibrium_volume.csv"))
 
-    F_tot_diff = (df_crystal_eos["F_tot_crystal_eos (kJ∕mol∕unit cell)"]
-                  - df_crystal_qha["F_tot_crystal (kJ∕mol∕unit cell)"])
-    F_RMSD_per_atom = np.sqrt((F_tot_diff**2).mean()) / len(unit_cell_V0)
-    print(f"RMSD(F_tot_crystal-F_tot_crystal_eos) = {F_RMSD_per_atom:.5f} kJ∕mol∕atom")
+    G_tot_diff = (df_crystal_eos["G_tot_crystal_eos (kJ∕mol∕unit cell)"]
+                  - df_crystal_qha["G_tot_crystal (kJ∕mol∕unit cell)"])
+    G_RMSD_per_atom = np.sqrt((F_tot_diff**2).mean()) / len(unit_cell_V0)
+    print(f"Accuracy check for the interpolated Gibbs free energy:")
+    print(f"RMSD(interpolated-actual) = {F_RMSD_per_atom:.5f} kJ∕mol∕atom")
         
-    print(f"Properties with thermal expansion completed")
+    print(f"Thermal expansion calculations completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)
 

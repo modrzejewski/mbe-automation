@@ -304,5 +304,3 @@ def relax(
         raise RuntimeError("Relaxation with dftb+ failed. No output geometry was generated.")
         
     return relaxed_system
-
-
