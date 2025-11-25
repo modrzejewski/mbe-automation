@@ -341,7 +341,7 @@ def equilibrium_curve(
             dataset=dataset,
             root_key=root_key,
             system_label=label
-        )        
+        )
         df_eos_points.append(df_crystal_V)
 
     #
@@ -404,11 +404,11 @@ def equilibrium_curve(
     for i, T in enumerate(temperatures):
         fit = mbe_automation.dynamics.harmonic.eos.fit(
             V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
-            F=df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
+            G=df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
             equation_of_state=equation_of_state
         )
         G_tot_curves.append(fit)
-        G_tot_eos[i] = fit.F_min # interpolated G at equilibrium volume, can slightly differ from the actual G
+        G_tot_eos[i] = fit.G_min # interpolated G at equilibrium volume, can slightly differ from the actual G
         V_eos[i] = fit.V_min     # volume which minimizes G as a function of T and p_external
         min_found[i] = fit.min_found
         min_extrapolated[i] = fit.min_extrapolated
