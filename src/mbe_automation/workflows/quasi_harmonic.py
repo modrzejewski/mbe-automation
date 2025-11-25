@@ -92,7 +92,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         # The private attribute _pressure_GPa is
         # referenced only for cell_relaxation='full' 
         #
-        optimizer._pressure_GPa = config.external_pressure_GPa
+        optimizer._pressure_GPa = config.pressure_GPa
     unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
         unit_cell=unit_cell,
         calculator=config.calculator,
@@ -135,7 +135,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         unit_cell_V0,
         phonons,
         temperatures=config.temperatures_K,
-        external_pressure_GPa=config.external_pressure_GPa,
+        external_pressure_GPa=config.pressure_GPa,
         imaginary_mode_threshold=config.imaginary_mode_threshold,
         space_group=space_group_V0,
         work_dir=config.work_dir,
@@ -194,7 +194,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         space_group_V0,
         config.calculator,
         config.temperatures_K,
-        config.external_pressure_GPa,
+        config.pressure_GPa,
         supercell_matrix,
         interp_mesh,
         config.relaxation,
@@ -230,14 +230,14 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             unit_cell_V0.cell * (V/V0)**(1/3),
             scale_atoms=True
         )
-        label_crystal = f"crystal[eq:T={T:.2f},p={config.external_pressure_GPa:.4f}]"
+        label_crystal = f"crystal[eq:T={T:.2f},p={config.pressure_GPa:.4f}]"
         if config.eos_sampling == "pressure":
             #
             # Relax geometry with an effective pressure which
             # forces QHA equilibrium value
             #
             optimizer = deepcopy(config.relaxation)
-            optimizer._pressure_GPa = row["p_thermal (GPa)"] + config.external_pressure_GPa
+            optimizer._pressure_GPa = row["p_thermal (GPa)"] + config.pressure_GPa
             optimizer.cell_relaxation = "full"
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell=unit_cell_T,
@@ -282,7 +282,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             unit_cell_T,
             phonons,
             temperatures=np.array([T]),
-            external_pressure_GPa=config.external_pressure_GPa,
+            external_pressure_GPa=config.pressure_GPa,
             imaginary_mode_threshold=config.imaginary_mode_threshold, 
             space_group=space_group_T,
             work_dir=config.work_dir,
