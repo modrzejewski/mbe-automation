@@ -4,7 +4,7 @@ from ase import Atoms
 from typing import Dict, List
 
 def get_vacuum_energies(calc_mace_off: MACECalculator, calc_mace_mp: MACECalculator, z_list: List[int]) -> Dict[int, float]:
-    """Calculates the energy (mace_off) for single, isolated atoms."""
+    """Calculates the energy difference between two MACE calculators (mace_off - mace_mp) for single, isolated atoms."""
     print("Calculating vacuum energies for regression baseline...")
     vacuum_energies = {}
     unique_atomic_numbers = sorted(list(set(z_list)))
