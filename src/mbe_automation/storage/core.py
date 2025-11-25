@@ -591,14 +591,14 @@ def save_eos_curves(
     """
 
     n_temperatures = len(temperatures)
-    n_volumes = len(F_tot_curves[0].V_sampled)
+    n_volumes = len(G_tot_curves[0].V_sampled)
     n_interp = 200
 
     V_sampled = np.zeros((n_temperatures, n_volumes))
     G_sampled = np.zeros((n_temperatures, n_volumes))
     V_min = np.zeros(n_temperatures) 
     G_min = np.zeros(n_temperatures)
-    for i, fit in enumerate(F_tot_curves):
+    for i, fit in enumerate(G_tot_curves):
         V_sampled[i, :] = fit.V_sampled[:]
         G_sampled[i, :] = fit.G_sampled[:]
         if fit.min_found:
@@ -641,7 +641,7 @@ def save_eos_curves(
         )
         group.create_dataset(
             name="G_interp (kJ∕mol∕unit cell)",
-            data=F_interp
+            data=G_interp
         )
         group.create_dataset(
             name="V_min (Å³∕unit cell)",
@@ -667,7 +667,7 @@ def read_eos_curves(
             V_interp=group["V_interp (Å³∕unit cell)"][...],
             G_interp=group["G_interp (kJ∕mol∕unit cell)"][...],
             V_min=group["V_min (Å³∕unit cell)"][...],
-            F_min=group["G_min (kJ∕mol∕unit cell)"][...]
+            G_min=group["G_min (kJ∕mol∕unit cell)"][...]
         )
 
     return eos_curves
