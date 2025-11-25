@@ -224,13 +224,12 @@ def equilibrium_curve(
         reference_space_group,
         calculator,
         temperatures,
-        external_pressure_GPa,
         supercell_matrix,
         interp_mesh,
         relaxation: Minimum,
         supercell_displacement,
         work_dir,
-        thermal_pressures_GPa,
+        pressure_range,
         volume_range,
         equation_of_state: Literal[*EQUATIONS_OF_STATE],
         eos_sampling: Literal[*EOS_SAMPLING_ALGOS],
@@ -239,7 +238,8 @@ def equilibrium_curve(
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
         dataset,
-        root_key
+        root_key,
+        pressure_GPa: float = 0.0
 ):
 
     geom_opt_dir = Path(work_dir) / "relaxation"
@@ -248,7 +248,7 @@ def equilibrium_curve(
     V0 = unit_cell_V0.get_volume()
     
     if eos_sampling == "pressure":
-        n_volumes = len(thermal_pressures_GPa)
+        n_volumes = len(pressure_range)
     elif eos_sampling == "volume" or eos_sampling == "uniform_scaling":
         n_volumes = len(volume_range)
         
@@ -262,18 +262,16 @@ def equilibrium_curve(
     ])
     print(f"equation_of_state               {equation_of_state}")
     print(f"eos_sampling                    {eos_sampling}")
-    print(f"external_pressure               {external_pressure_GPa:.4f} GPa")
     print(f"filter_out_imaginary_acoustic   {filter_out_imaginary_acoustic}")
     print(f"filter_out_imaginary_optical    {filter_out_imaginary_optical}")
     print(f"filter_out_broken_symmetry      {filter_out_broken_symmetry}")
     
     if eos_sampling == "volume" or eos_sampling == "uniform_scaling":
-        print("sampled range of cell volumes (V∕V₀)")
+        print("volume sampling interval (V∕V₀)")
         print(np.array2string(volume_range, precision=2))
     else:
-        print(f"sampled range of thermal pressures (GPa)")
-        print(np.array2string(thermal_pressures_GPa, precision=2))
-        print("total pressure used for relaxations is p=p_thermal+p_external")
+        print(f"pressure sampling interval (GPa)")
+        print(np.array2string(pressure_range, precision=2))
     
     for i in range(n_volumes):
         if eos_sampling == "pressure":
@@ -282,10 +280,11 @@ def equilibrium_curve(
             # pressure. Volume of the cell will adjust
             # to the pressure.
             #
-            label = f"crystal[eos:p_thermal={thermal_pressures_GPa[i]:.4f}]"
+            thermal_pressure = pressure_range[i]
+            label = f"crystal[eos:p_thermal={thermal_pressure:.4f}]"
             optimizer = deepcopy(relaxation)
             optimizer.cell_relaxation = "full"
-            optimizer._pressure_GPa = thermal_pressures_GPa[i] + external_pressure_GPa
+            optimizer.pressure_GPa = thermal_pressure
             unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
                 unit_cell=unit_cell_V0,
                 calculator=calculator,
@@ -307,7 +306,7 @@ def equilibrium_curve(
             
             label = f"crystal[eos:V={V/V0:.4f}]"
             optimizer = deepcopy(relaxation)
-            optimizer._pressure_GPa = 0.0
+
             if eos_sampling == "volume":
                 optimizer.cell_relaxation = "constant_volume"
             else:
@@ -329,18 +328,17 @@ def equilibrium_curve(
             interp_mesh=interp_mesh,
             key=f"{root_key}/phonons/{label}"
         )
-        
         df_crystal_V = mbe_automation.dynamics.harmonic.data.crystal(
             unit_cell_V,
             ph,
             temperatures,
-            external_pressure_GPa,
             imaginary_mode_threshold,
             space_group=space_group_V,
             work_dir=work_dir,
             dataset=dataset,
             root_key=root_key,
-            system_label=label
+            system_label=label,
+            pressure_GPa=pressure_GPa
         )
         df_eos_points.append(df_crystal_V)
 
@@ -394,25 +392,51 @@ def equilibrium_curve(
         raise RuntimeError("Insufficient number of points left after applying filtering criteria")
     
     V_eos = np.full(n_temperatures, np.nan)
+    F_tot_eos = np.full(n_temperatures, np.nan)
     G_tot_eos = np.full(n_temperatures, np.nan)
+    B_eos = np.full(n_temperatures, np.nan)
     p_thermal_eos = np.full(n_temperatures, np.nan)
     min_found = np.zeros(n_temperatures, dtype=bool)
     min_extrapolated = np.zeros(n_temperatures, dtype=bool)
     curve_type = []
-    G_tot_curves = []
+    F_tot_curves = []
         
     for i, T in enumerate(temperatures):
+        if pressure_GPa == 0.0:
+            F_fit_input = df_eos[good_points & select_T[i]]["F_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
+        else:
+            F_fit_input = df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
+
         fit = mbe_automation.dynamics.harmonic.eos.fit(
             V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
-            G=df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
+            F=F_fit_input,
             equation_of_state=equation_of_state
         )
-        G_tot_curves.append(fit)
-        G_tot_eos[i] = fit.G_min # interpolated G at equilibrium volume, can slightly differ from the actual G
-        V_eos[i] = fit.V_min     # volume which minimizes G as a function of T and p_external
+        F_tot_curves.append(fit)
+
+        V_eos[i] = fit.V_min
+        B_eos[i] = fit.B
         min_found[i] = fit.min_found
         min_extrapolated[i] = fit.min_extrapolated
         curve_type.append(fit.curve_type)
+
+        if pressure_GPa == 0.0:
+            F_tot_eos[i] = fit.F_min
+            G_tot_eos[i] = fit.F_min
+        else:
+            #
+            # The EOS fit was performed for G_tot(V)
+            #
+            G_tot_eos[i] = fit.F_min
+
+            #
+            # Reconstruct F_tot(V) at the equilibrium volume
+            # by subtracting the PV term.
+            #
+            kJ_mol_Angs3_to_GPa = (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa
+            pV_term_kJ_mol = pressure_GPa * fit.V_min / kJ_mol_Angs3_to_GPa
+            F_tot_eos[i] = G_tot_eos[i] - pV_term_kJ_mol
+
         #
         # Effective pressure (thermal pressure) which forces
         # the equilibrum volume of the unit cell at
@@ -422,22 +446,16 @@ def equilibrium_curve(
         #
         # At the minimum we have
         #
-        # 0 = dG(T,p_external,V)/dV = dE_el/dV + dFvib/dV + p_external
-        #   = dE_el/dV + p_thermal + p_external
+        # 0 = dEel/dV + dFvib/dV
         #
-        # where
+        # Thus, we can map the problem of free energy minimization
+        # at temperature T onto a unit cell relaxation at T=0
+        # with external isotropic pressure
         #
-        # G(T,p_external,V) = E_el(V) + E_vib(T, V) - T * S_vib(T, V) + p_external * V
+        # p_thermal = dFvib/dV
         #
-        # Thus, we can map the problem of Gibbs free energy
-        # minimization at temperature T onto unit cell relaxation
-        # at T=0 with isotropic pressure
-        #
-        # p = p_thermal + p_external
-        # p_thermal = dF_vib/dV 
-        #
-        # The objective of this procedure is to implicitly include the physical
-        # effects of zero-point vibrational motion and thermal expansion.
+        # Zero-point vibrational motion and thermal expansion will
+        # be included implicitly.
         #
         # See eq 20 in
         # A. Otero-de-la-Roza and Erin R. Johnson,
@@ -463,12 +481,11 @@ def equilibrium_curve(
             p_thermal_eos[i] = dFdV(V_eos[i]) * kJ_mol_Angs3_to_GPa # GPa
 
     mbe_automation.storage.save_eos_curves(
-        G_tot_curves=G_tot_curves,
+        F_tot_curves=F_tot_curves,
         temperatures=temperatures,
         dataset=dataset,
         key=f"{root_key}/eos_interpolated"
     )
-    
     mbe_automation.dynamics.harmonic.display.eos_curves(
         dataset=dataset,
         key=f"{root_key}/eos_interpolated",
@@ -479,7 +496,9 @@ def equilibrium_curve(
         "T (K)": temperatures,
         "V_eos (Å³∕unit cell)": V_eos,
         "p_thermal (GPa)": p_thermal_eos,
+        "F_tot_crystal_eos (kJ∕mol∕unit cell)": F_tot_eos,
         "G_tot_crystal_eos (kJ∕mol∕unit cell)": G_tot_eos,
+        "B (GPa)": B_eos,
         "curve_type": curve_type,
         "min_found": min_found,
         "min_extrapolated": min_extrapolated

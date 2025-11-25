@@ -140,8 +140,7 @@ def crystal(
     print(f"backend                       {config.backend}")
     print(f"cell_relaxation               {config.cell_relaxation}")
     print(f"max_force_on_atom             {config.max_force_on_atom_eV_A:.1e} eV/Å")
-    if config.cell_relaxation == "full":
-        print(f"pressure                      {config.pressure_GPa} GPa")
+    print(f"pressure                      {config.pressure_GPa} GPa")
     print(f"symmetrize_final_structure    {config.symmetrize_final_structure}")
 
     cuda_available = torch.cuda.is_available()

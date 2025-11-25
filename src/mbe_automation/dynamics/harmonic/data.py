@@ -46,8 +46,13 @@ def detect_imaginary_modes(
     band_start_index = 1
     all_imaginary_acoustic = np.where(acoustic_freqs < 0.0)[0] + band_start_index
     significant_imaginary_acoustic = np.where(acoustic_freqs < imaginary_mode_threshold)[0] + band_start_index
-    all_imaginary_optical = np.where(optical_freqs < 0.0)[0] + 3 + band_start_index
-    significant_imaginary_optical = np.where(optical_freqs < imaginary_mode_threshold)[0] + 3 + band_start_index
+
+    if len(optical_freqs) > 0:
+        all_imaginary_optical = np.where(optical_freqs < 0.0)[0] + 3 + band_start_index
+        significant_imaginary_optical = np.where(optical_freqs < imaginary_mode_threshold)[0] + 3 + band_start_index
+    else:
+        all_imaginary_optical = np.array([])
+        significant_imaginary_optical = np.array([])
 
     header = f"{'threshold (THz)':15}   {'type':15} bands"
     line = "-" * 50
@@ -72,7 +77,7 @@ def detect_imaginary_modes(
         acoustic_freqs_real = (len(significant_imaginary_acoustic) == 0),
         optical_freqs_real = (len(significant_imaginary_optical) == 0),
         acoustic_freq_min_thz = np.min(acoustic_freqs),
-        optical_freq_min_thz = np.min(optical_freqs)
+        optical_freq_min_thz = np.min(optical_freqs) if len(optical_freqs) > 0 else np.nan
     )
          
     
@@ -175,13 +180,13 @@ def crystal(
         unit_cell,
         phonons,
         temperatures,
-        external_pressure_GPa,
         imaginary_mode_threshold,
         space_group,
         work_dir,
         dataset,
         root_key,
         system_label,
+        pressure_GPa: float = 0.0
 ):
     """
     Physical properties derived from the harmonic model
@@ -203,11 +208,11 @@ def crystal(
     F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
 
     V = unit_cell.get_volume() # Å³/unit cell
-    rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
+    kJ_mol_Angs3_to_GPa = (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa
+    pV_term_kJ_mol = pressure_GPa * V / kJ_mol_Angs3_to_GPa
+    G_tot_crystal = F_tot_crystal + pV_term_kJ_mol # kJ/mol/unit cell
 
-    GPa_Angs3_to_kJ_mol = (ase.units.GPa*ase.units.Angstrom**3)/(ase.units.kJ/ase.units.mol)
-    pV_crystal = external_pressure_GPa * V * GPa_Angs3_to_kJ_mol # kJ/mol/unit cell
-    G_tot_crystal = F_tot_crystal + pV_crystal
+    rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
 
     generate_fbz_path(phonons)
     fbz_analysis = detect_imaginary_modes(
@@ -252,8 +257,6 @@ def crystal(
         "F_tot_crystal (kJ∕mol∕unit cell)": F_tot_crystal,
         "G_tot_crystal (kJ∕mol∕unit cell)": G_tot_crystal,
         "V_crystal (Å³∕unit cell)": V,
-        "p_external_crystal (GPa)": external_pressure_GPa,
-        "pV_crystal (kJ∕mol∕unit cell)": pV_crystal,
         "ρ_crystal (g∕cm³)": rho,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "space_group": space_group,
