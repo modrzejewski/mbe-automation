@@ -16,7 +16,7 @@ def get_vacuum_energies(calc_mace_off: MACECalculator, calc_mace_mp: MACECalcula
         atom.calc = calc_mace_mp
         vacuum_base = atom.get_potential_energy()
         vacuum_energies[z] = vacuum_ref - vacuum_base
-        print(f"  - Referance vacuum energy for Z={z}: {vacuum_ref:.4f} eV")
+        print(f"  - Reference vacuum energy for Z={z}: {vacuum_ref:.4f} eV")
         print(f"  - Base vacuum energy for Z={z}: {vacuum_base:.4f} eV")
         
     return vacuum_energies
