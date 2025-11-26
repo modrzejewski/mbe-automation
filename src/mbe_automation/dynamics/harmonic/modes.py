@@ -71,7 +71,7 @@ class ThermalDisplacements:
     mean_square_displacements_matrix_full: npt.NDArray[np.float64] # eq 6 in ref 1
     instantaneous_displacements: npt.NDArray[np.float64] | None # eq 2 in ref 1
 
-def _at_k_point(
+def at_k_point(
     dynamical_matrix: phonopy.DynamicalMatrix,
     k_point: npt.NDArray[np.floating],
 ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
@@ -85,34 +85,6 @@ def _at_k_point(
     
     return freqs_THz, eigenvecs
 
-def at_k_point(
-    dataset: str,
-    key: str,
-    k_point: npt.NDArray[np.floating],
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
-    """
-    Read force constants from a dataset file and compute phonon
-    frequencies and eigenvectors at a specified k-point.
-
-    Args:
-        dataset: Path to the dataset file containing the force constants.
-        key: Key to the force constants group in the dataset, usually
-             in the format `quasi_harmonic/phonons/crystal[...]/force_constants`
-        k_point: The k-point coordinates in reciprocal space (fractional coordinates).
-    Returns:
-        A tuple containing:
-        - frequencies (in THz)
-        - eigenvectors stored as columns of the matrix
-        - dynamical matrix
-    """
-    ph = mbe_automation.storage.to_phonopy(
-        dataset=dataset,
-        key=key
-    )
-    return _at_k_point(
-        dynamical_matrix=ph.dynamical_matrix,
-        k_point=k_point,
-    )
 
 def _Ejq_eq_3(
         freqs_THz: npt.NDArray[np.floating],
@@ -319,7 +291,7 @@ def _thermal_displacements(
     )
 
     for q in qpoints:
-        all_freqs_THz, eigenvecs = _at_k_point(
+        all_freqs_THz, eigenvecs = at_k_point(
             dynamical_matrix=dynamical_matrix,
             k_point=q,
         )

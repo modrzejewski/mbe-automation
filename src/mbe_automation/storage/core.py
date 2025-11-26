@@ -180,7 +180,7 @@ class Structure:
 
 @dataclass
 class ForceConstants:
-    """Store harmonic force constants and associated structures."""
+    """Harmonic force constants model."""
     primitive: Structure
     supercell: Structure
     force_constants: npt.NDArray[np.floating]

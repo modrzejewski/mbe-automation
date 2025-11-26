@@ -10,9 +10,11 @@ from .storage.core import (
     BrillouinZonePath,
     EOSCurves,
     Structure,
-    ForceConstants,
     Trajectory,
     MolecularCrystal,
     UniqueClusters,
     FiniteSubsystem,
+)
+from .api import (
+    ForceConstants,
 )
