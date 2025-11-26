@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 import numpy as np
@@ -11,6 +12,15 @@ import mbe_automation.dynamics.harmonic.modes
 class ForceConstants(_ForceConstants):
     @classmethod
     def read(cls, dataset: str, key: str) -> ForceConstants:
+        """
+        Read force constants from a dataset file.
+            
+        Args:
+        dataset: Path to the dataset file containing the force constants.
+        key: Key to the force constants group in the dataset.
+        Returns:
+        A ForceConstants object.
+        """
         return cls(**vars(
             mbe_automation.storage.read_force_constants(dataset, key)
         ))
