@@ -79,11 +79,11 @@ mbe_automation.workflows.md.run(md_config)
 
 | Parameter | Description | Default Value |
 | --- | --- | --- |
-| `molecule` | Initial, non-relaxed structure of the isolated molecule. An MD simulation is performed in the NVT ensemble to compute the average potential and kinetic energies. | - |
-| `crystal` | Initial, non-relaxed crystal structure. An MD simulation is performed in the NPT ensemble to compute the average potential and kinetic energies, and the average volume. | - |
 | `calculator` | MLIP calculator for energies and forces. | - |
-| `md_molecule` | An instance of `ClassicalMD` that configures the MD simulation for the isolated molecule. | - |
+| `crystal` | Initial, non-relaxed crystal structure. An MD simulation is performed in the NPT ensemble to compute the average potential and kinetic energies, and the average volume. | - |
+| `molecule` | Initial, non-relaxed structure of the isolated molecule. An MD simulation is performed in the NVT ensemble to compute the average potential and kinetic energies. | - |
 | `md_crystal` | An instance of `ClassicalMD` that configures the MD simulation for the crystal. | - |
+| `md_molecule` | An instance of `ClassicalMD` that configures the MD simulation for the isolated molecule. | - |
 | `temperature_K` | Target temperature (in Kelvin) for the MD simulation. | `298.15` |
 | `pressure_GPa` | Target pressure (in GPa) for the MD simulation. | `1.0E-4` |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
@@ -99,11 +99,11 @@ mbe_automation.workflows.md.run(md_config)
 
 | Parameter               | Description                                                                                                                              | Default Value     |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `ensemble`              | Thermodynamic ensemble for the simulation ("NVT" or "NPT").                                                                          | "NVT"                 |
 | `time_total_fs`         | Total simulation time in femtoseconds.                                                                                               | `50000.0`             |
 | `time_step_fs`          | Time step for the integration algorithm.                                                                                             | `0.5`                 |
 | `sampling_interval_fs`  | Interval for trajectory sampling.                                                                                                   | `50.0`                |
 | `time_equilibration_fs` | Initial period of the simulation discarded to allow the system to reach equilibrium.                                         | `5000.0`              |
-| `ensemble`              | Thermodynamic ensemble for the simulation ("NVT" or "NPT").                                                                          | "NVT"                 |
 | `nvt_algo`              | Thermostat algorithm for NVT simulations. "csvr" (Canonical Sampling Through Velocity Rescaling) is robust for isolated molecules. | "csvr"                |
 | `npt_algo`              | Barostat/thermostat algorithm for NPT simulations.                                                                                   | "mtk_full"            |
 | `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |

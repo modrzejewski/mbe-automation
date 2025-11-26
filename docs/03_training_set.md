@@ -137,7 +137,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `calculator`              | MLIP calculator.                                                                                    | -                                  |
 | `features_calculator`     | Calculator used to compute feature vectors.                                                         | `None`                             |
 | `feature_vectors_type`    | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Ignored unless `features_calculator` is present. | `"averaged_environments"`          |
-| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters. Defaults used in `MDSampling` differ from standard `ClassicalMD` defaults: `time_total_fs=100000.0`, `supercell_radius=15.0`. | -                                  |
+| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters. Defaults used in `MDSampling` differ from standard `ClassicalMD` defaults: `time_total_fs=100000.0`, `time_step_fs=1.0`, `time_equilibration_fs=1000.0`, `sampling_interval_fs=1000.0`, `supercell_radius=15.0`. | -                                  |
 | `temperature_K`           | Target temperature (in Kelvin) for the MD simulation.                                               | `298.15`                           |
 | `pressure_GPa`            | Target pressure (in GPa) for the MD simulation.                                                     | `1.0E-4`                           |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
@@ -147,6 +147,7 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `verbose`                 | Verbosity of the program's output. `0` suppresses warnings.                                             | `0`                                |
 | `save_plots`              | If `True`, save plots of the simulation results.                                                        | `True`                             |
 | `save_csv`                | If `True`, save CSV files of the simulation results.                                                    | `True`                             |
+| `save_xyz`                | If `True`, save XYZ files of the simulation results.                                                    | `True`                             |
 
 ### `PhononSampling` Class
 
@@ -158,14 +159,14 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | `"training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"` |
 | `calculator`              | MLIP calculator.                                                                 | -                 |
 | `features_calculator`     | Calculator used to compute feature vectors.                                      | `None`            |
-| `temperature_K`           | Temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
 | `phonon_filter`           | An instance of `PhononFilter` that specifies which phonon modes to sample from. This method is particularly effective at generating distorted geometries that may be energetically unfavorable but are important for teaching the MLIP about repulsive interactions.       | `PhononFilter()`  |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
+| `feature_vectors_type`    | Type of feature vectors to save. Required for subsampling based on feature space distances. Works only with MACE models. Ignored unless `features_calculator` is present. | `"averaged_environments"` |
+| `temperature_K`           | Temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
 | `amplitude_scan`          | Method for sampling normal-mode coordinates. `"random"` multiplies eigenvectors by a random number on (-1, 1). `"time_propagation"` uses a time-dependent phase factor. | `"random"`                         |
 | `time_step_fs`            | Time step for trajectory generation (used only if `amplitude_scan` is `"time_propagation"`).            | `100.0`           |
 | `rng`                     | Random number generator for randomized amplitude sampling (used only if `amplitude_scan` is `"random"`). | `np.random.default_rng(seed=42)`   |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
-| `feature_vectors_type`    | Type of feature vectors to save. Required for subsampling based on feature space distances. Works only with MACE models. Ignored unless `features_calculator` is present. | `"averaged_environments"` |
 | `work_dir`                | Directory where files are stored at runtime.                                                            | `"./"`                             |
 | `dataset`                 | The main HDF5 file with all data computed for the physical system.                                      | `"./properties.hdf5"`              |
 | `root_key`                | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                     | `"training/phonon_sampling"` |
@@ -213,18 +214,18 @@ mbe_automation.workflows.training.run(phonon_sampling_config)
 | `max_force_on_atom_eV_A`     | Maximum residual force threshold for geometry relaxation (eV/Å).                                                                                                      | `1.0E-4`            |
 | `max_n_steps`                | Maximum number of steps in the geometry relaxation.                                                                                                                   | `500`               |
 | `cell_relaxation`            | Relaxation of the input structure: "full" (optimizes atomic positions, cell shape, and volume), "constant_volume" (optimizes atomic positions and cell shape at fixed volume), or "only_atoms" (optimizes only atomic positions). | `"constant_volume"` |
-| `pressure_GPa`               | External isotropic pressure (in GPa) applied during lattice relaxation.                                                                                               | `0.0`               |
+| `pressure_GPa`               | External isotropic pressure (in GPa) applied during lattice relaxation.                                                                                               | `1.0E-4`            |
 | `symmetrize_final_structure` | If `True`, refines the space group symmetry after each geometry relaxation.                                                                                           | `True`              |
 | `backend`                    | Software used to perform the geometry relaxation: "ase" or "dftb".                                                                                                    | `"ase"`             |
 
 ### `FiniteSubsystemFilter` Class
 
-**Location:** `mbe_automation.structure.clusters.FiniteSubsystemFilter`
+**Location:** `mbe_automation.configs.clusters.FiniteSubsystemFilter`
 
 | Parameter                       | Description                                                                                                                                                             | Default Value                               |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
 | `selection_rule`                | The rule for selecting molecules. Options include: `closest_to_center_of_mass` (selects molecules closest to the center of mass of the entire system), `closest_to_central_molecule` (selects molecules closest to the central molecule), `max_min_distance_to_central_molecule` (selects molecules where the minimum interatomic distance to the central molecule is less than a given `distance`), and `max_max_distance_to_central_molecule` (selects molecules where the maximum interatomic distance to the central molecule is less than a given `distance`). | `closest_to_central_molecule`               |
-| `n_molecules`                   | An array of integers specifying the number of molecules to include in each cluster. Used with `closest_to_center_of_mass` and `closest_to_central_molecule` selection rules. | `np.array([1, 2, ..., 8])`                  |
+| `n_molecules`                   | An array of integers specifying the number of molecules to include in each cluster. Used with `closest_to_center_of_mass` and `closest_to_central_molecule` selection rules. | `np.array([1, 2, 3, 4, 5, 6, 7, 8])`                  |
 | `distances`                     | An array of floating-point numbers specifying the cutoff distances (in Å) for molecule selection. Used with `max_min_distance_to_central_molecule` and `max_max_distance_to_central_molecule` rules. | `None`                                      |
 | `assert_identical_composition`  | If `True`, the workflow will raise an error if it detects that not all molecules in the periodic structure have the same elemental composition.                            | `True`                                      |
 
