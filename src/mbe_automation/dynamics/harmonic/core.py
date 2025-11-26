@@ -439,6 +439,8 @@ def equilibrium_curve(
         # The objective of this procedure is to implicitly include the physical
         # effects of zero-point vibrational motion and thermal expansion.
         #
+        # Note that p_thermal defined here is negative.
+        #
         # See eq 20 in
         # A. Otero-de-la-Roza and Erin R. Johnson,
         # A benchmark for non-covalent interactions in solids,
@@ -478,7 +480,7 @@ def equilibrium_curve(
     df = pd.DataFrame({
         "T (K)": temperatures,
         "V_eos (Å³∕unit cell)": V_eos,
-        "p_thermal (GPa)": p_thermal_eos,
+        "p_thermal_crystal (GPa)": p_thermal_eos,
         "G_tot_crystal_eos (kJ∕mol∕unit cell)": G_tot_eos,
         "curve_type": curve_type,
         "min_found": min_found,
