@@ -79,7 +79,6 @@ __all__ = [
     "read_unique_clusters",
     "save_finite_subsystem",
     "read_finite_subsystem",
-    "read_gamma_point_eigenvecs",
     
     # Visualization of the dataset tree structure
     "tree",
