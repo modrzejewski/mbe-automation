@@ -615,3 +615,33 @@ def trajectory(
         n_atoms=len(equilibrium_cell),
         n_frames=n_frames,
     )
+
+
+def at_kpoint(
+    dataset: str,
+    key: str,
+    k_point: npt.NDArray[np.floating],
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
+    """
+    Compute phonon frequencies and eigenvectors at a specific k-point.
+
+    Args:
+        dataset: Path to the dataset file containing the force constants.
+        key: Key to the force constants group in the dataset, usually
+             in the format `quasi_harmonic/phonons/crystal[...]/force_constants`
+        k_point: The k-point coordinates in reciprocal space (fractional coordinates).
+
+    Returns:
+        A tuple containing:
+        - frequencies (in THz)
+        - eigenvectors
+    """
+    ph = mbe_automation.storage.to_phonopy(
+        dataset=dataset,
+        key=key
+    )
+
+    # phonopy takes k-point in fractional coordinates
+    frequencies, eigenvectors = ph.get_frequencies_with_eigenvectors(k_point)
+
+    return frequencies, eigenvectors

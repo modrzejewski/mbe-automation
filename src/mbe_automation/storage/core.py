@@ -1041,27 +1041,28 @@ def read_force_constants(dataset: str, key: str) -> ForceConstants:
 def read_gamma_point_eigenvecs(
         dataset: str,
         key: str
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128] | None]:
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
     """
-    Read phonon frequencies and eigenvectors at the Gamma point (k=[0,0,0]).
+    Compute phonon frequencies and eigenvectors at the Gamma point (k=[0,0,0]).
+
+    Args:
+        dataset: Path to the dataset file containing the force constants.
+        key: Key to the force constants group in the dataset, usually
+             in the format `quasi_harmonic/phonons/crystal[...]/force_constants`
+
+    Returns:
+        A tuple containing:
+        - frequencies (in THz)
+        - eigenvectors
     """
+    import mbe_automation.dynamics.harmonic.modes
 
-    with h5py.File(dataset, "r") as f:
-        group = f[key]
-        n_segments = group.attrs["n_segments"]
-
-        for i in range(n_segments):
-            kpoints = group[f"kpoints_segment_{i}"][...]
-            for j, kpoint in enumerate(kpoints):
-                if np.allclose(kpoint, [0, 0, 0]):
-                    frequencies = group[f"frequencies_segment_{i} (THz)"][j]
-                    if f"eigenvectors_segment_{i}" in group:
-                        eigenvectors = group[f"eigenvectors_segment_{i}"][j]
-                    else:
-                        eigenvectors = None
-                    return frequencies, eigenvectors
-
-        raise ValueError(f"Γ point not found in dataset '{dataset}' at key '{key}'.")
+    frequencies, eigenvectors = mbe_automation.dynamics.harmonic.modes.at_kpoint(
+        dataset=dataset,
+        key=key,
+        k_point=np.array([0.0, 0.0, 0.0])
+    )
+    return frequencies, eigenvectors
 
 
 def save_molecular_crystal(
