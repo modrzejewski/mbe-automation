@@ -74,7 +74,7 @@ class ThermalDisplacements:
 def _at_k_point(
     dynamical_matrix: phonopy.DynamicalMatrix,
     k_point: npt.NDArray[np.floating],
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128], npt.NDArray[np.complex128]]:
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
 
     dynamical_matrix.run(k_point)
     D = dynamical_matrix.dynamical_matrix # mass-weighted dynamical matrix
