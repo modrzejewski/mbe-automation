@@ -89,7 +89,7 @@ def at_k_point(
     dataset: str,
     key: str,
     k_point: npt.NDArray[np.floating],
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128], npt.NDArray[np.complex128]]:
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
     """
     Read force constants from a dataset file and compute phonon
     frequencies and eigenvectors at a specified k-point.
