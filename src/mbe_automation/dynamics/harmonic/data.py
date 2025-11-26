@@ -93,9 +93,18 @@ def generate_fbz_path(
         n_points,
         is_const_interval=True
     )
+    #
+    # Compute frequencies along the high-symmetry path.
+    # The computation of eigenvectors is disabled
+    # (with_eigenvectors=False) for efficiency.
+    # We have tested with_eigenvectors=True for
+    # tracking of the eigenvalue along the high-symmetry
+    # path in the k space, but the resulting dispersion
+    # curves were often misaligned.
+    #
     phonons.run_band_structure(
         bands,
-        with_eigenvectors=True,            
+        with_eigenvectors=False,
         with_group_velocities=False,
         is_band_connection=band_connection,
         path_connections=path_connections,
@@ -223,7 +232,6 @@ def crystal(
         phonons=phonons,
         dataset=dataset,
         key=f"{root_key}/phonons/{system_label}/brillouin_zone_path",
-        save_eigenvectors=False
     )
     mbe_automation.dynamics.harmonic.display.band_structure(
         dataset=dataset,

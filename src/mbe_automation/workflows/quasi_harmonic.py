@@ -184,8 +184,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     #
     # 1. cell volumes V
     # 2. total Gibbs free energies G_tot_crystal (electronic energy + vibrational free energy + p*V)
-    # 3. effective thermal pressures p_thermal, which simulate the effect
-    #    of ZPE and thermal motion on the cell relaxation
+    # 3. effective thermal pressure p_thermal (negative pressure), which simulates the effect
+    #    of ZPE and thermal motion on the cell expansion
     #
     interp_mesh = phonons.mesh.mesh_numbers # enforce the same mesh for all systems
 
@@ -237,7 +237,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             # forces QHA equilibrium value
             #
             optimizer = deepcopy(config.relaxation)
-            optimizer._pressure_GPa = row["p_thermal (GPa)"] + config.pressure_GPa
+            optimizer._pressure_GPa = row["p_thermal_crystal (GPa)"] + config.pressure_GPa
             optimizer.cell_relaxation = "full"
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell=unit_cell_T,

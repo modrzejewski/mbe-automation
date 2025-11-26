@@ -70,7 +70,50 @@ class ThermalDisplacements:
     mean_square_displacements_matrix_diagonal_cif: npt.NDArray[np.float64] # eq 4a in ref 2
     mean_square_displacements_matrix_full: npt.NDArray[np.float64] # eq 6 in ref 1
     instantaneous_displacements: npt.NDArray[np.float64] | None # eq 2 in ref 1
+
+def _at_k_point(
+    dynamical_matrix: phonopy.DynamicalMatrix,
+    k_point: npt.NDArray[np.floating],
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
+
+    dynamical_matrix.run(k_point)
+    D = dynamical_matrix.dynamical_matrix # mass-weighted dynamical matrix
+    eigenvals, eigenvecs = np.linalg.eigh(D) # eigenvectors ejk are dimensionless
+    freqs_THz = (
+        np.sqrt(abs(eigenvals)) * np.sign(eigenvals)
+    ) * phonopy.physical_units.get_physical_units().DefaultToTHz
     
+    return freqs_THz, eigenvecs
+
+def at_k_point(
+    dataset: str,
+    key: str,
+    k_point: npt.NDArray[np.floating],
+) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
+    """
+    Read force constants from a dataset file and compute phonon
+    frequencies and eigenvectors at a specified k-point.
+
+    Args:
+        dataset: Path to the dataset file containing the force constants.
+        key: Key to the force constants group in the dataset, usually
+             in the format `quasi_harmonic/phonons/crystal[...]/force_constants`
+        k_point: The k-point coordinates in reciprocal space (fractional coordinates).
+    Returns:
+        A tuple containing:
+        - frequencies (in THz)
+        - eigenvectors stored as columns of the matrix
+        - dynamical matrix
+    """
+    ph = mbe_automation.storage.to_phonopy(
+        dataset=dataset,
+        key=key
+    )
+    return _at_k_point(
+        dynamical_matrix=ph.dynamical_matrix,
+        k_point=k_point,
+    )
+
 def _Ejq_eq_3(
         freqs_THz: npt.NDArray[np.floating],
         temperature_K: np.floating
@@ -276,13 +319,10 @@ def _thermal_displacements(
     )
 
     for q in qpoints:
-        dynamical_matrix.run(q)
-        D = dynamical_matrix.dynamical_matrix # mass-weighted dynamical matrix
-        eigenvals, eigenvecs = np.linalg.eigh(D) # eigenvectors ejk are dimensionless
-        all_freqs_THz = (
-            np.sqrt(abs(eigenvals)) * np.sign(eigenvals)
-        ) * phonopy.physical_units.get_physical_units().DefaultToTHz
-
+        all_freqs_THz, eigenvecs = _at_k_point(
+            dynamical_matrix=dynamical_matrix,
+            k_point=q,
+        )
         if selected_modes is None:
             mask = (all_freqs_THz > freq_min_THz)
             if freq_max_THz is not None:
