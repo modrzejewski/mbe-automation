@@ -186,16 +186,6 @@ class ForceConstants:
     force_constants: npt.NDArray[np.floating]
     supercell_matrix: npt.NDArray[np.integer]
 
-    def frequencies_and_eigenvectors(
-            self,
-            k_point: npt.NDArray[np.floating]
-    ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
-        """Compute frequencies (THz) and eigenvectors at a specified k-point."""
-        return _frequencies_and_eigenvectors(
-            self,
-            k_point
-        )
-
     @classmethod
     def read(
             cls,
@@ -1331,27 +1321,3 @@ def _run_model(
                 structure.feature_vectors[i] = features
 
     return
-
-
-def _frequencies_and_eigenvectors(
-        force_constants: ForceConstants,
-        k_point: npt.NDArray[np.floating],
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
-    """
-    Compute phonon frequencies and eigenvectors at a specified k-point.
-
-    Args:
-        force_constants: Parameters of the force constants model.
-        k_point: The k-point coordinates in reciprocal space (fractional coordinates).
-    Returns:
-        A tuple containing:
-        - frequencies (in THz)
-        - eigenvectors stored as columns
-    """
-    import mbe_automation.dynamics.harmonic.modes
-    
-    ph = mbe_automation.storage.to_phonopy(force_constants)
-    return mbe_automation.dynamics.harmonic.modes.at_k_point(
-        dynamical_matrix=ph.dynamical_matrix,
-        k_point=k_point,
-    )
