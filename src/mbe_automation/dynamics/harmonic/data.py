@@ -104,7 +104,7 @@ def generate_fbz_path(
     #
     phonons.run_band_structure(
         bands,
-        with_eigenvectors=False,             
+        with_eigenvectors=False,
         with_group_velocities=False,
         is_band_connection=band_connection,
         path_connections=path_connections,
