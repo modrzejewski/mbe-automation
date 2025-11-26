@@ -9,6 +9,12 @@ import mbe_automation.dynamics.harmonic.modes
 
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
+    @classmethod
+    def read(cls, dataset: str, key: str) -> ForceConstants:
+        return cls(**vars(
+            mbe_automation.storage.read_force_constants(dataset, key)
+        ))
+    
     def frequencies_and_eigenvectors(
             self,
             k_point: npt.NDArray[np.floating],
@@ -22,7 +28,7 @@ class ForceConstants(_ForceConstants):
         A tuple containing:
         - frequencies (in THz)
         - eigenvectors stored as columns
-    """
+        """
         ph = mbe_automation.storage.to_phonopy(self)
         return mbe_automation.dynamics.harmonic.modes.at_k_point(
             dynamical_matrix=ph.dynamical_matrix,

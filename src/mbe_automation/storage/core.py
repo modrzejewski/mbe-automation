@@ -186,15 +186,6 @@ class ForceConstants:
     force_constants: npt.NDArray[np.floating]
     supercell_matrix: npt.NDArray[np.integer]
 
-    @classmethod
-    def read(
-            cls,
-            dataset: str,
-            key: str,
-    ) -> ForceConstants:
-        """Load a ForceConstants object from a dataset."""
-        return read_force_constants(dataset, key)
-
 @dataclass(kw_only=True)
 class Trajectory(Structure):
     time_equilibration: float
