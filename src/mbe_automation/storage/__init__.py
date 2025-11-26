@@ -30,10 +30,7 @@ from mbe_automation.storage.core import (
     save_unique_clusters,
     read_unique_clusters,
     save_finite_subsystem,
-    read_finite_subsystem,
-    
-    read_gamma_point_eigenvecs,
-    
+    read_finite_subsystem,    
 )
 
 # --- Visual summary of dataset files ---
