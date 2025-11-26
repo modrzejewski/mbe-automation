@@ -170,9 +170,16 @@ class FreeEnergy:
                                                         1.03, 1.04, 1.05, 1.06, 1.07, 1.08
                                                     ]))
                                    #
-                                   # Range of external isotropic pressures applied
-                                   # to sample different cell volumes and fit
-                                   # the equation of state
+                                   # External pressure (in GPa) at which the equilibrium
+                                   # properties are computed.
+                                   #
+                                   # If non-zero, the equilibrium cell volume is determined
+                                   # by minimizing the Gibbs free energy G(V) = F(V) + p*V.
+                                   #
+    pressure_GPa: float = 1.0E-4
+                                   #
+                                   # Range of thermal, effective isotropic pressures applied
+                                   # to during cell relaxation to sample cell volumes.
                                    #
                                    # The corresponding F_tot(V(p)) are used to establish
                                    # to fit F_tot(V) and p_effective(V).
@@ -188,8 +195,9 @@ class FreeEnergy:
                                    # molecular crystals, Chem. Sci., 2025, 16, 11419;
                                    # doi: 10.1039/d5sc01325a
                                    #
-    pressure_range: npt.NDArray[np.floating] = field(default_factory=lambda:
-                                                     np.array([0.2, 0.0, -0.2, -0.3, -0.4, -0.5, -0.6]))
+    thermal_pressures_GPa: npt.NDArray[np.floating] = field(
+        default_factory=lambda: np.array([0.2, 0.0, -0.2, -0.3, -0.4, -0.5, -0.6])
+    )
                                    #
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.

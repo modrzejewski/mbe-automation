@@ -241,7 +241,6 @@ def run(
     print(f"time_step             {md.time_step_fs} fs")
     print(f"n_total_steps         {n_total_steps}")
     print(f"n_samples             {n_samples}")
-    print(f"feature_vectors_type  {md.feature_vectors_type}")
     print(f"n_removed_rot_dof     {n_removed_rot_dof}")
     print(f"n_removed_trans_dof   {n_removed_trans_dof}")
     if is_periodic:
@@ -304,14 +303,6 @@ def run(
     print("Time propagation...", flush=True)
     dyn.run(steps=n_total_steps)
 
-    if md.feature_vectors_type != "none":
-        traj.run_neural_network(
-            calculator=calculator,
-            feature_vectors_type=md.feature_vectors_type,
-            potential_energies=False,
-            forces=False,
-        )
-        
     mbe_automation.storage.save_trajectory(
         dataset=dataset,
         key=key,

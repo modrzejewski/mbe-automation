@@ -9,7 +9,21 @@ SUBSAMPLING_ALGOS = [
     "farthest_point_sampling",
     "kmeans"
 ]
-
+#
+# Type of feature vectors to be saved as a part
+# of the Trajectory and Structure objects:
+#
+# (1) none: no feature vectors are computed and saved
+# (2) atomic_environments: feature vectors for every atom
+# (3) averaged_environments: feature vectors
+#     averaged over all atoms
+#
+# Options (2) or (3) enable subsampling of frames
+# based on the distances in the feature space.
+#
+# Limitation: options (2) and (3) work only with
+# MACE models.
+#
 FEATURE_VECTOR_TYPES = [
     "none",
     "averaged_environments",

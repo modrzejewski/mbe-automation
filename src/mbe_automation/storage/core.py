@@ -9,9 +9,9 @@ import numpy as np
 import numpy.typing as npt
 import os
 from mace.calculators import MACECalculator
+from ase.calculators.calculator import Calculator as ASECalculator
 
 import mbe_automation.ml.core
-import mbe_automation.ml.mace
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 
 DATA_FOR_TRAINING = [
@@ -33,11 +33,11 @@ class BrillouinZonePath:
 class EOSCurves:
     temperatures: npt.NDArray[np.floating]
     V_sampled: npt.NDArray[np.floating]
-    F_sampled: npt.NDArray[np.floating]
+    G_sampled: npt.NDArray[np.floating]
     V_interp: npt.NDArray[np.floating]
-    F_interp: npt.NDArray[np.floating]
+    G_interp: npt.NDArray[np.floating]
     V_min: npt.NDArray[np.floating]
-    F_min: npt.NDArray[np.floating]
+    G_min: npt.NDArray[np.floating]
 
 @dataclass
 class Structure:
@@ -73,45 +73,24 @@ class Structure:
             ),
             feature_vectors_type=self.feature_vectors_type,
         )
-    
-    def run_neural_network(
+
+    def run_model(
             self,
-            calculator: MACECalculator,
-            feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="atomic_environments",
-            potential_energies: bool=False,
-            forces: bool=False,
-    ) -> None:
-        """
-        Run MACE inference to compute energies, forces, and feature vectors.
+            calculator: ASECalculator | MACECalculator,
+            energies: bool = True,
+            forces: bool = True,
+            feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+    ):
 
-        Updates the object's E_pot, forces, and feature_vectors fields.
-        """
-        if not isinstance(calculator, MACECalculator):
-            print("Skipping run_neural_network: can be done only for MACE models.")
-            return
-
-        assert feature_vectors_type in FEATURE_VECTOR_TYPES
-
-        if feature_vectors_type == "none":
-            compute_feature_vectors = False
-        else:
-            compute_feature_vectors = True
-
-        mace_output = mbe_automation.ml.mace.inference(
-            calculator=calculator,
+        _run_model(
             structure=self,
-            energies=potential_energies,
+            calculator=calculator,
+            energies=energies,
             forces=forces,
-            feature_vectors=compute_feature_vectors,
-            average_over_atoms=(feature_vectors_type == "averaged_environments"),
+            feature_vectors=(feature_vectors_type!="none"),
+            average_over_atoms=(feature_vectors_type=="averaged_environments"),
         )
-        
-        if compute_feature_vectors:
-            self.feature_vectors = mace_output.feature_vectors
-            self.feature_vectors_type = feature_vectors_type
-        if potential_energies: self.E_pot = mace_output.E_pot
-        if forces: self.forces = mace_output.forces
-
+    
     def save(
             self,
             dataset: str,
@@ -160,7 +139,7 @@ class Structure:
         if self.feature_vectors_type == "none":
             raise ValueError(
                 "Subsampling requires precomputed feature vectors. "
-                "Execute run_neural_network on your Structure before subsampling."
+                "Execute run_model on your Structure before subsampling."
             )
         if self.masses.ndim == 2 or self.atomic_numbers.ndim == 2:
             raise ValueError(
@@ -280,7 +259,7 @@ class Trajectory(Structure):
         if self.feature_vectors_type == "none":
             raise ValueError(
                 "Subsampling requires precomputed feature vectors. "
-                "Execute run_neural_network on your Structure before subsampling."
+                "Execute run_model on your Structure before subsampling."
             )
         
         if self.masses.ndim == 2 or self.atomic_numbers.ndim == 2:
@@ -602,38 +581,38 @@ def read_brillouin_zone_path(
 
 
 def save_eos_curves(
-        F_tot_curves,
+        G_tot_curves,
         temperatures,
         dataset,
         key
 ):
     """
-    Save Helmholtz free energy vs. volume data for multiple temperatures.
+    Save Gibbs free enthalpy vs. volume data for multiple temperatures.
     """
 
     n_temperatures = len(temperatures)
-    n_volumes = len(F_tot_curves[0].V_sampled)
+    n_volumes = len(G_tot_curves[0].V_sampled)
     n_interp = 200
 
     V_sampled = np.zeros((n_temperatures, n_volumes))
-    F_sampled = np.zeros((n_temperatures, n_volumes))
+    G_sampled = np.zeros((n_temperatures, n_volumes))
     V_min = np.zeros(n_temperatures) 
-    F_min = np.zeros(n_temperatures)
-    for i, fit in enumerate(F_tot_curves):
+    G_min = np.zeros(n_temperatures)
+    for i, fit in enumerate(G_tot_curves):
         V_sampled[i, :] = fit.V_sampled[:]
-        F_sampled[i, :] = fit.F_sampled[:]
+        G_sampled[i, :] = fit.G_sampled[:]
         if fit.min_found:
             V_min[i] = fit.V_min
-            F_min[i] = fit.F_min
+            G_min[i] = fit.G_min
         else:
             V_min[i] = np.nan
-            F_min[i] = np.nan
+            G_min[i] = np.nan
 
-    F_interp = np.full((n_temperatures, n_interp), np.nan)
+    G_interp = np.full((n_temperatures, n_interp), np.nan)
     V_interp = np.linspace(np.min(V_sampled), np.max(V_sampled), n_interp)
-    for i, fit in enumerate(F_tot_curves):
-        if fit.F_interp is not None:
-            F_interp[i, :] = fit.F_interp(V_interp)
+    for i, fit in enumerate(G_tot_curves):
+        if fit.G_interp is not None:
+            G_interp[i, :] = fit.G_interp(V_interp)
         
     with h5py.File(dataset, "a") as f:
         if key in f:
@@ -653,24 +632,24 @@ def save_eos_curves(
             data=V_sampled
         )
         group.create_dataset(
-            name="F_sampled (kJ∕mol∕unit cell)",
-            data=F_sampled
+            name="G_sampled (kJ∕mol∕unit cell)",
+            data=G_sampled
         )
         group.create_dataset(
             name="V_interp (Å³∕unit cell)",
             data=V_interp
         )
         group.create_dataset(
-            name="F_interp (kJ∕mol∕unit cell)",
-            data=F_interp
+            name="G_interp (kJ∕mol∕unit cell)",
+            data=G_interp
         )
         group.create_dataset(
             name="V_min (Å³∕unit cell)",
             data=V_min
         )
         group.create_dataset(
-            name="F_min (kJ∕mol∕unit cell)",
-            data=F_min
+            name="G_min (kJ∕mol∕unit cell)",
+            data=G_min
         )
 
 
@@ -684,11 +663,11 @@ def read_eos_curves(
         eos_curves = EOSCurves(
             temperatures=group["T (K)"][...],
             V_sampled=group["V_sampled (Å³∕unit cell)"][...],
-            F_sampled=group["F_sampled (kJ∕mol∕unit cell)"][...],
+            G_sampled=group["G_sampled (kJ∕mol∕unit cell)"][...],
             V_interp=group["V_interp (Å³∕unit cell)"][...],
-            F_interp=group["F_interp (kJ∕mol∕unit cell)"][...],
+            G_interp=group["G_interp (kJ∕mol∕unit cell)"][...],
             V_min=group["V_min (Å³∕unit cell)"][...],
-            F_min=group["F_min (kJ∕mol∕unit cell)"][...]
+            G_min=group["G_min (kJ∕mol∕unit cell)"][...]
         )
 
     return eos_curves
@@ -1273,7 +1252,7 @@ def _save_only(
             if structure.feature_vectors is None:
                 raise RuntimeError(
                     "Feature vectors are not present in the Structure object. "
-                    "Execute run_neural_network to compute the required data."
+                    "Execute run_model to compute the required data."
                 )
 
             if "feature_vectors" in group:
@@ -1317,4 +1296,57 @@ def _save_only(
                 data=structure.forces
             )
                 
+    return
+
+def _run_model(
+        structure: Structure,
+        calculator: ASECalculator | MACECalculator,
+        energies: bool = True,
+        forces: bool = True,
+        feature_vectors: bool = True,
+        average_over_atoms: bool = False,
+) -> None:
+    """
+    Run a calculator of energies/forces/feature vectors for all frames
+    of a given Structure. Store the computed quantities in-place.
+    """
+    from mbe_automation.storage.views import to_ase
+    
+    if feature_vectors: feature_vectors = isinstance(calculator, MACECalculator)
+
+    if energies:
+        structure.E_pot = np.zeros(structure.n_frames)
+
+    if forces:
+        structure.forces = np.zeros((structure.n_frames, structure.n_atoms, 3))
+
+    if feature_vectors:
+        if average_over_atoms:
+            structure.feature_vectors_type = "averaged_environments"
+        else:
+            structure.feature_vectors_type = "atomic"
+            
+    for i in range(structure.n_frames):
+        atoms = to_ase(
+            structure=structure,
+            frame_index=i
+        )
+        atoms.calc = calculator
+        if forces:
+            structure.forces[i] = atoms.get_forces()
+        if energies:
+            structure.E_pot[i] = atoms.get_potential_energy() / structure.n_atoms
+        if feature_vectors:
+            features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
+            n_features = features.shape[-1]
+            if i == 0:
+                if average_over_atoms:
+                    structure.feature_vectors = np.zeros((structure.n_frames, n_features))
+                else:
+                    structure.feature_vectors = np.zeros((structure.n_frames, structure.n_atoms, n_features))
+            if average_over_atoms:
+                structure.feature_vectors[i] = np.average(features, axis=0)
+            else:
+                structure.feature_vectors[i] = features
+
     return

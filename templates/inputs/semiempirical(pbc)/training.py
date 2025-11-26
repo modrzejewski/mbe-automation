@@ -1,5 +1,6 @@
 import numpy as np
 import os.path
+import torch
 
 import mbe_automation
 from mbe_automation.configs.md import ClassicalMD
@@ -22,6 +23,7 @@ model_name = "dftb3_d4"
 md_sampling_config = MDSampling(
     crystal=crystal,
     calculator=calc,
+    features_calculator=None,
     temperature_K=temperature_K,
     pressure_GPa=1.0E-4,
     finite_subsystem_filter=FiniteSubsystemFilter(
@@ -62,6 +64,7 @@ mbe_automation.workflows.quasi_harmonic.run(free_energy_config)
 
 phonon_sampling_config = PhononSampling(
     calculator = calc,
+    features_calculator=None,
     temperature_K = temperature_K,
     finite_subsystem_filter=FiniteSubsystemFilter(
         selection_rule="closest_to_central_molecule",

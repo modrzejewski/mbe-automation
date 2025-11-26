@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Literal, Tuple, List
-from dataclasses import dataclass
+from copy import deepcopy
+from dataclasses import dataclass, field
 
 from mbe_automation.configs.recommended import SEMIEMPIRICAL_DFTB, KNOWN_MODELS
 #
@@ -90,9 +91,13 @@ class Minimum:
     symmetry_tolerance_strict: float = SYMMETRY_TOLERANCE_STRICT
                                    #
                                    # External isotropic pressure (GPa) applied during
-                                   # lattice relaxation.
+                                   # lattice relaxation. This is an internal property
+                                   # that should not be set by the user. The pressure
+                                   # applied during relaxation is set automatically
+                                   # by the workflow driver based on the workflow
+                                   # configuration parameters.
                                    #
-    pressure_GPa: float = 0.0
+    _pressure_GPa: float = field(default=0.0, init=False)
                                    #
                                    # Software used to perform the geometry
                                    # relaxation:
@@ -110,6 +115,11 @@ class Minimum:
                                    #
     algo_primary: Literal["PreconLBFGS", "PreconFIRE"] = "PreconLBFGS"
     algo_fallback: Literal["PreconLBFGS", "PreconFIRE"] = "PreconFIRE"
+
+    @property
+    def pressure_GPa(self) -> float:
+        """Get external pressure (GPa)."""
+        return self._pressure_GPa
 
     def __post_init__(self):
         if (

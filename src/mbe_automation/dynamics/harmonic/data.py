@@ -175,6 +175,7 @@ def crystal(
         unit_cell,
         phonons,
         temperatures,
+        external_pressure_GPa,
         imaginary_mode_threshold,
         space_group,
         work_dir,
@@ -203,6 +204,10 @@ def crystal(
 
     V = unit_cell.get_volume() # Å³/unit cell
     rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
+
+    GPa_Angs3_to_kJ_mol = (ase.units.GPa*ase.units.Angstrom**3)/(ase.units.kJ/ase.units.mol)
+    pV_crystal = external_pressure_GPa * V * GPa_Angs3_to_kJ_mol # kJ/mol/unit cell
+    G_tot_crystal = F_tot_crystal + pV_crystal
 
     generate_fbz_path(phonons)
     fbz_analysis = detect_imaginary_modes(
@@ -245,7 +250,10 @@ def crystal(
         "C_V_vib_crystal (J∕K∕mol∕unit cell)": C_V_vib_crystal,
         "E_el_crystal (kJ∕mol∕unit cell)": E_el_crystal,
         "F_tot_crystal (kJ∕mol∕unit cell)": F_tot_crystal,
+        "G_tot_crystal (kJ∕mol∕unit cell)": G_tot_crystal,
         "V_crystal (Å³∕unit cell)": V,
+        "p_external_crystal (GPa)": external_pressure_GPa,
+        "pV_crystal (kJ∕mol∕unit cell)": pV_crystal,
         "ρ_crystal (g∕cm³)": rho,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "space_group": space_group,
