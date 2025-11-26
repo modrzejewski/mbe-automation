@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Tuple
 import numpy as np
 import numpy.typing as npt
@@ -22,12 +23,8 @@ class ForceConstants(_ForceConstants):
         - frequencies (in THz)
         - eigenvectors stored as columns
     """
-    ph = mbe_automation.storage.to_phonopy(self)
-    return mbe_automation.dynamics.harmonic.modes.at_k_point(
-        dynamical_matrix=ph.dynamical_matrix,
-        k_point=k_point,
-    )
-
-
-
-
+        ph = mbe_automation.storage.to_phonopy(self)
+        return mbe_automation.dynamics.harmonic.modes.at_k_point(
+            dynamical_matrix=ph.dynamical_matrix,
+            k_point=k_point,
+        )
