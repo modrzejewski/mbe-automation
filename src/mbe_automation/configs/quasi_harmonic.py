@@ -176,7 +176,7 @@ class FreeEnergy:
                                    # If non-zero, the equilibrium cell volume is determined
                                    # by minimizing the Gibbs free energy G(V) = F(V) + p*V.
                                    #
-    pressure_GPa: float = 0.0
+    pressure_GPa: float = 1.0E-4
                                    #
                                    # Range of thermal, effective isotropic pressures applied
                                    # to during cell relaxation to sample cell volumes.
