@@ -45,6 +45,16 @@ class Structure(_Structure):
 
         Args:
             dataset: Path to the dataset file containing the structure.
+    def read(
+            cls,
+            dataset: str,
+            key: str,
+    ) -> Structure:
+        """
+        Read a structure from a dataset file.
+
+        Args:
+            dataset: Path to the dataset file containing the structure.
             key: Key to the structure group in the dataset.
 
         Returns:
