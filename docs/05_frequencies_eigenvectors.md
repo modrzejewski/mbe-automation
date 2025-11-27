@@ -11,8 +11,7 @@ import numpy as np
 import mace.calculators
 import torch
 
-import mbe_automation.configs
-import mbe_automation.workflows
+import mbe_automation
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "solid.xyz"
@@ -42,7 +41,7 @@ Once you have the `properties.hdf5` file, you can read the computed force consta
 
 ### Step 1: Identify the Force Constants Key
 
-Use `mbe_automation.storage.tree` to inspect the file structure and locate the force constants key. Look for groups under `phonons` corresponding to your structure of interest. For a calculation with `thermal_expansion=False`, the relevant structure is usually the relaxed input crystal.
+Use `mbe_automation.storage.tree` to inspect the file structure and locate the force constants key. Look for groups under `phonons` corresponding to your structure of interest.
 
 ```python
 import mbe_automation
@@ -72,15 +71,10 @@ The following script reads the force constants for the relaxed crystal structure
 import numpy as np
 import mbe_automation
 
-# Define the dataset path
 dataset_path = "properties.hdf5"
-# Key pointing to the group containing 'force_constants' data
 key = "quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"
 
-# Read the force constants from the HDF5 file
 fc = mbe_automation.ForceConstants.read(dataset=dataset_path, key=key)
-
-# Compute frequencies and eigenvectors at the Gamma point
 freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_point=np.array([0.0, 0.0, 0.0]))
 
 print("Frequencies (THz):")
@@ -89,7 +83,6 @@ print(freqs_THz)
 print("\nEigenvectors (shape):")
 print(eigenvecs.shape)
 
-# Verify orthonormality: U^dagger * U = I
 identity_check = np.dot(eigenvecs.conj().T, eigenvecs)
 is_orthonormal = np.allclose(identity_check, np.eye(len(freqs_THz)))
 print(f"\nEigenvectors are orthonormal: {is_orthonormal}")
@@ -98,10 +91,9 @@ print(f"\nEigenvectors are orthonormal: {is_orthonormal}")
 ## Output Explanation
 
 *   **`freqs_THz`**: A 1D NumPy array containing the phonon frequencies in Terahertz (THz).
-    *   The size is $3N$, where $N$ is the number of atoms in the **primitive cell**.
-    *   The first 3 modes are typically acoustic modes with frequencies near zero (at the Gamma point).
+    *   The size is $3N$, where $N$ is the number of atoms in the primitive cell.
+    *   The first 3 modes are acoustic modes with frequencies near zero at the Gamma point.
 
-*   **`eigenvecs`**: A 2D NumPy array containing the phonon eigenvectors.
+*   **`eigenvecs`**: A 2D NumPy array containing the eigenvectors of the dynamical matrix.
     *   Shape: `(3N, 3N)`.
     *   Each **column** `j` corresponds to the eigenvector for the frequency `freqs_THz[j]`.
-    *   The components represent the displacements of the atoms in Cartesian coordinates.
