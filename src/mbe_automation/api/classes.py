@@ -41,6 +41,15 @@ class Structure(_Structure):
             dataset: str,
             key: str,
     ) -> Structure:
+        """Load a structure from a dataset.
+
+        Args:
+            dataset: Path to the dataset file containing the structure.
+            key: Key to the structure group in the dataset.
+
+        Returns:
+            A Structure object.
+        """
         return cls(**vars(
             mbe_automation.storage.read_structure(dataset, key)
         ))
