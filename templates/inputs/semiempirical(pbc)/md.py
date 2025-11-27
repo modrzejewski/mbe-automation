@@ -45,4 +45,4 @@ md_config = mbe_automation.configs.md.Enthalpy(
     )
 )
 
-mbe_automation.workflows.md.run(md_config)
+mbe_automation.run(md_config)

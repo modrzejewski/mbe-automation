@@ -1,5 +1,6 @@
 import numpy as np
 import os.path
+
 import mbe_automation
 from mbe_automation.storage import from_xyz_file
 from mbe_automation.configs.execution import ParallelCPU
@@ -26,4 +27,4 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     dataset = os.path.join(work_dir, "properties.hdf5"),
 )
 
-mbe_automation.workflows.quasi_harmonic.run(properties_config)
+mbe_automation.run(properties_config)
