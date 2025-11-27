@@ -3,8 +3,7 @@ import os.path
 import mace.calculators
 import torch
 
-import mbe_automation.configs
-import mbe_automation.workflows
+import mbe_automation
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "{xyz_solid}"
@@ -28,7 +27,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     dataset = os.path.join(work_dir, "properties.hdf5")
 )
 
-mbe_automation.workflows.quasi_harmonic.run(properties_config)
+mbe_automation.run(properties_config)
 
 
 
