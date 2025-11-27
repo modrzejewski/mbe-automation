@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Tuple, Literal, overload
 import pandas as pd
 import phonopy
@@ -261,7 +262,7 @@ def save_data_frame(
         key: str,
         df: pd.DataFrame
 ):
-    
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]
@@ -326,6 +327,7 @@ def save_brillouin_zone_path(
     n_segments = len(band_structure.frequencies)
     _, n_bands = band_structure.frequencies[0].shape
     
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]
@@ -419,7 +421,8 @@ def save_eos_curves(
     for i, fit in enumerate(G_tot_curves):
         if fit.G_interp is not None:
             G_interp[i, :] = fit.G_interp(V_interp)
-        
+
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]
@@ -502,6 +505,7 @@ def _save_structure(
             f"positions array must have rank 2 or 3, but has rank {positions.ndim}"
         )
 
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)    
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]
@@ -655,6 +659,7 @@ def save_trajectory(
         traj: Trajectory
 ):
 
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]
@@ -792,7 +797,8 @@ def save_force_constants(
     assert np.issubdtype(phonons.supercell_matrix.dtype, np.integer)
     assert isinstance(phonons.supercell, phonopy.structure.atoms.PhonopyAtoms)
     assert isinstance(phonons.primitive, phonopy.structure.atoms.PhonopyAtoms)
-    
+
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]
@@ -855,7 +861,8 @@ def save_molecular_crystal(
     If molecules have different compositions, the index_map (a list of arrays)
     is converted to a single 2D array padded with -1.
     """
-    
+
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]
@@ -942,6 +949,7 @@ def save_finite_subsystem(
 ) -> None:
     """Save a FiniteSubsystem object to a dataset."""
 
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]  
@@ -982,6 +990,8 @@ def save_unique_clusters(
         clusters: UniqueClusters
 ) -> None:
     """Save a UniqueClusters object to a dataset."""
+
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(dataset, "a") as f:
         if key in f:
             del f[key]
@@ -1024,7 +1034,7 @@ def _save_only(
     Keeps the rest of the saved Structure object unaltered.
     """
 
-    with h5py.File(dataset, "a") as f:
+    with h5py.File(dataset, "r+") as f:
         group = f[key]
         
         if "feature_vectors" in quantities:
