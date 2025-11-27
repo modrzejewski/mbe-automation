@@ -23,8 +23,10 @@ def to_xyz_training_set(
     forces_key = "REF_forces"
     stress_key = "REF_stress"
 
-    if "energies" in quantities: assert structure.E_pot is not None
-    if "forces" in quantities: assert structure.forces is not None
+    if "energies" in quantities and structure.E_pot is None:
+        raise ValueError("Energies requested but 'E_pot' is not present in the structure.")
+    if "forces" in quantities and structure.forces is None:
+        raise ValueError("Forces requested but 'forces' is not present in the structure.")
 
     ase_atoms_list = []
     for i in range(structure.n_frames):
