@@ -23,9 +23,5 @@ def _(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     return mbe_automation.workflows.quasi_harmonic.run(config)
 
 @run.register
-def _(config: mbe_automation.configs.training.MDSampling):
-    return mbe_automation.workflows.training.run(config)
-
-@run.register
-def _(config: mbe_automation.configs.training.PhononSampling):
+def _(config: mbe_automation.configs.training.MDSampling | mbe_automation.configs.training.PhononSampling):
     return mbe_automation.workflows.training.run(config)
