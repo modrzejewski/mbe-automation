@@ -68,7 +68,7 @@ md_config = mbe_automation.configs.md.Enthalpy(
 The MD workflow is executed by passing the configuration object to the `run` function.
 
 ```python
-mbe_automation.workflows.md.run(md_config)
+mbe_automation.run(md_config)
 ```
 
 ## Adjustable parameters
@@ -117,6 +117,12 @@ mbe_automation.workflows.md.run(md_config)
 ## Function Call Overview
 
 ```
++--------------------------------------+
+|           mbe_automation             |
+|                run                   |
++--------------------------------------+
+                   |
+                   |
 +--------------------------------------+
 |             workflows.md             |
 |                 run                  |
@@ -216,7 +222,7 @@ md_config = mbe_automation.configs.md.Enthalpy(
     )
 )
 
-mbe_automation.workflows.md.run(md_config)
+mbe_automation.run(md_config)
 ```
 
 ### SLURM Script (`mace-gpu.py`)

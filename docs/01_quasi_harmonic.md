@@ -64,7 +64,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 The workflow is executed by passing the configuration object to the `run` function.
 
 ```python
-mbe_automation.workflows.quasi_harmonic.run(properties_config)
+mbe_automation.run(properties_config)
 ```
 
 ## Adjustable parameters
@@ -123,6 +123,12 @@ mbe_automation.workflows.quasi_harmonic.run(properties_config)
 ## Function Call Overview
 
 ```
++----------------------------------------+
+|            mbe_automation              |
+|                 run                    |
++----------------------------------------+
+                    |
+                    |
 +----------------------------------------+
 |      workflows.quasi_harmonic          |
 |                 run                    |
@@ -297,7 +303,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     relaxation=relaxation_config
 )
 
-mbe_automation.workflows.quasi_harmonic.run(properties_config)
+mbe_automation.run(properties_config)
 ```
 
 ### SLURM Script (`mace-gpu.py`)
