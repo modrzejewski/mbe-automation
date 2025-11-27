@@ -76,7 +76,7 @@ md_sampling_config = MDSampling(
     dataset=dataset,
     root_key="training/md_sampling"
 )
-mbe_automation.workflows.training.run(md_sampling_config)
+mbe_automation.run(md_sampling_config)
 ```
 
 ## Step 2: Force Constants Model
@@ -93,7 +93,7 @@ free_energy_config = FreeEnergy.recommended(
     dataset=dataset,
     root_key="training/quasi_harmonic"
 )
-mbe_automation.workflows.quasi_harmonic.run(free_energy_config)
+mbe_automation.run(free_energy_config)
 ```
 
 ## Step 3: Phonon Sampling
@@ -122,7 +122,7 @@ phonon_sampling_config = PhononSampling(
     dataset=dataset,
     root_key="training/phonon_sampling"
 )
-mbe_automation.workflows.training.run(phonon_sampling_config)
+mbe_automation.run(phonon_sampling_config)
 ```
 
 ## Adjustable parameters
@@ -314,6 +314,12 @@ traj.save(
 
 ```
 +------------------------------------+
+|          mbe_automation            |
+|               run                  |
++------------------------------------+
+                    |
+                    |
++------------------------------------+
 |         workflows.training         |
 |            md_sampling             |
 +------------------------------------+
@@ -341,6 +347,12 @@ traj.save(
 ### Phonon Sampling
 
 ```
++------------------------------------+
+|          mbe_automation            |
+|               run                  |
++------------------------------------+
+                    |
+                    |
 +------------------------------------+
 |         workflows.training         |
 |          phonon_sampling           |
@@ -421,7 +433,7 @@ md_sampling_config = MDSampling(
     dataset=dataset,
     root_key="training/md_sampling"
 )
-mbe_automation.workflows.training.run(md_sampling_config)
+mbe_automation.run(md_sampling_config)
 
 free_energy_config = FreeEnergy.recommended(
     model_name="mace",
@@ -432,7 +444,7 @@ free_energy_config = FreeEnergy.recommended(
     dataset=dataset,
     root_key="training/quasi_harmonic"
 )
-mbe_automation.workflows.quasi_harmonic.run(free_energy_config)
+mbe_automation.run(free_energy_config)
 
 phonon_sampling_config = PhononSampling(
     calculator=mace_calc,
@@ -456,7 +468,7 @@ phonon_sampling_config = PhononSampling(
     dataset=dataset,
     root_key="training/phonon_sampling"
 )
-mbe_automation.workflows.training.run(phonon_sampling_config)
+mbe_automation.run(phonon_sampling_config)
 ```
 
 ### SLURM Script (`mace-gpu.py`)

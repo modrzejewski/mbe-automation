@@ -6,6 +6,7 @@ from mbe_automation.storage.core import (
     EOSCurves,
     Structure,
     Trajectory,
+    ForceConstants,
     MolecularCrystal,
     UniqueClusters,
     FiniteSubsystem,
@@ -53,6 +54,7 @@ __all__ = [
     "EOSCurves",
     "Structure",
     "Trajectory",
+    "ForceConstants",
     "MolecularCrystal",
     "UniqueClusters",
     "FiniteSubsystem",
@@ -89,5 +91,3 @@ __all__ = [
     "to_xyz_file",
     "from_xyz_file"
 ]
-
-

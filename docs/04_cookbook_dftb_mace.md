@@ -53,7 +53,7 @@ config = Enthalpy(
 
 # Execute the MD workflow
 # This will run the simulation and save the trajectory to 'dftb_trajectory.hdf5'
-mbe_automation.workflows.md.run(config)
+mbe_automation.run(config)
 
 
 # 3. Post-processing: Append MACE Feature Vectors
