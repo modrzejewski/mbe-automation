@@ -11,9 +11,6 @@ import os
 from mace.calculators import MACECalculator
 from ase.calculators.calculator import Calculator as ASECalculator
 
-import mbe_automation.ml.core
-from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
-
 DATA_FOR_TRAINING = [
     "feature_vectors",
     "potential_energies",
@@ -112,72 +109,6 @@ class Structure:
                 quantities=only,
             )
 
-    @classmethod
-    def read(
-            cls,
-            dataset: str,
-            key: str,
-    ) -> Structure:
-        """Load a structure from a dataset."""
-        
-        return read_structure(dataset, key)
-        
-    def subsample(
-        self,
-        n: int,
-        algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
-    ) -> Structure:
-        """
-        Return new Structure containing a subset of frames selected using
-        either either farthest point sampling or K-means sampling.
-
-        The feature vectors used to compute distances in the feature
-        space are averaged over atoms and normalized.
-        """
-
-        if self.feature_vectors_type == "none":
-            raise ValueError(
-                "Subsampling requires precomputed feature vectors. "
-                "Execute run_model on your Structure before subsampling."
-            )
-        if self.masses.ndim == 2 or self.atomic_numbers.ndim == 2:
-            raise ValueError(
-                "subsample cannot work on a structure where atoms "
-                "are permuted between frames."
-            )
-        selected_indices = mbe_automation.ml.core.subsample(
-            feature_vectors=self.feature_vectors,
-            feature_vectors_type=self.feature_vectors_type,
-            n_samples=n,
-            algorithm=algorithm,
-        )
-        selected_cell_vectors = self.cell_vectors
-        if self.cell_vectors is not None:
-            if self.cell_vectors.ndim == 3:
-                selected_cell_vectors = self.cell_vectors[selected_indices]
-            else:
-                selected_cell_vectors = self.cell_vectors
-                
-        return Structure(
-            positions=self.positions[selected_indices],
-            atomic_numbers=self.atomic_numbers,
-            masses=self.masses,
-            cell_vectors=selected_cell_vectors,
-            n_frames=len(selected_indices),
-            n_atoms=self.n_atoms,
-            E_pot=(
-                self.E_pot[selected_indices]
-                if self.E_pot is not None else None
-            ),
-            forces=(
-                self.forces[selected_indices]
-                if self.forces is not None
-                else None
-            ),
-            feature_vectors=self.feature_vectors[selected_indices],
-            feature_vectors_type=self.feature_vectors_type
-        )
-
 @dataclass
 class ForceConstants:
     """Harmonic force constants model."""
@@ -244,82 +175,6 @@ class Trajectory(Structure):
             n_removed_trans_dof=n_removed_trans_dof,
             n_removed_rot_dof=n_removed_rot_dof
         )
-    
-    def subsample(
-            self,
-            n: int,
-            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
-    ) -> Trajectory:
-        """
-        Return new Trajectory containing a subset of frames
-        selected based on the distances in the feature
-        vector space.
-        """
-        if self.feature_vectors_type == "none":
-            raise ValueError(
-                "Subsampling requires precomputed feature vectors. "
-                "Execute run_model on your Structure before subsampling."
-            )
-        
-        if self.masses.ndim == 2 or self.atomic_numbers.ndim == 2:
-            raise ValueError(
-                "subsample cannot work on a trajectory where atoms"
-                "are permuted between frames."
-            )
-                
-        selected_indices = mbe_automation.ml.core.subsample(
-            feature_vectors=self.feature_vectors,
-            feature_vectors_type=self.feature_vectors_type,
-            n_samples=n,
-            algorithm=algorithm,
-        )
-        
-        selected_cell_vectors = self.cell_vectors
-        if self.cell_vectors is not None and self.cell_vectors.ndim == 3:
-            selected_cell_vectors = self.cell_vectors[selected_indices]
-                
-        return Trajectory(
-            time_equilibration=self.time_equilibration,
-            target_temperature=self.target_temperature,
-            target_pressure=self.target_pressure,
-            ensemble=self.ensemble,
-            n_removed_trans_dof=self.n_removed_trans_dof,
-            n_removed_rot_dof=self.n_removed_rot_dof,
-            n_atoms=self.n_atoms,
-            periodic=self.periodic,
-            atomic_numbers=self.atomic_numbers,
-            masses=self.masses,
-            n_frames=len(selected_indices),
-            positions=self.positions[selected_indices],
-            velocities=self.velocities[selected_indices],
-            time=self.time[selected_indices],
-            temperature=self.temperature[selected_indices],
-            E_kin=self.E_kin[selected_indices],
-            E_trans_drift=self.E_trans_drift[selected_indices],
-            cell_vectors=selected_cell_vectors,
-            E_pot=(
-                self.E_pot[selected_indices] 
-                if self.E_pot is not None else None
-            ),
-            forces=(
-                self.forces[selected_indices] 
-                if self.forces is not None else None
-            ),
-            feature_vectors=self.feature_vectors[selected_indices],
-            feature_vectors_type=self.feature_vectors_type,
-            pressure=(
-                self.pressure[selected_indices] 
-                if self.pressure is not None else None
-            ),
-            volume=(
-                self.volume[selected_indices] 
-                if self.volume is not None else None
-            ),
-            E_rot_drift=(
-                self.E_rot_drift[selected_indices] 
-                if self.E_rot_drift is not None else None
-            ),
-        )
 
     def save(
             self,
@@ -342,18 +197,7 @@ class Trajectory(Structure):
                 key=key,
                 structure=self,
                 quantities=only,
-            )
-            
-
-    @classmethod
-    def read(
-            cls,
-            dataset: str,
-            key: str,
-    ) -> Trajectory:
-        """Load a trajectory from a dataset."""
-        
-        return read_trajectory(dataset, key)
+            )            
 
 @dataclass
 class MolecularCrystal:
@@ -394,22 +238,6 @@ class MolecularCrystal:
             selected_positions = self.supercell.positions[atom_indices, :]
             
         return selected_positions
-        
-    def subsample(
-            self,
-            n: int,
-            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
-    ) -> MolecularCrystal:
-        return MolecularCrystal(
-            supercell=self.supercell.subsample(n, algorithm),
-            index_map=self.index_map,
-            centers_of_mass=self.centers_of_mass,
-            identical_composition=self.identical_composition,
-            n_molecules=self.n_molecules,
-            central_molecule_index=self.central_molecule_index,
-            min_distances_to_central_molecule=self.min_distances_to_central_molecule,
-            max_distances_to_central_molecule=self.max_distances_to_central_molecule
-        )
 
 @dataclass(kw_only=True)
 class UniqueClusters:
@@ -427,16 +255,6 @@ class FiniteSubsystem:
     cluster_of_molecules: Structure
     molecule_indices: npt.NDArray[np.integer]
     n_molecules: int
-    def subsample(
-            self,
-            n: int,
-            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
-    ) -> FiniteSubsystem:
-        return FiniteSubsystem(
-            cluster_of_molecules=self.cluster_of_molecules.subsample(n, algorithm),
-            molecule_indices=self.molecule_indices,
-            n_molecules=self.n_molecules
-        )
     
 def save_data_frame(
         dataset: str,

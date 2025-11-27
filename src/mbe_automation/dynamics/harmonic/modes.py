@@ -75,7 +75,17 @@ def at_k_point(
     dynamical_matrix: phonopy.DynamicalMatrix,
     k_point: npt.NDArray[np.floating],
 ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
-
+    """
+    Compute phonon frequencies and eigenvectors at a specified k-point.
+        
+    Args:
+    dynamical_matrix: Phonopy dynamical matrix object.
+    k_point: The k-point coordinates in reciprocal space (fractional coordinates).
+    Returns:
+    A tuple containing:
+    - frequencies (in THz)
+    - eigenvectors stored as columns
+    """
     dynamical_matrix.run(k_point)
     D = dynamical_matrix.dynamical_matrix # mass-weighted dynamical matrix
     eigenvals, eigenvecs = np.linalg.eigh(D) # eigenvectors ejk are dimensionless
