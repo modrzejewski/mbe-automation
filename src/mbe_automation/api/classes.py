@@ -41,7 +41,7 @@ class Structure(_Structure):
             dataset: str,
             key: str,
     ) -> Structure:
-        return cls(**vals(
+        return cls(**vars(
             mbe_automation.storage.read_structure(dataset, key)
         ))
         
@@ -50,15 +50,15 @@ class Structure(_Structure):
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
     ) -> Structure:
-        return Structure(**vals(
+        return Structure(**vars(
             _subsample_structure(self, n, algorithm)
         ))
 
     def to_training_set(
             self,
             save_path: str,
+            quantities: List[Literal["energies", "forces"]],
             append: bool = False,
-            quantities: Literal["energies", "forces"] = ["energies", "forces"],
             data_format: Literal["mace_xyz"] = "mace_xyz",
     ):
         if data_format == "mace_xyz":
@@ -81,7 +81,7 @@ class Trajectory(_Trajectory):
     ) -> Trajectory:
         """Load a trajectory from a dataset."""
         
-        return cls(**vals(
+        return cls(**vars(
             mbe_automation.storage.read_trajectory(dataset, key)
         ))
 
@@ -90,9 +90,9 @@ class Trajectory(_Trajectory):
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
     ):
-    return Trajectory(**vals(
-        _subsample_trajectory(self, n, algorithm)
-    ))
+        return Trajectory(**vars(
+            _subsample_trajectory(self, n, algorithm)
+        ))
 
 @dataclass(kw_only=True)
 class MolecularCrystal(_MolecularCrystal):

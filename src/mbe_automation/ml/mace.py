@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import List, Literal
 import numpy as np
 import ase.io
 import mace
@@ -31,13 +32,12 @@ def to_xyz_training_set(
             structure=structure,
             frame_index=i
         )
-
-        atoms.info["config_type"] = default_config_type
+        ase_atoms.info["config_type"] = default_config_type
         if "energies" in quantities:
-            atoms.info[energy_key] = structure.E_pot[i]
+            ase_atoms.info[energy_key] = structure.E_pot[i]
         if "forces" in quantities:
-            atoms.arrays[forces_key] = atoms.forces[i]
-        ase_atoms_list.append(atoms)
+            ase_atoms.arrays[forces_key] = structure.forces[i]
+        ase_atoms_list.append(ase_atoms)
 
     ase.io.write(
         save_path,
@@ -45,6 +45,4 @@ def to_xyz_training_set(
         format="extxyz",
         append=append
     )
-    
-    return
 
