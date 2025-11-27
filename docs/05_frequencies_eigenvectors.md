@@ -90,7 +90,7 @@ print(f"\nEigenvectors are orthonormal: {is_orthonormal}")
 
 ## Output Explanation
 
-*   **`freqs_THz`**: A 1D NumPy array containing the phonon frequencies in Terahertz (THz).
+*   **`freqs_THz`**: A 1D NumPy array containing the phonon frequencies (THz).
     *   The size is $3N$, where $N$ is the number of atoms in the primitive cell.
     *   The first 3 modes are acoustic modes with frequencies near zero at the Gamma point.
 
