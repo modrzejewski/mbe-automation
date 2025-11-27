@@ -32,7 +32,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     dataset="properties.hdf5"
 )
 
-mbe_automation.workflows.quasi_harmonic.run(properties_config)
+mbe_automation.run(properties_config)
 ```
 
 ## Step-by-step Guide
