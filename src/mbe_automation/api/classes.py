@@ -41,25 +41,6 @@ class Structure(_Structure):
             dataset: str,
             key: str,
     ) -> Structure:
-        """Load a structure from a dataset.
-
-        Args:
-            dataset: Path to the dataset file containing the structure.
-    def read(
-            cls,
-            dataset: str,
-            key: str,
-    ) -> Structure:
-        """
-        Read a structure from a dataset file.
-
-        Args:
-            dataset: Path to the dataset file containing the structure.
-            key: Key to the structure group in the dataset.
-
-        Returns:
-            A Structure object.
-        """
         return cls(**vars(
             mbe_automation.storage.read_structure(dataset, key)
         ))
@@ -98,8 +79,6 @@ class Trajectory(_Trajectory):
             dataset: str,
             key: str,
     ) -> Trajectory:
-        """Load a trajectory from a dataset."""
-        
         return cls(**vars(
             mbe_automation.storage.read_trajectory(dataset, key)
         ))
