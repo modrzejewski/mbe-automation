@@ -243,7 +243,7 @@ mbe_automation.run(phonon_sampling_config)
 
 The purpose of subsampling is to select a diverse set of configurations for training a machine learning potential. By choosing a smaller, representative subset of frames from a larger dataset, you can reduce the computational cost of training while ensuring that the model is exposed to a wide range of atomic environments. The `subsample` method, available for `Structure`, `Trajectory`, `MolecularCrystal`, and `FiniteSubsystem` objects, provides a way to do this.
 
-The subsampling process is based on feature vectors, which are numerical representations of the atomic environments in each frame. The method uses algorithms like farthest point sampling to select a diverse set of frames that cover the feature space as broadly as possible. To enable subsampling, you must first save the feature vectors to the dataset by setting the [`feature_vectors_type`](#classicalmd-class) parameter to `"atomic_environments"` or `"averaged_environments"` in the `ClassicalMD` or `PhononSampling` configurations.
+The subsampling process is based on feature vectors, which are numerical representations of the atomic environments in each frame. The method uses algorithms like farthest point sampling to select a diverse set of frames that cover the feature space as broadly as possible. To enable subsampling, you must first save the feature vectors to the dataset by setting the [`feature_vectors_type`](#classicalmd-class) parameter to `"atomic_environments"` or `"averaged_environments"` in the `MDSampling` or `PhononSampling` configurations.
 
 ### `subsample` Method Parameters
 
