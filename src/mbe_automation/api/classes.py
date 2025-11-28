@@ -15,6 +15,7 @@ from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 import mbe_automation.dynamics.harmonic.modes
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
+import mbe_automation.calculators
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 
 @dataclass(kw_only=True)
