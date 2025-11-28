@@ -153,8 +153,6 @@ def _select_frames(
         if struct.cell_vectors is not None:
             if struct.cell_vectors.ndim == 3:
                 selected_cell_vectors = struct.cell_vectors[indices]
-            else:
-                selected_cell_vectors = struct.cell_vectors
 
         return _Structure(
             positions=struct.positions[indices],
