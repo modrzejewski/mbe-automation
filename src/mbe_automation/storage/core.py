@@ -9,8 +9,6 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 import os
-from mace.calculators import MACECalculator
-from ase.calculators.calculator import Calculator as ASECalculator
 
 DATA_FOR_TRAINING = [
     "feature_vectors",
@@ -69,23 +67,6 @@ class Structure:
                 if self.feature_vectors_type != "none" else None
             ),
             feature_vectors_type=self.feature_vectors_type,
-        )
-
-    def run_model(
-            self,
-            calculator: ASECalculator | MACECalculator,
-            energies: bool = True,
-            forces: bool = True,
-            feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-    ):
-
-        _run_model(
-            structure=self,
-            calculator=calculator,
-            energies=energies,
-            forces=forces,
-            feature_vectors=(feature_vectors_type!="none"),
-            average_over_atoms=(feature_vectors_type=="averaged_environments"),
         )
     
     def save(
@@ -1086,57 +1067,4 @@ def _save_only(
                 data=structure.forces
             )
                 
-    return
-
-def _run_model(
-        structure: Structure,
-        calculator: ASECalculator | MACECalculator,
-        energies: bool = True,
-        forces: bool = True,
-        feature_vectors: bool = True,
-        average_over_atoms: bool = False,
-) -> None:
-    """
-    Run a calculator of energies/forces/feature vectors for all frames
-    of a given Structure. Store the computed quantities in-place.
-    """
-    from mbe_automation.storage.views import to_ase
-    
-    if feature_vectors: feature_vectors = isinstance(calculator, MACECalculator)
-
-    if energies:
-        structure.E_pot = np.zeros(structure.n_frames)
-
-    if forces:
-        structure.forces = np.zeros((structure.n_frames, structure.n_atoms, 3))
-
-    if feature_vectors:
-        if average_over_atoms:
-            structure.feature_vectors_type = "averaged_environments"
-        else:
-            structure.feature_vectors_type = "atomic"
-            
-    for i in range(structure.n_frames):
-        atoms = to_ase(
-            structure=structure,
-            frame_index=i
-        )
-        atoms.calc = calculator
-        if forces:
-            structure.forces[i] = atoms.get_forces()
-        if energies:
-            structure.E_pot[i] = atoms.get_potential_energy() / structure.n_atoms
-        if feature_vectors:
-            features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
-            n_features = features.shape[-1]
-            if i == 0:
-                if average_over_atoms:
-                    structure.feature_vectors = np.zeros((structure.n_frames, n_features))
-                else:
-                    structure.feature_vectors = np.zeros((structure.n_frames, structure.n_atoms, n_features))
-            if average_over_atoms:
-                structure.feature_vectors[i] = np.average(features, axis=0)
-            else:
-                structure.feature_vectors[i] = features
-
     return

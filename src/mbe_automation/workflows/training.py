@@ -6,6 +6,7 @@ import mbe_automation.storage
 import mbe_automation.configs
 import mbe_automation.dynamics
 import mbe_automation.structure
+import mbe_automation.calculators
 
 try:
     from mace.calculators import MACECalculator
@@ -61,17 +62,23 @@ def phonon_sampling(
     
     all_structures = [molecular_crystal.supercell] + [s.cluster_of_molecules for s in finite_subsystems]
     for s in all_structures:
-        s.run_model(
+        mbe_automation.calculators.run_model(
+            structure=s,
             calculator=config.calculator,
-            feature_vectors_type="none",
-            potential_energies=True,
+            feature_vectors=False,
+            energies=True,
             forces=True,
         )
-        if config.features_calculator is not None:
-            s.run_model(
+        if (
+                config.features_calculator is not None and
+                config.feature_vectors_type != "none"
+        ):
+            mbe_automation.calculators.run_model(
+                structure=s,
                 calculator=config.features_calculator,
-                feature_vectors_type=config.feature_vectors_type,
-                potential_energies=False,
+                feature_vectors=True,
+                average_over_atoms=(config.feature_vectors_type=="averaged_environments"),
+                energies=False,
                 forces=False,
             )
 
@@ -156,10 +163,15 @@ def md_sampling(
         key=pbc_trajectory_key
     )
 
-    if config.features_calculator is not None:
-        pbc_md_frames.run_model(
+    if (
+            config.features_calculator is not None and
+            config.feature_vectors_type != "none"
+    ):
+        mbe_automation.calculators.run_model(
+            structure=pbc_md_frames,
             calculator=config.features_calculator,
-            feature_vectors_type=config.feature_vectors_type,
+            feature_vectors=True,
+            average_over_atoms=(config.feature_vectors_type=="averaged_environments"),
             energies=False,
             forces=False,
         )
@@ -188,19 +200,25 @@ def md_sampling(
 
         for s in finite_subsystems:
             key = f"{config.root_key}/{system_label}/finite_subsystems/n={s.n_molecules}"
-            
-            s.cluster_of_molecules.run_model(
+
+            mbe_automation.calculators.run_model(
+                structure=s.cluster_of_molecules,
                 calculator=config.calculator,
-                feature_vectors_type="none",
-                potential_energies=True,
+                feature_vectors=False,
+                energies=True,
                 forces=True
             )
-
-            if config.features_calculator is not None:
-                s.cluster_of_molecules.run_model(
+            
+            if (
+                    config.features_calculator is not None and
+                    config.feature_vectors_type != "none"
+            ):
+                mbe_automation.calculators.run_model(
+                    structure=s.cluster_of_molecules,
                     calculator=config.features_calculator,
-                    feature_vectors_type=config.feature_vectors_type,
-                    potential_energies=False,
+                    feature_vectors=True,
+                    average_over_atoms=(config.feature_vectors_type=="averaged_environments"),
+                    energies=False,
                     forces=False
                 )
 
