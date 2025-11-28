@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Tuple, Literal
+from typing import Tuple, Literal, Sequence
 import numpy as np
 import numpy.typing as npt
 
@@ -64,25 +64,33 @@ class Structure(_Structure):
 
     def split(
             self,
-            fraction_train: float = 0.8,
-            seed: int | np.random.Generator | None = None
-    ) -> Tuple[Structure, Structure]:
+            fractions: Sequence[float],
+            rng: np.random.Generator | None = None
+    ) -> Tuple[Structure, ...]:
 
-        if seed is None:
+        if not np.isclose(sum(fractions), 1.0):
+             raise ValueError("Fractions must sum to 1.0")
+
+        if rng is None:
             rng = np.random.default_rng()
-        elif isinstance(seed, int):
-            rng = np.random.default_rng(seed)
-        else:
-            rng = seed
 
-        n_train = int(self.n_frames * fraction_train)
-        indices = np.arange(self.n_frames)
+        n_total = self.n_frames
+        indices = np.arange(n_total)
         rng.shuffle(indices)
 
-        train_indices = indices[:n_train]
-        test_indices = indices[n_train:]
+        lengths = [int(f * n_total) for f in fractions]
+        # Distribute remainder to the last split to ensure coverage
+        lengths[-1] = n_total - sum(lengths[:-1])
 
-        return self.select(train_indices), self.select(test_indices)
+        structures = []
+        start = 0
+        for length in lengths:
+            end = start + length
+            selected_indices = indices[start:end]
+            structures.append(self.select(selected_indices))
+            start = end
+
+        return tuple(structures)
 
     def to_training_set(
             self,
