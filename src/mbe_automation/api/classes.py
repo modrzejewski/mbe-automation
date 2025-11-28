@@ -66,7 +66,7 @@ class Structure(_Structure):
             self,
             fractions: Sequence[float],
             rng: np.random.Generator | None = None,
-    ) -> Sequence[Structure, ...]:
+    ) -> Sequence[Structure]:
 
         return [
             Structure(**vars(x)) for x in _split_frames(self, fractions, rng)
