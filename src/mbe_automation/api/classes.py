@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Tuple, Literal
+from typing import Tuple, Literal, Sequence
 import numpy as np
 import numpy.typing as npt
 
@@ -53,6 +53,44 @@ class Structure(_Structure):
         return Structure(**vars(
             _subsample_structure(self, n, algorithm)
         ))
+
+    def select(
+            self,
+            indices: npt.NDArray[np.integer]
+    ) -> Structure:
+        return Structure(**vars(
+            _select_structure(self, indices)
+        ))
+
+    def split(
+            self,
+            fractions: Sequence[float],
+            rng: np.random.Generator | None = None
+    ) -> Tuple[Structure, ...]:
+
+        if not np.isclose(sum(fractions), 1.0):
+             raise ValueError("Fractions must sum to 1.0")
+
+        if rng is None:
+            rng = np.random.default_rng()
+
+        n_total = self.n_frames
+        indices = np.arange(n_total)
+        rng.shuffle(indices)
+
+        lengths = [int(f * n_total) for f in fractions]
+        # Distribute remainder to the last split to ensure coverage
+        lengths[-1] = n_total - sum(lengths[:-1])
+
+        structures = []
+        start = 0
+        for length in lengths:
+            end = start + length
+            selected_indices = indices[start:end]
+            structures.append(self.select(selected_indices))
+            start = end
+
+        return tuple(structures)
 
     def to_training_set(
             self,
@@ -123,6 +161,44 @@ class FiniteSubsystem(_FiniteSubsystem):
             n_molecules=self.n_molecules
         )
 
+def _select_structure(
+        struct: _Structure,
+        indices: npt.NDArray[np.integer]
+    ) -> _Structure:
+        """
+        Return a new Structure containing only the specified frames.
+        """
+
+        selected_cell_vectors = struct.cell_vectors
+        if struct.cell_vectors is not None:
+            if struct.cell_vectors.ndim == 3:
+                selected_cell_vectors = struct.cell_vectors[indices]
+            else:
+                selected_cell_vectors = struct.cell_vectors
+
+        return _Structure(
+            positions=struct.positions[indices],
+            atomic_numbers=struct.atomic_numbers,
+            masses=struct.masses,
+            cell_vectors=selected_cell_vectors,
+            n_frames=len(indices),
+            n_atoms=struct.n_atoms,
+            E_pot=(
+                struct.E_pot[indices]
+                if struct.E_pot is not None else None
+            ),
+            forces=(
+                struct.forces[indices]
+                if struct.forces is not None
+                else None
+            ),
+            feature_vectors=(
+                struct.feature_vectors[indices]
+                if struct.feature_vectors is not None else None
+            ),
+            feature_vectors_type=struct.feature_vectors_type
+        )
+
 def _subsample_structure(
         struct: _Structure,
         n: int,
@@ -154,32 +230,7 @@ def _subsample_structure(
             algorithm=algorithm,
         )
         
-        selected_cell_vectors = struct.cell_vectors
-        if struct.cell_vectors is not None:
-            if struct.cell_vectors.ndim == 3:
-                selected_cell_vectors = struct.cell_vectors[selected_indices]
-            else:
-                selected_cell_vectors = struct.cell_vectors
-                
-        return _Structure(
-            positions=struct.positions[selected_indices],
-            atomic_numbers=struct.atomic_numbers,
-            masses=struct.masses,
-            cell_vectors=selected_cell_vectors,
-            n_frames=len(selected_indices),
-            n_atoms=struct.n_atoms,
-            E_pot=(
-                struct.E_pot[selected_indices]
-                if struct.E_pot is not None else None
-            ),
-            forces=(
-                struct.forces[selected_indices]
-                if struct.forces is not None
-                else None
-            ),
-            feature_vectors=struct.feature_vectors[selected_indices],
-            feature_vectors_type=struct.feature_vectors_type
-        )
+        return _select_structure(struct, selected_indices)
 
 def _subsample_trajectory(
         traj: _Trajectory,
