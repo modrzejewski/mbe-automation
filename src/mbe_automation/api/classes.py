@@ -65,7 +65,7 @@ class Structure(_Structure):
     def random_split(
             self,
             fractions: Sequence[float],
-            rng: np.random.Generator = lambda: np.random.default_rng(seed=42)
+            rng: np.random.Generator | None = None,
     ) -> Sequence[Structure, ...]:
 
         return [
@@ -215,11 +215,14 @@ def _subsample_structure(
 def _split_frames(
         struct: _Structure,
         fractions: Sequence[float],
-        rng: np.random.Generator = lambda: np.random.default_rng(seed=42)
+        rng: np.random.Generator | None = None, 
 ) -> Sequence[_Structure, ...]:
 
     if not np.isclose(sum(fractions), 1.0):
          raise ValueError("Fractions must sum to 1.0")
+
+    if rng is None:
+        rng = np.random.default_rng(seed=42)
 
     n_total = struct.n_frames
     indices = np.arange(n_total)
