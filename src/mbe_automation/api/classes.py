@@ -156,6 +156,16 @@ def _select_frames(
             else:
                 selected_cell_vectors = struct.cell_vectors
 
+        if struct.atomic_numbers.ndim == 2:
+            selected_atomic_numbers = struct.atomic_numbers[indices]
+        else:
+            selected_atomic_numbers = struct.atomic_numbers
+
+        if struct.masses.ndim == 2:
+            selected_masses = struct.masses[indices]
+        else:
+            selected_masses = struct.masses
+
         return _Structure(
             positions=struct.positions[indices],
             atomic_numbers=struct.atomic_numbers,
@@ -217,7 +227,20 @@ def _split_frames(
         fractions: Sequence[float],
         rng: np.random.Generator | None = None, 
 ) -> Sequence[_Structure, ...]:
+    """Split the frames of a structure into multiple structures.
 
+    The split is random. For reproducibility, a random number generator
+    can be passed. If not, a default one with a fixed seed is used.
+
+    Args:
+        struct: The structure to split.
+        fractions: A sequence of floats that sum to 1.0, representing the
+            fraction of frames for each new structure.
+        rng: An optional numpy random number generator.
+
+    Returns:
+        A sequence of new _Structure objects.
+    """
     if not np.isclose(sum(fractions), 1.0):
          raise ValueError("Fractions must sum to 1.0")
 
