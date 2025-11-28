@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Tuple, Literal, Sequence, Optional, List
+from typing import Tuple, Literal, Sequence, List
 import numpy as np
 import numpy.typing as npt
 
@@ -152,13 +152,13 @@ def _select_frames(
         """
         Return a new Structure containing only the specified frames.
         """
+        if len(indices) == 0:
+            raise ValueError("Cannot create a Structure with 0 frames.")
 
         selected_cell_vectors = struct.cell_vectors
         if struct.cell_vectors is not None:
             if struct.cell_vectors.ndim == 3:
                 selected_cell_vectors = struct.cell_vectors[indices]
-            else:
-                selected_cell_vectors = struct.cell_vectors
 
         return _Structure(
             positions=struct.positions[indices],
@@ -232,7 +232,7 @@ def _split_frames(
     """Split the frames of a structure into multiple structures.
 
     The split is random. For reproducibility, a random number generator
-    can be passed. If not, a default one with a fixed seed is used.
+    can be passed. If not, a new generator is created, seeded from OS entropy.
 
     Args:
         struct: The structure to split.
