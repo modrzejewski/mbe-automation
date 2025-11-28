@@ -156,20 +156,16 @@ def _select_frames(
             else:
                 selected_cell_vectors = struct.cell_vectors
 
-        if struct.atomic_numbers.ndim == 2:
-            selected_atomic_numbers = struct.atomic_numbers[indices]
-        else:
-            selected_atomic_numbers = struct.atomic_numbers
-
-        if struct.masses.ndim == 2:
-            selected_masses = struct.masses[indices]
-        else:
-            selected_masses = struct.masses
-
         return _Structure(
             positions=struct.positions[indices],
-            atomic_numbers=struct.atomic_numbers,
-            masses=struct.masses,
+            atomic_numbers=(
+                struct.atomic_numbers[indices] if struct.atomic_numbers.ndim == 2 else
+                struct.atomic_numbers
+            ),
+            masses=(
+                struct.masses[indices] if struct.masses.ndim == 2 else
+                struct.masses
+            ),
             cell_vectors=selected_cell_vectors,
             n_frames=len(indices),
             n_atoms=struct.n_atoms,
