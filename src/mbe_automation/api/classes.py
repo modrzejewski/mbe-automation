@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from typing import Tuple, Literal, Sequence, List
 import numpy as np
 import numpy.typing as npt
+from mace.calculators import MACECalculator
+from ase.calculators.calculator import Calculator as ASECalculator
 
 import mbe_automation.storage
 from mbe_automation.storage import ForceConstants as _ForceConstants
@@ -89,6 +91,22 @@ class Structure(_Structure):
             )
         else:
             raise ValueError("Unsupported data format of the training set")
+
+    def run_model(
+            self,
+            calculator: ASECalculator | MACECalculator,
+            energies: bool = True,
+            forces: bool = True,
+            feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+    ):
+        mbe_automation.calculators.run_model(
+            structure=self,
+            calculator=calculator,
+            energies=energies,
+            forces=forces,
+            feature_vectors=(feature_vectors_type!="none"),
+            average_over_atoms=(feature_vectors_type=="averaged_environments"),
+        )
 
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory):
