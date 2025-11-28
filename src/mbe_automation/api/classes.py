@@ -106,13 +106,8 @@ class Trajectory(_Trajectory):
             self,
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
-<<<<<<< HEAD
-            rng: Optional[np.random.Generator] = None,
-    ) -> Trajectory:
-=======
             rng: np.random.Generator | None = None,
-    ):
->>>>>>> 2907fdf (small corrections to imports)
+    ) -> Trajectory:
         return Trajectory(**vars(
             _subsample_trajectory(self, n, algorithm, rng)
         ))
