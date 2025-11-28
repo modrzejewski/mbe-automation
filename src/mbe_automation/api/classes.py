@@ -237,8 +237,8 @@ def _split_frames(
     Returns:
         A sequence of new _Structure objects.
     """
-    if not np.isclose(sum(fractions), 1.0):
-        raise ValueError("Fractions must sum to 1.0")
+    if any(f < 0 for f in fractions) or not np.isclose(sum(fractions), 1.0):
+        raise ValueError("Fractions must be non-negative and sum to 1.0")
 
     if rng is None:
         rng = np.random.default_rng(seed=42)
