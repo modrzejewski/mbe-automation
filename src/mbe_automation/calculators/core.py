@@ -43,6 +43,7 @@ def run_model(
         if energies:
             structure.E_pot[i] = atoms.get_potential_energy() / structure.n_atoms
         if compute_feature_vectors:
+            assert isinstance(calculator, MACECalculator)
             features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
             n_features = features.shape[-1]
             if i == 0:
