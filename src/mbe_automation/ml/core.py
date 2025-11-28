@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Literal, Tuple, Optional
+from typing import Literal, Tuple
 import numpy as np
 import numpy.typing as npt
 import scipy
@@ -99,7 +99,7 @@ def subsample(
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES],
         n_samples: int,
         algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
-        rng: Optional[np.random.Generator] = None
+        rng: np.random.Generator | None = None
 ) -> npt.NDArray[np.integer]:
     """
     Subsample feature vectors using farthest point sampling or
@@ -108,6 +108,11 @@ def subsample(
     assert feature_vectors_type != "none"
     
     if rng is None:
+        #
+        # Random number sequence initialized without seed means
+        # that the entropy is taken from the operating system
+        # an very function call will result in a different sequence.
+        #
         rng = np.random.default_rng()
 
     n_frames = feature_vectors.shape[0]

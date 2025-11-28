@@ -49,7 +49,7 @@ class Structure(_Structure):
             self,
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
-            rng: Optional[np.random.Generator] = None,
+            rng: np.random.Generator | None = None,
     ) -> Structure:
         return Structure(**vars(
             _subsample_structure(self, n, algorithm, rng)
@@ -106,8 +106,13 @@ class Trajectory(_Trajectory):
             self,
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+<<<<<<< HEAD
             rng: Optional[np.random.Generator] = None,
     ) -> Trajectory:
+=======
+            rng: np.random.Generator | None = None,
+    ):
+>>>>>>> 2907fdf (small corrections to imports)
         return Trajectory(**vars(
             _subsample_trajectory(self, n, algorithm, rng)
         ))
@@ -118,7 +123,7 @@ class MolecularCrystal(_MolecularCrystal):
             self,
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
-            rng: Optional[np.random.Generator] = None,
+            rng: np.random.Generator | None = None,
     ) -> MolecularCrystal:
         return MolecularCrystal(
             supercell=_subsample_structure(self.supercell, n, algorithm, rng),
@@ -137,7 +142,7 @@ class FiniteSubsystem(_FiniteSubsystem):
             self,
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
-            rng: Optional[np.random.Generator] = None,
+            rng: np.random.Generator | None = None,
     ) -> FiniteSubsystem:
         return FiniteSubsystem(
             cluster_of_molecules=_subsample_structure(self.cluster_of_molecules, n, algorithm, rng),
@@ -193,7 +198,7 @@ def _subsample_structure(
         struct: _Structure,
         n: int,
         algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
-        rng: Optional[np.random.Generator] = None,
+        rng: np.random.Generator | None = None,
     ) -> _Structure:
         """
         Return new Structure containing a subset of frames selected using
@@ -276,7 +281,7 @@ def _subsample_trajectory(
         traj: _Trajectory,
         n: int,
         algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
-        rng: Optional[np.random.Generator] = None,
+        rng: np.random.Generator | None = None,
 ) -> _Trajectory:
         """
         Return new Trajectory containing a subset of frames
