@@ -221,7 +221,7 @@ def _subsample_structure(
 def _split_frames(
         struct: _Structure,
         fractions: Sequence[float],
-        rng: np.random.Generator | None = None, 
+        rng: np.random.Generator | None = None
 ) -> Sequence[_Structure, ...]:
     """Split the frames of a structure into multiple structures.
 
