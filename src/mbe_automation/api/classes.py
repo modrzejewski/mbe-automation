@@ -262,16 +262,12 @@ def _split_frames(
             f"in at least one empty split, which is not allowed."
         )
 
-    structures = []
-    start = 0
-    for length in lengths:
-        end = start + length
-        selected_indices = indices[start:end]
-        structures.append(_select_frames(struct, selected_indices))
-        start = end
+    split_points = np.cumsum(lengths[:-1])
+    indices_split = np.split(indices, split_points)
+    return [
+        _select_frames(struct, idx_group) for idx_group in indices_split
+    ]
 
-    return structures
-    
 def _subsample_trajectory(
         traj: _Trajectory,
         n: int,
