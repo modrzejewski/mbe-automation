@@ -1,4 +1,5 @@
 from __future__ import annotations
+import numpy as np
 from mace.calculators import MACECalculator
 from ase.calculators.calculator import Calculator as ASECalculator
 
