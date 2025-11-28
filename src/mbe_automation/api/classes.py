@@ -59,38 +59,18 @@ class Structure(_Structure):
             indices: npt.NDArray[np.integer]
     ) -> Structure:
         return Structure(**vars(
-            _select_structure(self, indices)
+            _select_frames(self, indices)
         ))
 
     def split(
             self,
             fractions: Sequence[float],
-            rng: np.random.Generator | None = None
-    ) -> Tuple[Structure, ...]:
+            rng: np.random.Generator = lambda: np.random.default_rng(seed=42)
+    ) -> Sequence[Structure, ...]:
 
-        if not np.isclose(sum(fractions), 1.0):
-             raise ValueError("Fractions must sum to 1.0")
-
-        if rng is None:
-            rng = np.random.default_rng()
-
-        n_total = self.n_frames
-        indices = np.arange(n_total)
-        rng.shuffle(indices)
-
-        lengths = [int(f * n_total) for f in fractions]
-        # Distribute remainder to the last split to ensure coverage
-        lengths[-1] = n_total - sum(lengths[:-1])
-
-        structures = []
-        start = 0
-        for length in lengths:
-            end = start + length
-            selected_indices = indices[start:end]
-            structures.append(self.select(selected_indices))
-            start = end
-
-        return tuple(structures)
+        return [
+            Structure(**vars(x)) for x in _split_frames(self, fractions, rng)
+        ]
 
     def to_training_set(
             self,
@@ -161,7 +141,7 @@ class FiniteSubsystem(_FiniteSubsystem):
             n_molecules=self.n_molecules
         )
 
-def _select_structure(
+def _select_frames(
         struct: _Structure,
         indices: npt.NDArray[np.integer]
     ) -> _Structure:
@@ -230,8 +210,34 @@ def _subsample_structure(
             algorithm=algorithm,
         )
         
-        return _select_structure(struct, selected_indices)
+        return _select_frames(struct, selected_indices)
 
+def _split_frames(
+        struct: _Structure,
+        fractions: Sequence[float],
+        rng: np.random.Generator = lambda: np.random.default_rng(seed=42)
+) -> Sequence[_Structure, ...]:
+
+    if not np.isclose(sum(fractions), 1.0):
+         raise ValueError("Fractions must sum to 1.0")
+
+    n_total = struct.n_frames
+    indices = np.arange(n_total)
+    rng.shuffle(indices)
+
+    lengths = [int(f * n_total) for f in fractions]
+    lengths[-1] = n_total - sum(lengths[:-1])
+
+    structures = []
+    start = 0
+    for length in lengths:
+        end = start + length
+        selected_indices = indices[start:end]
+        structures.append(_select_frames(struct, selected_indices))
+        start = end
+
+    return structures
+    
 def _subsample_trajectory(
         traj: _Trajectory,
         n: int,
