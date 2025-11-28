@@ -256,6 +256,12 @@ def _split_frames(
     lengths = [int(f * n_total) for f in fractions]
     lengths[-1] = n_total - sum(lengths[:-1])
 
+    if 0 in lengths:
+        raise ValueError(
+            f"Splitting {n_total} frames with fractions {fractions} would result "
+            f"in at least one empty split, which is not allowed."
+        )
+
     structures = []
     start = 0
     for length in lengths:
