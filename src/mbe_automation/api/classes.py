@@ -78,7 +78,7 @@ class Structure(_Structure):
             quantities: List[Literal["energies", "forces"]],
             append: bool = False,
             data_format: Literal["mace_xyz"] = "mace_xyz",
-    ):
+    ) -> None:
         if data_format == "mace_xyz":
             mbe_automation.ml.mace.to_xyz_training_set(
                 structure=self,
@@ -241,7 +241,7 @@ def _split_frames(
         raise ValueError("Fractions must be non-negative and sum to 1.0")
 
     if rng is None:
-        rng = np.random.default_rng(seed=42)
+        rng = np.random.default_rng()
 
     n_total = struct.n_frames
     indices = np.arange(n_total)

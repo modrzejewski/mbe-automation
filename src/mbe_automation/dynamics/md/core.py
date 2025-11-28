@@ -96,7 +96,7 @@ def run(
         md: ClassicalMD,
         dataset: str,
         key: str,
-        rng_seed=42
+        rng: np.random.Generator | None = None
 ):
 
     mbe_automation.common.display.framed([
@@ -106,8 +106,13 @@ def run(
 
     if np.any(system.pbc) and supercell_matrix is None:
         raise ValueError("Supercell matrix must be specified for periodic calculations")
-    
-    rng = np.random.default_rng(rng_seed) # source of pseudo-random numbers
+
+    if rng is None:
+        #        
+        # No seed means that the sequence of pseudo-random numbers
+        # is initialized from the operating system's entropy.
+        #
+        rng = np.random.default_rng() 
     
     if np.any(system.pbc):
         init_conf = ase.build.make_supercell(system, supercell_matrix)

@@ -247,7 +247,12 @@ def _thermal_displacements(
     elif amplitude_scan in ["random", "equidistant"]:
         n_time_points = n_random_samples
         if rng is None:
-            rng = np.random.default_rng(seed=42)
+            #
+            # Initializing rng without seed makes the random
+            # number series different for every call of this
+            # function
+            #
+            rng = np.random.default_rng()
 
     assert n_time_points > 0
 
