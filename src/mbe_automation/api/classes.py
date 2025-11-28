@@ -224,7 +224,7 @@ def _split_frames(
     """Split the frames of a structure into multiple structures.
 
     The split is random. For reproducibility, a random number generator
-    can be passed. If not, a default one with a fixed seed is used.
+    can be passed. If not, a new generator is created, seeded from OS entropy.
 
     Args:
         struct: The structure to split.
