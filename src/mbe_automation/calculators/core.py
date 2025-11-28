@@ -18,7 +18,7 @@ def run_model(
     of a given Structure. Store the computed quantities in-place.
     """
     
-    if feature_vectors: feature_vectors = isinstance(calculator, MACECalculator)
+    compute_feature_vectors = (feature_vectors and isinstance(calculator, MACECalculator))
 
     if energies:
         structure.E_pot = np.zeros(structure.n_frames)
@@ -26,7 +26,7 @@ def run_model(
     if forces:
         structure.forces = np.zeros((structure.n_frames, structure.n_atoms, 3))
 
-    if feature_vectors:
+    if compute_feature_vectors:
         if average_over_atoms:
             structure.feature_vectors_type = "averaged_environments"
         else:
@@ -42,7 +42,7 @@ def run_model(
             structure.forces[i] = atoms.get_forces()
         if energies:
             structure.E_pot[i] = atoms.get_potential_energy() / structure.n_atoms
-        if feature_vectors:
+        if compute_feature_vectors:
             features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
             n_features = features.shape[-1]
             if i == 0:

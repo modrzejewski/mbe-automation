@@ -205,7 +205,7 @@ def md_sampling(
                 structure=s.cluster_of_molecules,
                 calculator=config.calculator,
                 feature_vectors=False,
-                potential_energies=True,
+                energies=True,
                 forces=True
             )
             
@@ -218,7 +218,7 @@ def md_sampling(
                     calculator=config.features_calculator,
                     feature_vectors=True,
                     average_over_atoms=(config.feature_vectors_type=="averaged_environments"),
-                    potential_energies=False,
+                    energies=False,
                     forces=False
                 )
 
