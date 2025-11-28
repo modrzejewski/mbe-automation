@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Tuple, Literal
+from typing import Tuple, Literal, Sequence, List
 import numpy as np
 import numpy.typing as npt
 
@@ -48,11 +48,30 @@ class Structure(_Structure):
     def subsample(
             self,
             n: int,
-            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
+            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+            rng: np.random.Generator | None = None,
     ) -> Structure:
         return Structure(**vars(
-            _subsample_structure(self, n, algorithm)
+            _subsample_structure(self, n, algorithm, rng)
         ))
+
+    def select(
+            self,
+            indices: npt.NDArray[np.integer]
+    ) -> Structure:
+        return Structure(**vars(
+            _select_frames(self, indices)
+        ))
+
+    def random_split(
+            self,
+            fractions: Sequence[float],
+            rng: np.random.Generator | None = None,
+    ) -> Sequence[Structure]:
+
+        return [
+            Structure(**vars(x)) for x in _split_frames(self, fractions, rng)
+        ]
 
     def to_training_set(
             self,
@@ -60,7 +79,7 @@ class Structure(_Structure):
             quantities: List[Literal["energies", "forces"]],
             append: bool = False,
             data_format: Literal["mace_xyz"] = "mace_xyz",
-    ):
+    ) -> None:
         if data_format == "mace_xyz":
             mbe_automation.ml.mace.to_xyz_training_set(
                 structure=self,
@@ -86,10 +105,11 @@ class Trajectory(_Trajectory):
     def subsample(
             self,
             n: int,
-            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
-    ):
+            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+            rng: np.random.Generator | None = None,
+    ) -> Trajectory:
         return Trajectory(**vars(
-            _subsample_trajectory(self, n, algorithm)
+            _subsample_trajectory(self, n, algorithm, rng)
         ))
 
 @dataclass(kw_only=True)
@@ -97,10 +117,11 @@ class MolecularCrystal(_MolecularCrystal):
     def subsample(
             self,
             n: int,
-            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
+            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+            rng: np.random.Generator | None = None,
     ) -> MolecularCrystal:
         return MolecularCrystal(
-            supercell=_subsample_structure(self.supercell, n, algorithm),
+            supercell=_subsample_structure(self.supercell, n, algorithm, rng),
             index_map=self.index_map,
             centers_of_mass=self.centers_of_mass,
             identical_composition=self.identical_composition,
@@ -115,18 +136,64 @@ class FiniteSubsystem(_FiniteSubsystem):
     def subsample(
             self,
             n: int,
-            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
+            algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+            rng: np.random.Generator | None = None,
     ) -> FiniteSubsystem:
         return FiniteSubsystem(
-            cluster_of_molecules=_subsample_structure(self.cluster_of_molecules, n, algorithm),
+            cluster_of_molecules=_subsample_structure(self.cluster_of_molecules, n, algorithm, rng),
             molecule_indices=self.molecule_indices,
             n_molecules=self.n_molecules
+        )
+
+def _select_frames(
+        struct: _Structure,
+        indices: npt.NDArray[np.integer]
+    ) -> _Structure:
+        """
+        Return a new Structure containing only the specified frames.
+        """
+        if len(indices) == 0:
+            raise ValueError("Cannot create a Structure with 0 frames.")
+
+        selected_cell_vectors = struct.cell_vectors
+        if struct.cell_vectors is not None:
+            if struct.cell_vectors.ndim == 3:
+                selected_cell_vectors = struct.cell_vectors[indices]
+
+        return _Structure(
+            positions=struct.positions[indices],
+            atomic_numbers=(
+                struct.atomic_numbers[indices] if struct.atomic_numbers.ndim == 2 else
+                struct.atomic_numbers
+            ),
+            masses=(
+                struct.masses[indices] if struct.masses.ndim == 2 else
+                struct.masses
+            ),
+            cell_vectors=selected_cell_vectors,
+            n_frames=len(indices),
+            n_atoms=struct.n_atoms,
+            E_pot=(
+                struct.E_pot[indices]
+                if struct.E_pot is not None else None
+            ),
+            forces=(
+                struct.forces[indices]
+                if struct.forces is not None
+                else None
+            ),
+            feature_vectors=(
+                struct.feature_vectors[indices]
+                if struct.feature_vectors is not None else None
+            ),
+            feature_vectors_type=struct.feature_vectors_type
         )
 
 def _subsample_structure(
         struct: _Structure,
         n: int,
-        algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
+        algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+        rng: np.random.Generator | None = None,
     ) -> _Structure:
         """
         Return new Structure containing a subset of frames selected using
@@ -152,39 +219,60 @@ def _subsample_structure(
             feature_vectors_type=struct.feature_vectors_type,
             n_samples=n,
             algorithm=algorithm,
+            rng=rng,
         )
         
-        selected_cell_vectors = struct.cell_vectors
-        if struct.cell_vectors is not None:
-            if struct.cell_vectors.ndim == 3:
-                selected_cell_vectors = struct.cell_vectors[selected_indices]
-            else:
-                selected_cell_vectors = struct.cell_vectors
-                
-        return _Structure(
-            positions=struct.positions[selected_indices],
-            atomic_numbers=struct.atomic_numbers,
-            masses=struct.masses,
-            cell_vectors=selected_cell_vectors,
-            n_frames=len(selected_indices),
-            n_atoms=struct.n_atoms,
-            E_pot=(
-                struct.E_pot[selected_indices]
-                if struct.E_pot is not None else None
-            ),
-            forces=(
-                struct.forces[selected_indices]
-                if struct.forces is not None
-                else None
-            ),
-            feature_vectors=struct.feature_vectors[selected_indices],
-            feature_vectors_type=struct.feature_vectors_type
+        return _select_frames(struct, selected_indices)
+
+def _split_frames(
+        struct: _Structure,
+        fractions: Sequence[float],
+        rng: np.random.Generator | None = None
+) -> Sequence[_Structure]:
+    """Split the frames of a structure into multiple structures.
+
+    The split is random. For reproducibility, a random number generator
+    can be passed. If not, a new generator is created, seeded from OS entropy.
+
+    Args:
+        struct: The structure to split.
+        fractions: A sequence of floats that sum to 1.0, representing the
+            fraction of frames for each new structure.
+        rng: An optional numpy random number generator.
+
+    Returns:
+        A sequence of new _Structure objects.
+    """
+    if any(f < 0 for f in fractions) or not np.isclose(sum(fractions), 1.0):
+        raise ValueError("Fractions must be non-negative and sum to 1.0")
+
+    if rng is None:
+        rng = np.random.default_rng()
+
+    n_total = struct.n_frames
+    indices = np.arange(n_total)
+    rng.shuffle(indices)
+
+    lengths = [int(f * n_total) for f in fractions]
+    lengths[-1] = n_total - sum(lengths[:-1])
+
+    if 0 in lengths:
+        raise ValueError(
+            f"Splitting {n_total} frames with fractions {fractions} would result "
+            f"in at least one empty split, which is not allowed."
         )
+
+    split_points = np.cumsum(lengths[:-1])
+    indices_split = np.split(indices, split_points)
+    return [
+        _select_frames(struct, idx_group) for idx_group in indices_split
+    ]
 
 def _subsample_trajectory(
         traj: _Trajectory,
         n: int,
-        algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
+        algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+        rng: np.random.Generator | None = None,
 ) -> _Trajectory:
         """
         Return new Trajectory containing a subset of frames
@@ -208,6 +296,7 @@ def _subsample_trajectory(
             feature_vectors_type=traj.feature_vectors_type,
             n_samples=n,
             algorithm=algorithm,
+            rng=rng,
         )
         
         selected_cell_vectors = traj.cell_vectors

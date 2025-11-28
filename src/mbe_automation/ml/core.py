@@ -4,6 +4,10 @@ import numpy as np
 import numpy.typing as npt
 import scipy
 import sklearn
+import sklearn.cluster
+import sklearn.metrics
+import sklearn.preprocessing
+import sklearn.decomposition
 
 SUBSAMPLING_ALGOS = [
     "farthest_point_sampling",
@@ -44,7 +48,8 @@ def _average_over_atoms(
 
 def _farthest_point_sampling(
     feature_vectors: npt.NDArray[np.floating],
-    n_samples: int
+    n_samples: int,
+    rng: np.random.Generator
 ) -> npt.NDArray[np.integer]:
     """Select points using farthest point sampling."""
     
@@ -52,7 +57,7 @@ def _farthest_point_sampling(
     selected_indices = np.zeros(n_samples, dtype=int)
     min_distances = np.full(n_frames, np.inf)
 
-    first_index = np.random.randint(n_frames)
+    first_index = rng.integers(n_frames)
     selected_indices[0] = first_index
 
     for i in range(1, n_samples):
@@ -67,14 +72,18 @@ def _farthest_point_sampling(
 
 def _kmeans_sampling(
     feature_vectors: npt.NDArray[np.floating],
-    n_samples: int
+    n_samples: int,
+    rng: np.random.Generator
 ) -> npt.NDArray[np.integer]:
     """Select points using K-means medoid sampling."""
+
+    # Generate a seed for sklearn from the rng
+    seed = rng.integers(0, 2**32 - 1)
 
     kmeans = sklearn.cluster.KMeans(
         n_clusters=n_samples,
         n_init="auto",
-        random_state=42
+        random_state=seed
     ).fit(feature_vectors)    
     centroids = kmeans.cluster_centers_
     closest_indices, _ = sklearn.metrics.pairwise_distances_argmin_min(
@@ -89,7 +98,8 @@ def subsample(
         feature_vectors: npt.NDArray[np.floating],
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES],
         n_samples: int,
-        algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling"
+        algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+        rng: np.random.Generator | None = None
 ) -> npt.NDArray[np.integer]:
     """
     Subsample feature vectors using farthest point sampling or
@@ -97,6 +107,14 @@ def subsample(
     """
     assert feature_vectors_type != "none"
     
+    if rng is None:
+        #
+        # Random number sequence initialized without seed means
+        # that the entropy is taken from the operating system
+        # an very function call will result in a different sequence.
+        #
+        rng = np.random.default_rng()
+
     n_frames = feature_vectors.shape[0]
     
     if feature_vectors_type == "atomic_environments":
@@ -119,12 +137,14 @@ def subsample(
     if algorithm == "farthest_point_sampling":
         selected_frames = _farthest_point_sampling(
             feature_vectors=scaled_features,
-            n_samples=n_samples
+            n_samples=n_samples,
+            rng=rng
         )
     elif algorithm == "kmeans":
        selected_frames = _kmeans_sampling(
             feature_vectors=scaled_features,
-            n_samples=n_samples
+            n_samples=n_samples,
+            rng=rng
         )
 
     return selected_frames

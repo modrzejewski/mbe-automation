@@ -114,11 +114,13 @@ class PhononSampling:
     time_step_fs: float = 100.0
                                    #
                                    # Random number generator for randomized
-                                   # amplitude sampling
+                                   # amplitude sampling. rng=None means that the random
+                                   # number sequence will be seeded from operating
+                                   # system's entropy in every function call.
                                    #
                                    # (referenced only if amplitude_scan=="random")
                                    #
-    rng: np.random.Generator = field(default_factory=lambda: np.random.default_rng(seed=42))
+    rng: np.random.Generator | None = None
                                    #
                                    # Number of periodic system frames
                                    # to generate by phonon sampling
