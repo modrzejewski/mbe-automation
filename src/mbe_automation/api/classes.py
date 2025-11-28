@@ -62,7 +62,7 @@ class Structure(_Structure):
             _select_frames(self, indices)
         ))
 
-    def split(
+    def random_split(
             self,
             fractions: Sequence[float],
             rng: np.random.Generator = lambda: np.random.default_rng(seed=42)
