@@ -34,6 +34,8 @@ def to_xyz_training_set(
             structure=structure,
             frame_index=i
         )
+        if "masses" in ase_atoms.arrays:
+            del ase_atoms.arrays["masses"] # masses are not used as inputs for training
         ase_atoms.info["config_type"] = default_config_type
         if "energies" in quantities:
             ase_atoms.info[energy_key] = structure.E_pot[i]
