@@ -72,7 +72,7 @@ class Progress:
                     self.jobs_done = current_percent_block
                     block_end_time = time.time()
                     elapsed = block_end_time - self.block_start_time
-                    print(f"{self.jobs_done:3d}% {self.label} completed (Δτ={elapsed:.1E} s)")
+                    print(f"{self.jobs_done:3d}% {self.label} completed (Δτ={elapsed:.1E} s)", flush=True)
                     self.block_start_time = block_end_time
 
             return item
@@ -84,10 +84,10 @@ class Progress:
             #
             if self.jobs_done < 100 and self.processed_count == self.n_total_steps:
                 block_elapsed = total_end_time - self.block_start_time
-                print(f"100% {self.label} completed (Δτ={block_elapsed:.1E} s)")
+                print(f"100% {self.label} completed (Δτ={block_elapsed:.1E} s)", flush=True)
 
             total_elapsed = total_end_time - self.total_start_time
-            print(f"Complete task performed in τ={total_elapsed:.1E} s")
+            print(f"Complete task performed in τ={total_elapsed:.1E} s", flush=True)
             raise StopIteration
 
 
