@@ -42,18 +42,20 @@ The program integrates several scientific codes into a unified workflow, includi
 *   **ASE:** For geometry relaxation and molecular dynamics simulations.
 *   **MRCC** and **beyond-rpa**: High-fidelity data points from correlated wave-function theory.
 
-## Installation
+## Table of Contents
 
-For instructions on how to install the program, please see the [Installation Guide](./00_installation.md).
+### Installation
 
-## Workflows
+*   [Installation Guide](./00_installation.md)
 
-The program is organized into three main workflows:
+### Basics
 
-1.  [Quasi-Harmonic Calculation](./01_quasi_harmonic.md)
-2.  [Molecular Dynamics](./02_molecular_dynamics.md)
-3.  [Training Set Creation](./03_training_set.md)
-4.  [Cookbook: Semi-empirical MD + MACE Features](./04_cookbook_dftb_mace.md)
-5.  [Cookbook: Extracting frequencies and eigenvectors of the dynamical matrix](./05_frequencies_eigenvectors.md)
+*   [Quasi-Harmonic Calculation](./01_quasi_harmonic.md)
+*   [Molecular Dynamics](./02_molecular_dynamics.md)
+*   [Training Set Creation](./03_training_set.md)
+*   [Computational Bottlenecks](./06_bottlenecks.md)
 
-For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
+### Cookbooks
+
+*   [Semi-empirical MD + MACE Features](./04_cookbook_dftb_mace.md)
+*   [Extracting frequencies and eigenvectors of the dynamical matrix](./05_frequencies_eigenvectors.md)
