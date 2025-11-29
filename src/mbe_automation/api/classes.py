@@ -392,6 +392,8 @@ def _run_model(
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
         exec_params: ParallelCPU | None = None,
 ):
+    assert feature_vectors_type in FEATURE_VECTOR_TYPES
+    
     if exec_params is None:
         exec_params = ParallelCPU.recommended()
 
