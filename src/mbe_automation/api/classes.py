@@ -7,6 +7,7 @@ from mace.calculators import MACECalculator
 from ase.calculators.calculator import Calculator as ASECalculator
 
 import mbe_automation.storage
+from mbe_automation.configs.execution import ParallelCPU
 from mbe_automation.storage import ForceConstants as _ForceConstants
 from mbe_automation.storage import Structure as _Structure
 from mbe_automation.storage import Trajectory as _Trajectory
@@ -99,16 +100,17 @@ class Structure(_Structure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+            exec_params: ParallelCPU | None = None,
     ):
-        mbe_automation.calculators.run_model(
+        _run_model(
             structure=self,
             calculator=calculator,
             energies=energies,
             forces=forces,
-            feature_vectors=(feature_vectors_type!="none"),
-            average_over_atoms=(feature_vectors_type=="averaged_environments"),
+            feature_vectors_type=feature_vectors_type,
+            exec_params=exec_params,
         )
-
+        
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory):
     @classmethod
@@ -130,6 +132,23 @@ class Trajectory(_Trajectory):
         return Trajectory(**vars(
             _subsample_trajectory(self, n, algorithm, rng)
         ))
+
+    def run_model(
+            self,
+            calculator: ASECalculator | MACECalculator,
+            energies: bool = True,
+            forces: bool = True,
+            feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+            exec_params: ParallelCPU | None = None,
+    ):
+        _run_model(
+            structure=self,
+            calculator=calculator,
+            energies=energies,
+            forces=forces,
+            feature_vectors_type=feature_vectors_type,
+            exec_params=exec_params,
+        )
 
 @dataclass(kw_only=True)
 class MolecularCrystal(_MolecularCrystal):
@@ -364,3 +383,25 @@ def _subsample_trajectory(
                 if traj.E_rot_drift is not None else None
             ),
         )
+
+def _run_model(
+        structure: _Structure,
+        calculator: ASECalculator | MACECalculator,
+        energies: bool = True,
+        forces: bool = True,
+        feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+        exec_params: ParallelCPU | None = None,
+):
+    if exec_params is None:
+        exec_params = ParallelCPU.recommended()
+
+    exec_params.set()
+
+    mbe_automation.calculators.run_model(
+        structure=structure,
+        calculator=calculator,
+        energies=energies,
+        forces=forces,
+        feature_vectors=(feature_vectors_type!="none"),
+        average_over_atoms=(feature_vectors_type=="averaged_environments"),
+    )
