@@ -4,7 +4,7 @@ from mace.calculators import MACECalculator
 from ase.calculators.calculator import Calculator as ASECalculator
 
 from mbe_automation.storage import Structure, to_ase
-import mbe_automation.display
+import mbe_automation.common.display
 
 def run_model(
         structure: Structure,
@@ -34,7 +34,7 @@ def run_model(
         else:
             structure.feature_vectors_type = "atomic"
 
-    mbe_automation.display.framed([
+    mbe_automation.common.display.framed([
         "Properties for pre-computed structures"
     ])
     print(f"n_frames            {structure.n_frames}")
@@ -44,7 +44,7 @@ def run_model(
 
     print(f"Loop over frames...")
     
-    for i in mbe_automation.display.Progress(
+    for i in mbe_automation.common.display.Progress(
             iterable=range(structure.n_frames),
             n_total_steps=structure.n_frames,
             label="frames",
