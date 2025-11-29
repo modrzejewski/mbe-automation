@@ -69,12 +69,12 @@ The following script reads the force constants for the relaxed crystal structure
 
 ```python
 import numpy as np
-import mbe_automation
+from mbe_automation ForceConstants
 
 dataset_path = "properties.hdf5"
 key = "quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"
 
-fc = mbe_automation.ForceConstants.read(dataset=dataset_path, key=key)
+fc = ForceConstants.read(dataset=dataset_path, key=key)
 freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_point=np.array([0.0, 0.0, 0.0]))
 
 print("Frequencies (THz):")
