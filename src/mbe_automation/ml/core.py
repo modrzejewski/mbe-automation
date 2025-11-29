@@ -18,7 +18,7 @@ SUBSAMPLING_ALGOS = [
 # of the Trajectory and Structure objects:
 #
 # (1) none: no feature vectors are computed and saved
-# (2) atomic_environments: feature vectors for every atom
+# (2) atomic: feature vectors for every atom
 # (3) averaged_environments: feature vectors
 #     averaged over all atoms
 #
@@ -31,7 +31,7 @@ SUBSAMPLING_ALGOS = [
 FEATURE_VECTOR_TYPES = [
     "none",
     "averaged_environments",
-    "atomic_environments"
+    "atomic"
 ]
 
 def _average_over_atoms(
@@ -105,6 +105,7 @@ def subsample(
     Subsample feature vectors using farthest point sampling or
     K-means clustering (kmeans).
     """
+    assert feature_vectors_type in FEATURE_VECTOR_TYPES
     assert feature_vectors_type != "none"
     
     if rng is None:
@@ -117,7 +118,7 @@ def subsample(
 
     n_frames = feature_vectors.shape[0]
     
-    if feature_vectors_type == "atomic_environments":
+    if feature_vectors_type == "atomic":
         n_atoms = feature_vectors.shape[1]
         n_features = feature_vectors.shape[2]
         features_averaged = _average_over_atoms(feature_vectors)
@@ -162,12 +163,12 @@ def pca(
     - The principal vectors stored in columns.
     - The explained variance ratio for each component.
     """
-
+    assert feature_vectors_type in FEATURE_VECTOR_TYPES
     assert feature_vectors_type != "none"
     
     n_frames = feature_vectors.shape[0]
 
-    if feature_vectors_type == "atomic_environments":
+    if feature_vectors_type == "atomic":
         n_atoms = feature_vectors.shape[1]
         n_features = feature_vectors.shape[2]
         features_averaged = _average_over_atoms(feature_vectors)
