@@ -4,7 +4,7 @@ This cookbook demonstrates how to extract force constants, phonon frequencies, a
 
 ## Prerequisites
 
-To perform this analysis, you first need to generate a properties dataset using the quasi-harmonic workflow. Below is a minimal example script (`quasi_harmonic.py`) that generates the required `properties.hdf5` file using the harmonic approximation (no thermal expansion) and a fixed supercell radius of 24 Å.
+To perform this analysis, you first need to generate a properties dataset using the quasi-harmonic workflow. Below is a minimal example script (`quasi_harmonic.py`) that generates the required `properties.hdf5` file using the harmonic approximation (no thermal expansion) and a supercell radius of 24 Å.
 
 ```python
 import numpy as np
@@ -92,7 +92,7 @@ print(f"\nEigenvectors are orthonormal: {is_orthonormal}")
 
 *   **`freqs_THz`**: A 1D NumPy array containing the phonon frequencies (THz).
     *   The size is $3N$, where $N$ is the number of atoms in the primitive cell.
-    *   The first 3 modes are acoustic modes with frequencies near zero at the Gamma point.
+    *   The first 3 modes are acoustic modes with frequencies near zero at the Gamma point. It is normal that the acoustic mode frequencies are slightly negative at the Gamma point due to numerical inaccuracies.
 
 *   **`eigenvecs`**: A 2D NumPy array containing the eigenvectors of the dynamical matrix.
     *   Shape: `(3N, 3N)`.
