@@ -17,6 +17,7 @@ def run_model(
     """
     Run a calculator of energies/forces/feature vectors for all frames
     of a given Structure. Store the computed quantities in-place.
+    The coordinates are not modified.
     """
     
     compute_feature_vectors = (feature_vectors and isinstance(calculator, MACECalculator))
@@ -33,10 +34,10 @@ def run_model(
         else:
             structure.feature_vectors_type = "atomic"
 
-    mbe_automaion.display.framed([
+    mbe_automation.display.framed([
         "Properties for pre-computed structures"
     ])
-    print(f"n_frames            {structure.nframes}")
+    print(f"n_frames            {structure.n_frames}")
     print(f"energies            {energies}")
     print(f"forces              {forces}")
     print(f"feature vectors     {feature_vectors}")

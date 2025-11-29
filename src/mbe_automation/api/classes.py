@@ -398,7 +398,7 @@ def _run_model(
     exec_params.set()
 
     mbe_automation.calculators.run_model(
-        structure=self,
+        structure=structure,
         calculator=calculator,
         energies=energies,
         forces=forces,
