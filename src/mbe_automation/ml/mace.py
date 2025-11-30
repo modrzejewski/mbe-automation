@@ -38,9 +38,9 @@ def to_xyz_training_set(
             del ase_atoms.arrays["masses"] # masses are not used as inputs for training
         ase_atoms.info["config_type"] = default_config_type
         if "energies" in quantities:
-            ase_atoms.info[energy_key] = structure.E_pot[i]
+            ase_atoms.info[energy_key] = structure.E_pot[i] * structure.n_atoms # eV/unit cell or eV/total finite system
         if "forces" in quantities:
-            ase_atoms.arrays[forces_key] = structure.forces[i]
+            ase_atoms.arrays[forces_key] = structure.forces[i] # eV/Angs
         ase_atoms_list.append(ase_atoms)
 
     ase.io.write(
