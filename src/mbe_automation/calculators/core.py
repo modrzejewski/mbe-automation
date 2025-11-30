@@ -58,7 +58,7 @@ def run_model(
         if forces:
             structure.forces[i] = atoms.get_forces()
         if energies:
-            structure.E_pot[i] = atoms.get_potential_energy() / structure.n_atoms
+            structure.E_pot[i] = atoms.get_potential_energy() / structure.n_atoms # eV/atom
         if compute_feature_vectors:
             assert isinstance(calculator, MACECalculator)
             features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
