@@ -311,6 +311,6 @@ Use this SLURM script to run `step_3.py` on a multi-core CPU. 
 module load oneAPI python/3.11.9-gcc-11.5.0-5l7rvgy
 source ~/.virtualenvs/compute-env/bin/activate
 
-python step_3.py >& step3.log
-python step_4.py >& step4.log
+python step_3.py > step3.log 2>&1
+python step_4.py > step4.log 2>&1
 ```
