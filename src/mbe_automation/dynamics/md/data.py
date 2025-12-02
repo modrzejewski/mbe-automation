@@ -332,38 +332,46 @@ def sublimation(df_crystal, df_molecule):
        Chem. Sci., 16, 11419 (2025); doi: 10.1039/d5sc01325a
     
     """
-    n_atoms_molecule = df_molecule["n_atoms_molecule"]
-    n_atoms_unit_cell = df_crystal["n_atoms_unit_cell"]
+    #
+    # Merge the crystal and molecule dataframes on "T (K)".
+    # This aligns the rows and broadcasts the temperature-dependent
+    # molecule data to all pressure points of the crystal data.
+    #
+    assert df_molecule["T (K)"].is_unique
+    df_merged = pd.merge(df_crystal, df_molecule, on="T (K)", how="left")
+
+    n_atoms_molecule = df_merged["n_atoms_molecule"]
+    n_atoms_unit_cell = df_merged["n_atoms_unit_cell"]
     beta = n_atoms_molecule / n_atoms_unit_cell
     
-    V_Ang3 = df_crystal["⟨V⟩_crystal (Å³∕unit cell)"]
+    V_Ang3 = df_merged["⟨V⟩_crystal (Å³∕unit cell)"]
     V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm³/mol/molecule
 
     ΔE_pot = (
-        df_molecule["⟨E_pot⟩_molecule (kJ∕mol∕molecule)"]
-        - df_crystal["⟨E_pot⟩_crystal (kJ∕mol∕unit cell)"] * beta
+        df_merged["⟨E_pot⟩_molecule (kJ∕mol∕molecule)"]
+        - df_merged["⟨E_pot⟩_crystal (kJ∕mol∕unit cell)"] * beta
         ) # kJ/mol/molecule
     ΔE_kin = (
-        df_molecule["⟨E_kin⟩_molecule (kJ∕mol∕molecule)"] # excludes translation and rotation of the entire molecule
-        - df_crystal["⟨E_kin⟩_crystal (kJ∕mol∕unit cell)"] * beta
+        df_merged["⟨E_kin⟩_molecule (kJ∕mol∕molecule)"] # excludes translation and rotation of the entire molecule
+        - df_merged["⟨E_kin⟩_crystal (kJ∕mol∕unit cell)"] * beta
         ) # kJ/mol/molecule, with COM translation removed
-    pV = df_crystal["p⟨V⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
-    E_pot_crystal = df_crystal["⟨E_pot⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
-    E_kin_crystal = df_crystal["⟨E_kin⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
+    pV = df_merged["p⟨V⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
+    E_pot_crystal = df_merged["⟨E_pot⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
+    E_kin_crystal = df_merged["⟨E_kin⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
     #
     # Enthalpy defined in eq 10 of ref 1
     #
     ΔH_sub = (
         ΔE_pot
         + ΔE_kin 
-        + df_molecule["E_trans_molecule (kJ∕mol∕molecule)"] # COM translation
-        + df_molecule["E_rot_molecule (kJ∕mol∕molecule)"] # rotation of the entire molecule
-        + df_molecule["kT (kJ∕mol)"] # the pV term per molecule in the ideal gas approximation
+        + df_merged["E_trans_molecule (kJ∕mol∕molecule)"] # COM translation
+        + df_merged["E_rot_molecule (kJ∕mol∕molecule)"] # rotation of the entire molecule
+        + df_merged["kT (kJ∕mol)"] # the pV term per molecule in the ideal gas approximation
         - pV
     ) # kJ/mol/molecule
         
     return pd.DataFrame({
-        "T (K)": df_crystal["T (K)"],
+        "T (K)": df_merged["T (K)"],
         "ΔH_sub (kJ∕mol∕molecule)": ΔH_sub,
         "Δ⟨E_pot⟩ (kJ∕mol∕molecule)": ΔE_pot,
         "Δ⟨E_kin⟩ (kJ∕mol∕molecule)": ΔE_kin,
