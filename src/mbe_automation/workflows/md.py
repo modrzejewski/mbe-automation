@@ -136,20 +136,10 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         df_crystal = _md_crystal(supercell_matrix, config)
 
     if config.molecule is not None and config.crystal is not None:
-        df_sublimation = mbe_automation.dynamics.md.data.sublimation(
+        df_npt_nvt = mbe_automation.dynamics.md.data.sublimation(
             df_crystal=df_crystal,
             df_molecule=df_molecule
         )
-        #
-        # First create a pandas dataframe  with molecule in vacuum data
-        # replicated to different pressure points from the crystal
-        # dataframe
-        #
-        df_crys_mol_aligned = pd.merge(df_crystal, df_molecule, on="T (K)", how="left")
-        df_npt_nvt = pd.concat([
-            df_sublimation,            
-            df_crys_mol_aligned.drop(columns="T (K)"),
-        ], axis=1)
 
     elif config.crystal is not None:
         df_npt_nvt = df_crystal
