@@ -358,7 +358,7 @@ def sublimation(
         df_aligned["⟨E_kin⟩_molecule (kJ∕mol∕molecule)"] # excludes translation and rotation of the entire molecule
         - df_aligned["⟨E_kin⟩_crystal (kJ∕mol∕unit cell)"] * beta
         ) # kJ/mol/molecule, with COM translation removed
-    pV = df_aligned["p⟨V⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
+    pV_crystal = df_aligned["p⟨V⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
     E_pot_crystal = df_aligned["⟨E_pot⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
     E_kin_crystal = df_aligned["⟨E_kin⟩_crystal (kJ∕mol∕unit cell)"] * beta # kJ/mol/molecule
     #
@@ -370,7 +370,7 @@ def sublimation(
         + df_aligned["E_trans_molecule (kJ∕mol∕molecule)"] # COM translation
         + df_aligned["E_rot_molecule (kJ∕mol∕molecule)"] # rotation of the entire molecule
         + df_aligned["kT (kJ∕mol)"] # the pV term per molecule in the ideal gas approximation
-        - pV
+        - pV_crystal
     ) # kJ/mol/molecule
         
     df_sublimation = pd.DataFrame({
@@ -380,7 +380,7 @@ def sublimation(
         "Δ⟨E_kin⟩ (kJ∕mol∕molecule)": ΔE_kin,
         "⟨E_pot⟩_crystal (kJ∕mol∕molecule)": E_pot_crystal,
         "⟨E_kin⟩_crystal (kJ∕mol∕molecule)": E_kin_crystal,
-        "p⟨V⟩_crystal (kJ∕mol∕molecule)": pV,
+        "p⟨V⟩_crystal (kJ∕mol∕molecule)": pV_crystal,
         "⟨V⟩_crystal (cm³∕mol∕molecule)": V_molar
     })
 
