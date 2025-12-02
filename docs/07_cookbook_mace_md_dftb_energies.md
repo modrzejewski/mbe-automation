@@ -226,7 +226,6 @@ Train the MACE model using the files generated in the previous step. This is don
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
-# Key names updated to 'REF_energy' and 'REF_forces'
 python -m mace.cli.run_train \
     --name="urea_dftb3_d4" \
     --train_file="train.xyz" \
