@@ -43,8 +43,8 @@ md_config = mbe_automation.configs.md.Enthalpy(
     molecule=from_xyz_file(os.path.join(work_dir, xyz_molecule)),
     crystal=from_xyz_file(os.path.join(work_dir, xyz_solid)),
     calculator=mace_calc,
-    temperature_K=298.15,
-    pressure_GPa=1.0E-4,
+    temperatures_K=np.array([298.15]),
+    pressures_GPa=np.array([1.0E-4, 1.0]),
     work_dir=os.path.join(work_dir, "properties"),
     dataset=os.path.join(work_dir, "properties.hdf5"),
 
@@ -84,8 +84,8 @@ mbe_automation.run(md_config)
 | `calculator` | MLIP calculator for energies and forces. | - |
 | `md_molecule` | An instance of `ClassicalMD` that configures the MD simulation for the isolated molecule. | - |
 | `md_crystal` | An instance of `ClassicalMD` that configures the MD simulation for the crystal. | - |
-| `temperature_K` | Target temperature (in Kelvin) for the MD simulation. | `298.15` |
-| `pressure_GPa` | Target pressure (in GPa) for the MD simulation. | `1.0E-4` |
+| `temperatures_K` | Target temperatures (in Kelvin) for the MD simulation. Can be a single float or an array of floats. Default is converted to an array. | `298.15` |
+| `pressures_GPa` | Target pressures (in GPa) for the MD simulation. Can be a single float or an array of floats. Default is converted to an array. | `1.0E-4` |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
 | `dataset` | The main HDF5 file with all data computed for the physical system. | `"./properties.hdf5"` |
 | `root_key` | Specifies the root path in the HDF5 dataset where the workflow's output is stored. | `"md"` |
@@ -198,8 +198,8 @@ md_config = mbe_automation.configs.md.Enthalpy(
     molecule=from_xyz_file(os.path.join(work_dir, xyz_molecule)),
     crystal=from_xyz_file(os.path.join(work_dir, xyz_solid)),
     calculator=mace_calc,
-    temperature_K=298.15,
-    pressure_GPa=1.0E-4,
+    temperatures_K=np.array([298.15]),
+    pressures_GPa=np.array([1.0E-4, 1.0]),
     work_dir=os.path.join(work_dir, "properties"),
     dataset=os.path.join(work_dir, "properties.hdf5"),
 
