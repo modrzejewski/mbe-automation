@@ -171,6 +171,16 @@ class MolecularCrystal(_MolecularCrystal):
 
 @dataclass(kw_only=True)
 class FiniteSubsystem(_FiniteSubsystem):
+    @classmethod
+    def read(
+            cls,
+            dataset: str,
+            key: str,
+    ) -> FiniteSubsystem:
+        return cls(**vars(
+            mbe_automation.storage.read_finite_subsystem(dataset, key)
+        ))
+
     def subsample(
             self,
             n: int,
@@ -182,6 +192,55 @@ class FiniteSubsystem(_FiniteSubsystem):
             molecule_indices=self.molecule_indices,
             n_molecules=self.n_molecules
         )
+
+    def run_model(
+            self,
+            calculator: ASECalculator | MACECalculator,
+            energies: bool = True,
+            forces: bool = True,
+            feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+            exec_params: ParallelCPU | None = None,
+    ):
+        _run_model(
+            structure=self.cluster_of_molecules,
+            calculator=calculator,
+            energies=energies,
+            forces=forces,
+            feature_vectors_type=feature_vectors_type,
+            exec_params=exec_params,
+        )
+
+    def random_split(
+            self,
+            fractions: Sequence[float],
+            rng: np.random.Generator | None = None,
+    ) -> Sequence[FiniteSubsystem]:
+
+        return [
+            FiniteSubsystem(
+                cluster_of_molecules=s,
+                molecule_indices=self.molecule_indices,
+                n_molecules=self.n_molecules
+            )
+            for s in _split_frames(self.cluster_of_molecules, fractions, rng)
+        ]
+
+    def to_training_set(
+            self,
+            save_path: str,
+            quantities: List[Literal["energies", "forces"]],
+            append: bool = False,
+            data_format: Literal["mace_xyz"] = "mace_xyz",
+    ) -> None:
+        if data_format == "mace_xyz":
+            mbe_automation.ml.mace.to_xyz_training_set(
+                structure=self.cluster_of_molecules,
+                save_path=save_path,
+                append=append,
+                quantities=quantities,
+            )
+        else:
+            raise ValueError("Unsupported data format of the training set")
 
 def _select_frames(
         struct: _Structure,
