@@ -19,6 +19,30 @@ except ImportError:
     MACECalculator = None
     mace_available = False
 
+def _save_md_plots(
+        config: mbe_automation.configs.md.Enthalpy,
+        label: str
+) -> None:
+
+    key = f"{config.root_key}/{label}/trajectory"
+    save_dir = os.path.join(config.work_dir, label)
+    
+    mbe_automation.dynamics.md.display.trajectory(
+        dataset=config.dataset,
+        key=key,
+        save_path=os.path.join(save_dir, "trajectory.png"),
+    )
+    mbe_automation.dynamics.md.display.reblocking(
+        dataset=config.dataset,
+        key=key,
+        save_path=os.path.join(save_dir, "reblocking.png"),
+    )
+    mbe_automation.dynamics.md.display.velocity_autocorrelation(
+        dataset=config.dataset,
+        key=key,
+        save_path=os.path.join(save_dir, "velocity_autocorrelation.png"),
+    )
+
 def _md_molecule(
         config: mbe_automation.configs.md.Enthalpy,
 ) -> pd.DataFrame:
@@ -42,34 +66,8 @@ def _md_molecule(
             system_label=label_molecule
         ))
         if config.save_plots:
-            mbe_automation.dynamics.md.display.trajectory(
-                dataset=config.dataset,
-                key=f"{config.root_key}/{label_molecule}/trajectory",
-                save_path=os.path.join(
-                    config.work_dir,
-                    label_molecule,
-                    "trajectory.png",
-                )
-            )
-            mbe_automation.dynamics.md.display.reblocking(
-                dataset=config.dataset,
-                key=f"{config.root_key}/{label_molecule}/trajectory",
-                save_path=os.path.join(
-                    config.work_dir,
-                    label_molecule,
-                    "reblocking.png",
-                )
-            )
-            mbe_automation.dynamics.md.display.velocity_autocorrelation(
-                dataset=config.dataset,
-                key=f"{config.root_key}/{label_molecule}/trajectory",
-                save_path=os.path.join(
-                    config.work_dir,
-                    label_molecule,
-                    "velocity_autocorrelation.png",
-                )
-            )
-        
+            _save_md_plots(config, label_molecule)
+            
     return pd.concat(rows, axis=0, ignore_index=True)
 
 
@@ -98,34 +96,8 @@ def _md_crystal(
             system_label=label_crystal
         ))
         if config.save_plots:
-            mbe_automation.dynamics.md.display.trajectory(
-                dataset=config.dataset,
-                key=f"{config.root_key}/{label_crystal}/trajectory",
-                save_path=os.path.join(
-                    config.work_dir,
-                    label_crystal,
-                    "trajectory.png",
-                )
-            )
-            mbe_automation.dynamics.md.display.reblocking(
-                dataset=config.dataset,
-                key=f"{config.root_key}/{label_crystal}/trajectory",
-                save_path=os.path.join(
-                    config.work_dir,
-                    label_crystal,
-                    "reblocking.png",
-                )
-            )
-            mbe_automation.dynamics.md.display.velocity_autocorrelation(
-                dataset=config.dataset,
-                key=f"{config.root_key}/{label_crystal}/trajectory",
-                save_path=os.path.join(
-                    config.work_dir,
-                    label_crystal,
-                    "velocity_autocorrelation.png"
-                )
-            )
-
+            _save_md_plots(config, label_crystal)
+            
     return pd.concat(rows, axis=0, ignore_index=True)
     
 
