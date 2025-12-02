@@ -169,8 +169,6 @@ def _crystal_at_pT(
 def _finite_system_at_pT(
         pbc_md_frames: mbe_automation.storage.Structure,
         system_label: str,
-        p: float,
-        T: float,
         config: mbe_automation.configs.training.MDSampling
 ) -> None:
 
@@ -250,19 +248,17 @@ def md_sampling(
     for p, T in itertools.product(config.pressures_GPa, config.temperatures_K):
         system_label = f"crystal[dyn:T={T:.2f},p={p:.5f}]"
         pbc_md_frames = _crystal_at_pT(
-            system_label,
-            p,
-            T,
-            supercell_matrix,
-            config,
+            system_label=system_label,
+            p=p,
+            T=T,
+            supercell_matrix=supercell_matrix,
+            config=config,
         )        
         if config.finite_subsystem_filter is not None:
             _finite_system_at_pT(
-                pbc_md_frames,
-                system_label,
-                p,
-                T,
-                config,
+                pbc_md_frames=pbc_md_frames,
+                system_label=system_label,
+                config=config,
             )
         
     print("MD sampling completed")
