@@ -1,4 +1,4 @@
-# Cookbook: Training Set Generation from MD
+# Cookbook: Training Set from MACE MD + DFTB Energies & Forces
 
 This cookbook outlines a multi-step workflow for generating a machine learning training set. The procedure consists of generating candidate structures via molecular dynamics (MD) with a baseline model, identifying diverse configurations via feature-based subsampling, and labeling them with a reference calculator.
 
