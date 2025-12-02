@@ -44,7 +44,7 @@ md_config = mbe_automation.configs.md.Enthalpy(
     crystal=from_xyz_file(os.path.join(work_dir, xyz_solid)),
     calculator=mace_calc,
     temperatures_K=np.array([298.15]),
-    pressures_GPa=np.array([1.0E-4]),
+    pressures_GPa=np.array([1.0E-4, 1.0]),
     work_dir=os.path.join(work_dir, "properties"),
     dataset=os.path.join(work_dir, "properties.hdf5"),
 
@@ -199,7 +199,7 @@ md_config = mbe_automation.configs.md.Enthalpy(
     crystal=from_xyz_file(os.path.join(work_dir, xyz_solid)),
     calculator=mace_calc,
     temperatures_K=np.array([298.15]),
-    pressures_GPa=np.array([1.0E-4]),
+    pressures_GPa=np.array([1.0E-4, 1.0]),
     work_dir=os.path.join(work_dir, "properties"),
     dataset=os.path.join(work_dir, "properties.hdf5"),
 
