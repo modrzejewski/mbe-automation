@@ -140,11 +140,16 @@ def run(config: mbe_automation.configs.md.Enthalpy):
             df_crystal=df_crystal,
             df_molecule=df_molecule
         )
+        #
+        # Create a unified DataFrame by merging crystal and molecule data
+        # on T (K), so the rows align with df_sublimation.
+        #
+        df_raw_aligned = pd.merge(df_crystal, df_molecule, on="T (K)", how="left")
+
         df_npt_nvt = pd.concat([
             df_sublimation,
-            df_crystal.drop(columns="T (K)"),
-            df_molecule.drop(columns="T (K)"),
-        ],axis=1)
+            df_raw_aligned.drop(columns=["T (K)"]),
+        ], axis=1)
 
     elif config.crystal is not None:
         df_npt_nvt = df_crystal
