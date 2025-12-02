@@ -168,10 +168,10 @@ class Enthalpy:
     md_crystal: ClassicalMD | None = None
     md_molecule: ClassicalMD | None = None
                                    #
-                                   # Target temperature (K) and pressure (GPa)
+                                   # Target temperatures (K) and pressures (GPa)
                                    #
-    temperature_K: float = 298.15
-    pressure_GPa: float = 1.0E-4
+    temperatures_K: float | npt.NDArray[np.floating] = 298.15
+    pressures_GPa: float | npt.NDArray[np.floating] = 1.0E-4
                                    #
                                    # Directory where files are stored
                                    # at runtime
@@ -193,6 +193,9 @@ class Enthalpy:
     save_csv: bool = True
 
     def __post_init__(self):
+        self.temperatures_K = np.atleast_1d(self.temperatures_K)
+        self.pressures_GPa = np.atleast_1d(self.pressures_GPa)
+        
         if self.crystal is None and self.molecule is None:
             raise ValueError("Both crystal and molecule undefined.")
         if self.crystal is not None and self.md_crystal is None:
