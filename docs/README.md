@@ -59,3 +59,4 @@ The program integrates several scientific codes into a unified workflow, includi
 
 *   [Semi-empirical MD + MACE Features](./04_cookbook_dftb_mace.md)
 *   [Extracting frequencies and eigenvectors of the dynamical matrix](./05_frequencies_eigenvectors.md)
+*   [Training Set from MACE MD + DFTB Energies](./07_cookbook_mace_md_dftb_energies.md)
