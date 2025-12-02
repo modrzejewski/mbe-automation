@@ -140,11 +140,16 @@ def run(config: mbe_automation.configs.md.Enthalpy):
             df_crystal=df_crystal,
             df_molecule=df_molecule
         )
+        #
+        # First create a pandas dataframe  with molecule in vacuum data
+        # replicated to different pressure points from the crystal
+        # dataframe
+        #
+        df_crys_mol_aligned = pd.merge(df_crystal, df_molecule, on="T (K)", how="left")
         df_npt_nvt = pd.concat([
-            df_sublimation,
-            df_crystal.drop(columns="T (K)"),
-            df_molecule.drop(columns="T (K)"),
-        ],axis=1)
+            df_sublimation,            
+            df_crys_mol_aligned.drop(columns="T (K)"),
+        ], axis=1)
 
     elif config.crystal is not None:
         df_npt_nvt = df_crystal
@@ -162,5 +167,3 @@ def run(config: mbe_automation.configs.md.Enthalpy):
 
     print("MD workflow completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)
-
-    

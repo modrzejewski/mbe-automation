@@ -197,8 +197,8 @@ class MDSampling:
         default_factory = lambda: FiniteSubsystemFilter()
     )
 
-    temperatures_K: float | np.NDArray[np.floating] = 298.15
-    pressures_GPa: float | np.NDArray[np.floating] = 1.0E-4
+    temperatures_K: float | npt.NDArray[np.floating] = 298.15
+    pressures_GPa: float | npt.NDArray[np.floating] = 1.0E-4
                                    #
                                    # Directory where files are stored
                                    # at runtime
