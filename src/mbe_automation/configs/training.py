@@ -197,8 +197,8 @@ class MDSampling:
         default_factory = lambda: FiniteSubsystemFilter()
     )
 
-    temperature_K: float = 298.15
-    pressure_GPa: float = 1.0E-4
+    temperatures_K: float | npt.NDArray[np.floating] = 298.15
+    pressures_GPa: float | npt.NDArray[np.floating] = 1.0E-4
                                    #
                                    # Directory where files are stored
                                    # at runtime
@@ -223,6 +223,9 @@ class MDSampling:
     save_csv: bool = True
 
     def __post_init__(self):
+        self.temperatures_K = np.atleast_1d(self.temperatures_K)
+        self.pressures_GPa = np.atleast_1d(self.pressures_GPa)
+        
         if self.feature_vectors_type != "none" and self.features_calculator is None:
             raise ValueError(
                 "A features_calculator must be provided when "
