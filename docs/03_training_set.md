@@ -138,8 +138,8 @@ mbe_automation.run(phonon_sampling_config)
 | `features_calculator`     | Calculator used to compute feature vectors.                                                         | `None`                             |
 | `feature_vectors_type`    | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Ignored unless `features_calculator` is present. | `"averaged_environments"`          |
 | `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters. Defaults used in `MDSampling` differ from standard `ClassicalMD` defaults: `time_total_fs=100000.0`, `supercell_radius=15.0`. | -                                  |
-| `temperatures_K`          | Target temperatures (in Kelvin) for the MD simulation. Can be a single float or an array of floats. Default is converted to an array. | `298.15` |
-| `pressures_GPa`           | Target pressures (in GPa) for the MD simulation. Can be a single float or an array of floats. Default is converted to an array. | `1.0E-4` |
+| `temperatures_K`          | Target temperatures (in Kelvin) for the MD simulation. Can be a single float or an array of floats. | `298.15` |
+| `pressures_GPa`           | Target pressures (in GPa) for the MD simulation. Can be a single float or an array of floats. | `1.0E-4` |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
 | `work_dir`                | Directory where files are stored at runtime.                                                            | `"./"`                             |
 | `dataset`                 | The main HDF5 file with all data computed for the physical system.                                      | `"./properties.hdf5"`              |
