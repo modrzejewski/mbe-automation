@@ -25,7 +25,7 @@ def _save_md_plots(
 ) -> None:
 
     key = f"{config.root_key}/{label}/trajectory"
-    save_dir = os.path.join(config.work_dir, label)
+    save_dir = os.path.join(config.work_dir, config.root_key, label)
     
     mbe_automation.dynamics.md.display.trajectory(
         dataset=config.dataset,
