@@ -84,8 +84,8 @@ mbe_automation.run(md_config)
 | `calculator` | MLIP calculator for energies and forces. | - |
 | `md_molecule` | An instance of `ClassicalMD` that configures the MD simulation for the isolated molecule. | - |
 | `md_crystal` | An instance of `ClassicalMD` that configures the MD simulation for the crystal. | - |
-| `temperatures_K` | Target temperatures (in Kelvin) for the MD simulation. Can be a single float or an array of floats. Default is converted to an array. | `298.15` |
-| `pressures_GPa` | Target pressures (in GPa) for the MD simulation. Can be a single float or an array of floats. Default is converted to an array. | `1.0E-4` |
+| `temperatures_K` | Target temperatures (in Kelvin) for the MD simulation. Can be a single float or an array of floats. | `298.15` |
+| `pressures_GPa` | Target pressures (in GPa) for the MD simulation. Can be a single float or an array of floats. | `1.0E-4` |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
 | `dataset` | The main HDF5 file with all data computed for the physical system. | `"./properties.hdf5"` |
 | `root_key` | Specifies the root path in the HDF5 dataset where the workflow's output is stored. | `"md"` |
