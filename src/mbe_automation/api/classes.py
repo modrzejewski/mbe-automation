@@ -183,14 +183,12 @@ class MolecularCrystal(_MolecularCrystal):
             self,
             filter: FiniteSubsystemFilter,
     ) -> List[FiniteSubsystem]:
-        
-        return [
-            FiniteSubsystem(**vars(s))
-            for s in mbe_automation.structure.clusters.extract_finite_subsystem(
-                    system=self,
-                    filter=filter
-            )
-        ]
+
+        clusters = mbe_automation.structure.clusters.extract_finite_subsystem(
+            system=self,
+            filter=filter
+        )
+        return [FiniteSubsystem(**vars(s)) for s in clusters]
 
 @dataclass(kw_only=True)
 class FiniteSubsystem(_FiniteSubsystem):
