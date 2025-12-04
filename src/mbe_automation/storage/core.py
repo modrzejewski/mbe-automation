@@ -926,23 +926,34 @@ def read_molecular_crystal(dataset: str, key: str) -> MolecularCrystal:
 def save_finite_subsystem(
         dataset: str,
         key: str,
-        subsystem: FiniteSubsystem
+        subsystem: FiniteSubsystem,
+        only: List[Literal[*DATA_FOR_TRAINING]] | None = None,
 ) -> None:
     """Save a FiniteSubsystem object to a dataset."""
 
-    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(dataset, "a") as f:
-        if key in f:
-            del f[key]  
-        group = f.create_group(key)
-        group.attrs["n_molecules"] = subsystem.n_molecules
-        group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
-        
-    save_structure(
-        structure=subsystem.cluster_of_molecules,
-        dataset=dataset,
-        key=f"{key}/cluster_of_molecules"
-    )
+    if only is not None:
+        Path(dataset).parent.mkdir(parents=True, exist_ok=True)
+        with h5py.File(dataset, "a") as f:
+            if key in f:
+                del f[key]  
+            group = f.create_group(key)
+            group.attrs["n_molecules"] = subsystem.n_molecules
+            group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
+
+    if only is None:
+        save_structure(
+            structure=subsystem.cluster_of_molecules,
+            dataset=dataset,
+            key=f"{key}/cluster_of_molecules"
+        )
+
+    else:
+        _save_only(
+            dataset=dataset,
+            keyf"{key}/cluster_of_molecules",
+            structure=subsystem.cluster_of_molecules,
+            quantities=only,
+        )
         
     return
 
