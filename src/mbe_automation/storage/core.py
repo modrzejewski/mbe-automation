@@ -950,7 +950,7 @@ def save_finite_subsystem(
     else:
         _save_only(
             dataset=dataset,
-            keyf"{key}/cluster_of_molecules",
+            key=f"{key}/cluster_of_molecules",
             structure=subsystem.cluster_of_molecules,
             quantities=only,
         )
