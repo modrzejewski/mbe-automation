@@ -162,6 +162,27 @@ class Trajectory(_Trajectory):
 
 @dataclass(kw_only=True)
 class MolecularCrystal(_MolecularCrystal):
+    def save(
+            self,
+            dataset: str,
+            key: str,
+    ) -> None:
+        mbe_automation.storage.core.save_molecular_crystal(
+            dataset=dataset,
+            key=key,
+            system=self,
+        )
+
+    @classmethod
+    def read(
+            cls,
+            dataset: str,
+            key: str,
+    ):
+        return cls(**vars(
+            mbe_automation.storage.core.read_molecular_crystal(dataset, key)
+        ))
+        
     def subsample(
             self,
             n: int,
