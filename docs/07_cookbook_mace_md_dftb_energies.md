@@ -407,31 +407,30 @@ temperatures_K = np.array([300.0])
 cluster_sizes = [1, 2, 3, 4, 5, 6, 7, 8]
 
 for i, (T, p, n_molecules) in enumerate(itertools.product(temperatures_K, pressures_GPa, cluster_sizes)):
+    print(f"T={T:.2f} K p={p:.5f} GPa n_molecules={n_molecules}")
 
-        print(f"T={T:.2f} K p={p:.5f} GPa n_molecules={n_molecules}")
-        
-        clusters = FiniteSubsystem.read(
-            dataset=dataset,
-            key=f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
-        )
+    clusters = FiniteSubsystem.read(
+        dataset=dataset,
+        key=f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
+    )
 
-        train, validate, test = clusters.random_split([0.90, 0.05, 0.05])
+    train, validate, test = clusters.random_split([0.90, 0.05, 0.05])
 
-        train.to_training_set(
-            save_path="./urea/train_finite_clusters.xyz",
-            quantities=["energies", "forces"],
-            append=(i>0),
-        )
-        validate.to_training_set(
-            save_path="./urea/validate_finite_clusters.xyz",
-            quantities=["energies", "forces"],
-            append=(i>0),
-        )
-        test.to_training_set(
-            save_path="./urea/test_finite_clusters.xyz",
-            quantities=["energies", "forces"],
-            append=(i>0),
-        )
+    train.to_training_set(
+        save_path="./urea/train_finite_clusters.xyz",
+        quantities=["energies", "forces"],
+        append=(i>0),
+    )
+    validate.to_training_set(
+        save_path="./urea/validate_finite_clusters.xyz",
+        quantities=["energies", "forces"],
+        append=(i>0),
+    )
+    test.to_training_set(
+        save_path="./urea/test_finite_clusters.xyz",
+        quantities=["energies", "forces"],
+        append=(i>0),
+    )
 
 print("All calculations completed")
 ```
