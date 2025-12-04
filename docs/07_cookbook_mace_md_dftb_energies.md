@@ -456,7 +456,6 @@ Train the MACE model using all generated data files (both PBC and finite cluster
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
-# Include both PBC and cluster files in the training
 python -m mace.cli.run_train \
     --name="urea_dftb3_d4" \
     --train_file="urea/train_pbc.xyz urea/train_finite_clusters.xyz" \
