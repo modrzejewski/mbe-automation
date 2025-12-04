@@ -1,3 +1,11 @@
+```
++------------------------------------------------------------+
+| This is experimental code with lots of bugs intended for   |
+| internal use only. Will be ready as soon as we publish the |
+| methodology.                                               |
++------------------------------------------------------------+
+```
+
 # `mbe-automation`
 
 Automate the modeling of thermodynamic properties in organic molecular crystals using machine-learning interatomic potentials (MLIPs). 
