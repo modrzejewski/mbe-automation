@@ -47,12 +47,25 @@ class FiniteSubsystemFilter:
 
     def __post_init__(self):
         if self.selection_rule in NUMBER_SELECTION:
-            if not (self.n_molecules is not None and self.distances is None):
-                raise ValueError("n_molecules must be set and distance must be None.")
-            
+            if self.distances is not None:
+                 raise ValueError(
+                     f"Selection rule '{self.selection_rule}' requires 'distances' to be None. "
+                     "But 'distances' was provided."
+                 )
+            if self.n_molecules is None:
+                raise ValueError(
+                    f"Selection rule '{self.selection_rule}' requires 'n_molecules' to be set."
+                )
+
         elif self.selection_rule in DISTANCE_SELECTION:
+            if self.distances is not None:
+                # Automatically unset n_molecules if it has the default value or was not explicitly set to None
+                # Since we can't easily check if it's default vs user-set default, we just clear it
+                # if distances is provided, assuming user intent is distance selection.
+                self.n_molecules = None
+
             if not (self.distances is not None and self.n_molecules is None):
-                raise ValueError("distance must be set and n_molecules must be None.")
+                raise ValueError("distances must be set and n_molecules must be None.")
             
         else:
             raise ValueError(f"Invalid selection_rule: {self.selection_rule}")
@@ -72,3 +85,13 @@ class UniqueClustersFilter:
     alignment_thresh: float = 1.0e-4 # Å
     align_mirror_images: bool = True
     algorithm: Literal["ase", "pymatgen"] = "ase"
+
+    def __post_init__(self):
+        missing_keys = [
+            ctype for ctype in self.cluster_types
+            if ctype not in self.cutoffs
+        ]
+        if missing_keys:
+            raise ValueError(
+                f"The following cluster types are missing from 'cutoffs': {missing_keys}"
+            )

@@ -8,6 +8,7 @@ from ase.calculators.calculator import Calculator as ASECalculator
 
 import mbe_automation.storage
 from mbe_automation.configs.execution import ParallelCPU
+from mbe_automation.configs.clusters import FiniteSubsystemFilter
 from mbe_automation.storage import ForceConstants as _ForceConstants
 from mbe_automation.storage import Structure as _Structure
 from mbe_automation.storage import Trajectory as _Trajectory
@@ -17,7 +18,9 @@ import mbe_automation.dynamics.harmonic.modes
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
 import mbe_automation.calculators
+import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
+from mbe_automation.storage.core import DATA_FOR_TRAINING
 
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
@@ -110,6 +113,14 @@ class Structure(_Structure):
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
         )
+
+    def detect_molecules(
+            self,
+    ) -> MolecularCrystal:
+
+        return MolecularCrystal(**vars(
+            mbe_automation.structure.clusters.detect_molecules(system=self)
+        ))
         
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory):
@@ -152,6 +163,27 @@ class Trajectory(_Trajectory):
 
 @dataclass(kw_only=True)
 class MolecularCrystal(_MolecularCrystal):
+    def save(
+            self,
+            dataset: str,
+            key: str,
+    ) -> None:
+        mbe_automation.storage.core.save_molecular_crystal(
+            dataset=dataset,
+            key=key,
+            system=self,
+        )
+
+    @classmethod
+    def read(
+            cls,
+            dataset: str,
+            key: str,
+    ) -> MolecularCrystal:
+        return cls(**vars(
+            mbe_automation.storage.core.read_molecular_crystal(dataset, key)
+        ))
+        
     def subsample(
             self,
             n: int,
@@ -169,6 +201,20 @@ class MolecularCrystal(_MolecularCrystal):
             max_distances_to_central_molecule=self.max_distances_to_central_molecule
         )
 
+    def extract_finite_subsystem(
+            self,
+            filter: FiniteSubsystemFilter | None = None,
+    ) -> List[FiniteSubsystem]:
+
+        if filter is None:
+            filter = FiniteSubsystemFilter()
+
+        clusters = mbe_automation.structure.clusters.extract_finite_subsystem(
+            system=self,
+            filter=filter
+        )
+        return [FiniteSubsystem(**vars(s)) for s in clusters]
+
 @dataclass(kw_only=True)
 class FiniteSubsystem(_FiniteSubsystem):
     @classmethod
@@ -180,6 +226,20 @@ class FiniteSubsystem(_FiniteSubsystem):
         return cls(**vars(
             mbe_automation.storage.read_finite_subsystem(dataset, key)
         ))
+
+    def save(
+            self,
+            dataset: str,
+            key: str,
+            only: List[Literal[*DATA_FOR_TRAINING]] | None = None,            
+    ) -> None:
+
+        mbe_automation.storage.core.save_finite_subsystem(
+            dataset=dataset,
+            key=key,
+            subsystem=self,
+            only=only
+        )
 
     def subsample(
             self,
