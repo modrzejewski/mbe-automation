@@ -179,7 +179,7 @@ class MolecularCrystal(_MolecularCrystal):
             cls,
             dataset: str,
             key: str,
-    ):
+    ) -> MolecularCrystal:
         return cls(**vars(
             mbe_automation.storage.core.read_molecular_crystal(dataset, key)
         ))
