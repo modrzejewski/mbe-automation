@@ -19,7 +19,8 @@ import mbe_automation.ml.core
 import mbe_automation.ml.mace
 import mbe_automation.calculators
 import mbe_automation.structure.clusters
-from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES, DATA_FOR_TRAINING
+from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
+from mbe_automation.storage.core import DATA_FOR_TRAINING
 
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
