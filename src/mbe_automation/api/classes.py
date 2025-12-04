@@ -181,7 +181,7 @@ class MolecularCrystal(_MolecularCrystal):
 
     def extract_finite_subsystem(
             self,
-            filter: FiniteSubsystemFilter | None,
+            filter: FiniteSubsystemFilter | None = None,
     ) -> List[FiniteSubsystem]:
 
         if filter is None:
