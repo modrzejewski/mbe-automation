@@ -8,6 +8,7 @@ from ase.calculators.calculator import Calculator as ASECalculator
 
 import mbe_automation.storage
 from mbe_automation.configs.execution import ParallelCPU
+from mbe_automation.configs.clusters import FiniteSubsystemFilter
 from mbe_automation.storage import ForceConstants as _ForceConstants
 from mbe_automation.storage import Structure as _Structure
 from mbe_automation.storage import Trajectory as _Trajectory
@@ -17,6 +18,7 @@ import mbe_automation.dynamics.harmonic.modes
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
 import mbe_automation.calculators
+import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 
 @dataclass(kw_only=True)
@@ -110,6 +112,14 @@ class Structure(_Structure):
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
         )
+
+    def detect_molecules(
+            self,
+    ) -> MolecularCrystal:
+
+        return MolecularCrystal(**vars(
+            mbe_automation.structure.clusters.detect_molecules(system=self)
+        ))
         
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory):
@@ -168,6 +178,19 @@ class MolecularCrystal(_MolecularCrystal):
             min_distances_to_central_molecule=self.min_distances_to_central_molecule,
             max_distances_to_central_molecule=self.max_distances_to_central_molecule
         )
+
+    def extract_finite_subsystem(
+            self,
+            filter: FiniteSubsystemFilter,
+    ) -> List[FiniteSubsystem]:
+        
+        return [
+            FiniteSubsystem(**vars(s))
+            for s in mbe_automation.structure.clusters.extract_finite_subsystem(
+                    system=self,
+                    filter=filter
+            )
+        ]
 
 @dataclass(kw_only=True)
 class FiniteSubsystem(_FiniteSubsystem):
