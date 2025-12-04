@@ -181,8 +181,11 @@ class MolecularCrystal(_MolecularCrystal):
 
     def extract_finite_subsystem(
             self,
-            filter: FiniteSubsystemFilter,
+            filter: FiniteSubsystemFilter | None,
     ) -> List[FiniteSubsystem]:
+
+        if filter is None:
+            filter = FiniteSubsystemFilter()
 
         clusters = mbe_automation.structure.clusters.extract_finite_subsystem(
             system=self,
@@ -201,6 +204,18 @@ class FiniteSubsystem(_FiniteSubsystem):
         return cls(**vars(
             mbe_automation.storage.read_finite_subsystem(dataset, key)
         ))
+
+    def save(
+            self,
+            dataset: str,
+            key: str,
+    ) -> None:
+
+        mbe_automation.storage.core.save_finite_subsystem(
+            dataset=dataset,
+            key=key,
+            subsystem=self,
+        )
 
     def subsample(
             self,
