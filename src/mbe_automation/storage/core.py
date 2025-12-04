@@ -931,7 +931,7 @@ def save_finite_subsystem(
 ) -> None:
     """Save a FiniteSubsystem object to a dataset."""
 
-    if only is not None:
+    if only is None:
         Path(dataset).parent.mkdir(parents=True, exist_ok=True)
         with h5py.File(dataset, "a") as f:
             if key in f:
@@ -939,8 +939,7 @@ def save_finite_subsystem(
             group = f.create_group(key)
             group.attrs["n_molecules"] = subsystem.n_molecules
             group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
-
-    if only is None:
+            
         save_structure(
             structure=subsystem.cluster_of_molecules,
             dataset=dataset,
