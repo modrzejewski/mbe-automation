@@ -10,7 +10,7 @@ import mbe_automation.single_point
                                                 # If the path already exists, e.g., it's your previous project,
                                                 # all existing files will be moved to a backup location.
                                                 #
-ProjectDirectory    = "./Projects/training_01_1,4-cyclohexanedione"
+ProjectDirectory    = "./Projects/training_08_cyanamide"
                                                 #
                                                 # List of all methods for which input files
                                                 # will be generated.
@@ -29,7 +29,7 @@ Methods = ["RPA", "LNO-CCSD(T)", "MACE(PBC)", "DFTB(PBC)", "UMA(PBC)"]
                                                 #
 mlip_parameters = {
     #"MACE": "~/models/mace/MACE-OFF24_medium.model",
-    "MACE": "~/models/michaelides_2025/01_cyclohexanedione/MACE_model_swa.model",
+    "MACE": "~/models/michaelides_2025/08_cyanamide/MACE_model_swa.model",
     "UMA": "~/models/uma/checkpoints/uma-m-1p1.pt"
     }
                                                 #
@@ -37,7 +37,7 @@ mlip_parameters = {
                                                 # the Atomic Simulation Environment is allowed, e.g.,
                                                 # a CIF file or a POSCAR file.
                                                 #
-UnitCellFile        = "./Systems/X23/01_1,4-cyclohexanedione/solid.xyz"
+UnitCellFile        = "./Systems/X23/08_cyanamide/solid.xyz"
                                                 #
                                                 # Types of calculated systems. Allowed values:
                                                 # monomers, dimers, trimers, tetramers, bulk.
@@ -66,7 +66,7 @@ SystemTypes         = ["monomers", "dimers", "bulk"]
                                                 # if "monomers" is present in SystemTypes.
                                                 #
                                                 
-RelaxedMonomerXYZ   = "./Systems/X23/01_1,4-cyclohexanedione/molecule.xyz"
+RelaxedMonomerXYZ   = "./Systems/X23/08_cyanamide/molecule.xyz"
 
                                                 #
                                                 # Distance cutoffs
