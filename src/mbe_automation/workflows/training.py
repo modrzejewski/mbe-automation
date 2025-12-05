@@ -69,9 +69,9 @@ def phonon_sampling(
         mbe_automation.calculators.run_model(
             structure=s,
             calculator=config.calculator,
-            feature_vectors=False,
-            energies=True,
-            forces=True,
+            compute_feature_vectors=False,
+            compute_energies=True,
+            compute_forces=True,
         )
         if (
                 config.features_calculator is not None and
@@ -80,10 +80,10 @@ def phonon_sampling(
             mbe_automation.calculators.run_model(
                 structure=s,
                 calculator=config.features_calculator,
-                feature_vectors=True,
+                compute_feature_vectors=True,
                 average_over_atoms=(config.feature_vectors_type=="averaged_environments"),
-                energies=False,
-                forces=False,
+                compute_energies=False,
+                compute_forces=False,
             )
 
     mbe_automation.storage.save_molecular_crystal(
@@ -153,10 +153,10 @@ def _crystal_at_pT(
         mbe_automation.calculators.run_model(
             structure=pbc_md_frames,
             calculator=config.features_calculator,
-            feature_vectors=True,
+            compute_feature_vectors=True,
             average_over_atoms=(config.feature_vectors_type=="averaged_environments"),
-            energies=False,
-            forces=False,
+            compute_energies=False,
+            compute_forces=False,
         )
         pbc_md_frames.save(
             dataset=config.dataset,
@@ -193,9 +193,9 @@ def _finite_system_at_pT(
         mbe_automation.calculators.run_model(
             structure=s.cluster_of_molecules,
             calculator=config.calculator,
-            feature_vectors=False,
-            energies=True,
-            forces=True
+            compute_feature_vectors=False,
+            compute_energies=True,
+            compute_forces=True
         )
 
         if (
@@ -205,10 +205,10 @@ def _finite_system_at_pT(
             mbe_automation.calculators.run_model(
                 structure=s.cluster_of_molecules,
                 calculator=config.features_calculator,
-                feature_vectors=True,
+                compute_feature_vectors=True,
                 average_over_atoms=(config.feature_vectors_type=="averaged_environments"),
-                energies=False,
-                forces=False
+                compute_energies=False,
+                compute_forces=False
             )
 
         mbe_automation.storage.save_finite_subsystem(

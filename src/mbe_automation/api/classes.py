@@ -521,8 +521,8 @@ def _run_model(
     mbe_automation.calculators.run_model(
         structure=structure,
         calculator=calculator,
-        energies=energies,
-        forces=forces,
-        feature_vectors=(feature_vectors_type!="none"),
+        compute_energies=energies,
+        compute_forces=forces,
+        compute_feature_vectors=(feature_vectors_type!="none"),
         average_over_atoms=(feature_vectors_type=="averaged_environments"),
     )

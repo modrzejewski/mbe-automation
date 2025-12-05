@@ -9,6 +9,8 @@ import sklearn.metrics
 import sklearn.preprocessing
 import sklearn.decomposition
 
+from mbe_automation.storage.core import Structure
+
 SUBSAMPLING_ALGOS = [
     "farthest_point_sampling",
     "kmeans"
@@ -187,3 +189,6 @@ def pca(
     principal_vecs = pca_decomposition.fit_transform(scaled_features)
     
     return principal_vecs, pca_decomposition.explained_variance_ratio_
+
+
+    

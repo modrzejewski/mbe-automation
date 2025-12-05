@@ -1,5 +1,6 @@
 from __future__ import annotations
 import numpy as np
+import numpy.typing as npt
 from mace.calculators import MACECalculator
 from ase.calculators.calculator import Calculator as ASECalculator
 
@@ -9,38 +10,42 @@ import mbe_automation.common.display
 def run_model(
         structure: Structure,
         calculator: ASECalculator | MACECalculator,
-        energies: bool = True,
-        forces: bool = True,
-        feature_vectors: bool = True,
+        compute_energies: bool = True,
+        compute_forces: bool = True,
+        compute_feature_vectors: bool = True,
         average_over_atoms: bool = False,
-) -> None:
+        return_arrays: bool = False,
+) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None] | None:
     """
     Run a calculator of energies/forces/feature vectors for all frames
     of a given Structure. Store the computed quantities in-place.
     The coordinates are not modified.
-    """
     
-    compute_feature_vectors = (feature_vectors and isinstance(calculator, MACECalculator))
+    """    
+    compute_feature_vectors = (compute_feature_vectors and isinstance(calculator, MACECalculator))
+    E_pot = forces = feature_vectors = None
 
-    if energies:
-        structure.E_pot = np.zeros(structure.n_frames)
+    if compute_energies:
+        E_pot = np.zeros(structure.n_frames)
+        if not return_arrays: structure.E_pot = E_pot
 
-    if forces:
-        structure.forces = np.zeros((structure.n_frames, structure.n_atoms, 3))
+    if compute_forces:
+        forces = np.zeros((structure.n_frames, structure.n_atoms, 3))
+        if not return_arrays: structure.forces = forces
 
     if compute_feature_vectors:
         if average_over_atoms:
-            structure.feature_vectors_type = "averaged_environments"
+            if not return_arrays: structure.feature_vectors_type = "averaged_environments"
         else:
-            structure.feature_vectors_type = "atomic"
+            if not return_arrays: structure.feature_vectors_type = "atomic"
 
     mbe_automation.common.display.framed([
         "Properties for pre-computed structures"
     ])
-    print(f"n_frames            {structure.n_frames}")
-    print(f"energies            {energies}")
-    print(f"forces              {forces}")
-    print(f"feature vectors     {feature_vectors}")
+    print(f"n_frames                    {structure.n_frames}")
+    print(f"compute_energies            {compute_energies}")
+    print(f"compute_forces              {compute_forces}")
+    print(f"compute_feature_vectors     {compute_feature_vectors}")
 
     print(f"Loop over frames...")
     
@@ -55,22 +60,23 @@ def run_model(
             frame_index=i
         )
         atoms.calc = calculator
-        if forces:
-            structure.forces[i] = atoms.get_forces()
-        if energies:
-            structure.E_pot[i] = atoms.get_potential_energy() / structure.n_atoms # eV/atom
+        if compute_forces: forces[i] = atoms.get_forces()
+        if compute_energies: E_pot[i] = atoms.get_potential_energy() / structure.n_atoms # eV/atom
         if compute_feature_vectors:
-            assert isinstance(calculator, MACECalculator)
             features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
-            n_features = features.shape[-1]
             if i == 0:
+                n_features = features.shape[-1]
                 if average_over_atoms:
-                    structure.feature_vectors = np.zeros((structure.n_frames, n_features))
+                    feature_vectors = np.zeros((structure.n_frames, n_features))
                 else:
-                    structure.feature_vectors = np.zeros((structure.n_frames, structure.n_atoms, n_features))
+                    feature_vectors = np.zeros((structure.n_frames, structure.n_atoms, n_features))
+                    
+                if not return_arrays: structure.feature_vectors = feature_vectors
+                
             if average_over_atoms:
-                structure.feature_vectors[i] = np.average(features, axis=0)
+                feature_vectors[i] = np.average(features, axis=0)
             else:
-                structure.feature_vectors[i] = features
+                feature_vectors[i] = features
 
-    return
+    if return_arrays:
+        return E_pot, forces, feature_vectors
