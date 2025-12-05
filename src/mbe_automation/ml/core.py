@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Literal, Tuple
+from typing import Literal, Tuple, List
 import numpy as np
 import numpy.typing as npt
 import scipy
@@ -9,7 +9,7 @@ import sklearn.metrics
 import sklearn.preprocessing
 import sklearn.decomposition
 
-from mbe_automation.storage.core import Structure
+from mbe_automation.storage.core import Structure, read_structure
 
 SUBSAMPLING_ALGOS = [
     "farthest_point_sampling",
@@ -192,3 +192,38 @@ def pca(
 
 
     
+
+def statistics(
+        dataset: str,
+        keys: List[str]
+) -> Tuple[List[int], float, float]:
+    """
+    Compute statistics for a given dataset.
+
+    Returns a tuple containing:
+    - A sorted list of unique atomic numbers present in the dataset.
+    - The average energy per atom.
+    - The standard deviation of the energy per atom.
+    """
+
+    unique_elements = set()
+    energies_per_atom = []
+
+    for key in keys:
+        structure = read_structure(dataset, key)
+
+        unique_elements.update(structure.atomic_numbers.tolist())
+
+        if structure.E_pot is None:
+            raise ValueError(
+                f"Structure at key '{key}' does not contain potential energies."
+            )
+
+        energies_per_atom.append(structure.E_pot)
+
+    all_energies = np.concatenate(energies_per_atom)
+
+    mean_energy = np.mean(all_energies)
+    std_energy = np.std(all_energies)
+
+    return sorted(list(unique_elements)), float(mean_energy), float(std_energy)
