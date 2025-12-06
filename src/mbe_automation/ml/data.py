@@ -1,9 +1,8 @@
 from __future__ import annotations
-from typing import Literal, Tuple, List
+from typing import Literal, Tuple, List, Optional
 from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
-import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 
 from mbe_automation.storage.core import Structure
@@ -16,26 +15,64 @@ class DataStats:
     n_elements: int
     n_frames: int
     unique_elements: npt.NDArray[np.int64] # unique atomic numbers
-    mean_energy: float # eV/atom
-    std_energy: float  # eV/atom
     z_map: npt.NDArray[np.int64]
+
+    mean_energy_target: float # eV/atom
+    std_energy_target: float  # eV/atom
+    mean_energy_baseline: float # eV/atom
+    std_energy_baseline: float # eV/atom
+    mean_energy_delta: float # eV/atom
+    std_energy_delta: float # eV/atom
 
 @dataclass(kw_only=True)
 class DeltaLearning:
     structures: List[Structure]
-    calculator_baseline: ASECalculator
     E_target: List[npt.NDArray[np.float64]] # eV/atom
-    forces_target: List[npt.NDArray[np.float64]] | None = None # eV/Angs
+    E_baseline: List[npt.NDArray[np.float64]] # eV/atom
+    forces_target: Optional[List[npt.NDArray[np.float64]]] = None # eV/Angs
+    forces_baseline: Optional[List[npt.NDArray[np.float64]]] = None # eV/Angs
+    calculator_baseline: Optional[ASECalculator] = None
+    E_atomic_baseline: Optional[npt.NDArray[np.float64]] = None # eV/atom
+
     stats: DataStats = field(init=False)
-    E_atomic_baseline: npt.NDArray[np.float64] = field(init=False) # eV/atom
     E_atomic_shift: npt.NDArray[np.float64] = field(init=False) # eV/atom
 
     def __post_init__(self):
-        self.stats = _statistics(self.structures)
-        self.E_atomic_baseline = mbe_automation.calculators.atomic_energies(
-            calculator=self.calculator_baseline,
-            z_numbers=self.stats.unique_elements
-        ) # eV/atom
+        # Validation
+        n_structures = len(self.structures)
+        if len(self.E_target) != n_structures:
+            raise ValueError(f"Length of E_target ({len(self.E_target)}) must match number of structures ({n_structures}).")
+        if len(self.E_baseline) != n_structures:
+            raise ValueError(f"Length of E_baseline ({len(self.E_baseline)}) must match number of structures ({n_structures}).")
+
+        if self.forces_target is not None and len(self.forces_target) != n_structures:
+             raise ValueError(f"Length of forces_target ({len(self.forces_target)}) must match number of structures ({n_structures}).")
+        if self.forces_baseline is not None and len(self.forces_baseline) != n_structures:
+             raise ValueError(f"Length of forces_baseline ({len(self.forces_baseline)}) must match number of structures ({n_structures}).")
+
+        for i, structure in enumerate(self.structures):
+            if len(self.E_target[i]) != structure.n_frames:
+                raise ValueError(f"Structure {i} has {structure.n_frames} frames but E_target has {len(self.E_target[i])}.")
+            if len(self.E_baseline[i]) != structure.n_frames:
+                raise ValueError(f"Structure {i} has {structure.n_frames} frames but E_baseline has {len(self.E_baseline[i])}.")
+            if self.forces_target is not None and len(self.forces_target[i]) != structure.n_frames:
+                raise ValueError(f"Structure {i} has {structure.n_frames} frames but forces_target has {len(self.forces_target[i])}.")
+            if self.forces_baseline is not None and len(self.forces_baseline[i]) != structure.n_frames:
+                raise ValueError(f"Structure {i} has {structure.n_frames} frames but forces_baseline has {len(self.forces_baseline[i])}.")
+
+        # Statistics
+        self.stats = _statistics(self.structures, self.E_target, self.E_baseline)
+
+        # Atomic energies
+        if self.E_atomic_baseline is None:
+            if self.calculator_baseline is None:
+                raise ValueError("Either E_atomic_baseline or calculator_baseline must be provided.")
+
+            self.E_atomic_baseline = mbe_automation.calculators.atomic_energies(
+                calculator=self.calculator_baseline,
+                z_numbers=self.stats.unique_elements
+            ) # eV/atom
+
         self.E_atomic_shift = _energy_shifts_linear_regression(
             E_target=self.E_target, # eV/atom
             E_atomic_baseline=self.E_atomic_baseline, # eV/atom
@@ -44,7 +81,9 @@ class DeltaLearning:
         )
 
 def _statistics(
-        structures: List[Structure]
+        structures: List[Structure],
+        E_target: List[npt.NDArray[np.float64]],
+        E_baseline: List[npt.NDArray[np.float64]]
 ) -> DataStats:
     """
     Compute statistics for a given dataset.
@@ -56,24 +95,38 @@ def _statistics(
 
     n_structures = len(structures)
     unique_elements = set()
-    energies_per_atom = []
     n_frames = 0
 
-    for structure in structures:
+    # Accumulate data for stats
+    all_target_energies = []
+    all_baseline_energies = []
+    all_delta_energies = []
+
+    for i, structure in enumerate(structures):
         unique_elements.update(structure.atomic_numbers.tolist())
-
-        if structure.E_pot is None:
-            raise ValueError(
-                f"Structure does not contain potential energies."
-            )
-
-        energies_per_atom.append(structure.E_pot)
         n_frames += structure.n_frames
 
-    all_energies = np.concatenate(energies_per_atom)
+        target = E_target[i]
+        baseline = E_baseline[i]
+        delta = target - baseline
 
-    mean_energy = np.mean(all_energies)
-    std_energy = np.std(all_energies)
+        all_target_energies.append(target)
+        all_baseline_energies.append(baseline)
+        all_delta_energies.append(delta)
+
+    all_target = np.concatenate(all_target_energies)
+    all_baseline = np.concatenate(all_baseline_energies)
+    all_delta = np.concatenate(all_delta_energies)
+
+    mean_target = np.mean(all_target)
+    std_target = np.std(all_target)
+
+    mean_baseline = np.mean(all_baseline)
+    std_baseline = np.std(all_baseline)
+
+    mean_delta = np.mean(all_delta)
+    std_delta = np.std(all_delta)
+
     unique_elements = np.sort(np.array(list(unique_elements)))
     n_elements = len(unique_elements)
     z_map = np.full(np.max(unique_elements) + 1, -1, dtype=np.int64)
@@ -81,18 +134,28 @@ def _statistics(
 
     print(f"n_structures        {n_structures}")
     print(f"n_frames            {n_frames}")
-    print(f"mean atomic energy  {mean_energy:.5f} eV∕atom")
-    print(f"standard deviation  {std_energy:.5f} eV∕atom")
+    print(f"n_elements          {n_elements}")
     print(f"unique_elements     {np.array2string(unique_elements)}")
+    print(f"")
+    print(f"Target Energy (eV/atom):")
+    print(f"  Mean: {mean_target:.5f}, Std: {std_target:.5f}")
+    print(f"Baseline Energy (eV/atom):")
+    print(f"  Mean: {mean_baseline:.5f}, Std: {std_baseline:.5f}")
+    print(f"Delta Energy (Target - Baseline) (eV/atom):")
+    print(f"  Mean: {mean_delta:.5f}, Std: {std_delta:.5f}")
 
     return DataStats(
         n_structures=n_structures,
         n_elements=n_elements,
         n_frames=n_frames,
         unique_elements=unique_elements,
-        mean_energy=mean_energy,
-        std_energy=std_energy,
-        z_map=z_map
+        z_map=z_map,
+        mean_energy_target=mean_target,
+        std_energy_target=std_target,
+        mean_energy_baseline=mean_baseline,
+        std_energy_baseline=std_baseline,
+        mean_energy_delta=mean_delta,
+        std_energy_delta=std_delta
     )
 
 def _energy_shifts_linear_regression(
@@ -137,5 +200,3 @@ def _energy_shifts_linear_regression(
     print(f"Atomic shifts completed")
 
     return x
-
-    

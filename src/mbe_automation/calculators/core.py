@@ -3,6 +3,7 @@ import numpy as np
 import numpy.typing as npt
 from mace.calculators import MACECalculator
 from ase.calculators.calculator import Calculator as ASECalculator
+from ase import Atoms # Added import
 
 from mbe_automation.storage import Structure, to_ase
 import mbe_automation.common.display
@@ -15,7 +16,7 @@ def atomic_energies(
     n_elements = len(z_numbers)
     E_atomic = np.zeros(n_elements)
     for i, z in enumerate(z_numbers):
-        isolated_atom = ase.Atoms(
+        isolated_atom = Atoms(
             numbers=[z],
             pbc=False
         )
