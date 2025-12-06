@@ -7,6 +7,23 @@ from ase.calculators.calculator import Calculator as ASECalculator
 from mbe_automation.storage import Structure, to_ase
 import mbe_automation.common.display
 
+def atomic_energies(
+        calculator: ASECalculator | MACECalculator,
+        z_numbers: npt.NDArray[np.integer],
+) -> npt.NDArray[np.floating]:
+
+    n_elements = len(z_numbers)
+    E_atomic = np.array(n_elements)
+    for i, z in enumerate(z_numbers):
+        isolated_atom = ase.Atoms(
+            numbers=[z],
+            pbc=False
+        )
+        isolated_atom.calc = calc_baseline
+        E_atomic[i] = isolated_atom.get_potential_energy()
+
+    return E_atomic
+    
 def run_model(
         structure: Structure,
         calculator: ASECalculator | MACECalculator,
