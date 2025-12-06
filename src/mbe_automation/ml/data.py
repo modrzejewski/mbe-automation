@@ -76,7 +76,7 @@ def _statistics(
     std_energy = np.std(all_energies)
     unique_elements = np.sort(np.array(list(unique_elements)))
     n_elements = len(unique_elements)
-    z_map = np.full(np.max(unique_elements_arr) + 1, -1, dtype=np.int64)
+    z_map = np.full(np.max(unique_elements) + 1, -1, dtype=np.int64)
     z_map[unique_elements] = np.arange(n_elements)
 
     print(f"n_structures        {n_structures}")
@@ -86,6 +86,7 @@ def _statistics(
     print(f"unique_elements     {np.array2string(unique_elements)}")
 
     return DataStats(
+        n_structures=n_structures,
         n_elements=n_elements,
         n_frames=n_frames,
         unique_elements=unique_elements,
@@ -98,8 +99,8 @@ def _energy_shifts_linear_regression(
         E_target: List[npt.NDArray[np.float64]], # eV/atom
         E_atomic_baseline: npt.NDArray[np.float64], # eV/atom
         structures: List[Structure],
-        stats: TrainingSetStats,
-):
+        stats: DataStats,
+) -> npt.NDArray[np.float64]:
     mbe_automation.common.display.framed([
         "Atomic energy shifts (linear regression)"
     ])
@@ -112,6 +113,7 @@ def _energy_shifts_linear_regression(
     n_frames_processed = 0
     for i, structure in enumerate(structures):
         element_count = np.bincount(structure.atomic_numbers, minlength=max(structure.atomic_numbers)+1)
+        n = np.zeros(stats.n_elements, dtype=int)
         n[stats.z_map[stats.unique_elements]] = element_count[stats.unique_elements]
         n = n / structure.n_atoms
         E_delta = E_target[i] - np.sum(n * E_atomic_baseline) # rank (structure.n_frames, ) eV/atom
