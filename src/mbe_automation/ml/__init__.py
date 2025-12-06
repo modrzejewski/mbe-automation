@@ -1,12 +1,10 @@
 from . import core
 from . import display
 from . import mace
-from . import data
-from .data import DeltaLearning
+from . import delta
 
 __all__ = [
     "core",
     "display",
     "mace",
-    "DeltaLearning",
 ]

@@ -4,10 +4,12 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 from ase.calculators.calculator import Calculator as ASECalculator
+import ase
 
 from mbe_automation.storage.core import Structure
 import mbe_automation.common.display
 import mbe_automation.calculators
+import mbe_automation.ml.mace
 
 @dataclass(kw_only=True)
 class DataStats:
@@ -25,7 +27,7 @@ class DataStats:
     std_energy_delta: float # eV/atom
 
 @dataclass(kw_only=True)
-class DeltaLearning:
+class Dataset:
     structures: List[Structure]
     E_target: List[npt.NDArray[np.float64]] # eV/atom
     E_baseline: List[npt.NDArray[np.float64]] # eV/atom
@@ -77,6 +79,54 @@ class DeltaLearning:
             structures=self.structures,
             stats=self.stats
         )
+
+    def to_training_set(
+            self,
+            save_path: str,
+    ) -> None:
+
+        energy_key = "Delta_energy"
+        forces_key = "Delta_forces"
+
+        for i, z in enumerate(self.stats.unique_elements):
+            atom = Structure(
+                positions = np.zeros((1, 1, 3)),
+                atomic_numbers = np.array([[z]], dtype=int)
+                masses=np.array([[ase.data.atomic_masses[z]]]),
+                n_frames=1,
+                n_atoms=1,
+                cell_vectors=None,
+            )
+            Delta_E_pot = self.E_atomic_shift[self.stats.z_map[z]]
+            mbe_automation.ml.mace.to_xyz_training_set(
+                structure=atom,
+                save_path=save_path,
+                E_pot=Delta_E_pot,
+                forces=None,
+                append=(i>0),
+                config_type="IsolatedAtom",
+                energy_key="Delta_Energy",
+                forces_key="Delta_Forces",
+            )
+
+        for i in range(self.stats.n_structures):
+            Delta_E_pot = self.E_target[i] - self.E_baseline[i]
+            if self.forces is not None:
+                Delta_forces = self.forces_target[i] - self.forces_baseline[i]
+            else:
+                Delta_forces = None
+            mbe_automation.ml.mace.to_xyz_training_set(
+                structure=self.structures[i],
+                save_path=save_path,
+                E_pot=Delta_E_pot,
+                forces=Delta_forces,
+                append=True,
+                config_type="Default",
+                energy_key="Delta_Energy",
+                forces_key="Delta_Forces",
+            )
+
+        return
 
 def _statistics(
         structures: List[Structure],

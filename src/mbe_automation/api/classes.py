@@ -21,6 +21,7 @@ import mbe_automation.calculators
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
+from mbe_automation.ml.delta import Dataset as DeltaLearningDataset
 
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
@@ -92,7 +93,8 @@ class Structure(_Structure):
                 structure=self,
                 save_path=save_path,
                 append=append,
-                quantities=quantities,
+                E_pot=(self.E_pot if "energies" in quantities else None),
+                forces=(self.forces if "forces" in quantities else None),
             )
         else:
             raise ValueError("Unsupported data format of the training set")
@@ -297,7 +299,8 @@ class FiniteSubsystem(_FiniteSubsystem):
                 structure=self.cluster_of_molecules,
                 save_path=save_path,
                 append=append,
-                quantities=quantities,
+                E_pot=(self.cluster_of_molecules.E_pot if "energies" in quantities else None),
+                forces=(self.cluster_of_molecules.forces if "forces" in quantities else None),
             )
         else:
             raise ValueError("Unsupported data format of the training set")

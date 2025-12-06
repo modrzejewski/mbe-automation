@@ -17,5 +17,6 @@ from .api import (
     Trajectory,
     MolecularCrystal,
     FiniteSubsystem,
+    DeltaLearningDataset,
     run,
 )
