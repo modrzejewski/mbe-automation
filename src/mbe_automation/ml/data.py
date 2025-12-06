@@ -60,10 +60,8 @@ class DeltaLearning:
             if self.forces_baseline is not None and len(self.forces_baseline[i]) != structure.n_frames:
                 raise ValueError(f"Structure {i} has {structure.n_frames} frames but forces_baseline has {len(self.forces_baseline[i])}.")
 
-        # Statistics
         self.stats = _statistics(self.structures, self.E_target, self.E_baseline)
 
-        # Atomic energies
         if self.E_atomic_baseline is None:
             if self.calculator_baseline is None:
                 raise ValueError("Either E_atomic_baseline or calculator_baseline must be provided.")
@@ -137,11 +135,11 @@ def _statistics(
     print(f"n_elements          {n_elements}")
     print(f"unique_elements     {np.array2string(unique_elements)}")
     print(f"")
-    print(f"Target Energy (eV/atom):")
+    print(f"Target Energy (eV/atom)")
     print(f"  Mean: {mean_target:.5f}, Std: {std_target:.5f}")
-    print(f"Baseline Energy (eV/atom):")
+    print(f"Baseline Energy (eV/atom)")
     print(f"  Mean: {mean_baseline:.5f}, Std: {std_baseline:.5f}")
-    print(f"Delta Energy (Target - Baseline) (eV/atom):")
+    print(f"Delta Energy (Target - Baseline) (eV/atom)")
     print(f"  Mean: {mean_delta:.5f}, Std: {std_delta:.5f}")
 
     return DataStats(
