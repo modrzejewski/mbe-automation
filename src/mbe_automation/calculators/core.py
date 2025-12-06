@@ -35,8 +35,8 @@ def run_model(
         return_arrays: bool = False,
 ) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None] | None:
     """
-    Run a calculator of energies/forces/feature vectors for all frames
-    of a given Structure. Store the computed quantities in-place.
+    Run a calculator of energies/forces/feature vectors for all frames of a given
+    Structure. Stores computed quantities in-place or returns them as arrays.
     The coordinates are not modified.
     
     """    
