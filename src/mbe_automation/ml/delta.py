@@ -105,8 +105,8 @@ class Dataset:
                 forces=None,
                 append=(i>0),
                 config_type="IsolatedAtom",
-                energy_key="Delta_Energy",
-                forces_key="Delta_Forces",
+                energy_key=energy_key,
+                forces_key=forces_key,
             )
 
         for i in range(self.stats.n_structures):
