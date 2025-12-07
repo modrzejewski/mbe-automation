@@ -370,7 +370,11 @@ def _select_frames(
                 struct.feature_vectors[indices]
                 if struct.feature_vectors is not None else None
             ),
-            feature_vectors_type=struct.feature_vectors_type
+            feature_vectors_type=struct.feature_vectors_type,
+            delta=(
+                struct.delta.select_frames(indices)
+                if struct.delta is not None else None
+            )
         )
 
 def _subsample_structure(
