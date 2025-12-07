@@ -323,7 +323,7 @@ class Dataset:
             fractions: npt.NDArray[np.float64]=np.array([0.90, 0.05, 0.05]),
     ) -> None:
         _export_to_mace(
-            dataset=self,
+            dataset=self.structures,
             save_paths=save_paths,
             fractions=fractions,
             learning_strategy=learning_strategy,
