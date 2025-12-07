@@ -142,7 +142,7 @@ def _statistics(
     ])
 
     n_structures = len(structures)
-    unique_elements = set()
+    all_elements = []
     n_frames = 0
 
     # Accumulate data for stats
@@ -151,13 +151,13 @@ def _statistics(
     all_delta_energies = []
 
     for i, structure in enumerate(structures):
-        unique_elements.update(structure.atomic_numbers.tolist())
         n_frames += structure.n_frames
 
         target = E_target[i]
         baseline = E_baseline[i]
         delta = target - baseline
 
+        all_elements.append(np.unique(structure.atomic_numbers))
         all_target_energies.append(target)
         all_baseline_energies.append(baseline)
         all_delta_energies.append(delta)
@@ -165,6 +165,11 @@ def _statistics(
     all_target = np.concatenate(all_target_energies)
     all_baseline = np.concatenate(all_baseline_energies)
     all_delta = np.concatenate(all_delta_energies)
+    #
+    # numpy.unique returns a *sorted* list
+    # of unique elements
+    #
+    unique_elements = np.unique(np.concatenate(all_elements))
 
     mean_target = np.mean(all_target)
     std_target = np.std(all_target)
@@ -175,7 +180,6 @@ def _statistics(
     mean_delta = np.mean(all_delta)
     std_delta = np.std(all_delta)
 
-    unique_elements = np.sort(np.array(list(unique_elements)))
     n_elements = len(unique_elements)
     z_map = np.full(np.max(unique_elements) + 1, -1, dtype=np.int64)
     z_map[unique_elements] = np.arange(n_elements)
@@ -223,7 +227,15 @@ def _energy_shifts_linear_regression(
     b = np.zeros((stats.n_frames))
     n_frames_processed = 0
     for i, structure in enumerate(structures):
-        element_count = np.bincount(structure.atomic_numbers, minlength=max(structure.atomic_numbers)+1)
+        #
+        # Note on elements count: atomic_numbers.ndim can be either 1 or 2.
+        # 2 means that the atoms can be permuted between frames. However,
+        # the composition in each frame is guaranteed to be the same.
+        #
+        element_count = np.bincount(
+            np.atleast_2d(structure.atomic_numbers)[0], 
+            minlength=max(structure.atomic_numbers)+1
+        )
         n = np.zeros(stats.n_elements, dtype=int)
         n[stats.z_map[stats.unique_elements]] = element_count[stats.unique_elements]
         n = n / structure.n_atoms

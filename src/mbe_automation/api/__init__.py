@@ -1,4 +1,7 @@
-from .classes import ForceConstants, Structure, Trajectory, MolecularCrystal, FiniteSubsystem, DeltaLearningDataset
+from .classes import (
+    ForceConstants, Structure, Trajectory,
+    MolecularCrystal, FiniteSubsystem, DeltaLearningDataset
+)
 from .workflow_entrypoint import run
 
 __all__ = [
