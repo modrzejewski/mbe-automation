@@ -13,7 +13,8 @@ import os
 DATA_FOR_TRAINING = [
     "feature_vectors",
     "potential_energies",
-    "forces"
+    "forces",
+    "delta",
 ]
 
 @dataclass
@@ -34,6 +35,33 @@ class EOSCurves:
     V_min: npt.NDArray[np.floating]
     G_min: npt.NDArray[np.floating]
 
+@dataclass(kw_only=True)
+class DeltaTargetBaseline:
+    E_pot_baseline: npt.NDArray[np.floating] | None = None # eV/atom
+    forces_baseline: npt.NDArray[np.floating] | None = None # eV/Angs
+    E_pot_target: npt.NDArray[np.floating] | None = None # eV/atom
+    forces_target: npt.NDArray[np.floating] | None = None # eV/Angs
+    E_atomic_baseline: npt.NDArray[np.float64] | None = None # eV/atom
+
+    def copy(self) -> DeltaTargetBaseline:
+        return DeltaTargetBaseline(
+            E_pot_baseline=(self.E_pot_baseline.copy() if self.E_pot_baseline is not None else None),
+            forces_baseline=(self.forces_baseline.copy() if self.forces_baseline is not None else None),
+            E_pot_target=(self.E_pot_target.copy() if self.E_pot_target is not None else None),
+            forces_target=(self.forces_target.copy() if self.forces_target is not None else None),
+            E_atomic_baseline=(self.E_atomic_baseline.copy() if self.E_atomic_baseline is not None else None),
+        )
+
+    def select_frames(self, indices: npt.NDArray[np.integer]) -> DeltaTargetBaseline:
+        return DeltaTargetBaseline(
+            E_pot_baseline=(self.E_pot_baseline[indices] if self.E_pot_baseline is not None else None),
+            forces_baseline=(self.forces_baseline[indices] if self.forces_baseline is not None else None),
+            E_pot_target=(self.E_pot_target[indices] if self.E_pot_target is not None else None),
+            forces_target=(self.forces_target[indices] if self.forces_target is not None else None),
+            E_atomic_baseline=self.E_atomic_baseline, # composition is the same in all frames
+        )
+        
+    
 @dataclass
 class Structure:
     positions: npt.NDArray[np.floating]
@@ -45,6 +73,7 @@ class Structure:
     periodic: bool = False
     E_pot: npt.NDArray[np.floating] | None = None
     forces: npt.NDArray[np.floating] | None = None
+    delta: DeltaTargetBaseline | None = None
     feature_vectors: npt.NDArray[np.floating] | None = None
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "none"
     
@@ -62,6 +91,7 @@ class Structure:
             periodic=self.periodic,
             E_pot=(self.E_pot.copy() if self.E_pot is not None else None),
             forces=(self.forces.copy() if self.forces is not None else None),
+            delta=(self.delta.copy() if self.delta is not None else None),
             feature_vectors=(
                 self.feature_vectors.copy() 
                 if self.feature_vectors_type != "none" else None
@@ -90,6 +120,18 @@ class Structure:
                 structure=self,
                 quantities=only,
             )
+
+    @property
+    def unique_elements(self) -> npt.NDArray[np.int64]:
+        return np.unique(np.atleast_2d(self.atomic_numbers)[0])
+
+    @property
+    def z_map(self) -> npt.NDArray[np.int64]:
+        unique_elements = self.unique_elements
+        n_elements = len(unique_elements)
+        x = np.full(np.max(unique_elements) + 1, -1, dtype=np.int64)
+        x[unique_elements] = np.arange(n_elements)
+        return x
 
 @dataclass
 class ForceConstants:
@@ -474,6 +516,7 @@ def _save_structure(
         forces: npt.NDArray[np.floating] | None=None,
         feature_vectors: npt.NDArray[np.floating] | None=None,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+        delta: DeltaTargetBaseline | None=None,
 ):
     if positions.ndim == 2:
         n_frames = 1
@@ -525,6 +568,9 @@ def _save_structure(
                 name="forces (eV∕Å)",
                 data=forces
             )
+        if delta is not None:
+            _save_delta_target_baseline(f, f"{key}/delta", delta)
+            
         group.attrs["n_frames"] = n_frames
         group.attrs["n_atoms"] = n_atoms
         group.attrs["periodic"] = is_periodic
@@ -546,6 +592,7 @@ def save_structure(
     forces: npt.NDArray[np.floating] | None = None,
     feature_vectors: npt.NDArray[np.floating] | None = None,
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+    delta: DeltaTargetBaseline | None = None,
 ) -> None: ...
 
 def save_structure(*, dataset: str, key: str, **kwargs):
@@ -579,6 +626,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             forces=structure.forces,
             feature_vectors=structure.feature_vectors,
             feature_vectors_type=structure.feature_vectors_type,
+            delta=structure.delta,
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -592,6 +640,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             E_pot=kwargs.get("E_pot"),
             forces=kwargs.get("forces"),
             feature_vectors=kwargs.get("feature_vectors"),
+            delta=kwargs.get("delta"),
             feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
         )
     else:
@@ -630,6 +679,7 @@ def read_structure(dataset, key):
                 group["forces (eV∕Å)"][...]
                 if "forces (eV∕Å)" in group else None
             )
+            delta=_read_delta_target_baseline(f, key=f"{key}/delta"),
         )
     return structure
 
@@ -1076,5 +1126,71 @@ def _save_only(
                 name="forces (eV∕Å)",
                 data=structure.forces
             )
-                
+
+        if "delta" in quantities:
+
+            if structure.delta is None:
+                raise RuntimeError(
+                    "Delta learning data are not present in the Structure object."
+                )
+
+            _save_delta_target_baseline(f, f"{key}/delta", structure.delta)
+            
     return
+
+
+def _save_delta_target_baseline(
+        f: h5py.File,
+        key: str,
+        delta: DeltaTargetBaseline,
+) -> None:
+
+    group = f.require_group(key)
+
+    if delta.forces_baseline is not None:
+        if "forces_baseline (eV∕Å)" in group: del group["forces_baseline (eV∕Å)"]
+        group.create_dataset("forces_baseline (eV∕Å)", data=delta.forces_baseline)
+
+    if delta.forces_target is not None:
+        if "forces_target (eV∕Å)" in group: del group["forces_target (eV∕Å)"]
+        group.create_dataset("forces_target (eV∕Å)", data=delta.forces_target)
+
+    if delta.E_pot_baseline is not None:
+        if "E_pot_baseline (eV∕atom)" in group: del group["E_pot_baseline (eV∕atom)"]
+        group.create_dataset(name="E_pot_baseline (eV∕atom)", data=delta.E_pot_baseline)
+
+    if delta.E_pot_target is not None:
+        if "E_pot_target (eV∕atom)" in group: del group["E_pot_target (eV∕atom)"]
+        group.create_dataset(name="E_pot_target (eV∕atom)", data=delta.E_pot_target)
+
+    if delta.E_atomic_baseline is not None:
+        if "E_atomic_baseline (eV∕atom)" in group: del group["E_atomic_baseline (eV∕atom)"]
+        group.create_dataset(name="E_atomic_baseline (eV∕atom)", data=delta.E_atomic_baseline)
+
+    return
+
+
+def _read_delta_target_baseline(f: h5py.File, key: str) -> DeltaTargetBaseline:
+
+    if key in f:
+        group = f[key]        
+        delta = DeltaTargetBaseline(
+            forces_baseline=(
+                group["forces_baseline (eV∕Å)"] if "forces_baseline (eV∕Å)" in group else None),
+            forces_target=(
+                group["forces_target (eV∕Å)"] if "forces_target (eV∕Å)" in group else None),
+            E_pot_baseline=(
+                group["E_pot_baseline (eV∕atom)"] if "E_pot_baseline (eV∕atom)" in group else None
+            )
+            E_pot_target=(
+                group["E_pot_target (eV∕atom)"] if "E_pot_target (eV∕atom)" in group else None
+            )
+            E_atomic_baseline=(
+                group["E_atomic_baseline (eV∕atom)"] if "E_atomic_baseline (eV∕atom)" in group else None
+            )
+        )
+    else:
+        delta = None
+
+    return delta
+

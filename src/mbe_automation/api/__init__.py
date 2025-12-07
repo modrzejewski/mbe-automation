@@ -1,6 +1,6 @@
 from .classes import (
     ForceConstants, Structure, Trajectory,
-    MolecularCrystal, FiniteSubsystem, DeltaLearningDataset
+    MolecularCrystal, FiniteSubsystem
 )
 from .workflow_entrypoint import run
 
@@ -10,6 +10,5 @@ __all__ = [
     "Trajectory",
     "MolecularCrystal",
     "FiniteSubsystem",
-    "DeltaLearningDataset",
     "run",
 ]

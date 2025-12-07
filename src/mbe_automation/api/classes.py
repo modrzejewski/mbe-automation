@@ -21,7 +21,6 @@ import mbe_automation.calculators
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
-from mbe_automation.ml.delta import Dataset as DeltaLearningDataset
 
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
