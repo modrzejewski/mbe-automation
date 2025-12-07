@@ -91,7 +91,7 @@ class Dataset:
         for i, z in enumerate(self.stats.unique_elements):
             atom = Structure(
                 positions = np.zeros((1, 1, 3)),
-                atomic_numbers = np.array([[z]], dtype=int)
+                atomic_numbers = np.array([[z]], dtype=int),
                 masses=np.array([[ase.data.atomic_masses[z]]]),
                 n_frames=1,
                 n_atoms=1,
