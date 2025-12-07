@@ -17,6 +17,7 @@ from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 import mbe_automation.dynamics.harmonic.modes
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
+import mbe_automation.ml.delta
 import mbe_automation.calculators
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
@@ -124,7 +125,7 @@ class Structure(_Structure):
         return MolecularCrystal(**vars(
             mbe_automation.structure.clusters.detect_molecules(system=self)
         ))
-        
+    
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory):
     @classmethod
@@ -309,6 +310,25 @@ class FiniteSubsystem(_FiniteSubsystem):
             )
         else:
             raise ValueError("Unsupported data format of the training set")
+
+
+@dataclass
+class Dataset:
+    structures: List[Structure|FiniteSubsystem]
+
+    def export_to_mace(
+            self,
+            learning_strategy: Literal["direct", "delta"] = "direct",
+            save_paths: List[str]=["train.xyz", "validate.xyz", "test.xyz"],
+            fractions: npt.NDArray[np.float64]=[0.90, 0.05, 0.05],     
+    ) -> None:
+        _export_to_mace(
+            dataset=self,
+            save_paths=save_paths,
+            fractions=fractions,
+            learning_strategy=learning_strategy,
+        )
+    
 
 def _select_frames(
         struct: _Structure,
@@ -563,5 +583,50 @@ def _run_model(
             z_numbers=unique_elements,
         )
         structure.delta.E_atomic_baseline = E_atomic_baseline
+
+    return
+
+
+def _export_to_mace(
+        dataset: List[Structure|FiniteSubsystem],            
+        save_paths: List[str] = ["train.xyz", "validate.xyz", "test.xyz"],
+        fractions: List[float] = [0.90, 0.05, 0.05],
+        learning_strategy: Literal["direct", "delta"] = "direct"
+) -> None:
+    assert len(save_paths) == 3
+    assert len(fractions) == 3
+
+    train, validate, test = [], [], []
+
+    for x in dataset:
+        a, b, c = x.random_split(fractions)
+        
+        if isinstance(x, FiniteSubsystem):
+            a = a.cluster_of_molecules
+            b = b.cluster_of_molecules
+            c = c.cluster_of_molecules
+
+        train.append(a)
+        validate.append(b)
+        test.append(c)
+
+    if learning_strategy == "direct":
+        for i, x in enumerate([train, validate, test]):
+            for j, y in enumerate(x):
+                mbe_automation.ml.mace.to_xyz_training_set(
+                    structure=y,
+                    save_path=save_paths[i],
+                    append=(j>0),
+                    E_pot=(y.E_pot if y.E_pot is not None else None),
+                    forces=(y.forces if y.forces is not None else None),
+                )
+
+    elif learning_strategy == "delta":
+        for i, x in enumerate([train, validate, test]):
+            mbe_automation.ml.delta.export_to_mace(
+                    structures=x,
+                    save_path=save_paths[i],
+                    skip_atoms=(i>0),
+            )
 
     return

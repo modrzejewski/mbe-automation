@@ -225,9 +225,10 @@ def _energy_shifts_linear_regression(
 
     return x
 
-def to_training_set(
+def export_to_mace(
         structures: List[Structure],
         save_path: str,
+        skip_atoms: bool = False,
         energy_key: str = "Delta_energy",
         forces_key: str = "Delta_forces",
 ) -> None:
@@ -239,7 +240,8 @@ def to_training_set(
     stats = _statistics(structures)
     unique_elements = _unique_elements(structures)
     z_map = _z_map(structures)
-    E_atomic_shift = _energy_shifts_linear_regression(structures, stats)
+    if not skip_atoms:
+        E_atomic_shift = _energy_shifts_linear_regression(structures, stats)
     E_target = _target_energies(structures)
     E_baseline = _baseline_energies(structures)
     forces_baseline = _baseline_forces(structures)
@@ -251,26 +253,27 @@ def to_training_set(
     else:
         forces_available = False
 
-    for i, z in enumerate(unique_elements):
-        atom = Structure(
-            positions = np.zeros((1, 1, 3)),
-            atomic_numbers=np.atleast_1d(z),
-            masses=np.atleast_1d(ase.data.atomic_masses[z]),
-            n_frames=1,
-            n_atoms=1,
-            cell_vectors=None,
-        )
-        Delta_E_pot = E_atomic_shift[z_map[z]]
-        mbe_automation.ml.mace.to_xyz_training_set(
-            structure=atom,
-            save_path=save_path,
-            E_pot=np.atleast_1d(Delta_E_pot),
-            forces=None,
-            append=(i>0),
-            config_type="IsolatedAtom",
-            energy_key=energy_key,
-            forces_key=forces_key,
-        )
+    if not skip_atoms:
+        for i, z in enumerate(unique_elements):
+            atom = Structure(
+                positions = np.zeros((1, 1, 3)),
+                atomic_numbers=np.atleast_1d(z),
+                masses=np.atleast_1d(ase.data.atomic_masses[z]),
+                n_frames=1,
+                n_atoms=1,
+                cell_vectors=None,
+            )
+            Delta_E_pot = E_atomic_shift[z_map[z]]
+            mbe_automation.ml.mace.to_xyz_training_set(
+                structure=atom,
+                save_path=save_path,
+                E_pot=np.atleast_1d(Delta_E_pot),
+                forces=None,
+                append=(i>0),
+                config_type="IsolatedAtom",
+                energy_key=energy_key,
+                forces_key=forces_key,
+            )
 
     for i in range(stats.n_structures):
         Delta_E_pot = E_target[i] - E_baseline[i] # rank (structure.n_frames, ) eV/atom
