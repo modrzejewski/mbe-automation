@@ -115,7 +115,7 @@ class Structure(_Structure):
             forces=forces,
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
-            return_arrays: bool = False,
+            return_arrays=return_arrays,
         )
 
        if return_arrays:
@@ -165,6 +165,7 @@ class Trajectory(_Trajectory):
             calculator=calculator,
             energies=energies,
             forces=forces,
+            return_arrays=return_arrays,
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
         )
@@ -270,16 +271,21 @@ class FiniteSubsystem(_FiniteSubsystem):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+            return_arrays: bool = False,
             exec_params: ParallelCPU | None = None,
     ):
-        _run_model(
+        results = _run_model(
             structure=self.cluster_of_molecules,
             calculator=calculator,
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
+            return_arrays=return_arrays,
             exec_params=exec_params,
         )
+
+        if return_arrays:
+            return results
 
     def random_split(
             self,
@@ -521,8 +527,8 @@ def _run_model(
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        exec_params: ParallelCPU | None = None,
         return_arrays: bool = False,
+        exec_params: ParallelCPU | None = None,
 ):
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
     
@@ -538,6 +544,7 @@ def _run_model(
         compute_forces=forces,
         compute_feature_vectors=(feature_vectors_type!="none"),
         average_over_atoms=(feature_vectors_type=="averaged_environments"),
+        return_arrays=return_arrays,
     )
 
     if return_arrays:
