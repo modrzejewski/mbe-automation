@@ -122,8 +122,8 @@ class Dataset:
                 forces=Delta_forces,
                 append=True,
                 config_type="Default",
-                energy_key="Delta_Energy",
-                forces_key="Delta_Forces",
+                energy_key=energy_key,
+                forces_key=forces_key,
             )
 
         return
