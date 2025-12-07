@@ -111,7 +111,7 @@ class Dataset:
 
         for i in range(self.stats.n_structures):
             Delta_E_pot = self.E_target[i] - self.E_baseline[i]
-            if self.forces is not None:
+            if self.forces_target is not None and self.forces_baseline is not None:
                 Delta_forces = self.forces_target[i] - self.forces_baseline[i]
             else:
                 Delta_forces = None
