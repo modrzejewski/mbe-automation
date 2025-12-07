@@ -7,4 +7,5 @@ __all__ = [
     "core",
     "display",
     "mace",
+    "delta",
 ]

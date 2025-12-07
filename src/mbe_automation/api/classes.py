@@ -105,16 +105,21 @@ class Structure(_Structure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+            return_arrays: bool = False,
             exec_params: ParallelCPU | None = None,
     ):
-        _run_model(
+       results = _run_model(
             structure=self,
             calculator=calculator,
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
+            return_arrays: bool = False,
         )
+
+       if return_arrays:
+           return results
 
     def detect_molecules(
             self,
@@ -152,9 +157,10 @@ class Trajectory(_Trajectory):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+            return_arrays: bool = False,
             exec_params: ParallelCPU | None = None,
     ):
-        _run_model(
+        results = _run_model(
             structure=self,
             calculator=calculator,
             energies=energies,
@@ -162,6 +168,9 @@ class Trajectory(_Trajectory):
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
         )
+
+        if return_arrays:
+            return results
 
 @dataclass(kw_only=True)
 class MolecularCrystal(_MolecularCrystal):
@@ -513,6 +522,7 @@ def _run_model(
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
         exec_params: ParallelCPU | None = None,
+        return_arrays: bool = False,
 ):
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
     
@@ -521,7 +531,7 @@ def _run_model(
 
     exec_params.set()
 
-    mbe_automation.calculators.run_model(
+    results = mbe_automation.calculators.run_model(
         structure=structure,
         calculator=calculator,
         compute_energies=energies,
@@ -529,3 +539,6 @@ def _run_model(
         compute_feature_vectors=(feature_vectors_type!="none"),
         average_over_atoms=(feature_vectors_type=="averaged_environments"),
     )
+
+    if return_arrays:
+        return results
