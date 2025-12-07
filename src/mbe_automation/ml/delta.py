@@ -3,7 +3,6 @@ from typing import Literal, Tuple, List, Optional
 from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
-from ase.calculators.calculator import Calculator as ASECalculator
 import ase
 
 from mbe_automation.storage.core import Structure
@@ -74,7 +73,7 @@ def _baseline_energies(
     return e
 
 def _baseline_forces(
-
+        structures: List[Structure]
 ):
     f = []
     for structure in structures:
@@ -90,7 +89,7 @@ def _baseline_forces(
     return f
 
 def _target_forces(
-
+        structures: List[Structure]
 ):
     f = []
     for structure in structures:
@@ -107,7 +106,7 @@ def _target_forces(
 
 def _atomic_energies(
         structures: List[Structure]
-) -> dict[np.int64, np.float64]:
+) -> npt.NDArray[np.float64]:
     e = {}
     for structure in structures:
         if (
@@ -228,7 +227,7 @@ def _energy_shifts_linear_regression(
     return x
 
 def to_training_set(
-        structures: List[Structures],
+        structures: List[Structure],
         save_path: str,
         energy_key: str = "Delta_energy",
         forces_key: str = "Delta_forces",
