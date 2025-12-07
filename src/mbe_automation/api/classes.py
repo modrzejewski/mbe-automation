@@ -319,7 +319,7 @@ class Dataset:
     def export_to_mace(
             self,
             learning_strategy: Literal["direct", "delta"],
-            save_paths: List[str]=["train.xyz", "validate.xyz", "test.xyz"],
+            save_paths: Sequence[str]=("train.xyz", "validate.xyz", "test.xyz"),
             fractions: npt.NDArray[np.float64]=np.array([0.90, 0.05, 0.05]),
     ) -> None:
         _export_to_mace(
@@ -587,7 +587,7 @@ def _run_model(
 
 def _export_to_mace(
         dataset: List[Structure|FiniteSubsystem],            
-        save_paths: List[str] = ["train.xyz", "validate.xyz", "test.xyz"],
+        save_paths: Sequence[str] = ("train.xyz", "validate.xyz", "test.xyz"),
         fractions: npt.NDArray[np.float64] = np.array([0.90, 0.05, 0.05]),
         learning_strategy: Literal["direct", "delta"] = "direct"
 ) -> None:
