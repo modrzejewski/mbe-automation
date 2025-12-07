@@ -318,9 +318,9 @@ class Dataset:
 
     def export_to_mace(
             self,
-            learning_strategy: Literal["direct", "delta"] = "direct",
+            learning_strategy: Literal["direct", "delta"],
             save_paths: List[str]=["train.xyz", "validate.xyz", "test.xyz"],
-            fractions: npt.NDArray[np.float64]=[0.90, 0.05, 0.05],     
+            fractions: npt.NDArray[np.float64]=np.array([0.90, 0.05, 0.05]),
     ) -> None:
         _export_to_mace(
             dataset=self,
@@ -329,7 +329,6 @@ class Dataset:
             learning_strategy=learning_strategy,
         )
     
-
 def _select_frames(
         struct: _Structure,
         indices: npt.NDArray[np.integer]
@@ -576,7 +575,7 @@ def _run_model(
         if energies: structure.delta.E_pot_target = E_pot
         if forces: structure.delta.forces_target = F
 
-    if delta_learning == "baseline" and forces:
+    if delta_learning == "baseline" and energies:
         unique_elements = structure.unique_elements
         E_atomic_baseline = mbe_automation.calculators.atomic_energies(
             calculator=calculator,
@@ -586,11 +585,10 @@ def _run_model(
 
     return
 
-
 def _export_to_mace(
         dataset: List[Structure|FiniteSubsystem],            
         save_paths: List[str] = ["train.xyz", "validate.xyz", "test.xyz"],
-        fractions: List[float] = [0.90, 0.05, 0.05],
+        fractions: npt.NDArray[np.float64] = np.array([0.90, 0.05, 0.05]),
         learning_strategy: Literal["direct", "delta"] = "direct"
 ) -> None:
     assert len(save_paths) == 3
