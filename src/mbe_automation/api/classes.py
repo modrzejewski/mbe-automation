@@ -104,21 +104,18 @@ class Structure(_Structure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            return_arrays: bool = False,
+            delta_learning: Literal["target", "baseline", "none"]="none",
             exec_params: ParallelCPU | None = None,
-    ):
-       results = _run_model(
+    ) -> None:
+        _run_model(
             structure=self,
             calculator=calculator,
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
+            delta_learning=delta_learning,
             exec_params=exec_params,
-            return_arrays=return_arrays,
         )
-
-       if return_arrays:
-           return results
 
     def detect_molecules(
             self,
@@ -156,21 +153,18 @@ class Trajectory(_Trajectory):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            return_arrays: bool = False,
+            delta_learning: Literal["none", "target", "baseline"]="none",
             exec_params: ParallelCPU | None = None,
-    ):
-        results = _run_model(
+    ) -> None:
+        _run_model(
             structure=self,
             calculator=calculator,
             energies=energies,
             forces=forces,
-            return_arrays=return_arrays,
             feature_vectors_type=feature_vectors_type,
+            delta_learning=delta_learning,
             exec_params=exec_params,
         )
-
-        if return_arrays:
-            return results
 
 @dataclass(kw_only=True)
 class MolecularCrystal(_MolecularCrystal):
@@ -270,21 +264,18 @@ class FiniteSubsystem(_FiniteSubsystem):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            return_arrays: bool = False,
+            delta_learning: Literal["none", "target", "baseline"]="none",
             exec_params: ParallelCPU | None = None,
-    ):
-        results = _run_model(
+    ) -> None:
+        _run_model(
             structure=self.cluster_of_molecules,
             calculator=calculator,
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
-            return_arrays=return_arrays,
+            delta_learning=delta_learning,
             exec_params=exec_params,
         )
-
-        if return_arrays:
-            return results
 
     def random_split(
             self,
@@ -526,9 +517,9 @@ def _run_model(
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        return_arrays: bool = False,
+        delta_learning: Literal["target", "baseline", "none"]="none",
         exec_params: ParallelCPU | None = None,
-):
+) -> None:
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
     
     if exec_params is None:
@@ -536,15 +527,41 @@ def _run_model(
 
     exec_params.set()
 
-    results = mbe_automation.calculators.run_model(
+    E_pot, F, d = mbe_automation.calculators.run_model(
         structure=structure,
         calculator=calculator,
         compute_energies=energies,
         compute_forces=forces,
         compute_feature_vectors=(feature_vectors_type!="none"),
         average_over_atoms=(feature_vectors_type=="averaged_environments"),
-        return_arrays=return_arrays,
+        return_arrays=True,
     )
 
-    if return_arrays:
-        return results
+    if feature_vectors_type != "none" and d is not None:
+        structure.feature_vectors = d
+        structure.feature_vectors_type = feature_vectors_type
+
+    if delta_learning == "none":
+        if energies: structure.E_pot = E_pot
+        if forces: structure.forces = F
+
+    if delta_learning != "none" and structure.delta is None:
+        structure.delta = mbe_automation.storage.core.DeltaTargetBaseline()
+
+    if delta_learning == "baseline":
+        if energies: structure.delta.E_pot_baseline = E_pot
+        if forces: structure.delta.forces_baseline = F
+
+    if delta_learning == "target":
+        if energies: structure.delta.E_pot_target = E_pot
+        if forces: structure.delta.forces_target = F
+
+    if delta_learning == "baseline" and forces:
+        unique_elements = structure.unique_elements
+        E_atomic_baseline = mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=unique_elements,
+        )
+        structure.delta.E_atomic_baseline = E_atomic_baseline
+
+    return

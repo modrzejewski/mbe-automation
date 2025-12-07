@@ -7,7 +7,6 @@ import ase
 
 from mbe_automation.storage.core import Structure
 import mbe_automation.common.display
-import mbe_automation.calculators
 import mbe_automation.ml.mace
 
 @dataclass(kw_only=True)
@@ -74,7 +73,7 @@ def _baseline_energies(
 
 def _baseline_forces(
         structures: List[Structure]
-):
+) -> List[npt.NDArray[np.float64]]:
     f = []
     for structure in structures:
         if (
@@ -90,7 +89,7 @@ def _baseline_forces(
 
 def _target_forces(
         structures: List[Structure]
-):
+) -> List[npt.NDArray[np.float64]]:
     f = []
     for structure in structures:
         if (

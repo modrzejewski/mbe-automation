@@ -61,7 +61,6 @@ class DeltaTargetBaseline:
             E_atomic_baseline=self.E_atomic_baseline, # composition is the same in all frames
         )
         
-    
 @dataclass
 class Structure:
     positions: npt.NDArray[np.floating]
@@ -1170,7 +1169,7 @@ def _save_delta_target_baseline(
     return
 
 
-def _read_delta_target_baseline(f: h5py.File, key: str) -> DeltaTargetBaseline:
+def _read_delta_target_baseline(f: h5py.File, key: str) -> DeltaTargetBaseline | None:
 
     if key in f:
         group = f[key]        
