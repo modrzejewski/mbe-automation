@@ -1176,18 +1176,18 @@ def _read_delta_target_baseline(f: h5py.File, key: str) -> DeltaTargetBaseline:
         group = f[key]        
         delta = DeltaTargetBaseline(
             forces_baseline=(
-                group["forces_baseline (eV∕Å)"] if "forces_baseline (eV∕Å)" in group else None),
+                group["forces_baseline (eV∕Å)"][...] if "forces_baseline (eV∕Å)" in group else None),
             forces_target=(
-                group["forces_target (eV∕Å)"] if "forces_target (eV∕Å)" in group else None),
+                group["forces_target (eV∕Å)"][...] if "forces_target (eV∕Å)" in group else None),
             E_pot_baseline=(
-                group["E_pot_baseline (eV∕atom)"] if "E_pot_baseline (eV∕atom)" in group else None
-            )
+                group["E_pot_baseline (eV∕atom)"][...] if "E_pot_baseline (eV∕atom)" in group else None
+            ),
             E_pot_target=(
-                group["E_pot_target (eV∕atom)"] if "E_pot_target (eV∕atom)" in group else None
-            )
+                group["E_pot_target (eV∕atom)"][...] if "E_pot_target (eV∕atom)" in group else None
+            ),
             E_atomic_baseline=(
-                group["E_atomic_baseline (eV∕atom)"] if "E_atomic_baseline (eV∕atom)" in group else None
-            )
+                group["E_atomic_baseline (eV∕atom)"][...] if "E_atomic_baseline (eV∕atom)" in group else None
+            ),
         )
     else:
         delta = None
