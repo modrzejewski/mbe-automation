@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Literal, Tuple
+from typing import Literal, Tuple, List
+from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 import scipy

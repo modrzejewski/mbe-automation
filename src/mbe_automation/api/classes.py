@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple, Literal, Sequence, List
 import numpy as np
 import numpy.typing as npt
@@ -17,6 +17,7 @@ from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 import mbe_automation.dynamics.harmonic.modes
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
+import mbe_automation.ml.delta
 import mbe_automation.calculators
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
@@ -92,7 +93,8 @@ class Structure(_Structure):
                 structure=self,
                 save_path=save_path,
                 append=append,
-                quantities=quantities,
+                E_pot=(self.E_pot if "energies" in quantities else None),
+                forces=(self.forces if "forces" in quantities else None),
             )
         else:
             raise ValueError("Unsupported data format of the training set")
@@ -103,14 +105,16 @@ class Structure(_Structure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+            delta_learning: Literal["target", "baseline", "none"]="none",
             exec_params: ParallelCPU | None = None,
-    ):
+    ) -> None:
         _run_model(
             structure=self,
             calculator=calculator,
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
+            delta_learning=delta_learning,
             exec_params=exec_params,
         )
 
@@ -121,7 +125,7 @@ class Structure(_Structure):
         return MolecularCrystal(**vars(
             mbe_automation.structure.clusters.detect_molecules(system=self)
         ))
-        
+    
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory):
     @classmethod
@@ -150,14 +154,16 @@ class Trajectory(_Trajectory):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+            delta_learning: Literal["none", "target", "baseline"]="none",
             exec_params: ParallelCPU | None = None,
-    ):
+    ) -> None:
         _run_model(
             structure=self,
             calculator=calculator,
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
+            delta_learning=delta_learning,
             exec_params=exec_params,
         )
 
@@ -259,14 +265,16 @@ class FiniteSubsystem(_FiniteSubsystem):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+            delta_learning: Literal["none", "target", "baseline"]="none",
             exec_params: ParallelCPU | None = None,
-    ):
+    ) -> None:
         _run_model(
             structure=self.cluster_of_molecules,
             calculator=calculator,
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
+            delta_learning=delta_learning,
             exec_params=exec_params,
         )
 
@@ -297,11 +305,44 @@ class FiniteSubsystem(_FiniteSubsystem):
                 structure=self.cluster_of_molecules,
                 save_path=save_path,
                 append=append,
-                quantities=quantities,
+                E_pot=(self.cluster_of_molecules.E_pot if "energies" in quantities else None),
+                forces=(self.cluster_of_molecules.forces if "forces" in quantities else None),
             )
         else:
             raise ValueError("Unsupported data format of the training set")
 
+@dataclass
+class Dataset:
+    """
+    Collection of atomistic structures or finite subsystems
+    for machine learning tasks.
+    """
+    structures: List[Structure|FiniteSubsystem] = field(default_factory=list)
+
+    def append(self, structure: Structure | FiniteSubsystem):
+        """
+        Add a structure or finite subsystem to the dataset.
+        """
+        self.structures.append(structure)
+
+    def export_to_mace(
+            self,
+            learning_strategy: Literal["direct", "delta"],
+            save_paths: Sequence[str]=("train.xyz", "validate.xyz", "test.xyz"),
+            fractions: npt.NDArray[np.float64]=np.array([0.90, 0.05, 0.05]),
+    ) -> None:
+        """
+        Export dataset to training files readable by MACE.
+        Split data into training, validation, and test sets
+        according to fractions.
+        """
+        _export_to_mace(
+            dataset=self.structures,
+            save_paths=save_paths,
+            fractions=fractions,
+            learning_strategy=learning_strategy,
+        )
+    
 def _select_frames(
         struct: _Structure,
         indices: npt.NDArray[np.integer]
@@ -343,7 +384,11 @@ def _select_frames(
                 struct.feature_vectors[indices]
                 if struct.feature_vectors is not None else None
             ),
-            feature_vectors_type=struct.feature_vectors_type
+            feature_vectors_type=struct.feature_vectors_type,
+            delta=(
+                struct.delta.select_frames(indices)
+                if struct.delta is not None else None
+            )
         )
 
 def _subsample_structure(
@@ -509,8 +554,9 @@ def _run_model(
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+        delta_learning: Literal["target", "baseline", "none"]="none",
         exec_params: ParallelCPU | None = None,
-):
+) -> None:
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
     
     if exec_params is None:
@@ -518,11 +564,85 @@ def _run_model(
 
     exec_params.set()
 
-    mbe_automation.calculators.run_model(
+    E_pot, F, d = mbe_automation.calculators.run_model(
         structure=structure,
         calculator=calculator,
-        energies=energies,
-        forces=forces,
-        feature_vectors=(feature_vectors_type!="none"),
+        compute_energies=energies,
+        compute_forces=forces,
+        compute_feature_vectors=(feature_vectors_type!="none"),
         average_over_atoms=(feature_vectors_type=="averaged_environments"),
+        return_arrays=True,
     )
+
+    if feature_vectors_type != "none" and d is not None:
+        structure.feature_vectors = d
+        structure.feature_vectors_type = feature_vectors_type
+
+    if delta_learning == "none":
+        if energies: structure.E_pot = E_pot
+        if forces: structure.forces = F
+
+    if delta_learning != "none" and structure.delta is None:
+        structure.delta = mbe_automation.storage.core.DeltaTargetBaseline()
+
+    if delta_learning == "baseline":
+        if energies: structure.delta.E_pot_baseline = E_pot
+        if forces: structure.delta.forces_baseline = F
+
+    if delta_learning == "target":
+        if energies: structure.delta.E_pot_target = E_pot
+        if forces: structure.delta.forces_target = F
+
+    if delta_learning == "baseline" and energies:
+        unique_elements = structure.unique_elements
+        E_atomic_baseline = mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=unique_elements,
+        )
+        structure.delta.E_atomic_baseline = E_atomic_baseline
+
+    return
+
+def _export_to_mace(
+        dataset: List[Structure|FiniteSubsystem],            
+        save_paths: Sequence[str] = ("train.xyz", "validate.xyz", "test.xyz"),
+        fractions: npt.NDArray[np.float64] = np.array([0.90, 0.05, 0.05]),
+        learning_strategy: Literal["direct", "delta"] = "direct"
+) -> None:
+    assert len(save_paths) == 3
+    assert len(fractions) == 3
+
+    train, validate, test = [], [], []
+
+    for x in dataset:
+        a, b, c = x.random_split(fractions)
+        
+        if isinstance(x, FiniteSubsystem):
+            a = a.cluster_of_molecules
+            b = b.cluster_of_molecules
+            c = c.cluster_of_molecules
+
+        train.append(a)
+        validate.append(b)
+        test.append(c)
+
+    if learning_strategy == "direct":
+        for i, x in enumerate([train, validate, test]):
+            for j, y in enumerate(x):
+                mbe_automation.ml.mace.to_xyz_training_set(
+                    structure=y,
+                    save_path=save_paths[i],
+                    append=(j>0),
+                    E_pot=(y.E_pot if y.E_pot is not None else None),
+                    forces=(y.forces if y.forces is not None else None),
+                )
+
+    elif learning_strategy == "delta":
+        for i, x in enumerate([train, validate, test]):
+            mbe_automation.ml.delta.export_to_mace(
+                    structures=x,
+                    save_path=save_paths[i],
+                    skip_atoms=(i>0),
+            )
+
+    return
