@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple, Literal, Sequence, List
 import numpy as np
 import numpy.typing as npt
@@ -311,10 +311,19 @@ class FiniteSubsystem(_FiniteSubsystem):
         else:
             raise ValueError("Unsupported data format of the training set")
 
-
 @dataclass
 class Dataset:
-    structures: List[Structure|FiniteSubsystem]
+    """
+    Collection of atomistic structures or finite subsystems
+    for machine learning tasks.
+    """
+    structures: List[Structure|FiniteSubsystem] = field(default_factory=list)
+
+    def append(self, structure: Structure | FiniteSubsystem):
+        """
+        Add a structure or finite subsystem to the dataset.
+        """
+        self.structures.append(structure)
 
     def export_to_mace(
             self,
@@ -322,6 +331,11 @@ class Dataset:
             save_paths: Sequence[str]=("train.xyz", "validate.xyz", "test.xyz"),
             fractions: npt.NDArray[np.float64]=np.array([0.90, 0.05, 0.05]),
     ) -> None:
+        """
+        Export dataset to training files readable by MACE.
+        Split data into training, validation, and test sets
+        according to fractions.
+        """
         _export_to_mace(
             dataset=self.structures,
             save_paths=save_paths,
