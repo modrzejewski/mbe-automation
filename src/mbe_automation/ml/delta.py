@@ -15,6 +15,7 @@ class DataStats:
     n_structures: int
     n_elements: int
     n_frames: int
+    unique_elements: npt.NDArray[np.float64]
     mean_energy_target: float # eV/atom
     std_energy_target: float  # eV/atom
     mean_energy_baseline: float # eV/atom
@@ -147,6 +148,7 @@ def _statistics(structures: List[Structure]) -> DataStats:
         n_structures=n_structures,
         n_frames=n_frames,
         n_elements=n_elements,
+        unique_elements=unique_elements,
         mean_energy_target=np.mean(target_energies),
         std_energy_target=np.std(target_energies),
         mean_energy_baseline=np.mean(baseline_energies),
