@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Literal, Tuple, List, Optional
 from dataclasses import dataclass, field
+import warnings
 import numpy as np
 import numpy.typing as npt
 import ase
@@ -217,7 +218,12 @@ def _energy_shifts_linear_regression(
     x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
 
     if rank < stats.n_elements:
-        raise ValueError("Cannot determine atomic shifts due to rank deficiency of matrix A.")
+        warnings.warn(f"Numerical rank if A is {rank} < n_elements = {stats.n_elements}", RuntimeWarning)
+
+    print(f"{'Z':<3} {'E_atomic_shift (eV∕atom)':>25}")
+
+    for element, shift in zip(stats.unique_elements, x):
+        print(f"{element:<3} {shift:>25.6f}")
 
     rmse_baseline = np.sqrt(np.mean(b**2))
     rmse_leastsq = np.sqrt(np.mean( (A @ x - b)**2))
