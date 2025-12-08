@@ -114,7 +114,10 @@ def _atomic_energies(
         ):
             z_map = structure.z_map
             for z in structure.unique_elements:
-                e[z] = structure.delta.E_atomic_baseline[z_map[z]]
+                val = structure.delta.E_atomic_baseline[z_map[z]]
+                if z in e and not np.isclose(e[z], val):
+                    raise ValueError(f"Dataset includes inconsistent baseline atomic energies for Z={z}.")
+                e[z] = val
 
     unique_elements = _unique_elements(structures)
     for z in unique_elements:
@@ -284,7 +287,7 @@ def export_to_mace(
             save_path=save_path,
             E_pot=Delta_E_pot,
             forces=Delta_forces,
-            append=True,
+            append=(not skip_atoms or i > 0),
             config_type="Default",
             energy_key=energy_key,
             forces_key=forces_key,

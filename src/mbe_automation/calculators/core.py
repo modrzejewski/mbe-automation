@@ -3,7 +3,7 @@ import numpy as np
 import numpy.typing as npt
 from mace.calculators import MACECalculator
 from ase.calculators.calculator import Calculator as ASECalculator
-from ase import Atoms # Added import
+from ase import Atoms
 
 from mbe_automation.storage import Structure, to_ase
 import mbe_automation.common.display
@@ -81,6 +81,7 @@ def run_model(
         if compute_forces: forces[i] = atoms.get_forces()
         if compute_energies: E_pot[i] = atoms.get_potential_energy() / structure.n_atoms # eV/atom
         if compute_feature_vectors:
+            assert isinstance(calculator, MACECalculator)
             features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
             if i == 0:
                 n_features = features.shape[-1]
