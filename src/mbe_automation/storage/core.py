@@ -677,7 +677,7 @@ def read_structure(dataset, key):
             forces=(
                 group["forces (eV∕Å)"][...]
                 if "forces (eV∕Å)" in group else None
-            )
+            ),
             delta=_read_delta_target_baseline(f, key=f"{key}/delta"),
         )
     return structure
