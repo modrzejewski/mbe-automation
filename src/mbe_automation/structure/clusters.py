@@ -513,7 +513,7 @@ def extract_all_molecules(
     Structures.
     """
     assert crystal.atomic_numbers.ndim == 1
-    assert crystal.masses.ndim = 1
+    assert crystal.masses.ndim == 1
     
     molecular_crystal = detect_molecules(
         system=crystal,
