@@ -9,6 +9,7 @@ import ase
 from mbe_automation.storage.core import Structure
 import mbe_automation.common.display
 import mbe_automation.ml.mace
+from .core import REFERENCE_ENERGY_TYPES
 
 @dataclass(kw_only=True)
 class DataStats:
@@ -171,22 +172,39 @@ def _statistics(structures: List[Structure]) -> DataStats:
 
     return stats
 
+def _energy_shifts_reference_molecule(
+        molecule: Structure,
+        stats: DataStats,
+        reference_frame_index = 0,
+) -> npt.NDArray[np.float64]:
+
+    assert molecule.delta is not None
+    assert molecule.delta.E_pot_baseline is not None
+    assert molecule.delta.E_pot_target is not None
+
+    E_baseline = molecule.delta.E_pot_baseline[reference_frame_index] # eV/atom
+    E_target = molecule.delta.E_pot_target[reference_frame_index] # eV/atom
+    E_delta = E_target - E_baseline
+    return np.full(stats.n_elements, fill_value=E_delta)
+
+def _energy_shifts_average(
+        stats: DataStats,
+) -> npt.NDArray[np.float64]:
+    
+    E_baseline = stats.mean_energy_baseline # eV/atom
+    E_target = stats.mean_energy_target # eV/atom
+    E_delta = E_target - E_baseline
+    return np.full(stats.n_elements, fill_value=E_delta)
+    
 def _energy_shifts_linear_regression(
         structures: List[Structure],
         stats: DataStats,
 ) -> npt.NDArray[np.float64]:
-    mbe_automation.common.display.framed([
-        "Atomic energy shifts (linear regression)"
-    ])
-    print(f"n_structures    {stats.n_structures}")
-    print(f"n_frames        {stats.n_frames}")
-    print(f"n_elements      {stats.n_elements}")
 
     z_map = _z_map(structures)
     E_atomic_baseline = _atomic_energies(structures)
     E_target = _target_energies(structures)
 
-    print("Setting up linear system...")
     A = np.zeros((stats.n_frames, stats.n_elements))
     b = np.zeros((stats.n_frames))
     n_frames_processed = 0
@@ -216,7 +234,6 @@ def _energy_shifts_linear_regression(
         b[i0:i1] = E_delta
         n_frames_processed += structure.n_frames
 
-    print("Solving least squares...")
     x, residuals, rank, s = np.linalg.lstsq(A, b, rcond=None)
 
     if rank < stats.n_elements:
@@ -229,17 +246,85 @@ def _energy_shifts_linear_regression(
 
     rmse_baseline = np.sqrt(np.mean(b**2))
     rmse_leastsq = np.sqrt(np.mean( (A @ x - b)**2))
-    
-    print(f"RMSE with baseline atomic energies     {rmse_baseline:.5f} eV∕atom")
-    print(f"RMSE after linear regression           {rmse_leastsq:.5f} eV∕atom")
-    print(f"Atomic shifts completed")
 
     return x
 
+def _rmse_atomic_shifts(
+        structures: List[Structure],
+        E_atomic_shifts: npt.NDArray[np.float64],
+        stats: DataStats,
+):
+    z_map = _z_map(structures)
+    E_atomic_baseline = _atomic_energies(structures)
+    E_target = _target_energies(structures)
+    E_diff_shifted_baseline = np.zeros(stats.n_frames)
+    n_frames_processed = 0
+    
+    for i, structure in enumerate(structures):
+        element_count = np.bincount(
+            np.atleast_2d(structure.atomic_numbers)[0], 
+            minlength=np.max(structure.atomic_numbers)+1
+        )
+        unique_elements = structure.unique_elements
+        n = np.zeros(stats.n_elements, dtype=np.float64)
+        n[z_map[unique_elements]] = element_count[unique_elements]
+        n = n / structure.n_atoms
+        i0 = n_frames_processed
+        i1 = n_frames_processed + structure
+        E_diff_shifted_baseline[i0:i1] = E_target[i] - np.sum(n * (E_atomic_baseline + E_atomic_shifts))
+        n_frames_processed += structure.n_frames
+
+    rmse_shifted = np.sqrt(np.mean(E_diff_shifted_baseline**2))
+    return rmse_shifted
+
+def _energy_shifts(
+        structures: List[Structure],
+        reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES],
+        stats: DataStats,
+        reference_molecule: Structure | None = None,        
+) -> npt.NDArray[np.float64]:
+
+    mbe_automation.common.display.framed([
+        "Reference atomic energies"
+    ])
+    
+    assert reference_energy_type != "none"
+    if reference_energy_type == "reference_molecule" and reference_molecule is None:
+         raise ValueError("Selected reference energy type requires providing reference molecule.")
+    
+    print(f"n_structures                    {stats.n_structures}")
+    print(f"n_frames                        {stats.n_frames}")
+    print(f"n_elements                      {stats.n_elements}")
+    print(f"reference_energy_type           {reference_energy_type}")
+    
+    if reference_energy_type == "linear_regression":
+        E_atomic_shifts =  _energy_shifts_linear_regression(
+            structures=structures,
+            stats=stats,
+        )
+
+    elif reference_energy_type == "average":
+        E_atomic_shifts = _energy_shifts_average(stats)
+
+    elif reference_energy_type == "reference_molecule":
+        E_atomic_shifts = _energy_shifts_reference_molecule(
+            molecule=reference_molecule,
+            stats=stats,
+        )
+
+    rmse_shifted_energies =  _rmse_atomic_shifts(
+        structures, E_atomic_shifts, stats
+    )
+    print(f"RMSE(target-shifted baseline)   {rmse_shifted_energies:.5f} eV∕atom")
+    print(f"Atomic energy shifts completed")
+            
+    return E_atomic_shifts
+        
 def export_to_mace(
         structures: List[Structure],
         save_path: str,
-        skip_atoms: bool = False,
+        reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
+        reference_molecule: Structure | None = None,
         energy_key: str = "Delta_energy",
         forces_key: str = "Delta_forces",
 ) -> None:
@@ -251,8 +336,14 @@ def export_to_mace(
     stats = _statistics(structures)
     unique_elements = _unique_elements(structures)
     z_map = _z_map(structures)
-    if not skip_atoms:
-        E_atomic_shift = _energy_shifts_linear_regression(structures, stats)
+    if reference_energy_type != "none":
+        E_atomic_shifts = _energy_shifts(
+            structures=structures,: List[Structure],
+            reference_energy_type=reference_energy_type,
+            stats=stats,
+            reference_molecule=reference_molecule,
+        )
+
     E_target = _target_energies(structures)
     E_baseline = _baseline_energies(structures)
     forces_baseline = _baseline_forces(structures)
@@ -264,7 +355,7 @@ def export_to_mace(
     else:
         forces_available = False
 
-    if not skip_atoms:
+    if reference_energy_type != "none":
         for i, z in enumerate(unique_elements):
             atom = Structure(
                 positions = np.zeros((1, 1, 3)),
@@ -274,7 +365,7 @@ def export_to_mace(
                 n_atoms=1,
                 cell_vectors=None,
             )
-            Delta_E_pot = E_atomic_shift[z_map[z]]
+            Delta_E_pot = E_atomic_shifts[z_map[z]]
             mbe_automation.ml.mace.to_xyz_training_set(
                 structure=atom,
                 save_path=save_path,

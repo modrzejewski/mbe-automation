@@ -21,6 +21,7 @@ import mbe_automation.ml.delta
 import mbe_automation.calculators
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
+from mbe_automation.ml.core import REFERENCE_ENERGY_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
 
 @dataclass(kw_only=True)
@@ -327,20 +328,20 @@ class Dataset:
 
     def export_to_mace(
             self,
+            save_path: str,
             learning_strategy: Literal["direct", "delta"],
-            save_paths: Sequence[str]=("train.xyz", "validate.xyz", "test.xyz"),
-            fractions: npt.NDArray[np.float64]=np.array([0.90, 0.05, 0.05]),
+            reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES] = "none",
+            reference_molecule: Structure | None = None,
     ) -> None:
         """
         Export dataset to training files readable by MACE.
-        Split data into training, validation, and test sets
-        according to fractions.
         """
         _export_to_mace(
             dataset=self.structures,
-            save_paths=save_paths,
-            fractions=fractions,
+            save_path=save_path,
             learning_strategy=learning_strategy,
+            reference_energy_type=reference_energy_type,
+            reference_molecule=reference_molecule,            
         )
     
 def _select_frames(
@@ -605,44 +606,35 @@ def _run_model(
 
 def _export_to_mace(
         dataset: List[Structure|FiniteSubsystem],            
-        save_paths: Sequence[str] = ("train.xyz", "validate.xyz", "test.xyz"),
-        fractions: npt.NDArray[np.float64] = np.array([0.90, 0.05, 0.05]),
-        learning_strategy: Literal["direct", "delta"] = "direct"
+        save_path: str,
+        learning_strategy: Literal["direct", "delta"] = "direct",
+        reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
+        reference_molecule: Structure | None = None,        
 ) -> None:
-    assert len(save_paths) == 3
-    assert len(fractions) == 3
 
-    train, validate, test = [], [], []
-
+    structures = []
     for x in dataset:
-        a, b, c = x.random_split(fractions)
-        
         if isinstance(x, FiniteSubsystem):
-            a = a.cluster_of_molecules
-            b = b.cluster_of_molecules
-            c = c.cluster_of_molecules
-
-        train.append(a)
-        validate.append(b)
-        test.append(c)
-
+            structures.append(x.cluster_of_molecules)
+        else:
+            structures.append(x)
+            
     if learning_strategy == "direct":
-        for i, x in enumerate([train, validate, test]):
-            for j, y in enumerate(x):
-                mbe_automation.ml.mace.to_xyz_training_set(
-                    structure=y,
-                    save_path=save_paths[i],
-                    append=(j>0),
-                    E_pot=(y.E_pot if y.E_pot is not None else None),
-                    forces=(y.forces if y.forces is not None else None),
-                )
+        for i, x in enumerate(structures):
+            mbe_automation.ml.mace.to_xyz_training_set(
+                structure=x,
+                save_path=save_path,
+                append=(i>0),
+                E_pot=(x.E_pot if x.E_pot is not None else None),
+                forces=(x.forces if x.forces is not None else None),
+            )
 
     elif learning_strategy == "delta":
-        for i, x in enumerate([train, validate, test]):
             mbe_automation.ml.delta.export_to_mace(
-                    structures=x,
-                    save_path=save_paths[i],
-                    skip_atoms=(i>0),
+                    structures=structures,
+                    save_path=save_path,
+                    reference_energy_type=reference_energy_type,
+                    reference_molecule=reference_molecule,
             )
 
     return
