@@ -257,10 +257,10 @@ The subsampling process is based on feature vectors, which are numerical represe
 The following example demonstrates how to read a `Trajectory` from a dataset, and then use the `subsample` method to select a smaller number of frames.
 
 ```python
-from mbe_automation.storage import read_trajectory, save_trajectory
+from mbe_automation import Trajectory
 
 # Read the full trajectory from the dataset
-full_trajectory = read_trajectory(
+full_trajectory = Trajectory.read(
     dataset="training_set.hdf5",
     key="training/md_sampling/trajectory"
 )
@@ -269,10 +269,9 @@ full_trajectory = read_trajectory(
 subsampled_trajectory = full_trajectory.subsample(n=100)
 
 # Save the subsampled trajectory to a new key in the dataset
-save_trajectory(
+subsampled_trajectory.save(
     dataset="training_set.hdf5",
-    key="training/md_sampling/trajectory_subsampled",
-    traj=subsampled_trajectory
+    key="training/md_sampling/trajectory_subsampled"
 )
 ```
 
