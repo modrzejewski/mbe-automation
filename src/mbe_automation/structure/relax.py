@@ -377,7 +377,7 @@ def isolated_molecule(
         
         return relaxed_molecule
 
-    elif instance(molecule, ase.Atoms):
+    elif isinstance(molecule, ase.Atoms):
         
         return _isolated_molecule(
             molecule=molecule,
@@ -386,4 +386,7 @@ def isolated_molecule(
             work_dir=work_dir,
             key=key,
         )
+
+    else:
+        raise ValueError("Unsupported object passed to relax.isolated_molecule.")
 

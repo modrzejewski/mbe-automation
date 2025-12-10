@@ -241,7 +241,7 @@ def detect_molecules(
     print(f"reference_frame_index   {reference_frame_index}")
 
     assert system.atomic_numbers.ndim == 1
-    assert system.masses.ndim = 1
+    assert system.masses.ndim == 1
     
     if not system.periodic:
         raise ValueError("detect_molecules is designed for periodic systems.")
@@ -545,7 +545,7 @@ def extract_all_molecules(
             mbe_automation.calculators.core.run_model(
                 structure=molecule,
                 calculator=calculator,
-                compute_energies=compute_energies,
+                compute_energies=True,
                 compute_forces=False,
                 compute_feature_vectors=False,
                 silent=True,
@@ -619,7 +619,7 @@ def extract_relaxed_unique_molecules(
         unique_labels.append(f"molecule[extracted,{i}]")
         relaxed_labels.append(f"molecule[extracted,{i},opt:atoms]")
         
-        relaxed_molecule = mbe_automation.stucture.relax.isolated_molecule(
+        relaxed_molecule = mbe_automation.structure.relax.isolated_molecule(
             molecule=molecule,
             calculator=calculator,
             config=config,
@@ -633,7 +633,7 @@ def extract_relaxed_unique_molecules(
         mbe_automation.calculators.core.run_model(
                 structure=molecule,
                 calculator=calculator,
-                compute_energies=compute_energies,
+                compute_energies=True,
                 compute_forces=False,
                 compute_feature_vectors=False,
                 silent=True,

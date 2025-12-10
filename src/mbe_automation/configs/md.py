@@ -182,6 +182,10 @@ class Enthalpy:
                                    #
     unique_molecules_energy_thresh: float = 1.0E-3
                                    #
+                                   # Parameters controlling geometry relaxation
+                                   #
+    relaxation: Minimum = field(default_factory=Minimum)
+                                   #
                                    # Directory where files are stored
                                    # at runtime
                                    #

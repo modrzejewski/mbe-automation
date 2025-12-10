@@ -1044,7 +1044,7 @@ def read_attribute(
         attribute_name: str,
 ):
     with h5py.File(dataset, "r") as f:
-        group = f.create_group(key)
+        group = f[key]
         attribute_value = group.attrs[attribute_name]
 
     return attribute_value
