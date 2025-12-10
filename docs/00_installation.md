@@ -36,6 +36,18 @@ git clone https://github.com/modrzejewski/mbe-automation.git
 cd mbe-automation
 ```
 
+### Initialize Submodules
+
+The repository uses **git submodules** for external dependencies, including DFTB parameter files and the `mbdf` library.
+
+Download these dependencies by running:
+
+```bash
+git submodule update --init --recursive
+```
+
+Failure to run this command will result in errors, such as missing parameter files during DFTB calculations.
+
 ## 3. Install the Program
 
 With the virtual environment active, install the program and its dependencies in editable mode using `pip`. The `-e` flag allows you to make changes to the source code without needing to reinstall the package.
