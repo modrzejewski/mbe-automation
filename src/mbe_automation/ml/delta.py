@@ -270,7 +270,7 @@ def _rmse_atomic_shifts(
         n[z_map[unique_elements]] = element_count[unique_elements]
         n = n / structure.n_atoms
         i0 = n_frames_processed
-        i1 = n_frames_processed + structure
+        i1 = n_frames_processed + structure.n_frames
         E_diff_shifted_baseline[i0:i1] = E_target[i] - np.sum(n * (E_atomic_baseline + E_atomic_shifts))
         n_frames_processed += structure.n_frames
 
@@ -338,7 +338,7 @@ def export_to_mace(
     z_map = _z_map(structures)
     if reference_energy_type != "none":
         E_atomic_shifts = _energy_shifts(
-            structures=structures,: List[Structure],
+            structures=structures,
             reference_energy_type=reference_energy_type,
             stats=stats,
             reference_molecule=reference_molecule,
