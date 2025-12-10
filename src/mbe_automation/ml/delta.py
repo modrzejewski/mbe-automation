@@ -239,11 +239,6 @@ def _energy_shifts_linear_regression(
     if rank < stats.n_elements:
         warnings.warn(f"Numerical rank if A is {rank} < n_elements = {stats.n_elements}", RuntimeWarning)
 
-    print(f"{'Z':<3} {'E_atomic_shift (eV∕atom)':>25}")
-
-    for element, shift in zip(stats.unique_elements, x):
-        print(f"{element:<3} {shift:>25.6f}")
-
     rmse_baseline = np.sqrt(np.mean(b**2))
     rmse_leastsq = np.sqrt(np.mean( (A @ x - b)**2))
 
@@ -311,6 +306,11 @@ def _energy_shifts(
             molecule=reference_molecule,
             stats=stats,
         )
+
+    print(f"{'Z':<3} {'E_atomic_shift (eV∕atom)':>25}")
+
+    for element, shift in zip(stats.unique_elements, E_atomic_shifts):
+        print(f"{element:<3} {shift:>25.6f}")
 
     rmse_shifted_energies =  _rmse_atomic_shifts(
         structures, E_atomic_shifts, stats
