@@ -69,7 +69,7 @@ The following script reads the force constants for the relaxed crystal structure
 
 ```python
 import numpy as np
-from mbe_automation ForceConstants
+from mbe_automation import ForceConstants
 
 dataset_path = "properties.hdf5"
 key = "quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"

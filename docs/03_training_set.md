@@ -137,7 +137,7 @@ mbe_automation.run(phonon_sampling_config)
 | `calculator`              | MLIP calculator.                                                                                    | -                                  |
 | `features_calculator`     | Calculator used to compute feature vectors.                                                         | `None`                             |
 | `feature_vectors_type`    | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Ignored unless `features_calculator` is present. | `"averaged_environments"`          |
-| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters. Defaults used in `MDSampling` differ from standard `ClassicalMD` defaults: `time_total_fs=100000.0`, `supercell_radius=15.0`. | -                                  |
+| `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters. Defaults used in `MDSampling` differ from standard `ClassicalMD` defaults: `time_total_fs=100000.0`, `supercell_radius=15.0`, `time_step_fs=1.0`, `sampling_interval_fs=1000.0`, `time_equilibration_fs=1000.0`. | -                                  |
 | `temperatures_K`          | Target temperatures (in Kelvin) for the MD simulation. Can be a single float or an array of floats. | `298.15` |
 | `pressures_GPa`           | Target pressures (in GPa) for the MD simulation. Can be a single float or an array of floats. | `1.0E-4` |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
@@ -163,7 +163,7 @@ mbe_automation.run(phonon_sampling_config)
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
 | `amplitude_scan`          | Method for sampling normal-mode coordinates. `"random"` multiplies eigenvectors by a random number on (-1, 1). `"time_propagation"` uses a time-dependent phase factor. | `"random"`                         |
 | `time_step_fs`            | Time step for trajectory generation (used only if `amplitude_scan` is `"time_propagation"`).            | `100.0`           |
-| `rng`                     | Random number generator for randomized amplitude sampling (used only if `amplitude_scan` is `"random"`). | `np.random.default_rng(seed=42)`   |
+| `rng`                     | Random number generator for randomized amplitude sampling (used only if `amplitude_scan` is `"random"`). | `None` (random seed)               |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
 | `feature_vectors_type`    | Type of feature vectors to save. Required for subsampling based on feature space distances. Works only with MACE models. Ignored unless `features_calculator` is present. | `"averaged_environments"` |
 | `work_dir`                | Directory where files are stored at runtime.                                                            | `"./"`                             |
