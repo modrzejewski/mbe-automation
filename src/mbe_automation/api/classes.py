@@ -332,6 +332,7 @@ class Dataset:
             learning_strategy: Literal["direct", "delta"],
             reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES] = "none",
             reference_molecule: Structure | None = None,
+            reference_frame_index: int = 0,
     ) -> None:
         """
         Export dataset to training files readable by MACE.
@@ -341,7 +342,8 @@ class Dataset:
             save_path=save_path,
             learning_strategy=learning_strategy,
             reference_energy_type=reference_energy_type,
-            reference_molecule=reference_molecule,            
+            reference_molecule=reference_molecule,
+            reference_frame_index=reference_frame_index,
         )
     
 def _select_frames(
@@ -609,7 +611,8 @@ def _export_to_mace(
         save_path: str,
         learning_strategy: Literal["direct", "delta"] = "direct",
         reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
-        reference_molecule: Structure | None = None,        
+        reference_molecule: Structure | None = None,
+        reference_frame_index: int = 0,
 ) -> None:
 
     structures = []
@@ -635,6 +638,7 @@ def _export_to_mace(
                     save_path=save_path,
                     reference_energy_type=reference_energy_type,
                     reference_molecule=reference_molecule,
+                    reference_frame_index=reference_frame_index,
             )
 
     return

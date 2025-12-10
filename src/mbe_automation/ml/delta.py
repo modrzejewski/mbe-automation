@@ -175,7 +175,7 @@ def _statistics(structures: List[Structure]) -> DataStats:
 def _energy_shifts_reference_molecule(
         molecule: Structure,
         stats: DataStats,
-        reference_frame_index = 0,
+        reference_frame_index: int = 0,
 ) -> npt.NDArray[np.float64]:
 
     assert molecule.delta is not None
@@ -273,7 +273,8 @@ def _energy_shifts(
         structures: List[Structure],
         reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES],
         stats: DataStats,
-        reference_molecule: Structure | None = None,        
+        reference_molecule: Structure | None = None,
+        reference_frame_index: int = 0,
 ) -> npt.NDArray[np.float64]:
 
     mbe_automation.common.display.framed([
@@ -302,6 +303,7 @@ def _energy_shifts(
         E_atomic_shifts = _energy_shifts_reference_molecule(
             molecule=reference_molecule,
             stats=stats,
+            reference_frame_index=reference_frame_index,
         )
 
     print(f"{'Z':<3} {'E_atomic_shift (eV∕atom)':>25}")
@@ -322,6 +324,7 @@ def export_to_mace(
         save_path: str,
         reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
         reference_molecule: Structure | None = None,
+        reference_frame_index: int = 0,
         energy_key: str = "Delta_energy",
         forces_key: str = "Delta_forces",
 ) -> None:
@@ -339,6 +342,7 @@ def export_to_mace(
             reference_energy_type=reference_energy_type,
             stats=stats,
             reference_molecule=reference_molecule,
+            reference_frame_index=reference_frame_index,
         )
 
     E_target = _target_energies(structures)
