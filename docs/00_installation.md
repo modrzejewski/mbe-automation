@@ -35,9 +35,7 @@ Navigate to the directory where you want to store the project and clone the `mbe
 git clone https://github.com/modrzejewski/mbe-automation.git
 cd mbe-automation
 ```
-The repository uses git submodules for external dependencies such as DFTB+ parameter files.
-
-Download these dependencies by running:
+The repository uses git submodules for external dependencies. Download these dependencies by running:
 
 ```bash
 git submodule update --init --recursive
