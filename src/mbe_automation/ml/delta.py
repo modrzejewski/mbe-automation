@@ -239,9 +239,6 @@ def _energy_shifts_linear_regression(
     if rank < stats.n_elements:
         warnings.warn(f"Numerical rank if A is {rank} < n_elements = {stats.n_elements}", RuntimeWarning)
 
-    rmse_baseline = np.sqrt(np.mean(b**2))
-    rmse_leastsq = np.sqrt(np.mean( (A @ x - b)**2))
-
     return x
 
 def _rmse_atomic_shifts(
