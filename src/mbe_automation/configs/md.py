@@ -173,6 +173,15 @@ class Enthalpy:
     temperatures_K: float | npt.NDArray[np.floating] = 298.15
     pressures_GPa: float | npt.NDArray[np.floating] = 1.0E-4
                                    #
+                                   # Energy threshold (eV/atom) used to detect
+                                   # nonequivalent molecules in the input unit
+                                   # cell. Molecules A and B are considered
+                                   # nonequivalent if
+                                   #
+                                   # ||E_pot(A)-E_pot(B)|| > unique_molecules_energy_thresh
+                                   #
+    unique_molecules_energy_thresh: float = 1.0E-3
+                                   #
                                    # Directory where files are stored
                                    # at runtime
                                    #

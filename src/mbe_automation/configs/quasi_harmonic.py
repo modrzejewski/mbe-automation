@@ -60,6 +60,15 @@ class FreeEnergy:
                                    #
     temperatures_K: npt.NDArray[np.floating] = field(default_factory=lambda: np.array([298.15]))
                                    #
+                                   # Energy threshold (eV/atom) used to detect
+                                   # nonequivalent molecules in the input unit
+                                   # cell. Molecules A and B are considered
+                                   # nonequivalent if
+                                   #
+                                   # ||E_pot(A)-E_pot(B)|| > unique_molecules_energy_thresh
+                                   #
+    unique_molecules_energy_thresh: float = 1.0E-3
+                                   #
                                    # Parameters controlling geometry relaxation
                                    #
     relaxation: Minimum = field(default_factory=Minimum)

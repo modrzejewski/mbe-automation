@@ -133,6 +133,16 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         else:
             supercell_matrix = config.md_crystal.supercell_matrix
 
+        mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
+            dataset=config.dataset,
+            key=f"{config.root_key}/structures",
+            crystal=mbe_automation.storage.from_ase_atoms(config.crystal),
+            calculator=config.calculator,
+            config=config.relaxation,
+            energy_thresh=config.unique_molecules_energy_thresh,
+            work_dir=f"{config.work_dir}/relaxation",
+        )
+
         df_crystal = _md_crystal(supercell_matrix, config)
 
     if config.molecule is not None and config.crystal is not None:

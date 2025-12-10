@@ -1024,6 +1024,32 @@ def read_finite_subsystem(dataset: str, key: str) -> FiniteSubsystem:
     )
 
 
+def save_attribute(
+        dataset: str,
+        key: str,
+        attribute_name: str,
+        attribute_value
+):
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(dataset, "a") as f:
+        group = f.require_group(key)
+        group.attrs[attribute_name] = attribute_value
+
+    return
+
+
+def read_attribute(
+        dataset: str,
+        key: str,
+        attribute_name: str,
+):
+    with h5py.File(dataset, "r") as f:
+        group = f.create_group(key)
+        attribute_value = group.attrs[attribute_name]
+
+    return attribute_value
+
+
 def save_unique_clusters(
         dataset: str,
         key: str,

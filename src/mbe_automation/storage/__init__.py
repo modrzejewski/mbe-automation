@@ -1,7 +1,6 @@
 
 # --- Core data structures and I/O functions ---
 from mbe_automation.storage.core import (
-
     BrillouinZonePath,
     EOSCurves,
     Structure,
@@ -10,18 +9,14 @@ from mbe_automation.storage.core import (
     MolecularCrystal,
     UniqueClusters,
     FiniteSubsystem,
-
     save_data_frame,
     read_data_frame,
-
     save_brillouin_zone_path,
     read_brillouin_zone_path,
     save_force_constants,
     read_force_constants,
-
     save_eos_curves,
     read_eos_curves,
-
     save_structure,
     read_structure,
     save_trajectory,
@@ -31,7 +26,9 @@ from mbe_automation.storage.core import (
     save_unique_clusters,
     read_unique_clusters,
     save_finite_subsystem,
-    read_finite_subsystem,    
+    read_finite_subsystem,
+    save_attribute,
+    read_attribute,
 )
 
 # --- Visual summary of dataset files ---
@@ -43,6 +40,7 @@ from mbe_automation.storage.views import to_ase
 from mbe_automation.storage.views import to_dynasor_mode_projector
 from mbe_automation.storage.views import to_phonopy
 from mbe_automation.storage.views import to_pymatgen
+from mbe_automation.storage.views import from_ase_atoms
 
 from mbe_automation.storage.xyz_formats import from_xyz_file
 from mbe_automation.storage.xyz_formats import to_xyz_file
@@ -78,6 +76,8 @@ __all__ = [
     "read_unique_clusters",
     "save_finite_subsystem",
     "read_finite_subsystem",
+    "save_attribute",
+    "read_attribute",
     
     # Visualization of the dataset tree structure
     "tree",
@@ -89,5 +89,6 @@ __all__ = [
     "to_phonopy",
     "to_pymatgen",
     "to_xyz_file",
-    "from_xyz_file"
+    "from_xyz_file",
+    "from_ase_atoms",
 ]

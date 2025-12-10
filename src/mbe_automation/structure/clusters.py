@@ -12,6 +12,7 @@ import ase.build
 import ase.spacegroup.symmetrize
 import ase.spacegroup.utils
 from ase import Atoms, neighborlist
+from ase.calculators.calculator import Calculator as ASECalculator
 from ase.neighborlist import natural_cutoffs, build_neighbor_list
 from scipy.sparse.csgraph import connected_components
 from scipy import sparse
@@ -30,9 +31,11 @@ import mbe_automation.storage
 import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.common.display
+import mbe_automation.calculators.core
 from mbe_automation.storage.core import MolecularCrystal, UniqueClusters
 from mbe_automation.configs.clusters import NUMBER_SELECTION, DISTANCE_SELECTION
 from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueClustersFilter
+from mbe_automation.configs.structure import Minimum
 
 def Label(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
@@ -236,6 +239,9 @@ def detect_molecules(
     mbe_automation.common.display.framed("Molecule detection")
     print(f"n_frames                {system.n_frames}")
     print(f"reference_frame_index   {reference_frame_index}")
+
+    assert system.atomic_numbers.ndim == 1
+    assert system.masses.ndim = 1
     
     if not system.periodic:
         raise ValueError("detect_molecules is designed for periodic systems.")
@@ -455,6 +461,205 @@ def _extract_finite_subsystem(
 
     return finite_subsystem
 
+
+def group_molecules_by_energy(
+        molecules: List[mbe_automation.storage.Structure],
+        thresh: float = 1.0E-5, # eV/atom
+        reference_frame_index: int = 0,
+) -> list[npt.NDArray[np.int64]]:
+    """
+    Group molecules based on energy similarity.
+    """
+    
+    assert len(molecules) > 0
+    assert thresh > 0.0
+    for molecule in molecules:
+        assert molecule.E_pot is not None
+
+    n_molecules = len(molecules)
+    energies = np.array([molecules[i].E_pot[reference_frame_index] for i in range(n_molecules)])
+    
+    sort_order = np.argsort(energies)
+    sorted_energies = energies[sort_order]
+    #
+    # Compute differences between consecutive sorted energies
+    # diffs[i] = sorted_energies[i+1] - sorted_energies[i]
+    #
+    diffs = np.diff(sorted_energies)
+    #
+    # Find where the 'gap' is larger than the threshold
+    # np.flatnonzero returns indices where the condition is True.
+    # We add 1 because diff[i] corresponds to the gap between
+    # index i and i+1.
+    #
+    split_indices = np.flatnonzero(diffs > thresh) + 1
+    #
+    # Split the SORTED indices array at these break points
+    # This creates a list of arrays, where each array contains the
+    # original indices of molecules in that group.
+    #
+    equiv_molecule_indices = np.split(sort_order, split_indices)    
+    return equiv_molecule_indices
+
+
+def extract_all_molecules(
+        crystal: mbe_automation.storage.Structure,
+        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+        reference_frame_index: int = 0,
+        calculator: ASECalculator | None = None,
+) -> List[mbe_automation.storage.Structure]:
+    """
+    Extract all molecules present in a unit cell as a list of separate
+    Structures.
+    """
+    assert crystal.atomic_numbers.ndim == 1
+    assert crystal.masses.ndim = 1
+    
+    molecular_crystal = detect_molecules(
+        system=crystal,
+        reference_frame_index=reference_frame_index,
+        assert_identical_composition=False,
+        bonding_algo=bonding_algo,
+    )
+
+    molecules = []
+    for atom_indices in molecular_crystal.index_map:
+
+        if molecular_crystal.supercell.positions.ndim == 3:
+            selected_positions = molecular_crystal.supercell.positions[reference_frame_index][atom_indices]
+        else: # ndim == 2
+            selected_positions = molecular_crystal.supercell.positions[atom_indices]
+        
+        molecule = mbe_automation.storage.Structure(
+            positions=selected_positions,
+            atomic_numbers=molecular_crystal.supercell.atomic_numbers[atom_indices],
+            masses=molecular_crystal.supercell.masses[atom_indices],
+            cell_vectors=None,
+            n_frames=1,
+            n_atoms=len(atom_indices),
+        )
+        molecules.append(molecule)
+
+    if calculator is not None:
+        for molecule in molecules:
+            mbe_automation.calculators.core.run_model(
+                structure=molecule,
+                calculator=calculator,
+                compute_energies=compute_energies,
+                compute_forces=False,
+                compute_feature_vectors=False,
+                silent=True,
+            )
+
+    return molecules
+
+
+def extract_unique_molecules(
+        crystal: mbe_automation.storage.Structure,
+        calculator: ASECalculator,
+        energy_thresh: float = 1.0E-5, # eV/atom
+        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+        reference_frame_index: int = 0,
+) -> list[mbe_automation.storage.Structure]:
+    
+    all_molecules = extract_all_molecules(
+        crystal=crystal,
+        bonding_algo=bonding_algo,
+        reference_frame_index=reference_frame_index,
+        calculator=calculator,
+    )
+
+    grouped_molecules = group_molecules_by_energy(
+        molecules=all_molecules,
+        thresh=energy_thresh,
+        reference_frame_index=reference_frame_index,
+    )
+    n_unique_molecules = len(grouped_molecules)
+    assert n_unique_molecules > 0
+    
+    unique_molecules = []
+    for equivalent_molecules in grouped_molecules:
+        molecule = all_molecules[equivalent_molecules[0]]
+        unique_molecules.append(molecule)
+
+    return unique_molecules
+
+
+def extract_relaxed_unique_molecules(
+        dataset: str,
+        key: str,
+        crystal: mbe_automation.storage.Structure,
+        calculator: ASECalculator,
+        config: Minimum,
+        energy_thresh: float = 1.0E-5, # eV/atom
+        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+        reference_frame_index: int = 0,
+        work_dir: Path | str = Path("./")
+) -> None:
+    """
+    Extract nonequivalent molecules from a periodic cell and save the corresponding
+    structures to a dataset file.
+    """
+    
+    unique_molecules = extract_unique_molecules(
+        crystal=crystal,
+        calculator=calculator,
+        energy_thresh=energy_thresh,
+        bonding_algo=bonding_algo,
+        reference_frame_index=reference_frame_index,
+    )
+    n_unique_molecules = len(unique_molecules)
+    
+    relaxed_molecules = []
+    relaxed_labels = []
+    unique_labels = []
+    
+    for i, molecule in enumerate(unique_molecules):
+
+        unique_labels.append(f"molecule[extracted,{i}]")
+        relaxed_labels.append(f"molecule[extracted,{i},opt:atoms]")
+        
+        relaxed_molecule = mbe_automation.stucture.relax.isolated_molecule(
+            molecule=molecule,
+            calculator=calculator,
+            config=config,
+            work_dir=work_dir,
+            key=f"{key}/{relaxed_labels[-1]}",
+        )
+
+        relaxed_molecules.append(relaxed_molecule)
+
+    for molecule in relaxed_molecules:
+        mbe_automation.calculators.core.run_model(
+                structure=molecule,
+                calculator=calculator,
+                compute_energies=compute_energies,
+                compute_forces=False,
+                compute_feature_vectors=False,
+                silent=True,
+            )
+
+    mbe_automation.storage.save_attribute(
+        dataset=dataset,
+        key=key,
+        attribute_name="n_unique_molecules",
+        attribute_value=n_unique_molecules,
+    )
+
+    for i in range(n_unique_molecules):
+        mbe_automation.storage.save_structure(
+            dataset=dataset,
+            key=f"{key}/{unique_labels[i]}",
+            structure=unique_molecules[i],
+        )
+        mbe_automation.storage.save_structure(
+            dataset=dataset,
+            key=f"{key}/{relaxed_labels[i]}",
+            structure=relaxed_molecules[i],
+        )
+
+    return
+        
 
 def extract_finite_subsystem(
         system: mbe_automation.storage.MolecularCrystal,
