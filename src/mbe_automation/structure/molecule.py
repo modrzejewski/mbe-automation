@@ -8,9 +8,6 @@ import pyscf.hessian.thermo
 import pymatgen.core
 import pymatgen.analysis.molecule_matcher
 
-import mbe_automation.calculators
-import mbe_automation.storage
-
 def to_pyscf(atoms: ase.Atoms, charge: int = 0, spin: int = 0) -> pyscf.gto.Mole:
     """
     Convert an ASE Atoms object to a PySCF Mole object.
