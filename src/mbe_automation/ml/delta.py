@@ -386,7 +386,7 @@ def export_to_mace(
             save_path=save_path,
             E_pot=Delta_E_pot,
             forces=Delta_forces,
-            append=(not skip_atoms or i > 0),
+            append=(reference_energy_type != "none" or i > 0),
             config_type="Default",
             energy_key=energy_key,
             forces_key=forces_key,
