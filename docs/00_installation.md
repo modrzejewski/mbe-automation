@@ -38,7 +38,7 @@ cd mbe-automation
 
 ### Initialize Submodules
 
-The repository uses **git submodules** for external dependencies, including DFTB parameter files and the `mbdf` library.
+The repository uses **git submodules** for external dependencies such as DFTB+ parameter files.
 
 Download these dependencies by running:
 
