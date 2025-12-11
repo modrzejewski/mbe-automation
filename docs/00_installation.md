@@ -1,6 +1,9 @@
 # Installation
 
-This guide provides step-by-step instructions for installing `mbe-automation` on a Linux-based system, such as a personal laptop or a compute cluster.
+- [1. Create a Virtual Environment](#1-create-a-virtual-environment)
+- [2. Clone the Repository](#2-clone-the-repository)
+- [3. Install the Program](#3-install-the-program)
+- [4. Supported Methods](#4-supported-methods)
 
 ## 1. Create a Virtual Environment
 
@@ -51,7 +54,15 @@ With the virtual environment active, install the program and its dependencies in
 pip install -e .
 ```
 
-This command will read the `pyproject.toml` file and install all the required dependencies. The installation process may take several minutes.
+This command will read the `pyproject.toml` file and install all the required dependencies.
+
+If you are using a system with CUDA 12, you should instead install the optional `gpu-cuda12` dependencies. This includes packages like `cuequivariance` which provide necessary GPU acceleration and optimizations for this environment.
+
+```bash
+pip install -e ".[gpu-cuda12]"
+```
+
+The installation process may take several minutes.
 
 > **Note on Editable Mode**
 > The `-e` flag installs the package in "editable" mode. This means that any changes you make to the source code will be immediately available without needing to reinstall the package. If you pull the latest changes from the GitHub repository, you will have access to the newest version of the program. However, if the required libraries in `pyproject.toml` have changed, you will need to re-run `pip install -e .` in your virtual environment to ensure all dependencies are up to date.
