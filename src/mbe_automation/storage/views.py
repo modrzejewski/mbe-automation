@@ -2,6 +2,7 @@ from __future__ import annotations
 import io
 from typing import overload
 from functools import singledispatch
+import numpy as np
 import h5py
 import ase
 import ase.io.trajectory
@@ -11,6 +12,19 @@ import pymatgen
 from phonopy.structure.atoms import PhonopyAtoms
 
 from . import core
+
+def from_ase_atoms(
+        system: ase.Atoms,
+) -> core.Structure:
+    
+    return core.Structure(
+            positions=system.positions,
+            masses=system.get_masses(),
+            atomic_numbers=system.numbers,
+            cell_vectors=(system.cell.array if np.any(system.pbc) else None),
+            n_frames=1,
+            n_atoms=len(system),
+    )
 
 class SlicedTrajectory:
     """

@@ -35,6 +35,13 @@ FEATURE_VECTOR_TYPES = [
     "atomic"
 ]
 
+REFERENCE_ENERGY_TYPES = [
+    "none",
+    "average",
+    "least_squares",
+    "reference_molecule",
+]
+
 def _average_over_atoms(
     feature_vectors: npt.NDArray[np.floating]
 ) -> npt.NDArray[np.floating]:

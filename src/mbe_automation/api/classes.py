@@ -1,14 +1,17 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Tuple, Literal, Sequence, List
+from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 from mace.calculators import MACECalculator
 from ase.calculators.calculator import Calculator as ASECalculator
+from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 
 import mbe_automation.storage
 from mbe_automation.configs.execution import ParallelCPU
 from mbe_automation.configs.clusters import FiniteSubsystemFilter
+from mbe_automation.configs.structure import Minimum
 from mbe_automation.storage import ForceConstants as _ForceConstants
 from mbe_automation.storage import Structure as _Structure
 from mbe_automation.storage import Trajectory as _Trajectory
@@ -21,7 +24,9 @@ import mbe_automation.ml.delta
 import mbe_automation.calculators
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
+from mbe_automation.ml.core import REFERENCE_ENERGY_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
@@ -52,6 +57,20 @@ class Structure(_Structure):
         return cls(**vars(
             mbe_automation.storage.read_structure(dataset, key)
         ))
+
+    @classmethod
+    def from_xyz_file(
+            cls,
+            read_path: str,
+            transform_to_symmetrized_primitive: bool = True,
+            symprec: float = SYMMETRY_TOLERANCE_LOOSE,
+    ):
+        ase_atoms = mbe_automation.storage.from_xyz_file(
+            read_path=read_path,
+            transform_to_symmetrized_primitive=transform_to_symmetrized_primitive,
+            symprec=symprec,
+        )        
+        return cls(**vars(mbe_automation.storage.from_ase_atoms(ase_atoms)))
         
     def subsample(
             self,
@@ -125,7 +144,63 @@ class Structure(_Structure):
         return MolecularCrystal(**vars(
             mbe_automation.structure.clusters.detect_molecules(system=self)
         ))
-    
+
+    def extract_all_molecules(
+            self,
+            bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+            reference_frame_index: int = 0,
+            calculator: ASECalculator | None = None,
+    ) -> List[Structure]:
+
+        return [Structure(**vars(molecule)) for molecule in
+                mbe_automation.structure.clusters.extract_all_molecules(
+                    crystal=self,
+                    bonding_algo=bonding_algo,
+                    reference_frame_index=reference_frame_index,
+                    calculator=calculator,
+                )]
+
+    def extract_unique_molecules(
+            self,
+            calculator: ASECalculator,
+            energy_thresh: float = 1.0E-5, # eV/atom
+            bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+            reference_frame_index: int = 0,
+    ) -> List[Structure]:
+
+        return [Structure(**vars(molecule)) for molecule in
+                mbe_automation.structure.clusters.extract_unique_molecules(
+                    crystal=self,
+                    calculator=calculator,
+                    energy_thresh=energy_thresh,
+                    bonding_algo=bonding_algo,
+                    reference_frame_index=reference_frame_index,
+                )]
+
+    def extract_relaxed_unique_molecules(
+            self,
+            dataset: str,
+            key: str,
+            calculator: ASECalculator,
+            config: Minimum,
+            energy_thresh: float = 1.0E-5, # eV/atom
+            bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+            reference_frame_index: int = 0,
+            work_dir: Path | str = Path("./")
+    ) -> None:
+        
+        mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
+            dataset=dataset,
+            key=key,
+            crystal=self,
+            calculator=calculator,
+            config=config,
+            energy_thresh=energy_thresh,
+            bonding_algo=bonding_algo,
+            reference_frame_index=reference_frame_index,
+            work_dir=work_dir,
+        )
+
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory):
     @classmethod
@@ -327,20 +402,22 @@ class Dataset:
 
     def export_to_mace(
             self,
+            save_path: str,
             learning_strategy: Literal["direct", "delta"],
-            save_paths: Sequence[str]=("train.xyz", "validate.xyz", "test.xyz"),
-            fractions: npt.NDArray[np.float64]=np.array([0.90, 0.05, 0.05]),
+            reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES] = "none",
+            reference_molecule: Structure | None = None,
+            reference_frame_index: int = 0,
     ) -> None:
         """
         Export dataset to training files readable by MACE.
-        Split data into training, validation, and test sets
-        according to fractions.
         """
         _export_to_mace(
             dataset=self.structures,
-            save_paths=save_paths,
-            fractions=fractions,
+            save_path=save_path,
             learning_strategy=learning_strategy,
+            reference_energy_type=reference_energy_type,
+            reference_molecule=reference_molecule,
+            reference_frame_index=reference_frame_index,
         )
     
 def _select_frames(
@@ -605,44 +682,37 @@ def _run_model(
 
 def _export_to_mace(
         dataset: List[Structure|FiniteSubsystem],            
-        save_paths: Sequence[str] = ("train.xyz", "validate.xyz", "test.xyz"),
-        fractions: npt.NDArray[np.float64] = np.array([0.90, 0.05, 0.05]),
-        learning_strategy: Literal["direct", "delta"] = "direct"
+        save_path: str,
+        learning_strategy: Literal["direct", "delta"] = "direct",
+        reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
+        reference_molecule: Structure | None = None,
+        reference_frame_index: int = 0,
 ) -> None:
-    assert len(save_paths) == 3
-    assert len(fractions) == 3
 
-    train, validate, test = [], [], []
-
+    structures = []
     for x in dataset:
-        a, b, c = x.random_split(fractions)
-        
         if isinstance(x, FiniteSubsystem):
-            a = a.cluster_of_molecules
-            b = b.cluster_of_molecules
-            c = c.cluster_of_molecules
-
-        train.append(a)
-        validate.append(b)
-        test.append(c)
-
+            structures.append(x.cluster_of_molecules)
+        else:
+            structures.append(x)
+            
     if learning_strategy == "direct":
-        for i, x in enumerate([train, validate, test]):
-            for j, y in enumerate(x):
-                mbe_automation.ml.mace.to_xyz_training_set(
-                    structure=y,
-                    save_path=save_paths[i],
-                    append=(j>0),
-                    E_pot=(y.E_pot if y.E_pot is not None else None),
-                    forces=(y.forces if y.forces is not None else None),
-                )
+        for i, x in enumerate(structures):
+            mbe_automation.ml.mace.to_xyz_training_set(
+                structure=x,
+                save_path=save_path,
+                append=(i>0),
+                E_pot=(x.E_pot if x.E_pot is not None else None),
+                forces=(x.forces if x.forces is not None else None),
+            )
 
     elif learning_strategy == "delta":
-        for i, x in enumerate([train, validate, test]):
-            mbe_automation.ml.delta.export_to_mace(
-                    structures=x,
-                    save_path=save_paths[i],
-                    skip_atoms=(i>0),
-            )
+        mbe_automation.ml.delta.export_to_mace(
+            structures=structures,
+            save_path=save_path,
+            reference_energy_type=reference_energy_type,
+            reference_molecule=reference_molecule,
+            reference_frame_index=reference_frame_index,
+        )
 
     return

@@ -1,11 +1,10 @@
 from __future__ import annotations
-from typing import Literal, Tuple, Optional
+from typing import Literal, Tuple, Optional, List
 import numpy as np
 import numpy.typing as npt
 import ase
 import pyscf
 import pyscf.hessian.thermo
-from typing import Tuple, Optional
 import pymatgen.core
 import pymatgen.analysis.molecule_matcher
 
@@ -167,4 +166,3 @@ def match(
         atomic_numbers_b,
         thresh_for_mirror_check,
     )
-    

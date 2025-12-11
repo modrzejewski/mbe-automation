@@ -14,6 +14,7 @@ import mbe_automation.dynamics.harmonic
 import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
+import mbe_automation.structure.clusters
 
 try:
     from mace.calculators import MACECalculator
@@ -50,6 +51,16 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         if isinstance(config.calculator, MACECalculator):
             mbe_automation.common.display.mace_summary(config.calculator)
 
+    mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
+        dataset=config.dataset,
+        key=f"{config.root_key}/structures",
+        crystal=mbe_automation.storage.from_ase_atoms(unit_cell),
+        calculator=config.calculator,
+        config=config.relaxation,
+        energy_thresh=config.unique_molecules_energy_thresh,
+        work_dir=geom_opt_dir,
+    )
+
     if config.molecule is not None:
         molecule = config.molecule.copy()
         relaxed_molecule_label = "molecule[opt:atoms]"
@@ -58,7 +69,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             calculator=config.calculator,
             config=config.relaxation,
             work_dir=geom_opt_dir/relaxed_molecule_label,
-            key=f"{config.root_key}/relaxation/{relaxed_molecule_label}"
+            key=f"{config.root_key}/structures/{relaxed_molecule_label}"
         )
         vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
             molecule,
@@ -98,13 +109,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         calculator=config.calculator,
         config=optimizer,
         work_dir=geom_opt_dir/relaxed_crystal_label,
-        key=f"{config.root_key}/relaxation/{relaxed_crystal_label}"
+        key=f"{config.root_key}/structures/{relaxed_crystal_label}"
     )
     V0 = unit_cell_V0.get_volume()
     reference_cell = unit_cell_V0.cell.copy()
     mbe_automation.structure.crystal.display(
         unit_cell=unit_cell_V0,
-        key=f"{config.root_key}/relaxation/{relaxed_crystal_label}"
+        key=f"{config.root_key}/structures/{relaxed_crystal_label}"
     )
     #
     # The supercell transformation is computed once and kept
@@ -244,7 +255,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 calculator=config.calculator,
                 config=optimizer,
                 work_dir=geom_opt_dir/label_crystal,
-                key=f"{config.root_key}/relaxation/{label_crystal}"
+                key=f"{config.root_key}/structures/{label_crystal}"
             )
         elif config.eos_sampling == "volume" or config.eos_sampling == "uniform_scaling":
             #
@@ -268,7 +279,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 calculator=config.calculator,
                 config=optimizer,
                 work_dir=geom_opt_dir/label_crystal,
-                key=f"{config.root_key}/relaxation/{label_crystal}"
+                key=f"{config.root_key}/structures/{label_crystal}"
             )
         phonons = mbe_automation.dynamics.harmonic.core.phonons(
             unit_cell_T,

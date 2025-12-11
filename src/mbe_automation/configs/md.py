@@ -7,6 +7,7 @@ import numpy as np
 import numpy.typing as npt
 
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
+from .structure import Minimum
 
 @dataclass(kw_only=True)
 class ClassicalMD:
@@ -172,6 +173,19 @@ class Enthalpy:
                                    #
     temperatures_K: float | npt.NDArray[np.floating] = 298.15
     pressures_GPa: float | npt.NDArray[np.floating] = 1.0E-4
+                                   #
+                                   # Energy threshold (eV/atom) used to detect
+                                   # nonequivalent molecules in the input unit
+                                   # cell. Molecules A and B are considered
+                                   # nonequivalent if
+                                   #
+                                   # ||E_pot(A)-E_pot(B)|| > unique_molecules_energy_thresh
+                                   #
+    unique_molecules_energy_thresh: float = 1.0E-3
+                                   #
+                                   # Parameters controlling geometry relaxation
+                                   #
+    relaxation: Minimum = field(default_factory=Minimum)
                                    #
                                    # Directory where files are stored
                                    # at runtime

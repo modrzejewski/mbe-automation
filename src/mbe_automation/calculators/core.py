@@ -33,6 +33,7 @@ def run_model(
         compute_feature_vectors: bool = True,
         average_over_atoms: bool = False,
         return_arrays: bool = False,
+        silent: bool = False,
 ) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None] | None:
     """
     Run a calculator of energies/forces/feature vectors for all frames of a given
@@ -57,21 +58,23 @@ def run_model(
         else:
             if not return_arrays: structure.feature_vectors_type = "atomic"
 
-    mbe_automation.common.display.framed([
-        "Properties for pre-computed structures"
-    ])
-    print(f"n_frames                    {structure.n_frames}")
-    print(f"compute_energies            {compute_energies}")
-    print(f"compute_forces              {compute_forces}")
-    print(f"compute_feature_vectors     {compute_feature_vectors}")
+    if not silent:
+        mbe_automation.common.display.framed([
+            "Properties for pre-computed structures"
+        ])
+        print(f"n_frames                    {structure.n_frames}")
+        print(f"compute_energies            {compute_energies}")
+        print(f"compute_forces              {compute_forces}")
+        print(f"compute_feature_vectors     {compute_feature_vectors}")
 
-    print(f"Loop over frames...")
+        print(f"Loop over frames...")
     
     for i in mbe_automation.common.display.Progress(
             iterable=range(structure.n_frames),
             n_total_steps=structure.n_frames,
             label="frames",
             percent_increment=10,
+            silent=silent,
     ):
         atoms = to_ase(
             structure=structure,

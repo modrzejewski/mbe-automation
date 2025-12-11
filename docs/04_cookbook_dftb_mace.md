@@ -43,8 +43,8 @@ config = Enthalpy(
     calculator=calculator,
     crystal=crystal,
     md_crystal=md_config,
-    temperature_K=300.0,
-    pressure_GPa=0.0001,
+    temperatures_K=np.array([300.0]),
+    pressures_GPa=np.array([0.0001]),
     work_dir="dftb_md_workdir",
     dataset="dftb_trajectory.hdf5",
     root_key="md_run",
@@ -62,7 +62,7 @@ mbe_automation.run(config)
 # Construct the key where the trajectory was saved.
 # The convention is: {root_key}/crystal[dyn:T={T},p={p}]/trajectory
 # Note: The format specifiers match those used in the workflow.
-traj_key = f"{config.root_key}/crystal[dyn:T={config.temperature_K:.2f},p={config.pressure_GPa:.5f}]/trajectory"
+traj_key = f"{config.root_key}/crystal[dyn:T={config.temperatures_K[0]:.2f},p={config.pressures_GPa[0]:.5f}]/trajectory"
 
 # Load the trajectory from the HDF5 file
 trajectory = Trajectory.read(

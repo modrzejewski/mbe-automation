@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+from pathlib import Path
 import warnings
 import pandas as pd
 import numpy as np
@@ -132,6 +133,16 @@ def run(config: mbe_automation.configs.md.Enthalpy):
             )
         else:
             supercell_matrix = config.md_crystal.supercell_matrix
+
+        mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
+            dataset=config.dataset,
+            key=f"{config.root_key}/structures",
+            crystal=mbe_automation.storage.from_ase_atoms(config.crystal),
+            calculator=config.calculator,
+            config=config.relaxation,
+            energy_thresh=config.unique_molecules_energy_thresh,
+            work_dir=Path(config.work_dir)/"relaxation",
+        )
 
         df_crystal = _md_crystal(supercell_matrix, config)
 

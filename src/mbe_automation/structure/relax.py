@@ -17,6 +17,7 @@ import mbe_automation.calculators.dftb
 import mbe_automation.structure.crystal
 import mbe_automation.configs.structure
 import mbe_automation.common
+import mbe_automation.storage
 
 def _crystal_optimizer_ase(
         unit_cell: ase.Atoms,
@@ -303,7 +304,7 @@ def _isolated_molecule_optimizer_ase(
     return relaxed_molecule
 
 
-def isolated_molecule(
+def _isolated_molecule(
         molecule: ase.Atoms,
         calculator: ASECalculator,
         config: mbe_automation.configs.structure.Minimum,
@@ -345,3 +346,47 @@ def isolated_molecule(
 
     relaxed_molecule.calc = calculator
     return relaxed_molecule
+
+def isolated_molecule(
+        molecule: ase.Atoms | mbe_automation.storage.Structure,
+        calculator: ASECalculator,
+        config: mbe_automation.configs.structure.Minimum,
+        work_dir: Path | str = Path("./"),
+        key: str | None = None,
+        frame_index: int = 0,
+) -> ase.Atoms | mbe_automation.storage.Structure:
+    
+    if isinstance(molecule, mbe_automation.storage.Structure):
+        assert (not molecule.periodic)
+        ase_atoms = mbe_automation.storage.to_ase(molecule, frame_index=frame_index)
+        relaxed_ase_atoms = _isolated_molecule(
+            molecule=ase_atoms,
+            calculator=calculator,
+            config=config,
+            work_dir=work_dir,
+            key=key,
+        )
+        relaxed_molecule = mbe_automation.storage.Structure(
+            positions=relaxed_ase_atoms.positions,
+            atomic_numbers=relaxed_ase_atoms.numbers,
+            masses=relaxed_ase_atoms.get_masses(),
+            cell_vectors=None,
+            n_frames=1,
+            n_atoms=molecule.n_atoms,
+        )
+        
+        return relaxed_molecule
+
+    elif isinstance(molecule, ase.Atoms):
+        
+        return _isolated_molecule(
+            molecule=molecule,
+            calculator=calculator,
+            config=config,
+            work_dir=work_dir,
+            key=key,
+        )
+
+    else:
+        raise ValueError("Unsupported object passed to relax.isolated_molecule.")
+
