@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Tuple, Literal, Sequence, List
+from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 from mace.calculators import MACECalculator
