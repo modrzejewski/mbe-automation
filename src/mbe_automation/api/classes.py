@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 from mace.calculators import MACECalculator
+import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 
@@ -23,7 +24,7 @@ import mbe_automation.ml.mace
 import mbe_automation.ml.delta
 import mbe_automation.calculators
 import mbe_automation.structure.clusters
-from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
+from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES, LEVELS_OF_THEORY
 from mbe_automation.ml.core import REFERENCE_ENERGY_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
@@ -57,6 +58,16 @@ class Structure(_Structure):
         return cls(**vars(
             mbe_automation.storage.read_structure(dataset, key)
         ))
+
+    def to_ase_atoms(
+            self,
+            frame_index: int = 0,
+    ) -> ase.Atoms:
+        
+        return mbe_automation.storage.to_ase(
+            structure=self,
+            frame_index=frame_index
+        )
 
     @classmethod
     def from_xyz_file(
@@ -100,23 +111,22 @@ class Structure(_Structure):
             Structure(**vars(x)) for x in _split_frames(self, fractions, rng)
         ]
 
-    def to_training_set(
+    def to_mace_dataset(
             self,
             save_path: str,
-            quantities: List[Literal["energies", "forces"]],
-            append: bool = False,
-            data_format: Literal["mace_xyz"] = "mace_xyz",
+            learning_strategy: Literal["direct", "delta"] = "direct",
+            reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
+            reference_molecule: Structure | None = None,
+            reference_frame_index: int = 0,
     ) -> None:
-        if data_format == "mace_xyz":
-            mbe_automation.ml.mace.to_xyz_training_set(
-                structure=self,
-                save_path=save_path,
-                append=append,
-                E_pot=(self.E_pot if "energies" in quantities else None),
-                forces=(self.forces if "forces" in quantities else None),
-            )
-        else:
-            raise ValueError("Unsupported data format of the training set")
+        _to_mace_dataset(
+            dataset=[self],
+            save_path=save_path,
+            learning_strategy=learning_strategy,
+            reference_energy_type=reference_energy_type,
+            reference_molecule=reference_molecule,
+            reference_frame_index=reference_frame_index,
+        )
 
     def run_model(
             self,
@@ -124,7 +134,7 @@ class Structure(_Structure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            delta_learning: Literal["target", "baseline", "none"]="none",
+            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -133,7 +143,7 @@ class Structure(_Structure):
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
-            delta_learning=delta_learning,
+            level_of_theory=level_of_theory,
             exec_params=exec_params,
         )
 
@@ -229,7 +239,7 @@ class Trajectory(_Trajectory):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            delta_learning: Literal["none", "target", "baseline"]="none",
+            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -238,7 +248,7 @@ class Trajectory(_Trajectory):
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
-            delta_learning=delta_learning,
+            level_of_theory=level_of_theory,
             exec_params=exec_params,
         )
 
@@ -340,7 +350,7 @@ class FiniteSubsystem(_FiniteSubsystem):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            delta_learning: Literal["none", "target", "baseline"]="none",
+            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -349,7 +359,7 @@ class FiniteSubsystem(_FiniteSubsystem):
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
-            delta_learning=delta_learning,
+            level_of_theory=level_of_theory,
             exec_params=exec_params,
         )
 
@@ -368,23 +378,22 @@ class FiniteSubsystem(_FiniteSubsystem):
             for s in _split_frames(self.cluster_of_molecules, fractions, rng)
         ]
 
-    def to_training_set(
+    def to_mace_dataset(
             self,
             save_path: str,
-            quantities: List[Literal["energies", "forces"]],
-            append: bool = False,
-            data_format: Literal["mace_xyz"] = "mace_xyz",
+            learning_strategy: Literal["direct", "delta"] = "direct",
+            reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
+            reference_molecule: Structure | None = None,
+            reference_frame_index: int = 0,
     ) -> None:
-        if data_format == "mace_xyz":
-            mbe_automation.ml.mace.to_xyz_training_set(
-                structure=self.cluster_of_molecules,
-                save_path=save_path,
-                append=append,
-                E_pot=(self.cluster_of_molecules.E_pot if "energies" in quantities else None),
-                forces=(self.cluster_of_molecules.forces if "forces" in quantities else None),
-            )
-        else:
-            raise ValueError("Unsupported data format of the training set")
+        _to_mace_dataset(
+            dataset=[self],
+            save_path=save_path,
+            learning_strategy=learning_strategy,
+            reference_energy_type=reference_energy_type,
+            reference_molecule=reference_molecule,
+            reference_frame_index=reference_frame_index,
+        )
 
 @dataclass
 class Dataset:
@@ -400,7 +409,7 @@ class Dataset:
         """
         self.structures.append(structure)
 
-    def export_to_mace(
+    def to_mace_dataset(
             self,
             save_path: str,
             learning_strategy: Literal["direct", "delta"],
@@ -411,7 +420,7 @@ class Dataset:
         """
         Export dataset to training files readable by MACE.
         """
-        _export_to_mace(
+        _to_mace_dataset(
             dataset=self.structures,
             save_path=save_path,
             learning_strategy=learning_strategy,
@@ -631,9 +640,10 @@ def _run_model(
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        delta_learning: Literal["target", "baseline", "none"]="none",
+        level_of_theory: Literal[*LEVELS_OF_THEORY] = "default",
         exec_params: ParallelCPU | None = None,
 ) -> None:
+    
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
     
     if exec_params is None:
@@ -655,22 +665,22 @@ def _run_model(
         structure.feature_vectors = d
         structure.feature_vectors_type = feature_vectors_type
 
-    if delta_learning == "none":
+    if level_of_theory == "default":
         if energies: structure.E_pot = E_pot
         if forces: structure.forces = F
 
-    if delta_learning != "none" and structure.delta is None:
-        structure.delta = mbe_automation.storage.core.DeltaTargetBaseline()
+    if level_of_theory != "default" and structure.delta is None:
+        structure.delta = mbe_automation.storage.DeltaTargetBaseline()
 
-    if delta_learning == "baseline":
+    if level_of_theory == "delta/baseline":
         if energies: structure.delta.E_pot_baseline = E_pot
         if forces: structure.delta.forces_baseline = F
 
-    if delta_learning == "target":
+    if level_of_theory == "delta/target":
         if energies: structure.delta.E_pot_target = E_pot
         if forces: structure.delta.forces_target = F
 
-    if delta_learning == "baseline" and energies:
+    if level_of_theory == "delta/baseline" and energies:
         unique_elements = structure.unique_elements
         E_atomic_baseline = mbe_automation.calculators.atomic_energies(
             calculator=calculator,
@@ -680,7 +690,7 @@ def _run_model(
 
     return
 
-def _export_to_mace(
+def _to_mace_dataset(
         dataset: List[Structure|FiniteSubsystem],            
         save_path: str,
         learning_strategy: Literal["direct", "delta"] = "direct",
@@ -688,6 +698,8 @@ def _export_to_mace(
         reference_molecule: Structure | None = None,
         reference_frame_index: int = 0,
 ) -> None:
+
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
     structures = []
     for x in dataset:

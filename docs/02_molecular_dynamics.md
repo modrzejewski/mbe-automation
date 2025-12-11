@@ -86,6 +86,8 @@ mbe_automation.run(md_config)
 | `md_crystal` | An instance of `ClassicalMD` that configures the MD simulation for the crystal. | - |
 | `temperatures_K` | Target temperatures (in Kelvin) for the MD simulation. Can be a single float or an array of floats. | `298.15` |
 | `pressures_GPa` | Target pressures (in GPa) for the MD simulation. Can be a single float or an array of floats. | `1.0E-4` |
+| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell. | `1.0E-3`    |
+| `relaxation`                     | An instance of `Minimum` that configures the geometry relaxation parameters.                | `Minimum()` |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
 | `dataset` | The main HDF5 file with all data computed for the physical system. | `"./properties.hdf5"` |
 | `root_key` | Specifies the root path in the HDF5 dataset where the workflow's output is stored. | `"md"` |

@@ -42,6 +42,8 @@ REFERENCE_ENERGY_TYPES = [
     "reference_molecule",
 ]
 
+LEVELS_OF_THEORY = ["default", "delta/baseline", "delta/target"]
+
 def _average_over_atoms(
     feature_vectors: npt.NDArray[np.floating]
 ) -> npt.NDArray[np.floating]:
