@@ -278,9 +278,9 @@ def detect_molecules(
     components = list(networkx.weakly_connected_components(structure_graph.graph))
     masses = np.array([site.specie.atomic_mass for site in supercell.sites])
     scaled_positions = supercell.frac_coords
-    
-    supercell_subset = []
-    n_atoms_found = 0
+
+    contiguous_molecules = []
+    distances_from_center = []
     for component in components:
         atom_indices = np.array(list(component))        
         subgraph = structure_graph.graph.subgraph(atom_indices)
@@ -292,10 +292,19 @@ def detect_molecules(
             mol_positions = scaled_positions[atom_indices]
             mol_masses = masses[atom_indices]
             com_scaled = np.sum(mol_positions * mol_masses[:, np.newaxis], axis=0) / np.sum(mol_masses)
-            print(f"com_scaled={com_scaled} {np.all(com_scaled >= 1.0/3.0) and np.all(com_scaled < 2.0/3.0)}")
-            if np.all(com_scaled >= 1.0/3.0) and np.all(com_scaled < 2.0/3.0):
-                supercell_subset.append(atom_indices)
-                n_atoms_found += len(atom_indices)
+
+            contiguous_molecules.append(atom_indices)
+            distances_from_center.append(np.linalg.norm(com_scaled-np.array([0.5, 0.5, 0.5])))
+            
+    distances_from_center = np.array(distances_from_center)
+    supercell_subset = []
+    n_atoms_found = 0
+
+    for i in np.argsort(distances_from_center):
+        if n_atoms_found < n_atoms_unit_cell:
+            atom_indices = contiguous_molecules[i]
+            supercell_subset.append(atom_indices)
+            n_atoms_found += len(atom_indices)
     
     assert n_atoms_found == n_atoms_unit_cell
 

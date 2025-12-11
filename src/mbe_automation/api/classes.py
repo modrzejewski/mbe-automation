@@ -10,6 +10,7 @@ from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 import mbe_automation.storage
 from mbe_automation.configs.execution import ParallelCPU
 from mbe_automation.configs.clusters import FiniteSubsystemFilter
+from mbe_automation.configs.structure import Minimum
 from mbe_automation.storage import ForceConstants as _ForceConstants
 from mbe_automation.storage import Structure as _Structure
 from mbe_automation.storage import Trajectory as _Trajectory
@@ -157,6 +158,47 @@ class Structure(_Structure):
                     reference_frame_index=reference_frame_index,
                     calculator=calculator,
                 )]
+
+    def extract_unique_molecules(
+            self,
+            calculator: ASECalculator,
+            energy_thresh: float = 1.0E-5, # eV/atom
+            bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+            reference_frame_index: int = 0,
+    ) -> List[Structure]:
+
+        return [Structure(**vars(molecule)) for molecule in
+                mbe_automation.structure.clusters.extract_unique_molecules(
+                    crystal=self,
+                    calculator: ASECalculator,
+                    energy_thresh: float = 1.0E-5, # eV/atom
+                    bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+                    reference_frame_index: int = 0,
+                )]
+
+    def extract_relaxed_unique_molecules(
+            self,
+            dataset: str,
+            key: str,
+            calculator: ASECalculator,
+            config: Minimum,
+            energy_thresh: float = 1.0E-5, # eV/atom
+            bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+            reference_frame_index: int = 0,
+            work_dir: Path | str = Path("./")
+    ) -> None:
+        
+        mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
+            dataset=dataset,
+            key=key,
+            crystal=self,
+            calculator=calculator,
+            config=config,
+            energy_thresh=energy_thresh,
+            bonding_algo=bonding_algo,
+            reference_frame_index=reference_frame_index,
+            work_dir=work_dir,
+        )
 
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory):
