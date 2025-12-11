@@ -7,6 +7,7 @@ import numpy as np
 import numpy.typing as npt
 
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
+from .structure import Minimum
 
 @dataclass(kw_only=True)
 class ClassicalMD:
