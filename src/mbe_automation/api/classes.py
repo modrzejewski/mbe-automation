@@ -648,12 +648,12 @@ def _export_to_mace(
             )
 
     elif learning_strategy == "delta":
-            mbe_automation.ml.delta.export_to_mace(
-                    structures=structures,
-                    save_path=save_path,
-                    reference_energy_type=reference_energy_type,
-                    reference_molecule=reference_molecule,
-                    reference_frame_index=reference_frame_index,
-            )
+        mbe_automation.ml.delta.export_to_mace(
+            structures=structures,
+            save_path=save_path,
+            reference_energy_type=reference_energy_type,
+            reference_molecule=reference_molecule,
+            reference_frame_index=reference_frame_index,
+        )
 
     return

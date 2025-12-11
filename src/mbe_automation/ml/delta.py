@@ -290,7 +290,7 @@ def _energy_shifts(
     print(f"n_elements                      {stats.n_elements}")
     print(f"reference_energy_type           {reference_energy_type}")
     
-    if reference_energy_type == "linear_regression":
+    if reference_energy_type == "least_squares":
         E_atomic_shifts =  _energy_shifts_linear_regression(
             structures=structures,
             stats=stats,

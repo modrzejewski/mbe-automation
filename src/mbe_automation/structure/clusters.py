@@ -624,7 +624,7 @@ def extract_relaxed_unique_molecules(
             molecule=molecule,
             calculator=calculator,
             config=config,
-            work_dir=f"{work_dir}/{relaxed_labels[-1]}",
+            work_dir=Path(work_dir)/relaxed_labels[-1],
             key=f"{key}/{relaxed_labels[-1]}",
         )
 
