@@ -247,8 +247,8 @@ def _rmse_atomic_shifts(
         stats: DataStats,
 ):
     z_map = _z_map(structures)
-    E_atomic_baseline = _atomic_energies(structures)
     E_target = _target_energies(structures)
+    E_baseline = _baseline_energies(structures)
     E_diff_shifted_baseline = np.zeros(stats.n_frames)
     n_frames_processed = 0
     
@@ -263,7 +263,7 @@ def _rmse_atomic_shifts(
         n = n / structure.n_atoms
         i0 = n_frames_processed
         i1 = n_frames_processed + structure.n_frames
-        E_diff_shifted_baseline[i0:i1] = E_target[i] - np.sum(n * (E_atomic_baseline + E_atomic_shifts))
+        E_diff_shifted_baseline[i0:i1] = E_target[i] - E_baseline[i] - np.sum(n * E_atomic_shifts)
         n_frames_processed += structure.n_frames
 
     rmse_shifted = np.sqrt(np.mean(E_diff_shifted_baseline**2))
