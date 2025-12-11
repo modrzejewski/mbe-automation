@@ -1,9 +1,9 @@
 # Installation
 
-- [1. Create a Virtual Environment](#1-create-a-virtual-environment)
-- [2. Clone the Repository](#2-clone-the-repository)
-- [3. Install the Program](#3-install-the-program)
-- [4. Supported Methods](#4-supported-methods)
+- [Create a Virtual Environment](#1-create-a-virtual-environment)
+- [Clone the Repository](#2-clone-the-repository)
+- [Install the Program](#3-install-the-program)
+- [Supported Methods](#4-supported-methods)
 
 ## 1. Create a Virtual Environment
 
