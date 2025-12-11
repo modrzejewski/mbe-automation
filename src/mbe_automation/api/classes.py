@@ -699,6 +699,8 @@ def _to_mace_dataset(
         reference_frame_index: int = 0,
 ) -> None:
 
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+
     structures = []
     for x in dataset:
         if isinstance(x, FiniteSubsystem):
