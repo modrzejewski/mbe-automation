@@ -660,7 +660,7 @@ def _run_model(
         if energies: structure.E_pot = E_pot
         if forces: structure.forces = F
 
-    if level_of_theory in ["delta/baseline", "delta/target"] and structure.delta is None:
+    if level_of_theory != "default" and structure.delta is None:
         structure.delta = mbe_automation.storage.core.DeltaTargetBaseline()
 
     if level_of_theory == "delta/baseline":
