@@ -23,7 +23,7 @@ import mbe_automation.ml.mace
 import mbe_automation.ml.delta
 import mbe_automation.calculators
 import mbe_automation.structure.clusters
-from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
+from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES, LEVELS_OF_THEORY
 from mbe_automation.ml.core import REFERENCE_ENERGY_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
@@ -124,7 +124,7 @@ class Structure(_Structure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            delta_learning: Literal["target", "baseline", "none"]="none",
+            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -133,7 +133,7 @@ class Structure(_Structure):
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
-            delta_learning=delta_learning,
+            level_of_theory=level_of_theory,
             exec_params=exec_params,
         )
 
@@ -229,7 +229,7 @@ class Trajectory(_Trajectory):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            delta_learning: Literal["none", "target", "baseline"]="none",
+            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -238,7 +238,7 @@ class Trajectory(_Trajectory):
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
-            delta_learning=delta_learning,
+            level_of_theory=level_of_theory,
             exec_params=exec_params,
         )
 
@@ -340,7 +340,7 @@ class FiniteSubsystem(_FiniteSubsystem):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            delta_learning: Literal["none", "target", "baseline"]="none",
+            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -349,7 +349,7 @@ class FiniteSubsystem(_FiniteSubsystem):
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
-            delta_learning=delta_learning,
+            level_of_theory=level_of_theory,
             exec_params=exec_params,
         )
 
@@ -631,9 +631,10 @@ def _run_model(
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        delta_learning: Literal["target", "baseline", "none"]="none",
+        level_of_theory: Literal[*LEVELS_OF_THEORY] = "default",
         exec_params: ParallelCPU | None = None,
 ) -> None:
+    
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
     
     if exec_params is None:
@@ -655,22 +656,22 @@ def _run_model(
         structure.feature_vectors = d
         structure.feature_vectors_type = feature_vectors_type
 
-    if delta_learning == "none":
+    if level_of_theory == "default":
         if energies: structure.E_pot = E_pot
         if forces: structure.forces = F
 
-    if delta_learning != "none" and structure.delta is None:
+    if level_of_theory in ["delta/baseline", "delta/target"] and structure.delta is None:
         structure.delta = mbe_automation.storage.core.DeltaTargetBaseline()
 
-    if delta_learning == "baseline":
+    if level_of_theory == "delta/baseline":
         if energies: structure.delta.E_pot_baseline = E_pot
         if forces: structure.delta.forces_baseline = F
 
-    if delta_learning == "target":
+    if level_of_theory == "delta/target":
         if energies: structure.delta.E_pot_target = E_pot
         if forces: structure.delta.forces_target = F
 
-    if delta_learning == "baseline" and energies:
+    if level_of_theory == "delta/baseline" and energies:
         unique_elements = structure.unique_elements
         E_atomic_baseline = mbe_automation.calculators.atomic_energies(
             calculator=calculator,
