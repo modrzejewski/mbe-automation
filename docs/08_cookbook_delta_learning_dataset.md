@@ -2,25 +2,17 @@
 
 This cookbook demonstrates how to create a dataset for **Delta Learning** using the MACE framework. Delta learning aims to learn the difference between a high-level target method (e.g., DFTB, DFT, or CCSD(T)) and a lower-level baseline method (e.g., a semi-empirical method or a simpler ML potential).
 
-## Prerequisites
+## Table of Contents
 
-This cookbook assumes you have already:
-1.  Performed MD sampling or generated structures (as described in [Molecular Dynamics](./02_molecular_dynamics.md) or the [MD + DFTB Cookbook](./07_cookbook_mace_md_dftb_energies.md)).
-2.  Saved these structures and their properties (energies, forces) to an HDF5 file (referred to here as `md_structures.hdf5`).
-3.  Have access to a pre-trained baseline model (e.g., `mace-mh-1.model`) and a target calculator (e.g., DFTB+).
+1. [Setup](#setup)
+2. [Reference Molecule Energy](#reference-molecule-energy)
+3. [Dataset of Periodic Structures](#dataset-of-periodic-structures)
+4. [Dataset of Finite Clusters](#dataset-of-finite-clusters)
+5. [Complete Example](#complete-example)
 
-## Workflow Overview
+## Setup
 
-1.  **Reference Calculation**: Compute the energies of an isolated molecule using both the baseline and target calculators. This is essential for referencing energies correctly in delta learning.
-2.  **Data Loading**: Iterate through the HDF5 dataset to load periodic crystals and finite clusters.
-3.  **Data Splitting**: Split the loaded structures into training, validation, and test sets.
-4.  **Export**: Export the datasets to MACE-compatible XYZ files with the appropriate delta learning labels.
-
-## Step-by-Step Guide
-
-### 1. Setup and Reference Calculation
-
-First, we set up the calculators and compute the energies for an isolated reference molecule. This provides the `E_atomic_baseline` and `E_atomic_target` needed for the delta learning scheme.
+First, we set up the necessary imports and configuration variables. We specify the HDF5 dataset containing our structures and define the thermodynamic conditions (temperature and pressure) and cluster sizes we wish to process.
 
 ```python
 import os
@@ -37,7 +29,14 @@ dataset_path = "md_structures.hdf5"
 pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
 cluster_sizes = [1, 2, 3, 4, 5, 6, 7, 8]
+output_dir = "./datasets_11.12.2025"
+```
 
+## Reference Molecule Energy
+
+We need to calculate the energy of an isolated molecule using both the baseline (MACE) and target (DFTB+) calculators. This provides the atomic reference energies (`E_atomic_baseline` and `E_atomic_target`) needed for the delta learning scheme. We load a relaxed molecule from the dataset to serve as this reference.
+
+```python
 # Load reference molecule (extracted from the dataset)
 # Ensure this key points to a single, relaxed molecule
 ref = Structure.read(dataset=dataset_path, key="training/dftb3_d4/structures/molecule[extracted,0,opt:atoms]")
@@ -58,18 +57,15 @@ ref.run_model(calculator=baseline_calc, level_of_theory="delta/baseline")
 ref.run_model(calculator=target_calc, level_of_theory="delta/target")
 ```
 
-### 2. Loading and Splitting Data
+## Dataset of Periodic Structures
 
-We iterate through the thermodynamic conditions (T, p) and cluster sizes to load structures from the HDF5 file. We then split them into training, validation, and test sets.
+We iterate through the specified thermodynamic conditions (T, p) to load periodic crystal structures from the HDF5 file. We then split these structures into training (90%), validation (5%), and test (5%) sets and accumulate them into `Dataset` objects.
 
 ```python
-# Initialize Dataset containers
+# Initialize Dataset containers for periodic structures
 train_pbc = Dataset()
-train_clusters = Dataset()
 validate_pbc = Dataset()
-validate_clusters = Dataset()
 test_pbc = Dataset()
-test_clusters = Dataset()
 
 # Loop over Periodic Crystals
 for T, p in itertools.product(temperatures_K, pressures_GPa):
@@ -83,28 +79,7 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
     validate_pbc.append(b)
     test_pbc.append(c)
 
-    # Loop over Finite Clusters
-    for n_molecules in cluster_sizes:
-        key_cluster = f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
-        cluster = FiniteSubsystem.read(dataset=dataset_path, key=key_cluster)
-
-        # Split clusters
-        a, b, c = cluster.random_split([0.90, 0.05, 0.05])
-        train_clusters.append(a)
-        validate_clusters.append(b)
-        test_clusters.append(c)
-```
-
-### 3. Exporting to MACE Format
-
-Finally, we export the collected datasets to XYZ files. The `learning_strategy="delta"` argument ensures the correct energy differences (Target - Baseline) are written to the file.
-
-For the training sets, we also provide the `reference_molecule` and set `reference_energy_type="reference_molecule"`. This subtracts the isolated molecule energy from the total energies, which is crucial for learning interaction energies in molecular crystals.
-
-```python
-output_dir = "./datasets_11.12.2025"
-
-# Export PBC Datasets
+# Export Periodic Datasets
 train_pbc.to_mace_dataset(
     save_path=f"{output_dir}/train_pbc.xyz",
     learning_strategy="delta",
@@ -121,6 +96,28 @@ test_pbc.to_mace_dataset(
     save_path=f"{output_dir}/test_pbc.xyz",
     learning_strategy="delta",
 )
+```
+
+## Dataset of Finite Clusters
+
+Similarly, we iterate through the cluster sizes and thermodynamic conditions to load finite molecular clusters. These are also split and accumulated into separate `Dataset` objects.
+
+```python
+# Initialize Dataset containers for clusters
+train_clusters = Dataset()
+validate_clusters = Dataset()
+test_clusters = Dataset()
+
+for T, p in itertools.product(temperatures_K, pressures_GPa):
+    for n_molecules in cluster_sizes:
+        key_cluster = f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
+        cluster = FiniteSubsystem.read(dataset=dataset_path, key=key_cluster)
+
+        # Split clusters
+        a, b, c = cluster.random_split([0.90, 0.05, 0.05])
+        train_clusters.append(a)
+        validate_clusters.append(b)
+        test_clusters.append(c)
 
 # Export Cluster Datasets
 train_clusters.to_mace_dataset(
@@ -141,7 +138,7 @@ test_clusters.to_mace_dataset(
 )
 ```
 
-## Complete Script
+## Complete Example
 
 <details>
 <summary>delta_learning_dataset.py</summary>
@@ -241,11 +238,4 @@ test_clusters.to_mace_dataset(
 
 </details>
 
-## Output Explanation
-
-Running this script will generate six XYZ files in the `datasets_11.12.2025` directory (or whichever directory you specified):
-
-*   `train_pbc.xyz`, `validate_pbc.xyz`, `test_pbc.xyz`: Contain periodic crystal structures.
-*   `train_clusters.xyz`, `validate_clusters.xyz`, `test_clusters.xyz`: Contain finite molecular clusters.
-
-The `train_*.xyz` files will have their energies adjusted by the reference molecule energy (if `reference_energy_type="reference_molecule"` was used), making them suitable for training MACE to learn interaction energies. All files will contain the delta energies (Target - Baseline) and forces required for training the delta model.
+Running this script will generate six XYZ files in the `datasets_11.12.2025` directory (or whichever directory you specified). The `train_*.xyz` files will have their energies adjusted by the reference molecule energy, making them suitable for training MACE to learn interaction energies. All files will contain the delta energies (Target - Baseline) and forces required for training the delta model.

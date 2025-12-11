@@ -114,7 +114,7 @@ import numpy as np
 import itertools
 
 import mbe_automation
-from mbe_automation import Structure
+from mbe_automation import Structure, Dataset
 
 work_dir = "urea"
 dataset = f"{work_dir}/md_structures.hdf5"
@@ -215,7 +215,11 @@ dataset = f"{work_dir}/md_structures.hdf5"
 pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
 
-for i, (T, p) in enumerate(itertools.product(temperatures_K, pressures_GPa)):
+train_set = Dataset()
+val_set = Dataset()
+test_set = Dataset()
+
+for T, p in itertools.product(temperatures_K, pressures_GPa):
     print(f"Processing structures for T={T:.2f} K p={p:.5f} GPa")
 
     subsampled_frames = Structure.read(
@@ -224,21 +228,22 @@ for i, (T, p) in enumerate(itertools.product(temperatures_K, pressures_GPa)):
     )
     train, validate, test = subsampled_frames.random_split([0.90, 0.05, 0.05])
 
-    train.to_training_set(
-        save_path="urea/train_pbc.xyz",
-        quantities=["energies", "forces"],
-        append=(i>0),
-    )
-    validate.to_training_set(
-        save_path="urea/validate_pbc.xyz",
-        quantities=["energies", "forces"],
-        append=(i>0),
-    )
-    test.to_training_set(
-        save_path="urea/test_pbc.xyz",
-        quantities=["energies", "forces"],
-        append=(i>0),
-    )
+    train_set.append(train)
+    val_set.append(validate)
+    test_set.append(test)
+
+train_set.to_mace_dataset(
+    save_path="urea/train_pbc.xyz",
+    learning_strategy="direct"
+)
+val_set.to_mace_dataset(
+    save_path="urea/validate_pbc.xyz",
+    learning_strategy="direct"
+)
+test_set.to_mace_dataset(
+    save_path="urea/test_pbc.xyz",
+    learning_strategy="direct"
+)
 
 print("All calculations completed")
 ```
@@ -300,7 +305,7 @@ import numpy as np
 import itertools
 
 import mbe_automation
-from mbe_automation import Structure, FiniteSubsystem
+from mbe_automation import Structure, FiniteSubsystem, Dataset
 
 work_dir = "urea"
 dataset = f"{work_dir}/md_structures.hdf5"
@@ -406,31 +411,37 @@ pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
 cluster_sizes = [1, 2, 3, 4, 5, 6, 7, 8]
 
-for i, (T, p, n_molecules) in enumerate(itertools.product(temperatures_K, pressures_GPa, cluster_sizes)):
-    print(f"T={T:.2f} K p={p:.5f} GPa n_molecules={n_molecules}")
+train_set = Dataset()
+val_set = Dataset()
+test_set = Dataset()
 
-    clusters = FiniteSubsystem.read(
-        dataset=dataset,
-        key=f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
-    )
+for T, p in itertools.product(temperatures_K, pressures_GPa):
+    for n_molecules in cluster_sizes:
+        print(f"T={T:.2f} K p={p:.5f} GPa n_molecules={n_molecules}")
 
-    train, validate, test = clusters.random_split([0.90, 0.05, 0.05])
+        clusters = FiniteSubsystem.read(
+            dataset=dataset,
+            key=f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
+        )
 
-    train.to_training_set(
-        save_path="./urea/train_finite_clusters.xyz",
-        quantities=["energies", "forces"],
-        append=(i>0),
-    )
-    validate.to_training_set(
-        save_path="./urea/validate_finite_clusters.xyz",
-        quantities=["energies", "forces"],
-        append=(i>0),
-    )
-    test.to_training_set(
-        save_path="./urea/test_finite_clusters.xyz",
-        quantities=["energies", "forces"],
-        append=(i>0),
-    )
+        train, validate, test = clusters.random_split([0.90, 0.05, 0.05])
+
+        train_set.append(train)
+        val_set.append(validate)
+        test_set.append(test)
+
+train_set.to_mace_dataset(
+    save_path="./urea/train_finite_clusters.xyz",
+    learning_strategy="direct"
+)
+val_set.to_mace_dataset(
+    save_path="./urea/validate_finite_clusters.xyz",
+    learning_strategy="direct"
+)
+test_set.to_mace_dataset(
+    save_path="./urea/test_finite_clusters.xyz",
+    learning_strategy="direct"
+)
 
 print("All calculations completed")
 ```
