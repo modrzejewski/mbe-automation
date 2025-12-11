@@ -111,7 +111,7 @@ class Structure(_Structure):
             Structure(**vars(x)) for x in _split_frames(self, fractions, rng)
         ]
 
-    def export_to_mace(
+    def to_mace_dataset(
             self,
             save_path: str,
             learning_strategy: Literal["direct", "delta"] = "direct",
@@ -119,7 +119,7 @@ class Structure(_Structure):
             reference_molecule: Structure | None = None,
             reference_frame_index: int = 0,
     ) -> None:
-        _export_to_mace(
+        _to_mace_dataset(
             dataset=[self],
             save_path=save_path,
             learning_strategy=learning_strategy,
@@ -378,7 +378,7 @@ class FiniteSubsystem(_FiniteSubsystem):
             for s in _split_frames(self.cluster_of_molecules, fractions, rng)
         ]
 
-    def export_to_mace(
+    def to_mace_dataset(
             self,
             save_path: str,
             learning_strategy: Literal["direct", "delta"] = "direct",
@@ -386,7 +386,7 @@ class FiniteSubsystem(_FiniteSubsystem):
             reference_molecule: Structure | None = None,
             reference_frame_index: int = 0,
     ) -> None:
-        _export_to_mace(
+        _to_mace_dataset(
             dataset=[self],
             save_path=save_path,
             learning_strategy=learning_strategy,
@@ -409,7 +409,7 @@ class Dataset:
         """
         self.structures.append(structure)
 
-    def export_to_mace(
+    def to_mace_dataset(
             self,
             save_path: str,
             learning_strategy: Literal["direct", "delta"],
@@ -420,7 +420,7 @@ class Dataset:
         """
         Export dataset to training files readable by MACE.
         """
-        _export_to_mace(
+        _to_mace_dataset(
             dataset=self.structures,
             save_path=save_path,
             learning_strategy=learning_strategy,
@@ -690,7 +690,7 @@ def _run_model(
 
     return
 
-def _export_to_mace(
+def _to_mace_dataset(
         dataset: List[Structure|FiniteSubsystem],            
         save_path: str,
         learning_strategy: Literal["direct", "delta"] = "direct",
