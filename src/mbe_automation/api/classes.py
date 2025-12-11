@@ -102,7 +102,6 @@ class Structure(_Structure):
 
     def export_to_mace(
             self,
-            dataset: List[Structure|FiniteSubsystem],            
             save_path: str,
             learning_strategy: Literal["direct", "delta"] = "direct",
             reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
@@ -114,7 +113,7 @@ class Structure(_Structure):
             save_path=save_path,
             learning_strategy=learning_strategy,
             reference_energy_type=reference_energy_type,
-            reference_molecule=reference_molecules,
+            reference_molecule=reference_molecule,
             reference_frame_index=reference_frame_index,
         )
 
@@ -370,7 +369,6 @@ class FiniteSubsystem(_FiniteSubsystem):
 
     def export_to_mace(
             self,
-            dataset: List[Structure|FiniteSubsystem],            
             save_path: str,
             learning_strategy: Literal["direct", "delta"] = "direct",
             reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
@@ -382,7 +380,7 @@ class FiniteSubsystem(_FiniteSubsystem):
             save_path=save_path,
             learning_strategy=learning_strategy,
             reference_energy_type=reference_energy_type,
-            reference_molecule=reference_molecules,
+            reference_molecule=reference_molecule,
             reference_frame_index=reference_frame_index,
         )
 
@@ -661,7 +659,7 @@ def _run_model(
         if forces: structure.forces = F
 
     if level_of_theory != "default" and structure.delta is None:
-        structure.delta = mbe_automation.storage.core.DeltaTargetBaseline()
+        structure.delta = mbe_automation.storage.DeltaTargetBaseline()
 
     if level_of_theory == "delta/baseline":
         if energies: structure.delta.E_pot_baseline = E_pot

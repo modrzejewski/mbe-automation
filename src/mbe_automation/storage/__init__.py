@@ -3,6 +3,7 @@
 from mbe_automation.storage.core import (
     BrillouinZonePath,
     EOSCurves,
+    DeltaTargetBaseline,
     Structure,
     Trajectory,
     ForceConstants,
@@ -50,6 +51,7 @@ __all__ = [
     # Core classes
     "BrillouinZonePath",
     "EOSCurves",
+    "DeltaTargetBaseline",
     "Structure",
     "Trajectory",
     "ForceConstants",
