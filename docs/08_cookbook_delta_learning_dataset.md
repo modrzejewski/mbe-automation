@@ -8,7 +8,7 @@ This cookbook demonstrates how to create a dataset for **Delta Learning** using 
 2. [Reference Molecule Energy](#reference-molecule-energy)
 3. [Dataset of Periodic Structures](#dataset-of-periodic-structures)
 4. [Dataset of Finite Clusters](#dataset-of-finite-clusters)
-5. [Complete Example](#complete-example)
+5. [Model Training](#model-training)
 
 ## Setup
 
@@ -81,19 +81,19 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
 
 # Export Periodic Datasets
 train_pbc.to_mace_dataset(
-    save_path=f"{output_dir}/train_pbc.xyz",
+    save_path=f"{output_dir}/delta_train_pbc.xyz",
     learning_strategy="delta",
     reference_energy_type="reference_molecule",
     reference_molecule=ref,
 )
 
 validate_pbc.to_mace_dataset(
-    save_path=f"{output_dir}/validate_pbc.xyz",
+    save_path=f"{output_dir}/delta_validate_pbc.xyz",
     learning_strategy="delta",
 )
 
 test_pbc.to_mace_dataset(
-    save_path=f"{output_dir}/test_pbc.xyz",
+    save_path=f"{output_dir}/delta_test_pbc.xyz",
     learning_strategy="delta",
 )
 ```
@@ -121,121 +121,67 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
 
 # Export Cluster Datasets
 train_clusters.to_mace_dataset(
-    save_path=f"{output_dir}/train_clusters.xyz",
+    save_path=f"{output_dir}/delta_train_clusters.xyz",
     learning_strategy="delta",
     reference_energy_type="reference_molecule",
     reference_molecule=ref,
 )
 
 validate_clusters.to_mace_dataset(
-    save_path=f"{output_dir}/validate_clusters.xyz",
+    save_path=f"{output_dir}/delta_validate_clusters.xyz",
     learning_strategy="delta",
 )
 
 test_clusters.to_mace_dataset(
-    save_path=f"{output_dir}/test_clusters.xyz",
+    save_path=f"{output_dir}/delta_test_clusters.xyz",
     learning_strategy="delta",
 )
 ```
 
-## Complete Example
+## Model Training
 
-<details>
-<summary>delta_learning_dataset.py</summary>
+Finally, once the datasets are generated, you can train a Delta Learning MACE model. Below is an example SLURM script that submits a training job.
 
-```python
-import os
-import itertools
-import numpy as np
-from mbe_automation import Structure, Dataset, FiniteSubsystem
-from mace.calculators import MACECalculator
-from mbe_automation.calculators.dftb import DFTB3_D4
+**Script:** `train.sh`
 
-dataset = "md_structures.hdf5"
-pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
-temperatures_K = np.array([300.0])
-cluster_sizes = [1, 2, 3, 4, 5, 6, 7, 8]
+```bash
+#!/bin/bash
+#SBATCH --job-name="MACE_Train"
+#SBATCH -A pl0415-02
+#SBATCH --partition=tesla --constraint=h100
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --mem=180gb
 
-# Load reference molecule
-ref = Structure.read(dataset=dataset, key="training/dftb3_d4/structures/molecule[extracted,0,opt:atoms]")
+module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
+source ~/.virtualenvs/compute-env/bin/activate
 
-# Setup Calculators
-baseline_calc = MACECalculator(model_paths=os.path.expanduser("~/models/mace/mace-mh-1.model"), head="omol")
-target_calc = DFTB3_D4(ref.to_ase_atoms().get_chemical_symbols())
-
-# Compute Reference Energies (Baseline & Target)
-ref.run_model(calculator=baseline_calc, level_of_theory="delta/baseline")
-ref.run_model(calculator=target_calc, level_of_theory="delta/target")
-
-# Initialize Containers
-train_pbc = Dataset()
-train_clusters = Dataset()
-validate_pbc = Dataset()
-validate_clusters = Dataset()
-test_pbc = Dataset()
-test_clusters = Dataset()
-
-# Iterate and Split
-for T, p in itertools.product(temperatures_K, pressures_GPa):
-    # Process PBC
-    struct = Structure.read(
-        dataset=dataset,
-        key = f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/subsampled_frames"
-    )
-    a, b, c = struct.random_split([0.90, 0.05, 0.05])
-    train_pbc.append(a)
-    validate_pbc.append(b)
-    test_pbc.append(c)
-
-    # Process Clusters
-    for n_molecules in cluster_sizes:
-        cluster = FiniteSubsystem.read(
-            dataset=dataset,
-            key=f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
-        )
-        a, b, c = cluster.random_split([0.90, 0.05, 0.05])
-        train_clusters.append(a)
-        validate_clusters.append(b)
-        test_clusters.append(c)
-
-# Export Datasets
-output_dir = "./datasets_11.12.2025"
-
-train_pbc.to_mace_dataset(
-    save_path=f"{output_dir}/train_pbc.xyz",
-    learning_strategy="delta",
-    reference_energy_type="reference_molecule",
-    reference_molecule=ref,
-)
-
-validate_pbc.to_mace_dataset(
-    save_path=f"{output_dir}/validate_pbc.xyz",
-    learning_strategy="delta",
-)
-
-test_pbc.to_mace_dataset(
-    save_path=f"{output_dir}/test_pbc.xyz",
-    learning_strategy="delta",
-)
-
-train_clusters.to_mace_dataset(
-    save_path=f"{output_dir}/train_clusters.xyz",
-    learning_strategy="delta",
-    reference_energy_type="reference_molecule",
-    reference_molecule=ref,
-)
-
-validate_clusters.to_mace_dataset(
-    save_path=f"{output_dir}/validate_clusters.xyz",
-    learning_strategy="delta",
-)
-
-test_clusters.to_mace_dataset(
-    save_path=f"{output_dir}/test_clusters.xyz",
-    learning_strategy="delta",
-)
+python -m mace.cli.run_train \
+    --name="urea_dftb3_d4_delta" \
+    --train_file="datasets_11.12.2025/delta_train_clusters.xyz" \
+    --valid_file="datasets_11.12.2025/delta_validate_pbc.xyz" \
+    --test_file="datasets_11.12.2025/delta_test_pbc.xyz" \
+    --energy_key="Delta_energy" \
+    --model="MACELES" \
+    --multiheads_finetuning=False \
+    --r_max=4 \
+    --num_channels=16 \
+    --max_L=0 \
+    --batch_size=10 \
+    --max_num_epochs=300 \
+    --forces_weight=0 \
+    --energy_weight=1000 \
+    --stress_weight=0 \
+    --scaling="no_scaling" \
+    --ema \
+    --ema_decay=0.99 \
+    --amsgrad \
+    --default_dtype="float64" \
+    --device=cuda \
+    --seed=3 \
+    --save_cpu \
+    --restart_latest > "train.log" 2>&1
 ```
-
-</details>
-
-Running this script will generate six XYZ files in the `datasets_11.12.2025` directory (or whichever directory you specified). The `train_*.xyz` files will have their energies adjusted by the reference molecule energy, making them suitable for training MACE to learn interaction energies. All files will contain the delta energies (Target - Baseline) and forces required for training the delta model.
