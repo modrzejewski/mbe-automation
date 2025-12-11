@@ -100,23 +100,23 @@ class Structure(_Structure):
             Structure(**vars(x)) for x in _split_frames(self, fractions, rng)
         ]
 
-    def to_training_set(
+    def export_to_mace(
             self,
+            dataset: List[Structure|FiniteSubsystem],            
             save_path: str,
-            quantities: List[Literal["energies", "forces"]],
-            append: bool = False,
-            data_format: Literal["mace_xyz"] = "mace_xyz",
+            learning_strategy: Literal["direct", "delta"] = "direct",
+            reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
+            reference_molecule: Structure | None = None,
+            reference_frame_index: int = 0,
     ) -> None:
-        if data_format == "mace_xyz":
-            mbe_automation.ml.mace.to_xyz_training_set(
-                structure=self,
-                save_path=save_path,
-                append=append,
-                E_pot=(self.E_pot if "energies" in quantities else None),
-                forces=(self.forces if "forces" in quantities else None),
-            )
-        else:
-            raise ValueError("Unsupported data format of the training set")
+        _export_to_mace(
+            dataset=[self],
+            save_path=save_path,
+            learning_strategy=learning_strategy,
+            reference_energy_type=reference_energy_type,
+            reference_molecule=reference_molecules,
+            reference_frame_index=reference_frame_index,
+        )
 
     def run_model(
             self,
@@ -368,23 +368,23 @@ class FiniteSubsystem(_FiniteSubsystem):
             for s in _split_frames(self.cluster_of_molecules, fractions, rng)
         ]
 
-    def to_training_set(
+    def export_to_mace(
             self,
+            dataset: List[Structure|FiniteSubsystem],            
             save_path: str,
-            quantities: List[Literal["energies", "forces"]],
-            append: bool = False,
-            data_format: Literal["mace_xyz"] = "mace_xyz",
+            learning_strategy: Literal["direct", "delta"] = "direct",
+            reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
+            reference_molecule: Structure | None = None,
+            reference_frame_index: int = 0,
     ) -> None:
-        if data_format == "mace_xyz":
-            mbe_automation.ml.mace.to_xyz_training_set(
-                structure=self.cluster_of_molecules,
-                save_path=save_path,
-                append=append,
-                E_pot=(self.cluster_of_molecules.E_pot if "energies" in quantities else None),
-                forces=(self.cluster_of_molecules.forces if "forces" in quantities else None),
-            )
-        else:
-            raise ValueError("Unsupported data format of the training set")
+        _export_to_mace(
+            dataset=[self],
+            save_path=save_path,
+            learning_strategy=learning_strategy,
+            reference_energy_type=reference_energy_type,
+            reference_molecule=reference_molecules,
+            reference_frame_index=reference_frame_index,
+        )
 
 @dataclass
 class Dataset:
