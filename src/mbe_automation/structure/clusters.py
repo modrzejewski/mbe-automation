@@ -292,6 +292,7 @@ def detect_molecules(
             mol_positions = scaled_positions[atom_indices]
             mol_masses = masses[atom_indices]
             com_scaled = np.sum(mol_positions * mol_masses[:, np.newaxis], axis=0) / np.sum(mol_masses)
+            print(f"com_scaled={com_scaled}")
             if np.all(com_scaled >= 1.0/3.0) and np.all(com_scaled < 2.0/3.0):
                 supercell_subset.append(atom_indices)
                 n_atoms_found += len(atom_indices)
