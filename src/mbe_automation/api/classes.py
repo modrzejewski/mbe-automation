@@ -141,7 +141,22 @@ class Structure(_Structure):
         return MolecularCrystal(**vars(
             mbe_automation.structure.clusters.detect_molecules(system=self)
         ))
-    
+
+    def extract_all_molecules(
+            self,
+            bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+            reference_frame_index: int = 0,
+            calculator: ASECalculator | None = None,
+    ) -> List[Structure]:
+
+        return [Structure(**vars(molecule)) for molecule in
+                mbe_automation.structure.clusters.extract_all_molecules(
+                    crystal=self,
+                    bonding_algo=bonding_algo,
+                    reference_frame_index=reference_frame_index,
+                    calculator=calculator,
+                )]
+
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory):
     @classmethod
