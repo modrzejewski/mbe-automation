@@ -141,7 +141,7 @@ def run(config: mbe_automation.configs.md.Enthalpy):
             calculator=config.calculator,
             config=config.relaxation,
             energy_thresh=config.unique_molecules_energy_thresh,
-            work_dir=Path(config.work_dir)/relaxation,
+            work_dir=Path(config.work_dir)/"relaxation",
         )
 
         df_crystal = _md_crystal(supercell_matrix, config)
