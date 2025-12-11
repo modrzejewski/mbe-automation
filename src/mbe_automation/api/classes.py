@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 from mace.calculators import MACECalculator
+import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 
@@ -57,6 +58,16 @@ class Structure(_Structure):
         return cls(**vars(
             mbe_automation.storage.read_structure(dataset, key)
         ))
+
+    def to_ase_atoms(
+            self,
+            frame_index: int = 0,
+    ) -> ase.Atoms:
+        
+        return mbe_automation.storage.to_ase(
+            structure=self,
+            frame_index=frame_index
+        )
 
     @classmethod
     def from_xyz_file(
