@@ -5,6 +5,7 @@ import numpy as np
 import numpy.typing as npt
 from mace.calculators import MACECalculator
 from ase.calculators.calculator import Calculator as ASECalculator
+from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 
 import mbe_automation.storage
 from mbe_automation.configs.execution import ParallelCPU
