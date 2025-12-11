@@ -170,10 +170,10 @@ class Structure(_Structure):
         return [Structure(**vars(molecule)) for molecule in
                 mbe_automation.structure.clusters.extract_unique_molecules(
                     crystal=self,
-                    calculator: ASECalculator,
-                    energy_thresh: float = 1.0E-5, # eV/atom
-                    bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
-                    reference_frame_index: int = 0,
+                    calculator=calculator,
+                    energy_thresh=energy_thresh,
+                    bonding_algo=bonding_algo,
+                    reference_frame_index=reference_frame_index,
                 )]
 
     def extract_relaxed_unique_molecules(
