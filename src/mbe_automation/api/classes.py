@@ -23,6 +23,7 @@ import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 from mbe_automation.ml.core import REFERENCE_ENERGY_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
@@ -53,6 +54,20 @@ class Structure(_Structure):
         return cls(**vars(
             mbe_automation.storage.read_structure(dataset, key)
         ))
+
+    @classmethod
+    def from_xyz_file(
+            cls,
+            read_path: str,
+            transform_to_symmetrized_primitive: bool = True,
+            symprec: float = SYMMETRY_TOLERANCE_LOOSE,
+    ):
+        ase_atoms = mbe_automation.storage.from_xyz_file(
+            read_path=read_path,
+            transform_to_symmetrized_primitive=transform_to_symmetrized_primitive,
+            symprec=symprec,
+        )        
+        return cls(**vars(mbe_automation.storage.from_ase_atoms(ase_atoms)))
         
     def subsample(
             self,
