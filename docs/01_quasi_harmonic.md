@@ -137,6 +137,12 @@ mbe_automation.run(properties_config)
                     |
                     |
 +----------------------------------------+
+|           structure.clusters           |   Extracts and relaxes unique
+|    extract_relaxed_unique_molecules    |   molecules from the crystal.
++----------------------------------------+
+                    |
+                    |
++----------------------------------------+
 |           structure.relax              |   Relaxes the geometry of the
 |    isolated_molecule (optional)        |   isolated gas-phase molecule.
 +----------------------------------------+
