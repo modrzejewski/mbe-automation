@@ -336,7 +336,15 @@ def export_to_mace(
     stats = _statistics(structures)
     unique_elements = _unique_elements(structures)
     z_map = _z_map(structures)
-    if reference_energy_type != "none":
+    
+    if reference_energy_type == "reference_molecule":
+        E_atomic_shifts = np.zeros(stats.n_elements)
+        Delta_E_pot_molecule = (
+            reference_molecule.delta.E_pot_target
+            - reference_molecule.delta.E_pot_baseline
+        )
+            
+    elif reference_energy_type != "none":
         E_atomic_shifts = _energy_shifts(
             structures=structures,
             reference_energy_type=reference_energy_type,
@@ -376,12 +384,15 @@ def export_to_mace(
                 config_type="IsolatedAtom",
                 energy_key=energy_key,
                 forces_key=forces_key,
-            )
+            )            
 
-    for i in range(stats.n_structures):
+    for i in range(stats.n_structures):        
         Delta_E_pot = E_target[i] - E_baseline[i] # rank (structure.n_frames, ) eV/atom
-        Delta_forces = (forces_target[i] - forces_baseline[i] if forces_available else None)
-            
+        if reference_energy_type == "reference_molecule":
+            Delta_E_pot = Delta_E_pot - Delta_E_pot_molecule
+
+        Delta_forces = (forces_target[i] - forces_baseline[i] if forces_available else None)        
+        
         mbe_automation.ml.mace.to_xyz_training_set(
             structure=structures[i],
             save_path=save_path,
