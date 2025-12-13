@@ -1,10 +1,11 @@
 from typing import Optional, Literal, List
 from ase.calculators.calculator import Calculator, all_changes
-from gpu4pyscf.tools.ase_interface import PySCF as BasePySCF
+import ase.units
 from pyscf.pbc.tools.pyscf_ase import ase_atoms_to_pyscf
 import pyscf
 import numpy as np
 import torch
+import warnings
 
 from pyscf import dft as cpu_dft
 from pyscf.pbc import dft as cpu_pbc_dft
@@ -12,9 +13,11 @@ from pyscf.pbc import dft as cpu_pbc_dft
 try:
     from gpu4pyscf import dft as gpu_dft
     from gpu4pyscf.pbc import dft as gpu_pbc_dft
+    from gpu4pyscf.tools.ase_interface import PySCF as BasePySCF
 except ImportError:
     gpu_dft = None
     gpu_pbc_dft = None
+    BasePySCF = Calculator
 
 DFT_METHODS = [
     "wb97m-v",
@@ -107,6 +110,8 @@ def DFT(
     )
 
 class PySCFCalculator(BasePySCF):
+    implemented_properties = ['energy', 'forces']
+
     def __init__(
             self,
             atoms=None,
@@ -154,7 +159,32 @@ class PySCFCalculator(BasePySCF):
              raise ValueError("Atoms object must be provided to calculate.")
 
         self._initialize_backend(current_atoms)
-        super().calculate(atoms, properties, system_changes)
+
+        # If BasePySCF is just Calculator (fallback), we must manually run the calculation
+        # Or if we are running CPU mode and BasePySCF is the GPU one (unlikely but possible logic)
+        # But actually, if BasePySCF is Calculator, it has no implementation for calculate.
+        if BasePySCF is Calculator or (not self.gpu):
+            self._calculate_cpu(current_atoms, properties, system_changes)
+        else:
+            # Assume BasePySCF (GPU version) handles it
+            super().calculate(atoms, properties, system_changes)
+
+    def _calculate_cpu(self, atoms, properties, system_changes):
+        Calculator.calculate(self, atoms, properties, system_changes)
+
+        if self.method is None:
+             raise RuntimeError("Backend not initialized")
+
+        # Energy in Hartree
+        e_tot = self.method.kernel()
+        self.results['energy'] = e_tot * ase.units.Hartree
+
+        # Forces in Hartree/Bohr (Atomic Units)
+        # Convert to eV/Angstrom
+        # grad is (N, 3)
+        if 'forces' in properties:
+            grad = self.method.nuc_grad_method().kernel()
+            self.results['forces'] = -grad * ase.units.Hartree / ase.units.Bohr
 
     def _initialize_backend(self, atoms):
         self.pbc = atoms.pbc.any()
@@ -179,12 +209,12 @@ class PySCFCalculator(BasePySCF):
         if self.gpu:
             if self.pbc:
                 if gpu_pbc_dft is None:
-                    raise ImportError("GPU4PySCF PBC module not found.")
+                    raise ImportError("GPU4PySCF PBC module not found. Please install gpu4pyscf or set gpu=False.")
                 dft_mod = gpu_pbc_dft
                 grid_mod = gpu_pbc_dft.gen_grid
             else:
                 if gpu_dft is None:
-                    raise ImportError("GPU4PySCF module not found.")
+                    raise ImportError("GPU4PySCF module not found. Please install gpu4pyscf or set gpu=False.")
                 dft_mod = gpu_dft
                 grid_mod = gpu_dft.gen_grid
         else:
@@ -207,10 +237,19 @@ class PySCFCalculator(BasePySCF):
                 mf = dft_mod.KRKS(self.mol, xc=self.xc, kpts=self.mol.make_kpts(self.kpts))
 
         if self.disp is not None:
+            # Attempt to set dispersion if supported (e.g. GPU4PySCF or patched PySCF)
+            # Standard PySCF CPU RKS does not use 'disp' attribute by default.
+            if not self.gpu and not hasattr(mf, 'disp'):
+                 warnings.warn(f"Dispersion '{self.disp}' was requested but might not be supported by the CPU backend configuration. Ensure pyscf-dispersion or similar extensions are active if needed.")
             mf.disp = self.disp
 
         mf.grids.atom_grid = (150, 590)
-        mf.grids.prune = grid_mod.sg1_prune
+        # sg1_prune exists in pyscf.dft.gen_grid
+        if hasattr(grid_mod, 'sg1_prune'):
+            mf.grids.prune = grid_mod.sg1_prune
+        elif hasattr(pyscf.dft.gen_grid, 'sg1_prune'):
+             mf.grids.prune = pyscf.dft.gen_grid.sg1_prune
+
         if self.xc == "wb97m-v":
             mf.nlcgrids.atom_grid = (50, 194)
 
@@ -221,4 +260,3 @@ class PySCFCalculator(BasePySCF):
                 mf = mf.density_fit()
 
         self.method = mf
-
