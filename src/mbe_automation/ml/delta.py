@@ -247,8 +247,8 @@ def _rmse_atomic_shifts(
         stats: DataStats,
 ):
     z_map = _z_map(structures)
-    E_atomic_baseline = _atomic_energies(structures)
     E_target = _target_energies(structures)
+    E_baseline = _baseline_energies(structures)
     E_diff_shifted_baseline = np.zeros(stats.n_frames)
     n_frames_processed = 0
     
@@ -263,7 +263,7 @@ def _rmse_atomic_shifts(
         n = n / structure.n_atoms
         i0 = n_frames_processed
         i1 = n_frames_processed + structure.n_frames
-        E_diff_shifted_baseline[i0:i1] = E_target[i] - np.sum(n * (E_atomic_baseline + E_atomic_shifts))
+        E_diff_shifted_baseline[i0:i1] = E_target[i] - E_baseline[i] - np.sum(n * E_atomic_shifts)
         n_frames_processed += structure.n_frames
 
     rmse_shifted = np.sqrt(np.mean(E_diff_shifted_baseline**2))
@@ -336,7 +336,15 @@ def export_to_mace(
     stats = _statistics(structures)
     unique_elements = _unique_elements(structures)
     z_map = _z_map(structures)
-    if reference_energy_type != "none":
+    
+    if reference_energy_type == "reference_molecule":
+        E_atomic_shifts = np.zeros(stats.n_elements)
+        Delta_E_pot_molecule = (
+            reference_molecule.delta.E_pot_target
+            - reference_molecule.delta.E_pot_baseline
+        )
+            
+    elif reference_energy_type != "none":
         E_atomic_shifts = _energy_shifts(
             structures=structures,
             reference_energy_type=reference_energy_type,
@@ -376,12 +384,15 @@ def export_to_mace(
                 config_type="IsolatedAtom",
                 energy_key=energy_key,
                 forces_key=forces_key,
-            )
+            )            
 
-    for i in range(stats.n_structures):
+    for i in range(stats.n_structures):        
         Delta_E_pot = E_target[i] - E_baseline[i] # rank (structure.n_frames, ) eV/atom
-        Delta_forces = (forces_target[i] - forces_baseline[i] if forces_available else None)
-            
+        if reference_energy_type == "reference_molecule":
+            Delta_E_pot = Delta_E_pot - Delta_E_pot_molecule
+
+        Delta_forces = (forces_target[i] - forces_baseline[i] if forces_available else None)        
+        
         mbe_automation.ml.mace.to_xyz_training_set(
             structure=structures[i],
             save_path=save_path,
