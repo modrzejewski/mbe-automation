@@ -6,7 +6,6 @@ import pyscf
 from gpu4pyscf import dft
 from gpu4pyscf.pbc import dft as pbc_dft
 import numpy as np
-import torch
 
 DFT_METHODS = [
     "wb97m-v",
@@ -58,7 +57,7 @@ def DFT(
         max_memory_mb: Maximum memory in MB.
     """
     name = model_name.lower().replace("_", "-")
-    assert name in DFT_FUNCTIONALS
+    assert name in DFT_METHODS
     
     disp = None
 
@@ -71,7 +70,7 @@ def DFT(
     elif name == "b3lyp-d3":  # B3LYP + D3 dispersion (Becke-Johnson damping) + ATM dispersion
         xc = "b3lyp-d3bjatm"
     elif name == "b3lyp-d4":  # B3LYP + D4 dispersion
-        xc = "b3lyp"
+        xc = "b3lyp-d4"
     elif name == "r2scan-d4": # r2SCAN + D4 dispersion
         xc = "r2scan"
         disp = "d4"
@@ -142,6 +141,9 @@ class PySCFCalculator(BasePySCF):
         # to the electronic structure calculation, but allows for defining a stateless
         # calculator that can be applied to a different system every time. This is
         # the expected behavior for all calculators within the calculators module.
+        #
+        # After that, we can safely call the original calculate method
+        # defined in GPUPySCF to handle the calculations.
         #
         self._initialize_backend(current_atoms)
         super().calculate(atoms, properties, system_changes)
