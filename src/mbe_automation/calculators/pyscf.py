@@ -3,18 +3,10 @@ from ase.calculators.calculator import Calculator, all_changes
 from gpu4pyscf.tools.ase_interface import PySCF as BasePySCF
 from pyscf.pbc.tools.pyscf_ase import ase_atoms_to_pyscf
 import pyscf
+from gpu4pyscf import dft
+from gpu4pyscf.pbc import dft as pbc_dft
 import numpy as np
 import torch
-
-from pyscf import dft as cpu_dft
-from pyscf.pbc import dft as cpu_pbc_dft
-
-try:
-    from gpu4pyscf import dft as gpu_dft
-    from gpu4pyscf.pbc import dft as gpu_pbc_dft
-except ImportError:
-    gpu_dft = None
-    gpu_pbc_dft = None
 
 DFT_METHODS = [
     "wb97m-v",
@@ -22,7 +14,9 @@ DFT_METHODS = [
     "wb97x-d4",
     "b3lyp-d3",
     "b3lyp-d4",
-    "r2scan-d4"
+    "pbe-d3",
+    "pbe-d4",
+    "r2scan-d4",
 ]
 
 BASIS_SETS = [
@@ -48,7 +42,6 @@ def DFT(
     density_fit: bool = True, 
     auxbasis: Optional[str] = None,
     max_memory_mb: Optional[int] = None, 
-    gpu: Optional[bool] = None
 ) -> Calculator:
     """
     Factory function for PySCF/GPU4PySCF calculators.
@@ -63,34 +56,29 @@ def DFT(
         density_fit: If True, uses density fitting.
         auxbasis: Auxiliary basis set for density fitting.
         max_memory_mb: Maximum memory in MB.
-        gpu: Enable GPU acceleration. Defaults to torch.cuda.is_available().
     """
-    if gpu is None:
-        gpu = torch.cuda.is_available()
-
     name = model_name.lower().replace("_", "-")
-    xc = name
+    assert name in DFT_FUNCTIONALS
+    
     disp = None
 
-    # Presets mapping
-    if name == "wb97m-v":
+    if name == "wb97m-v":     # wB97M + VV10 nonlocal dispersion
         xc = "wb97m-v"
-        disp = "vv10"
-    elif name == "wb97x-d3":
+    elif name == "wb97x-d3":  # wB97X + D3 dispersion (Becke-Johnon damping)
         xc = "wb97x-d3bj"
-        disp = "d3bj"
-    elif name == "wb97x-d4":
-        xc = "wb97x-d3bj" 
-        disp = "d4"
-    elif name == "b3lyp-d3":
+    elif name == "wb97x-d4":  # wB97X + D4 dispersion
+        xc = "wb97x-d4" 
+    elif name == "b3lyp-d3":  # B3LYP + D3 dispersion (Becke-Johnson damping) + ATM dispersion
+        xc = "b3lyp-d3bjatm"
+    elif name == "b3lyp-d4":  # B3LYP + D4 dispersion
         xc = "b3lyp"
-        disp = "d3bj"
-    elif name == "b3lyp-d4":
-        xc = "b3lyp"
-        disp = "d4"
-    elif name == "r2scan-d4":
+    elif name == "r2scan-d4": # r2SCAN + D4 dispersion
         xc = "r2scan"
         disp = "d4"
+    elif name == "pbe-d3":    # PBE + D3 dispersion (Becke-Johnson damping) + ATM dispersion
+        xc = "pbe-d3bjatm"
+    elif name == "pbe-d4":
+        xc = "pbe-d4"
 
     return PySCFCalculator(
         xc=xc,
@@ -103,7 +91,6 @@ def DFT(
         density_fit=density_fit,
         auxbasis=auxbasis,
         max_memory_mb=max_memory_mb,
-        gpu=gpu
     )
 
 class PySCFCalculator(BasePySCF):
@@ -120,7 +107,6 @@ class PySCFCalculator(BasePySCF):
             density_fit=True, 
             auxbasis=None,
             max_memory_mb=None,
-            gpu=True,
             **kwargs
     ):
         """
@@ -138,7 +124,6 @@ class PySCFCalculator(BasePySCF):
         self.density_fit = density_fit
         self.auxbasis = auxbasis
         self.max_memory_mb = max_memory_mb
-        self.gpu = gpu
         
         self.mol = None
         self.method = None
@@ -152,7 +137,12 @@ class PySCFCalculator(BasePySCF):
         current_atoms = atoms if atoms is not None else self.atoms
         if current_atoms is None:
              raise ValueError("Atoms object must be provided to calculate.")
-
+        #
+        # Initializing the backend here has a negligible cost compared
+        # to the electronic structure calculation, but allows for defining a stateless
+        # calculator that can be applied to a different system every time. This is
+        # the expected behavior for all calculators within the calculators module.
+        #
         self._initialize_backend(current_atoms)
         super().calculate(atoms, properties, system_changes)
 
@@ -176,24 +166,12 @@ class PySCFCalculator(BasePySCF):
         else:
             self.mol = pyscf.M(**common_kwargs)
 
-        if self.gpu:
-            if self.pbc:
-                if gpu_pbc_dft is None:
-                    raise ImportError("GPU4PySCF PBC module not found.")
-                dft_mod = gpu_pbc_dft
-                grid_mod = gpu_pbc_dft.gen_grid
-            else:
-                if gpu_dft is None:
-                    raise ImportError("GPU4PySCF module not found.")
-                dft_mod = gpu_dft
-                grid_mod = gpu_dft.gen_grid
+        if self.pbc:
+            dft_mod = pbc_dft
+            grid_mod = pbc_dft.gen_grid
         else:
-            if self.pbc:
-                dft_mod = cpu_pbc_dft
-                grid_mod = cpu_pbc_dft.gen_grid
-            else:
-                dft_mod = cpu_dft
-                grid_mod = cpu_dft.gen_grid
+            dft_mod = dft
+            grid_mod = dft.gen_grid
 
         if self.spin != 0:
             if self.kpts is None:
