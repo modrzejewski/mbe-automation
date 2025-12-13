@@ -163,9 +163,9 @@ class PySCFCalculator(Calculator):
             common_kwargs['max_memory'] = self.max_memory_mb
 
         if self.pbc:
-            self.system = pyscf.M(a=np.array(atoms.cell), **common_kwargs)
+            self.system = pyscf.pbc.gto.Cell(a=np.array(atoms.cell), **common_kwargs)
         else:
-            self.system = pyscf.pbc.gto.Cell(**common_kwargs)
+            self.system = pyscf.M(**common_kwargs)
 
         if self.pbc:
             dft_mod = pbc_dft
