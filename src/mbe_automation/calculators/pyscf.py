@@ -40,7 +40,7 @@ def DFT(
     verbose: int = 0,
     density_fit: bool = True, 
     auxbasis: Optional[str] = None,
-    max_memory_mb: Optional[int] = None, 
+    max_memory_mb: Optional[int] = 64000, 
 ) -> Calculator:
     """
     Factory function for PySCF/GPU4PySCF calculators.
@@ -114,7 +114,7 @@ class PySCFCalculator(Calculator):
         self.auxbasis = auxbasis
         self.max_memory_mb = max_memory_mb
         
-        self.mol = None
+        self.system = None
         self.method = None
         self.pbc = False
         
@@ -163,9 +163,9 @@ class PySCFCalculator(Calculator):
             common_kwargs['max_memory'] = self.max_memory_mb
 
         if self.pbc:
-            self.mol = pyscf.M(a=np.array(atoms.cell), **common_kwargs)
+            self.system = pyscf.M(a=np.array(atoms.cell), **common_kwargs)
         else:
-            self.mol = pyscf.M(**common_kwargs)
+            self.system = pyscf.pbc.gto.Cell(**common_kwargs)
 
         if self.pbc:
             dft_mod = pbc_dft
@@ -176,14 +176,14 @@ class PySCFCalculator(Calculator):
 
         if self.spin != 0:
             if self.kpts is None:
-                mf = dft_mod.UKS(self.mol, xc=self.xc)
+                mf = dft_mod.UKS(self.system, xc=self.xc)
             else:
-                mf = dft_mod.KUKS(self.mol, xc=self.xc, kpts=self.mol.make_kpts(self.kpts))
+                mf = dft_mod.KUKS(self.system, xc=self.xc, kpts=self.system.make_kpts(self.kpts))
         else:
             if self.kpts is None:
-                mf = dft_mod.RKS(self.mol, xc=self.xc)
+                mf = dft_mod.RKS(self.system, xc=self.xc)
             else:
-                mf = dft_mod.KRKS(self.mol, xc=self.xc, kpts=self.mol.make_kpts(self.kpts))
+                mf = dft_mod.KRKS(self.system, xc=self.xc, kpts=self.system.make_kpts(self.kpts))
 
         if self.disp is not None:
             mf.disp = self.disp
