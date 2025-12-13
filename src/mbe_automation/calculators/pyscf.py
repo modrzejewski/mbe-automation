@@ -18,6 +18,17 @@ DFT_METHODS = [
     "r2scan-d4",
 ]
 
+XC_MAP = {
+    "wb97m-v": {"xc": "wb97m-v"},
+    "wb97x-d3": {"xc": "wb97x-d3bj"},
+    "wb97x-d4": {"xc": "wb97x-d4"},
+    "b3lyp-d3": {"xc": "b3lyp-d3bjatm"},
+    "b3lyp-d4": {"xc": "b3lyp-d4"},
+    "r2scan-d4": {"xc": "r2scan", "disp": "d4"},
+    "pbe-d3": {"xc": "pbe-d3bjatm"},
+    "pbe-d4": {"xc": "pbe-d4"},
+}
+
 BASIS_SETS = [
     "def2-svp",
     "def2-svpd",
@@ -32,7 +43,7 @@ BASIS_SETS = [
 ]
 
 def DFT(
-    model_name: Literal[*DFT_METHODS], 
+    model_name: str = "r2scan-d4", 
     basis: Literal[*BASIS_SETS] = "def2-svp", 
     charge: int = 0,
     spin: int = 0,
@@ -47,27 +58,12 @@ def DFT(
     """
     name = model_name.lower().replace("_", "-")
     assert name in DFT_METHODS
+    assert basis in BASIS_SETS
+
+    config = XC_MAP[name]
+    xc = config["xc"]
+    disp = config.get("disp")
     
-    disp = None
-
-    if name == "wb97m-v":     
-        xc = "wb97m-v"
-    elif name == "wb97x-d3":  
-        xc = "wb97x-d3bj"
-    elif name == "wb97x-d4":  
-        xc = "wb97x-d4" 
-    elif name == "b3lyp-d3":  
-        xc = "b3lyp-d3bjatm"
-    elif name == "b3lyp-d4":  
-        xc = "b3lyp-d4"
-    elif name == "r2scan-d4": 
-        xc = "r2scan"
-        disp = "d4"
-    elif name == "pbe-d3":    
-        xc = "pbe-d3bjatm"
-    elif name == "pbe-d4":
-        xc = "pbe-d4"
-
     return PySCFCalculator(
         xc=xc,
         disp=disp,
