@@ -1,11 +1,11 @@
 from typing import Optional, Literal, List
+import numpy as np
 from ase.calculators.calculator import Calculator, all_changes
-from gpu4pyscf.tools.ase_interface import PySCF as BasePySCF
+from pyscf.data.nist import BOHR, HARTREE2EV
 from pyscf.pbc.tools.pyscf_ase import ase_atoms_to_pyscf
 import pyscf
 from gpu4pyscf import dft
 from gpu4pyscf.pbc import dft as pbc_dft
-import numpy as np
 
 DFT_METHODS = [
     "wb97m-v",
@@ -44,37 +44,26 @@ def DFT(
 ) -> Calculator:
     """
     Factory function for PySCF/GPU4PySCF calculators.
-    
-    Arguments:
-        model_name: Name of the model.
-        basis: Basis set name (e.g. 'def2-tzvpd').
-        charge: Total charge of the system.
-        spin: Number of unpaired electrons (N_alpha - N_beta).
-        kpts: K-points for PBC calculations, e.g. [3,3,3].
-        verbose: PySCF verbosity level.
-        density_fit: If True, uses density fitting.
-        auxbasis: Auxiliary basis set for density fitting.
-        max_memory_mb: Maximum memory in MB.
     """
     name = model_name.lower().replace("_", "-")
     assert name in DFT_METHODS
     
     disp = None
 
-    if name == "wb97m-v":     # wB97M + VV10 nonlocal dispersion
+    if name == "wb97m-v":     
         xc = "wb97m-v"
-    elif name == "wb97x-d3":  # wB97X + D3 dispersion (Becke-Johnon damping)
+    elif name == "wb97x-d3":  
         xc = "wb97x-d3bj"
-    elif name == "wb97x-d4":  # wB97X + D4 dispersion
+    elif name == "wb97x-d4":  
         xc = "wb97x-d4" 
-    elif name == "b3lyp-d3":  # B3LYP + D3 dispersion (Becke-Johnson damping) + ATM dispersion
+    elif name == "b3lyp-d3":  
         xc = "b3lyp-d3bjatm"
-    elif name == "b3lyp-d4":  # B3LYP + D4 dispersion
+    elif name == "b3lyp-d4":  
         xc = "b3lyp-d4"
-    elif name == "r2scan-d4": # r2SCAN + D4 dispersion
+    elif name == "r2scan-d4": 
         xc = "r2scan"
         disp = "d4"
-    elif name == "pbe-d3":    # PBE + D3 dispersion (Becke-Johnson damping) + ATM dispersion
+    elif name == "pbe-d3":    
         xc = "pbe-d3bjatm"
     elif name == "pbe-d4":
         xc = "pbe-d4"
@@ -92,7 +81,9 @@ def DFT(
         max_memory_mb=max_memory_mb,
     )
 
-class PySCFCalculator(BasePySCF):
+class PySCFCalculator(Calculator):
+    implemented_properties = ['energy', 'forces']
+
     def __init__(
             self,
             atoms=None,
@@ -106,12 +97,11 @@ class PySCFCalculator(BasePySCF):
             density_fit=True, 
             auxbasis=None,
             max_memory_mb=None,
-            **kwargs
     ):
         """
-        A wrapper around the GPU4PySCF ASE interface.
+        Wrapper around the GPU4PySCF ASE interface.
         """
-        Calculator.__init__(self, atoms=atoms, **kwargs)
+        Calculator.__init__(self, atoms=atoms)
         
         self.xc = xc
         self.disp = disp
@@ -126,7 +116,6 @@ class PySCFCalculator(BasePySCF):
         
         self.mol = None
         self.method = None
-        self.method_scan = None
         self.pbc = False
         
         if atoms is not None:
@@ -136,17 +125,27 @@ class PySCFCalculator(BasePySCF):
         current_atoms = atoms if atoms is not None else self.atoms
         if current_atoms is None:
              raise ValueError("Atoms object must be provided to calculate.")
+        
+        Calculator.calculate(self, current_atoms, properties, system_changes)
         #
         # Initializing the backend here has a negligible cost compared
         # to the electronic structure calculation, but allows for defining a stateless
         # calculator that can be applied to a different system every time. This is
         # the expected behavior for all calculators within the calculators module.
         #
-        # After that, we can safely call the original calculate method
-        # defined in GPUPySCF to handle the calculations.
-        #
         self._initialize_backend(current_atoms)
-        super().calculate(atoms, properties, system_changes)
+
+        self.method.kernel()
+        if not self.method.converged:
+            raise RuntimeError(f'{self.method} not converged')
+        
+        self.results['energy'] = self.method.e_tot * HARTREE2EV
+
+        if 'forces' in properties:
+            grad_obj = self.method.Gradients()
+            forces = -grad_obj.kernel()
+            self.results['forces'] = forces * (HARTREE2EV / BOHR)
+            
 
     def _initialize_backend(self, atoms):
         self.pbc = atoms.pbc.any()
@@ -201,4 +200,3 @@ class PySCFCalculator(BasePySCF):
                 mf = mf.density_fit()
 
         self.method = mf
-
