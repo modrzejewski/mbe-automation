@@ -78,6 +78,6 @@ The `mbe-automation` package supports several calculation methods. While some de
 | MACE | `mace-torch` (Python package) |
 | DFTB+MBD, DFTB3-D4 | `dftb+` (Executable) |
 | GFN1-xTB, GFN2-xTB | `dftb+` (Executable) |
-| DFT (wb97m-v, wb97x-d3/d4, b3lyp-d3/d4, pbe-d3/d4, r2scan-d4) | `gpu4pyscf` (Python package, GPU only)* |
+| DFT* | `gpu4pyscf` (Python package, GPU only) |
 
-\* These DFT methods are available only on GPUs via the `gpu4pyscf` extension of `pyscf`. To use them, you must install the optional `gpu-cuda` dependencies defined in `pyproject.toml` (e.g., `gpu-cuda12` for CUDA 12).
+\* Supported functionals: wb97m-v, wb97x-d3/d4, b3lyp-d3/d4, pbe-d3/d4, r2scan-d4. These methods are available only on GPUs via the `gpu4pyscf` extension of `pyscf`. To use them, you must [install the optional `gpu-cuda` dependencies](#3-install-the-program) defined in `pyproject.toml` (e.g., `gpu-cuda12` for CUDA 12).
