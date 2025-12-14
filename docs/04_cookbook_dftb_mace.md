@@ -60,9 +60,9 @@ mbe_automation.run(config)
 # -----------------------------------------------
 
 # Construct the key where the trajectory was saved.
-# The convention is: {root_key}/crystal[dyn:T={T},p={p}]/trajectory
+# The convention is: {root_key}/trajectories/crystal[dyn:T={T},p={p}]
 # Note: The format specifiers match those used in the workflow.
-traj_key = f"{config.root_key}/crystal[dyn:T={config.temperatures_K[0]:.2f},p={config.pressures_GPa[0]:.5f}]/trajectory"
+traj_key = f"{config.root_key}/trajectories/crystal[dyn:T={config.temperatures_K[0]:.2f},p={config.pressures_GPa[0]:.5f}]"
 
 # Load the trajectory from the HDF5 file
 trajectory = Trajectory.read(

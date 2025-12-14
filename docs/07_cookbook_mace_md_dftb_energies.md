@@ -129,7 +129,7 @@ mace_calc = MACECalculator(
 )
 
 for T, p in itertools.product(temperatures_K, pressures_GPa):
-    traj_key = f"training/md/crystal[dyn:T={T:.2f},p={p:.5f}]/trajectory"
+    traj_key = f"training/md/trajectories/crystal[dyn:T={T:.2f},p={p:.5f}]"
 
     frames = Structure.read(
         dataset=dataset,
@@ -175,8 +175,8 @@ temperatures_K = np.array([300.0])
 for T, p in itertools.product(temperatures_K, pressures_GPa):
     print(f"Processing structures for T={T:.2f} K p={p:.5f} GPa")
 
-    read_key = f"training/md/crystal[dyn:T={T:.2f},p={p:.5f}]/trajectory"
-    write_key = f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/subsampled_frames"
+    read_key = f"training/md/trajectories/crystal[dyn:T={T:.2f},p={p:.5f}]"
+    write_key = f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/subsampled_frames"
 
     subsampled_frames = Structure.read(
         dataset=dataset,
@@ -224,7 +224,7 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
 
     subsampled_frames = Structure.read(
         dataset=dataset,
-        key=f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/subsampled_frames"
+        key=f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/subsampled_frames"
     )
     train, validate, test = subsampled_frames.random_split([0.90, 0.05, 0.05])
 
@@ -272,21 +272,21 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
     
     pbc_frames = Structure.read(
         dataset=dataset,
-        key=f"training/md/crystal[dyn:T={T:.2f},p={p:.5f}]/trajectory"
+        key=f"training/md/trajectories/crystal[dyn:T={T:.2f},p={p:.5f}]"
     )
     molecular_crystal = pbc_frames.detect_molecules()
     clusters = molecular_crystal.extract_finite_subsystem()
 
     molecular_crystal.save(
         dataset=dataset,
-        key=f"training/md/crystal[dyn:T={T:.2f},p={p:.5f}]/molecular_crystal"
+        key=f"training/md/structures/crystal[dyn:T={T:.2f},p={p:.5f}]"
     )
     
     for cluster in clusters:
         n_molecules = cluster.n_molecules
         cluster.save(
             dataset=dataset,
-            key=f"training/md/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
+            key=f"training/md/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
         )
         
 print("All calculations completed")
@@ -326,7 +326,7 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
         
         cluster = FiniteSubsystem.read(
             dataset=dataset,
-            key=f"training/md/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
+            key=f"training/md/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
         )
 
         cluster.run_model(
@@ -338,7 +338,7 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
 
         cluster.save(
             dataset=dataset,
-            key=f"training/md/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}",
+            key=f"training/md/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}",
             only=["feature_vectors"]
         )
     
@@ -374,7 +374,7 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
         
         cluster = FiniteSubsystem.read(
             dataset=dataset,
-            key=f"training/md/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
+            key=f"training/md/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
         ).subsample(n=100)
 
         cluster.run_model(
@@ -385,7 +385,7 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
 
         cluster.save(
             dataset=dataset,
-            key=f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
+            key=f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
         )
     
 print("All calculations completed")
@@ -421,7 +421,7 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
 
         clusters = FiniteSubsystem.read(
             dataset=dataset,
-            key=f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
+            key=f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
         )
 
         train, validate, test = clusters.random_split([0.90, 0.05, 0.05])

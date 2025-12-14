@@ -210,7 +210,7 @@ qha.hdf5
     │   ├── crystal[eos:V=1.0000]
     │   ├── crystal[eq:T=300.00]
     │   └── ... (other structures)
-    ├── relaxation
+    ├── structures
     │   ├── crystal[eos:V=1.0000]
     │   ├── crystal[eq:T=300.00]
     │   └── ... (other structures)
@@ -221,11 +221,11 @@ qha.hdf5
 - **`eos_sampled`**: Contains the raw data from the equation of state (EOS) calculations at various cell volumes.
 - **`eos_interpolated`**: Stores the fitted EOS curves and the calculated free energy minima at each temperature.
 - **`phonons`**: Group containing phonon calculations for each structure.
-- **`relaxation`**: Group containing the relaxed crystal structures.
+- **`structures`**: Group containing the relaxed crystal structures.
 - **`thermodynamics_fixed_volume`**: Contains thermodynamic properties calculated at a single, fixed volume.
 - **`thermodynamics_equilibrium_volume`**: Contains the final thermodynamic properties calculated at the equilibrium volume for each temperature.
 
-The structures under the `phonons` and `relaxation` groups follow a specific naming scheme:
+The structures under the `phonons` and `structures` groups follow a specific naming scheme:
 - **`crystal[opt:...]`**: The relaxed input structure. The keywords after `opt:` indicate which degrees of freedom were included in the minimization of the static electronic energy (e.g., atomic positions, cell shape, cell volume), as determined by the `cell_relaxation` keyword.
 - **`crystal[eos:V=...]`**: Structures used to sample the equation of state curve, obtained by relaxing the crystal at a fixed volume.
 - **`crystal[eq:T=...]`**: Relaxed structures at the equilibrium volume for a given temperature.
