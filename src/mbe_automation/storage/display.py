@@ -1,5 +1,9 @@
 import os
 import h5py
+from typing import Set
+
+# Dataclasses that contain structures which should be ignored
+IGNORED_PARENTS = {"FiniteSubsystem", "MolecularCrystal", "ForceConstants"}
 
 def tree(dataset: str):
     """
@@ -52,13 +56,13 @@ def tree(dataset: str):
         print(f"Error reading dataset file: {e}")
 
 
-def list_structures(dataset: str) -> list[str]:
+def _list_objects_by_dataclass(
+        dataset: str,
+        target_dataclasses: Set[str],
+        check_ignored_parents: bool = True
+) -> list[str]:
     """
-    List all keys in a given dataset file which correspond to
-    dataclass="Structure" or dataclass="Trajectory|Structure".
-
-    Structures contained within composite objects (FiniteSubsystem,
-    MolecularCrystal, ForceConstants) are excluded.
+    Helper to list keys with specific dataclass attributes.
     """
     if not os.path.exists(dataset):
         print(f"Error: File '{dataset}' not found.")
@@ -66,18 +70,16 @@ def list_structures(dataset: str) -> list[str]:
 
     found_keys = []
 
-    # Dataclasses that contain structures which should be ignored
-    ignored_parents = {"FiniteSubsystem", "MolecularCrystal", "ForceConstants"}
-
     def visit_func(name, obj):
         dataclass_attr = obj.attrs.get("dataclass")
-        if dataclass_attr in ["Structure", "Trajectory|Structure"]:
-            # Check parent
-            parent = obj.parent
-            parent_dataclass = parent.attrs.get("dataclass")
+        if dataclass_attr in target_dataclasses:
+            if check_ignored_parents:
+                parent = obj.parent
+                parent_dataclass = parent.attrs.get("dataclass")
+                if parent_dataclass in IGNORED_PARENTS:
+                    return
 
-            if parent_dataclass not in ignored_parents:
-                found_keys.append(name)
+            found_keys.append(name)
 
     try:
         with h5py.File(dataset, "r") as f:
@@ -87,3 +89,50 @@ def list_structures(dataset: str) -> list[str]:
         return []
 
     return found_keys
+
+
+def list_structures(dataset: str) -> list[str]:
+    """
+    List all keys in a given dataset file which correspond to
+    dataclass="Structure" or dataclass="Trajectory|Structure".
+
+    Structures contained within composite objects (FiniteSubsystem,
+    MolecularCrystal, ForceConstants) are excluded.
+    """
+    return _list_objects_by_dataclass(
+        dataset,
+        {"Structure", "Trajectory|Structure"},
+        check_ignored_parents=True
+    )
+
+
+def list_trajectories(dataset: str) -> list[str]:
+    """
+    List all keys in a given dataset file which correspond to
+    dataclass="Trajectory|Structure".
+
+    Trajectories contained within composite objects are excluded.
+    """
+    return _list_objects_by_dataclass(
+        dataset,
+        {"Trajectory|Structure"},
+        check_ignored_parents=True
+    )
+
+
+def list_finite_subsystems(dataset: str) -> list[str]:
+    """
+    List all keys in a given dataset file which correspond to
+    dataclass="FiniteSubsystem".
+    """
+    # FiniteSubsystems themselves are not usually nested in ignored parents in a way that needs hiding.
+    # But for consistency with the pattern (listing top-level or relevant objects),
+    # we can default to False or True. Given they are "composite objects" themselves,
+    # checking for ignored parents might not be strictly necessary unless we have FS inside FS?
+    # Let's disable parent checking for FS unless we know they shouldn't be listed.
+    # The requirement for parent checking was specifically for "Structure" objects.
+    return _list_objects_by_dataclass(
+        dataset,
+        {"FiniteSubsystem"},
+        check_ignored_parents=False
+    )
