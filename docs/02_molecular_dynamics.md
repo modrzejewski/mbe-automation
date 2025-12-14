@@ -172,6 +172,42 @@ mbe_automation.run(md_config)
 
 For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
 
+## How to read the results
+
+### HDF5 Datasets
+
+The `mbe-automation` program uses the Hierarchical Data Format version 5 (HDF5) for storing large amounts of numerical data. The HDF5 file produced by a workflow contains all the raw and processed data in a hierarchical structure, similar to a file system with folders and files.
+
+### File Structure
+
+You can visualize the structure of the output file using `mbe_automation.tree`.
+
+```python
+import mbe_automation
+
+mbe_automation.tree("properties.hdf5")
+```
+
+An MD calculation will produce a file with the following structure:
+
+```
+properties.hdf5
+└── md
+    ├── structures
+    │   ├── molecule[extracted,0]
+    │   ├── molecule[extracted,0,opt:atoms]
+    │   └── ... (other structures)
+    ├── thermodynamics
+    └── trajectories
+        ├── crystal[dyn:T=298.15,p=0.00010]
+        ├── crystal[dyn:T=298.15,p=1.00000]
+        └── molecule[dyn:T=298.15]
+```
+
+- **`structures`**: Group containing the input crystal structures and extracted molecules.
+- **`thermodynamics`**: Contains thermodynamic properties such as potential energy, kinetic energy, and volume averaged over the MD trajectory.
+- **`trajectories`**: Group containing the MD trajectories (positions, velocities, forces, etc.) for each simulation.
+
 ## Complete Input Files
 
 ### Python Script (`md.py`)

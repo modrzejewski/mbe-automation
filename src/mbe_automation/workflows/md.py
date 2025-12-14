@@ -25,7 +25,7 @@ def _save_md_plots(
         label: str
 ) -> None:
 
-    key = f"{config.root_key}/{label}/trajectory"
+    key = f"{config.root_key}/trajectories/{label}"
     save_dir = os.path.join(config.work_dir, config.root_key, label)
     
     mbe_automation.dynamics.md.display.trajectory(
@@ -59,11 +59,11 @@ def _md_molecule(
             target_pressure_GPa=None,
             md=config.md_molecule,
             dataset=config.dataset,
-            key=f"{config.root_key}/{label_molecule}/trajectory",
+            key=f"{config.root_key}/trajectories/{label_molecule}",
         )
         rows.append(mbe_automation.dynamics.md.data.molecule(
             dataset=config.dataset,
-            key=f"{config.root_key}/{label_molecule}/trajectory",
+            key=f"{config.root_key}/trajectories/{label_molecule}",
             system_label=label_molecule
         ))
         if config.save_plots:
@@ -88,11 +88,11 @@ def _md_crystal(
             target_pressure_GPa=p,
             md=config.md_crystal,
             dataset=config.dataset,
-            key=f"{config.root_key}/{label_crystal}/trajectory",
+            key=f"{config.root_key}/trajectories/{label_crystal}",
         )
         rows.append(mbe_automation.dynamics.md.data.crystal(
             dataset=config.dataset,
-            key=f"{config.root_key}/{label_crystal}/trajectory",
+            key=f"{config.root_key}/trajectories/{label_crystal}",
             n_atoms_unit_cell=len(config.crystal),
             system_label=label_crystal
         ))
@@ -160,7 +160,7 @@ def run(config: mbe_automation.configs.md.Enthalpy):
 
     mbe_automation.storage.save_data_frame(
         dataset=config.dataset,
-        key=f"{config.root_key}/enthalpy",
+        key=f"{config.root_key}/thermodynamics",
         df=df_npt_nvt
     )
     if config.save_csv:

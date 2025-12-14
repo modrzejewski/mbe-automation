@@ -11,6 +11,9 @@ from .storage.core import (
     EOSCurves,
     UniqueClusters,
 )
+from .storage import (
+    tree
+)
 from .api import (
     ForceConstants,
     Structure,

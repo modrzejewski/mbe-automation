@@ -191,12 +191,12 @@ The `mbe-automation` program uses the Hierarchical Data Format version 5 (HDF5) 
 
 ### File Structure
 
-You can visualize the structure of the output file using `mbe_automation.storage.tree`.
+You can visualize the structure of the output file using `mbe_automation.tree`.
 
 ```python
 import mbe_automation
 
-mbe_automation.storage.tree("qha.hdf5")
+mbe_automation.tree("qha.hdf5")
 ```
 
 A quasi-harmonic calculation with thermal expansion enabled will produce a file with the following structure:
@@ -208,11 +208,11 @@ qha.hdf5
     ├── eos_sampled
     ├── phonons
     │   ├── crystal[eos:V=1.0000]
-    │   ├── crystal[eq:T=300.00]
+    │   ├── crystal[eq:T=300.00,p=0.00010]
     │   └── ... (other structures)
-    ├── relaxation
+    ├── structures
     │   ├── crystal[eos:V=1.0000]
-    │   ├── crystal[eq:T=300.00]
+    │   ├── crystal[eq:T=300.00,p=0.00010]
     │   └── ... (other structures)
     ├── thermodynamics_equilibrium_volume
     └── thermodynamics_fixed_volume
@@ -221,14 +221,14 @@ qha.hdf5
 - **`eos_sampled`**: Contains the raw data from the equation of state (EOS) calculations at various cell volumes.
 - **`eos_interpolated`**: Stores the fitted EOS curves and the calculated free energy minima at each temperature.
 - **`phonons`**: Group containing phonon calculations for each structure.
-- **`relaxation`**: Group containing the relaxed crystal structures.
+- **`structures`**: Group containing geometric data of molecular and crystal structures.
 - **`thermodynamics_fixed_volume`**: Contains thermodynamic properties calculated at a single, fixed volume.
 - **`thermodynamics_equilibrium_volume`**: Contains the final thermodynamic properties calculated at the equilibrium volume for each temperature.
 
-The structures under the `phonons` and `relaxation` groups follow a specific naming scheme:
+The structures under the `phonons` and `structures` groups follow a specific naming scheme:
 - **`crystal[opt:...]`**: The relaxed input structure. The keywords after `opt:` indicate which degrees of freedom were included in the minimization of the static electronic energy (e.g., atomic positions, cell shape, cell volume), as determined by the `cell_relaxation` keyword.
 - **`crystal[eos:V=...]`**: Structures used to sample the equation of state curve, obtained by relaxing the crystal at a fixed volume.
-- **`crystal[eq:T=...]`**: Relaxed structures at the equilibrium volume for a given temperature.
+- **`crystal[eq:T=...,p=...]`**: Relaxed structures at the equilibrium volume for a given temperature and external isotropic pressure.
 
 ### Reading Thermodynamic Properties
 
@@ -262,7 +262,7 @@ import mbe_automation
 # Plot the phonon band structure for the equilibrium structure at 300 K
 mbe_automation.dynamics.harmonic.display.band_structure(
     dataset="qha.hdf5",
-    key="quasi_harmonic/phonons/crystal[eq:T=300.00]/brillouin_zone_path",
+    key="quasi_harmonic/phonons/crystal[eq:T=300.00,p=0.00010]/brillouin_zone_path",
     save_path="band_structure_300K.png"
 )
 ```
