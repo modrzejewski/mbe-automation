@@ -16,7 +16,7 @@ dependencies = [
   "mace-torch>=0.3.14",
   "matplotlib",
   "pymatgen",
-  "pyscf",
+  "pyscf>=2.11.0",
   "pyscf-dispersion",
   "scikit-learn",
   "spglib",

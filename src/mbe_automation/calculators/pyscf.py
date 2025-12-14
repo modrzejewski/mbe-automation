@@ -44,7 +44,7 @@ BASIS_SETS = [
 
 def DFT(
     model_name: str = "r2scan-d4", 
-    basis: Literal[*BASIS_SETS] = "def2-svp", 
+    basis: Literal[*BASIS_SETS] = "def2-tzvp", 
     charge: int = 0,
     spin: int = 0,
     kpts: Optional[List[int]] = None,
@@ -83,19 +83,28 @@ class PySCFCalculator(Calculator):
     def __init__(
             self,
             atoms=None,
-            xc: str = 'b3lyp',
-            disp=None,
-            basis='def2-tzvpd',
+            xc: str,
+            disp: str | None = None,
+            basis: str,
             charge=0,
             spin=0,
             kpts=None,
             verbose=0,
             density_fit=True, 
-            auxbasis=None,
-            max_memory_mb=None,
+            auxbasis: str | None = None,
+            max_memory_mb: int | None = None,
+            conv_tol: float = 1.0E-10,         # convergence threshold for energy
+            conv_tol_grad: float = 1.0E-6,     # convergence threshold for orbital gradient
+            max_cycle: int = 128               # max number of SCF iterations
     ):
         """
-        Wrapper around the GPU4PySCF ASE interface.
+        Based on the GPU4PySCF ASE interface, with the following
+        modifications:
+        
+        (1) this calculator is stateless
+        (2) the default xc grids and convergence thresholds
+            are roughly equivalent to the default parameters
+            applied in the beyond-rpa program
         """
         Calculator.__init__(self, atoms=atoms)
         
@@ -109,6 +118,9 @@ class PySCFCalculator(Calculator):
         self.density_fit = density_fit
         self.auxbasis = auxbasis
         self.max_memory_mb = max_memory_mb
+        self.conv_tol = conv_tol
+        self.conv_tol_grad = conv_tol_grad
+        self.max_cycle = max_cycle
         
         self.system = None
         self.method = None
@@ -184,10 +196,14 @@ class PySCFCalculator(Calculator):
         if self.disp is not None:
             mf.disp = self.disp
 
-        mf.grids.atom_grid = (150, 590)
+        mf.conv_tol = self.conv_tol
+        mf.conv_tol_grad = self.conv_tol_grad
+        mf.max_cycle = self.max_cycle
+
+        mf.grids.atom_grid = (150, 590)        # excellent quality for noncovalent interactions, used in beyond-rpa
         mf.grids.prune = grid_mod.sg1_prune
         if self.xc == "wb97m-v":
-            mf.nlcgrids.atom_grid = (50, 194)
+            mf.nlcgrids.atom_grid = (50, 194)  # sg-1 grid for the nonlocal correlation functional
 
         if self.density_fit:
             if self.auxbasis:
