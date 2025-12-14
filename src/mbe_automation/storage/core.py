@@ -355,6 +355,7 @@ def save_brillouin_zone_path(
             del f[key]
             
         group = f.create_group(key)
+        group.attrs["dataclass"] = "BrillouinZonePath"
         group.attrs["n_segments"] = n_segments
         group.attrs["n_bands"] = n_bands
 
@@ -450,6 +451,7 @@ def save_eos_curves(
             del f[key]
             
         group = f.create_group(key)
+        group.attrs["dataclass"] = "EOSCurves"
         group.attrs["n_temperatures"] = n_temperatures
         group.attrs["n_volumes"] = n_volumes
         group.attrs["n_interp"] = n_interp
@@ -487,7 +489,7 @@ def save_eos_curves(
 def read_eos_curves(
         dataset,
         key
-):
+) -> EOSCurves:
 
     with h5py.File(dataset, "r") as f:
         group = f[key]
@@ -569,7 +571,8 @@ def _save_structure(
             )
         if delta is not None:
             _save_delta_target_baseline(f, f"{key}/delta", delta)
-            
+
+        group.attrs["dataclass"] = "Structure"
         group.attrs["n_frames"] = n_frames
         group.attrs["n_atoms"] = n_atoms
         group.attrs["periodic"] = is_periodic
@@ -695,6 +698,7 @@ def save_trajectory(
             del f[key]
 
         group = f.require_group(key)
+        group.attrs["dataclass"] = "Trajectory|Structure"
         group.attrs["ensemble"] = traj.ensemble
         group.attrs["n_frames"] = traj.n_frames
         group.attrs["n_atoms"] = traj.n_atoms
@@ -833,6 +837,7 @@ def save_force_constants(
         if key in f:
             del f[key]
         group = f.create_group(key)
+        group.attrs["dataclass"] = "ForceConstants"
         group.create_dataset(
             "force_constants (eV∕Å²)",
             data=phonons.force_constants
@@ -898,7 +903,7 @@ def save_molecular_crystal(
             del f[key]
         
         group = f.create_group(key)
-
+        group.attrs["dataclass"] = "MolecularCrystal"
         group.attrs["n_molecules"] = system.n_molecules
         group.attrs["identical_composition"] = system.identical_composition
         group.attrs["central_molecule_index"] = system.central_molecule_index
@@ -986,6 +991,7 @@ def save_finite_subsystem(
             if key in f:
                 del f[key]  
             group = f.create_group(key)
+            group.attrs["dataclass"] = "FiniteSubsystem"
             group.attrs["n_molecules"] = subsystem.n_molecules
             group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
             
@@ -1062,6 +1068,7 @@ def save_unique_clusters(
         if key in f:
             del f[key]
         group = f.create_group(key)
+        group.attrs["dataclass"] = "UniqueClusters"
         group.attrs["n_clusters"] = clusters.n_clusters
         group.create_dataset("molecule_indices", data=clusters.molecule_indices)
         group.create_dataset("weights", data=clusters.weights)

@@ -225,23 +225,23 @@ def crystal(
     )
     mbe_automation.storage.save_force_constants(
         dataset=dataset,
-        key=f"{root_key}/phonons/{system_label}/force_constants",
+        key=f"{root_key}/phonons/force_constants/{system_label}",
         phonons=phonons
     )
     mbe_automation.storage.save_brillouin_zone_path(
         phonons=phonons,
         dataset=dataset,
-        key=f"{root_key}/phonons/{system_label}/brillouin_zone_path",
+        key=f"{root_key}/phonons/brillouin_zone_paths/{system_label}",
     )
     mbe_automation.dynamics.harmonic.display.band_structure(
         dataset=dataset,
-        key=f"{root_key}/phonons/{system_label}/brillouin_zone_path",
+        key=f"{root_key}/phonons/brillouin_zone_paths/{system_label}",
         save_path=os.path.join(work_dir, "phonons", system_label, "brillouin_zone_path.png"),
         freq_max_THz=10.0 # THz
     )
     mbe_automation.storage.save_structure(
         dataset=dataset,
-        key=f"{root_key}/relaxation/{system_label}",
+        key=f"{root_key}/structures/{system_label}",
         positions=unit_cell.get_positions(),
         atomic_numbers=unit_cell.get_atomic_numbers(),
         masses=unit_cell.get_masses(),

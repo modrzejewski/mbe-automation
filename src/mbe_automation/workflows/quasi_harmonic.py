@@ -287,7 +287,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             supercell_matrix,
             config.supercell_displacement,
             interp_mesh=interp_mesh,
-            key=f"{config.root_key}/phonons/{label_crystal}"
+            key=f"{config.root_key}/phonons/force_constants/{label_crystal}"
         )
         df_crystal_T = mbe_automation.dynamics.harmonic.data.crystal(
             unit_cell_T,
