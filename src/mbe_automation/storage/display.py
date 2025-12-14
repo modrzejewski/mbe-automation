@@ -1,9 +1,16 @@
 import os
 import h5py
-from typing import Set
+from typing import Set, List, Literal
 
 # Dataclasses that contain structures which should be ignored
 IGNORED_PARENTS = {"FiniteSubsystem", "MolecularCrystal", "ForceConstants"}
+
+FilterCriterion = Literal[
+    "periodic",
+    "finite",
+    "with_delta_learning_data",
+    "with_feature_vectors"
+]
 
 def tree(dataset: str):
     """
@@ -59,7 +66,8 @@ def tree(dataset: str):
 def _list_objects_by_dataclass(
         dataset: str,
         target_dataclasses: Set[str],
-        check_ignored_parents: bool = True
+        check_ignored_parents: bool = True,
+        filters: List[FilterCriterion] | None = None
 ) -> list[str]:
     """
     Helper to list keys with specific dataclass attributes.
@@ -79,6 +87,21 @@ def _list_objects_by_dataclass(
                 if parent_dataclass in IGNORED_PARENTS:
                     return
 
+            if filters:
+                for criterion in filters:
+                    if criterion == "periodic":
+                        if not obj.attrs.get("periodic"):
+                            return
+                    elif criterion == "finite":
+                        if obj.attrs.get("periodic"):
+                            return
+                    elif criterion == "with_delta_learning_data":
+                        if "delta" not in obj:
+                            return
+                    elif criterion == "with_feature_vectors":
+                        if "feature_vectors" not in obj:
+                            return
+
             found_keys.append(name)
 
     try:
@@ -91,7 +114,10 @@ def _list_objects_by_dataclass(
     return found_keys
 
 
-def list_structures(dataset: str) -> list[str]:
+def list_structures(
+        dataset: str,
+        filters: List[FilterCriterion] | None = None
+) -> list[str]:
     """
     List all keys in a given dataset file which correspond to
     dataclass="Structure" or dataclass="Trajectory|Structure".
@@ -102,11 +128,15 @@ def list_structures(dataset: str) -> list[str]:
     return _list_objects_by_dataclass(
         dataset,
         {"Structure", "Trajectory|Structure"},
-        check_ignored_parents=True
+        check_ignored_parents=True,
+        filters=filters
     )
 
 
-def list_trajectories(dataset: str) -> list[str]:
+def list_trajectories(
+        dataset: str,
+        filters: List[FilterCriterion] | None = None
+) -> list[str]:
     """
     List all keys in a given dataset file which correspond to
     dataclass="Trajectory|Structure".
@@ -116,7 +146,8 @@ def list_trajectories(dataset: str) -> list[str]:
     return _list_objects_by_dataclass(
         dataset,
         {"Trajectory|Structure"},
-        check_ignored_parents=True
+        check_ignored_parents=True,
+        filters=filters
     )
 
 
@@ -125,12 +156,6 @@ def list_finite_subsystems(dataset: str) -> list[str]:
     List all keys in a given dataset file which correspond to
     dataclass="FiniteSubsystem".
     """
-    # FiniteSubsystems themselves are not usually nested in ignored parents in a way that needs hiding.
-    # But for consistency with the pattern (listing top-level or relevant objects),
-    # we can default to False or True. Given they are "composite objects" themselves,
-    # checking for ignored parents might not be strictly necessary unless we have FS inside FS?
-    # Let's disable parent checking for FS unless we know they shouldn't be listed.
-    # The requirement for parent checking was specifically for "Structure" objects.
     return _list_objects_by_dataclass(
         dataset,
         {"FiniteSubsystem"},
