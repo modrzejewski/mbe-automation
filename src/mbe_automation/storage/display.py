@@ -52,3 +52,38 @@ def tree(dataset: str):
         print(f"Error reading dataset file: {e}")
 
 
+def list_structures(dataset: str) -> list[str]:
+    """
+    List all keys in a given dataset file which correspond to
+    dataclass="Structure" or dataclass="Trajectory|Structure".
+
+    Structures contained within composite objects (FiniteSubsystem,
+    MolecularCrystal, ForceConstants) are excluded.
+    """
+    if not os.path.exists(dataset):
+        print(f"Error: File '{dataset}' not found.")
+        return []
+
+    found_keys = []
+
+    # Dataclasses that contain structures which should be ignored
+    ignored_parents = {"FiniteSubsystem", "MolecularCrystal", "ForceConstants"}
+
+    def visit_func(name, obj):
+        dataclass_attr = obj.attrs.get("dataclass")
+        if dataclass_attr in ["Structure", "Trajectory|Structure"]:
+            # Check parent
+            parent = obj.parent
+            parent_dataclass = parent.attrs.get("dataclass")
+
+            if parent_dataclass not in ignored_parents:
+                found_keys.append(name)
+
+    try:
+        with h5py.File(dataset, "r") as f:
+            f.visititems(visit_func)
+    except Exception as e:
+        print(f"Error reading dataset file: {e}")
+        return []
+
+    return found_keys
