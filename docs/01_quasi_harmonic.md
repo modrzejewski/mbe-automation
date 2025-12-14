@@ -208,11 +208,11 @@ qha.hdf5
     ├── eos_sampled
     ├── phonons
     │   ├── crystal[eos:V=1.0000]
-    │   ├── crystal[eq:T=300.00]
+    │   ├── crystal[eq:T=300.00,p=0.00010]
     │   └── ... (other structures)
     ├── structures
     │   ├── crystal[eos:V=1.0000]
-    │   ├── crystal[eq:T=300.00]
+    │   ├── crystal[eq:T=300.00,p=0.00010]
     │   └── ... (other structures)
     ├── thermodynamics_equilibrium_volume
     └── thermodynamics_fixed_volume
@@ -228,7 +228,7 @@ qha.hdf5
 The structures under the `phonons` and `structures` groups follow a specific naming scheme:
 - **`crystal[opt:...]`**: The relaxed input structure. The keywords after `opt:` indicate which degrees of freedom were included in the minimization of the static electronic energy (e.g., atomic positions, cell shape, cell volume), as determined by the `cell_relaxation` keyword.
 - **`crystal[eos:V=...]`**: Structures used to sample the equation of state curve, obtained by relaxing the crystal at a fixed volume.
-- **`crystal[eq:T=...]`**: Relaxed structures at the equilibrium volume for a given temperature.
+- **`crystal[eq:T=...,p=...]`**: Relaxed structures at the equilibrium volume for a given temperature and external isotropic pressure.
 
 ### Reading Thermodynamic Properties
 
@@ -262,7 +262,7 @@ import mbe_automation
 # Plot the phonon band structure for the equilibrium structure at 300 K
 mbe_automation.dynamics.harmonic.display.band_structure(
     dataset="qha.hdf5",
-    key="quasi_harmonic/phonons/crystal[eq:T=300.00]/brillouin_zone_path",
+    key="quasi_harmonic/phonons/crystal[eq:T=300.00,p=0.00010]/brillouin_zone_path",
     save_path="band_structure_300K.png"
 )
 ```
