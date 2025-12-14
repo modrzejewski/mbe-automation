@@ -208,40 +208,6 @@ properties.hdf5
 - **`thermodynamics`**: Contains thermodynamic properties such as potential energy, kinetic energy, and volume averaged over the MD trajectory.
 - **`trajectories`**: Group containing the MD trajectories (positions, velocities, forces, etc.) for each simulation.
 
-### Reading Thermodynamic Properties
-
-The thermodynamic properties can be read into a `pandas` DataFrame.
-
-```python
-import mbe_automation
-
-# Read the thermodynamic data
-df = mbe_automation.storage.read_data_frame(
-    dataset="properties.hdf5",
-    key="md/thermodynamics"
-)
-print(df.head())
-```
-
-### Reading Trajectories
-
-Trajectories are stored as `Trajectory` objects, which can be read to access atomic positions, velocities, forces, and other properties.
-
-```python
-import mbe_automation
-
-# Read a trajectory
-traj = mbe_automation.storage.read_trajectory(
-    dataset="properties.hdf5",
-    key="md/trajectories/crystal[dyn:T=298.15,p=0.00010]"
-)
-
-# Access properties
-print(f"Number of frames: {traj.n_frames}")
-if traj.potential_energies is not None:
-    print(f"Potential energy of first frame: {traj.potential_energies[0]} eV")
-```
-
 ## Complete Input Files
 
 ### Python Script (`md.py`)
