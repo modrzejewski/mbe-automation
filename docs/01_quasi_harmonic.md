@@ -191,12 +191,12 @@ The `mbe-automation` program uses the Hierarchical Data Format version 5 (HDF5) 
 
 ### File Structure
 
-You can visualize the structure of the output file using `mbe_automation.storage.tree`.
+You can visualize the structure of the output file using `mbe_automation.tree`.
 
 ```python
 import mbe_automation
 
-mbe_automation.storage.tree("qha.hdf5")
+mbe_automation.tree("qha.hdf5")
 ```
 
 A quasi-harmonic calculation with thermal expansion enabled will produce a file with the following structure:

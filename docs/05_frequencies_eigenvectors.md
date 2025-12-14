@@ -41,12 +41,12 @@ Once you have the `properties.hdf5` file, you can read the computed force consta
 
 ### Step 1: Identify the Force Constants Key
 
-Use `mbe_automation.storage.tree` to inspect the file structure and locate the force constants key. Look for groups under `phonons` corresponding to your structure of interest.
+Use `mbe_automation.tree` to inspect the file structure and locate the force constants key. Look for groups under `phonons` corresponding to your structure of interest.
 
 ```python
 import mbe_automation
 
-mbe_automation.storage.tree("properties.hdf5")
+mbe_automation.tree("properties.hdf5")
 ```
 
 Example output:
