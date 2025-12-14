@@ -70,7 +70,7 @@ test_pbc = Dataset()
 # Loop over Periodic Crystals
 for T, p in itertools.product(temperatures_K, pressures_GPa):
     # Read subsampled frames for this condition
-    key = f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/subsampled_frames"
+    key = f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/subsampled_frames"
     struct = Structure.read(dataset=dataset_path, key=key)
 
     # Split into Train/Val/Test (90%/5%/5%)
@@ -110,7 +110,7 @@ test_clusters = Dataset()
 
 for T, p in itertools.product(temperatures_K, pressures_GPa):
     for n_molecules in cluster_sizes:
-        key_cluster = f"training/dftb3_d4/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
+        key_cluster = f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
         cluster = FiniteSubsystem.read(dataset=dataset_path, key=key_cluster)
 
         # Split clusters

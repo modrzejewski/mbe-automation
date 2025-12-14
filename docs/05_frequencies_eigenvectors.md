@@ -58,7 +58,7 @@ properties.hdf5
     │       └── force_constants  <-- This group contains the data
     │           ├── force_constants (eV∕Å²)
     │           └── supercell_matrix
-    ├── relaxation
+    ├── structures
     │   └── crystal[opt:atoms,shape]
     └── thermodynamics_fixed_volume
 ```
