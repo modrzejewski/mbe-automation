@@ -991,7 +991,7 @@ def save_finite_subsystem(
             if key in f:
                 del f[key]  
             group = f.create_group(key)
-            group.attrs["dataclass"] = "FiniteSubsystem"
+            group.attrs["dataclass"] = type(subsystem).__name__
             group.attrs["n_molecules"] = subsystem.n_molecules
             group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
             
