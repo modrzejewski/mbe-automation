@@ -903,7 +903,7 @@ def save_molecular_crystal(
             del f[key]
         
         group = f.create_group(key)
-        group.attrs["dataclass"] = "MolecularCrystal"
+        group.attrs["dataclass"] = type(system).__name__
         group.attrs["n_molecules"] = system.n_molecules
         group.attrs["identical_composition"] = system.identical_composition
         group.attrs["central_molecule_index"] = system.central_molecule_index
