@@ -1,5 +1,16 @@
 import os
 import h5py
+from typing import Set, List, Literal
+
+# Dataclasses that contain structures which should be ignored
+IGNORED_PARENTS = {"FiniteSubsystem", "MolecularCrystal", "ForceConstants"}
+
+FilterCriterion = Literal[
+    "periodic",
+    "finite",
+    "with_delta_learning_data",
+    "with_feature_vectors"
+]
 
 def tree(dataset: str):
     """
@@ -52,3 +63,101 @@ def tree(dataset: str):
         print(f"Error reading dataset file: {e}")
 
 
+def _list_objects_by_dataclass(
+        dataset: str,
+        target_dataclasses: Set[str],
+        check_ignored_parents: bool = True,
+        filters: List[FilterCriterion] | None = None
+) -> list[str]:
+    """
+    Helper to list keys with specific dataclass attributes.
+    """
+    if not os.path.exists(dataset):
+        print(f"Error: File '{dataset}' not found.")
+        return []
+
+    found_keys = []
+
+    def visit_func(name, obj):
+        dataclass_attr = obj.attrs.get("dataclass")
+        if dataclass_attr in target_dataclasses:
+            if check_ignored_parents:
+                parent = obj.parent
+                parent_dataclass = parent.attrs.get("dataclass")
+                if parent_dataclass in IGNORED_PARENTS:
+                    return
+
+            if filters:
+                for criterion in filters:
+                    if criterion == "periodic":
+                        if not obj.attrs.get("periodic"):
+                            return
+                    elif criterion == "finite":
+                        if obj.attrs.get("periodic"):
+                            return
+                    elif criterion == "with_delta_learning_data":
+                        if "delta" not in obj:
+                            return
+                    elif criterion == "with_feature_vectors":
+                        if "feature_vectors" not in obj:
+                            return
+
+            found_keys.append(name)
+
+    try:
+        with h5py.File(dataset, "r") as f:
+            f.visititems(visit_func)
+    except Exception as e:
+        print(f"Error reading dataset file: {e}")
+        return []
+
+    return found_keys
+
+
+def list_structures(
+        dataset: str,
+        filters: List[FilterCriterion] | None = None
+) -> list[str]:
+    """
+    List all keys in a given dataset file which correspond to
+    dataclass="Structure" or dataclass="Trajectory|Structure".
+
+    Structures contained within composite objects (FiniteSubsystem,
+    MolecularCrystal, ForceConstants) are excluded.
+    """
+    return _list_objects_by_dataclass(
+        dataset,
+        {"Structure", "Trajectory|Structure"},
+        check_ignored_parents=True,
+        filters=filters
+    )
+
+
+def list_trajectories(
+        dataset: str,
+        filters: List[FilterCriterion] | None = None
+) -> list[str]:
+    """
+    List all keys in a given dataset file which correspond to
+    dataclass="Trajectory|Structure".
+
+    Trajectories contained within composite objects are excluded.
+    """
+    return _list_objects_by_dataclass(
+        dataset,
+        {"Trajectory|Structure"},
+        check_ignored_parents=True,
+        filters=filters
+    )
+
+
+def list_finite_subsystems(dataset: str) -> list[str]:
+    """
+    List all keys in a given dataset file which correspond to
+    dataclass="FiniteSubsystem".
+    """
+    return _list_objects_by_dataclass(
+        dataset,
+        {"FiniteSubsystem"},
+        check_ignored_parents=False
+    )
