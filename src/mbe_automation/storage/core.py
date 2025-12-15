@@ -1068,7 +1068,7 @@ def save_unique_clusters(
         if key in f:
             del f[key]
         group = f.create_group(key)
-        group.attrs["dataclass"] = "UniqueClusters"
+        group.attrs["dataclass"] = type(clusters).__name__
         group.attrs["n_clusters"] = clusters.n_clusters
         group.create_dataset("molecule_indices", data=clusters.molecule_indices)
         group.create_dataset("weights", data=clusters.weights)
