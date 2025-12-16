@@ -57,7 +57,7 @@ class DatasetKeys:
 
             if obj.parent and obj.parent.name != '/':
                 parent_dataclass = obj.parent.attrs.get("dataclass")
-                if parent_dataclass in  ["FiniteSubsystem", "MolecularCrystal", "ForceConstants"]:
+                if parent_dataclass in ["FiniteSubsystem", "MolecularCrystal", "ForceConstants"]:
                     return
             
             if dataclass_attr == "Structure" or dataclass_attr == "Trajectory":
@@ -111,11 +111,10 @@ class DatasetKeys:
                 dataclass=dataclass_attr
             ))
 
-        try:
-            with h5py.File(filename, "r") as f:
-                f.visititems(visit_func)
-        except Exception as e:
-            print(f"Error reading dataset file: {e}")
+        with h5py.File(filename, "r") as f:
+            f.visititems(visit_func)
+
+        return
 
     def __getitem__(self, index: int | slice) -> str | List[str]:
         """
@@ -144,28 +143,28 @@ class DatasetKeys:
     def structures(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass in ["Structure", "Trajectory"])
 
-    def trajectories(self):
+    def trajectories(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "Trajectory")
 
-    def molecular_crystals(self):
+    def molecular_crystals(self) DatasetKeys:
         return self._filter(lambda x: x.dataclass == "MolecularCrystal")
 
-    def finite_subsystems(self, n: int | None = None):
+    def finite_subsystems(self, n: int | None = None) -> DatasetKeys:
         return self._filter(lambda x: (
             x.dataclass == "FiniteSubsystem" and
             x.contains_exactly_n_molecules==n if n is not None else True
         ))
 
-    def brillouin_zone_paths(self):
+    def brillouin_zone_paths(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "BrillouinZonePath")
 
-    def eos_curves(self):
+    def eos_curves(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "EOSCurves")
 
-    def force_constants(self):
+    def force_constants(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "ForceConstants")
 
-    def unique_clusters(self):
+    def unique_clusters(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "UniqueClusters")
         
     def periodic(self) -> DatasetKeys:
