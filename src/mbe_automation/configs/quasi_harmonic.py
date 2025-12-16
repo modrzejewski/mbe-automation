@@ -9,6 +9,7 @@ import numpy.typing as npt
 
 from mbe_automation.configs.recommended import KNOWN_MODELS
 from mbe_automation.configs.structure import Minimum
+import mbe_automation.storage
 
 EOS_SAMPLING_ALGOS = ["volume", "pressure", "uniform_scaling"]
 EQUATIONS_OF_STATE = ["birch_murnaghan", "vinet", "polynomial", "spline"]
@@ -17,18 +18,18 @@ EQUATIONS_OF_STATE = ["birch_murnaghan", "vinet", "polynomial", "spline"]
 class FreeEnergy:
     """
     Default parameters for free energy calculations
-    in the quasi-harmonic approximation.
+    in the quasi-harmonic approximation.    
     """
-                                   #
-                                   # Initial, nonrelaxed structures of crystal
-                                   # and isolated molecule
-                                   #
-    crystal: ase.Atoms
-    molecule: ase.Atoms | None = None
                                    #
                                    # Calculator of energies and forces
                                    #
     calculator: ASECalculator
+                                   #
+                                   # Initial, nonrelaxed structures of crystal
+                                   # and isolated molecule
+                                   #
+    crystal: ase.Atoms | mbe_automation.storage.Structure    
+    molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
                                    #
                                    # Volumetric thermal expansion
                                    #
@@ -263,6 +264,11 @@ class FreeEnergy:
     save_xyz: bool = True
 
     def __post_init__(self):
+
+        if isinstance(self.crystal, mbe_automation.storage.Structure):
+            self.crystal = mbe_automation.storage.to_ase(self.crystal)
+        if isinstance(self.molecule, mbe_automation.storage.Structure):
+            self.molecule = mbe_automation.storage.to_ase(self.molecule)
         
         if (
                 self.thermal_expansion and
@@ -279,9 +285,9 @@ class FreeEnergy:
     def recommended(
             cls,
             model_name: Literal[*KNOWN_MODELS],
-            crystal: ase.Atoms,
-            molecule: ase.Atoms,
             calculator: ASECalculator,
+            crystal: ase.Atoms | mbe_automation.storage.Structure,
+            molecule: ase.Atoms | mbe_automation.storage.Structure | None = None,
             **kwargs
     ):
         """

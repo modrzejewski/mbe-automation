@@ -1,12 +1,13 @@
 from __future__ import annotations
 from typing import Any, Literal
 from dataclasses import dataclass, field
-from ase import Atoms
+import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
 import numpy.typing as npt
 
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
+import mbe_automation.storage
 from .structure import Minimum
 
 @dataclass(kw_only=True)
@@ -158,11 +159,11 @@ class Enthalpy:
                                    #
                                    # Initial structure of crystal
                                    #
-    crystal: Atoms | None = None
+    crystal: ase.Atoms | mbe_automation.storage.Structure | None = None
                                    #
                                    # Initial structure of molecule
                                    #
-    molecule: Atoms | None = None
+    molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
                                    #
                                    # Parameters of the MD propagation
                                    #
@@ -207,6 +208,11 @@ class Enthalpy:
     save_csv: bool = True
 
     def __post_init__(self):
+        if isinstance(self.crystal, mbe_automation.storage.Structure):
+            self.crystal = mbe_automation.storage.to_ase(self.crystal)
+        if isinstance(self.molecule, mbe_automation.storage.Structure):
+            self.molecule = mbe_automation.storage.to_ase(self.molecule)
+        
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
         self.pressures_GPa = np.atleast_1d(self.pressures_GPa)
         
