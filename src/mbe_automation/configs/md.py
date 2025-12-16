@@ -213,6 +213,8 @@ class Enthalpy:
         if isinstance(self.molecule, mbe_automation.storage.Structure):
             self.molecule = mbe_automation.storage.to_ase(self.molecule)
 
+        assert self.sampling_interaval_fs > self.time_step_fs
+        assert self.time_total_fs > self.sampling_interval_fs
         assert self.time_total_fs > self.time_equilibration_fs
         
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
