@@ -18,7 +18,6 @@ class DatasetKey:
         "FiniteSubsystem",
         "MolecularCrystal",
         "ForceConstants",
-        "UniqueClusters",
         "BrillouinZonePath",
         "EOSCurves",
     ]
@@ -78,30 +77,12 @@ class DatasetKeys:
                 is_periodic = False
                 contains_exactly_n_molecules = obj.attrs.get("n_molecules")
 
-            elif dataclass_attr == "ForceConstants":
-                has_feature_vectors = None
-                has_delta_learning_data = None
-                is_periodic = True
-                contains_exactly_n_molecules = None
-            
-            elif dataclass_attr == "BrillouinZonePath":
+            elif dataclass_attr in ["ForceConstants", "BrillouinZonePath", "EOSCurves"]:
                 has_feature_vectors = None
                 has_delta_learning_data = None
                 is_periodic = True
                 contains_exactly_n_molecules = None
 
-            elif dataclass_attr == "EOSCurves":
-                has_feature_vectors = None
-                has_delta_learning_data = None
-                is_periodic = True
-                contains_exactly_n_molecules = None
-
-            elif dataclass_attr == "UniqueClusters":
-                has_feature_vectors = False
-                has_delta_learning_data = False
-                is_periodic = False
-                contains_exactly_n_molecules = None                
-                
             self._items.append(DatasetKey(
                 key=name,
                 is_periodic=is_periodic,
@@ -146,7 +127,7 @@ class DatasetKeys:
     def trajectories(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "Trajectory")
 
-    def molecular_crystals(self) DatasetKeys:
+    def molecular_crystals(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "MolecularCrystal")
 
     def finite_subsystems(self, n: int | None = None) -> DatasetKeys:
@@ -164,9 +145,6 @@ class DatasetKeys:
     def force_constants(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "ForceConstants")
 
-    def unique_clusters(self) -> DatasetKeys:
-        return self._filter(lambda x: x.dataclass == "UniqueClusters")
-        
     def periodic(self) -> DatasetKeys:
         return self._filter(lambda x: x.is_periodic)
 
@@ -222,7 +200,7 @@ def tree(dataset: str):
 
     try:
         with h5py.File(dataset, "r") as f:
-            print(f"{os.path.basename(dataset)}")
+            print(Path(dataset).name)
             items = list(f.items())
             for i, (name, obj) in enumerate(items):
                 is_last = (i == len(items) - 1)
