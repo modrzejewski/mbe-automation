@@ -327,7 +327,7 @@ def equilibrium_curve(
             supercell_matrix,
             supercell_displacement,
             interp_mesh=interp_mesh,
-            key=f"{root_key}/phonons/{label}"
+            key=f"{root_key}/phonons/force_constants/{label}"
         )
         
         df_crystal_V = mbe_automation.dynamics.harmonic.data.crystal(
@@ -353,7 +353,7 @@ def equilibrium_curve(
     mbe_automation.storage.save_data_frame(
         df=df_eos,
         dataset=dataset,
-        key="quasi_harmonic/eos_sampled"
+        key=f"{root_key}/eos_sampled"
     )
     df_eos.to_csv(os.path.join(work_dir, "eos_sampled.csv"))
     #

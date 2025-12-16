@@ -82,10 +82,10 @@ class PySCFCalculator(Calculator):
 
     def __init__(
             self,
-            atoms=None,
             xc: str,
-            disp: str | None = None,
+            disp: str | None,
             basis: str,
+            atoms=None,
             charge=0,
             spin=0,
             kpts=None,

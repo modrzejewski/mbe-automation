@@ -213,7 +213,6 @@ mbe_automation.run(phonon_sampling_config)
 | `max_force_on_atom_eV_A`     | Maximum residual force threshold for geometry relaxation (eV/Å).                                                                                                      | `1.0E-4`            |
 | `max_n_steps`                | Maximum number of steps in the geometry relaxation.                                                                                                                   | `500`               |
 | `cell_relaxation`            | Relaxation of the input structure: "full" (optimizes atomic positions, cell shape, and volume), "constant_volume" (optimizes atomic positions and cell shape at fixed volume), or "only_atoms" (optimizes only atomic positions). | `"constant_volume"` |
-| `pressure_GPa`               | External isotropic pressure (in GPa) applied during lattice relaxation.                                                                                               | `0.0`               |
 | `symmetrize_final_structure` | If `True`, refines the space group symmetry after each geometry relaxation.                                                                                           | `True`              |
 | `backend`                    | Software used to perform the geometry relaxation: "ase" or "dftb".                                                                                                    | `"ase"`             |
 

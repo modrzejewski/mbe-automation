@@ -117,7 +117,7 @@ def _crystal_at_pT(
         config: mbe_automation.configs.training.MDSampling
 ) -> mbe_automation.storage.Structure:
     
-    pbc_trajectory_key = f"{config.root_key}/{system_label}/trajectory"    
+    pbc_trajectory_key = f"{config.root_key}/trajectories/{system_label}"    
     mbe_automation.dynamics.md.core.run(
         system=config.crystal,
         supercell_matrix=supercell_matrix,
@@ -172,7 +172,7 @@ def _finite_system_at_pT(
         config: mbe_automation.configs.training.MDSampling
 ) -> None:
 
-    md_molecular_crystal_key = f"{config.root_key}/{system_label}/molecular_crystal"
+    md_molecular_crystal_key = f"{config.root_key}/molecular_crystals/{system_label}"
     md_molecular_crystal = mbe_automation.structure.clusters.detect_molecules(
         system=pbc_md_frames,
         reference_frame_index=0,
@@ -188,7 +188,7 @@ def _finite_system_at_pT(
         filter=config.finite_subsystem_filter
     )
     for s in finite_subsystems:
-        key = f"{config.root_key}/{system_label}/finite_subsystems/n={s.n_molecules}"
+        key = f"{config.root_key}/finite_subsystems/n={s.n_molecules}/{system_label}"
 
         mbe_automation.calculators.run_model(
             structure=s.cluster_of_molecules,

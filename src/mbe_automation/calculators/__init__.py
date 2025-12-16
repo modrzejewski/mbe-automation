@@ -10,6 +10,7 @@ import torch
 if torch.cuda.is_available():
     try:
         from . import pyscf
+        from .pyscf import DFT
     except ImportError:
         pass
 

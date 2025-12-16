@@ -122,6 +122,11 @@ def run(config: mbe_automation.configs.md.Enthalpy):
             mbe_automation.common.display.mace_summary(config.calculator)
 
     if config.molecule is not None:
+        mbe_automation.storage.save_structure(
+            structure=mbe_automation.storage.from_ase_atoms(config.molecule),
+            dataset=config.dataset,
+            key=f"{config.root_key}/structures/molecule[input]",
+        )
         df_molecule = _md_molecule(config)
 
     if config.crystal is not None:    
@@ -134,6 +139,11 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         else:
             supercell_matrix = config.md_crystal.supercell_matrix
 
+        mbe_automation.storage.save_structure(
+            structure=mbe_automation.storage.from_ase_atoms(config.crystal),
+            dataset=config.dataset,
+            key=f"{config.root_key}/structures/crystal[input]",
+        )
         mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
             dataset=config.dataset,
             key=f"{config.root_key}/structures",

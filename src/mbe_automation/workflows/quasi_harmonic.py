@@ -51,6 +51,11 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         if isinstance(config.calculator, MACECalculator):
             mbe_automation.common.display.mace_summary(config.calculator)
 
+    mbe_automation.storage.save_structure(
+        structure=mbe_automation.storage.from_ase_atoms(config.crystal),
+        dataset=config.dataset,
+        key=f"{config.root_key}/structures/crystal[input]",
+    )
     mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
         dataset=config.dataset,
         key=f"{config.root_key}/structures",
@@ -63,6 +68,11 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
     if config.molecule is not None:
         molecule = config.molecule.copy()
+        mbe_automation.storage.save_structure(
+            structure=mbe_automation.storage.from_ase_atoms(config.molecule),
+            dataset=config.dataset,
+            key=f"{config.root_key}/structures/molecule[input]",
+        )
         relaxed_molecule_label = "molecule[opt:atoms]"
         molecule = mbe_automation.structure.relax.isolated_molecule(
             molecule=molecule,
@@ -287,7 +297,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             supercell_matrix,
             config.supercell_displacement,
             interp_mesh=interp_mesh,
-            key=f"{config.root_key}/phonons/{label_crystal}"
+            key=f"{config.root_key}/phonons/force_constants/{label_crystal}"
         )
         df_crystal_T = mbe_automation.dynamics.harmonic.data.crystal(
             unit_cell_T,

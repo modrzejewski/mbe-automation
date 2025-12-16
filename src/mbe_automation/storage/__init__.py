@@ -33,7 +33,7 @@ from mbe_automation.storage.core import (
 )
 
 # --- Visual summary of dataset files ---
-from mbe_automation.storage.display import tree
+from mbe_automation.storage.inspect import tree, DatasetKeys
 
 # --- Views for external libraries ---
 from mbe_automation.storage.views import ASETrajectory

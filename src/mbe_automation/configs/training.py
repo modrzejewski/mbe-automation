@@ -16,7 +16,7 @@ from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
 @dataclass(kw_only=True)
 class PhononSampling:
     force_constants_dataset: str = "./properties.hdf5"
-    force_constants_key: str = "training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"
+    force_constants_key: str = "training/quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]"
                                    #
                                    # Calculators used for
                                    # (1) energies and forces
@@ -24,10 +24,6 @@ class PhononSampling:
                                    #
     calculator: ASECalculator
     features_calculator: MACECalculator | None = None
-                                   #
-                                   # Calculator
-                                   #
-                                   
                                    #
                                    # Rules how to select a subset
                                    # from the full set of phonons

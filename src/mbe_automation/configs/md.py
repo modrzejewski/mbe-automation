@@ -1,12 +1,13 @@
 from __future__ import annotations
 from typing import Any, Literal
 from dataclasses import dataclass, field
-from ase import Atoms
+import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
 import numpy.typing as npt
 
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
+import mbe_automation.storage
 from .structure import Minimum
 
 @dataclass(kw_only=True)
@@ -149,6 +150,11 @@ class ClassicalMD:
                                    #
     supercell_diagonal: bool = False
 
+    def __post_init__(self):
+        assert self.sampling_interval_fs > self.time_step_fs
+        assert self.time_total_fs > self.sampling_interval_fs
+        assert self.time_total_fs > self.time_equilibration_fs
+
 @dataclass(kw_only=True)
 class Enthalpy:
                                    #
@@ -158,11 +164,11 @@ class Enthalpy:
                                    #
                                    # Initial structure of crystal
                                    #
-    crystal: Atoms | None = None
+    crystal: ase.Atoms | mbe_automation.storage.Structure | None = None
                                    #
                                    # Initial structure of molecule
                                    #
-    molecule: Atoms | None = None
+    molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
                                    #
                                    # Parameters of the MD propagation
                                    #
@@ -203,10 +209,15 @@ class Enthalpy:
                                    # 0 -> suppressed warnings
                                    #
     verbose: int = 0
-    save_plots: bool = True
-    save_csv: bool = True
+    save_plots: bool = False
+    save_csv: bool = False
 
     def __post_init__(self):
+        if isinstance(self.crystal, mbe_automation.storage.Structure):
+            self.crystal = mbe_automation.storage.to_ase(self.crystal)
+        if isinstance(self.molecule, mbe_automation.storage.Structure):
+            self.molecule = mbe_automation.storage.to_ase(self.molecule)
+        
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
         self.pressures_GPa = np.atleast_1d(self.pressures_GPa)
         

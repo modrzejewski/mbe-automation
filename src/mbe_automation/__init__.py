@@ -12,7 +12,8 @@ from .storage.core import (
     UniqueClusters,
 )
 from .storage import (
-    tree
+    tree,
+    DatasetKeys,
 )
 from .api import (
     ForceConstants,
