@@ -12,19 +12,12 @@ from ase.md.andersen import Andersen
 from ase.md.langevin import Langevin
 from ase.io.trajectory import Trajectory
 import ase.units
-try:
-    from mace.calculators import MACECalculator
-    mace_available = True
-except ImportError:
-    MACECalculator = None
-    mace_available = False
 
 import mbe_automation.common
 from  mbe_automation.configs.md import ClassicalMD
 import mbe_automation.storage
 import mbe_automation.structure.molecule
 import mbe_automation.dynamics.md.csvr
-import mbe_automation.calculators
 
 def get_velocities(
     system: ase.Atoms,
@@ -314,19 +307,6 @@ def run(
     t0 = time.time()
     print("Time propagation...", flush=True)
     dyn.run(steps=n_total_steps)
-
-    if mace_available:
-        if isinstance(calculator, MACECalculator):
-            mbe_automation.calculators.mace.run_model(
-                structure=traj,
-                calculator=calculator,
-                compute_energies=False,
-                compute_forces=False,
-                compute_feature_vectors=True,
-                average_over_atoms=True,
-                return_arrays=False,
-                silent=True,
-            )
 
     mbe_automation.storage.save_trajectory(
         dataset=dataset,
