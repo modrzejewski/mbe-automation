@@ -207,9 +207,13 @@ qha.hdf5
     ├── eos_interpolated
     ├── eos_sampled
     ├── phonons
-    │   ├── crystal[eos:V=1.0000]
-    │   ├── crystal[eq:T=300.00,p=0.00010]
-    │   └── ... (other structures)
+    │   ├── brillouin_zone_paths
+    │   │   ├── crystal[eq:T=300.00,p=0.00010]
+    │   │   └── ... (other structures)
+    │   └── force_constants
+    │       ├── crystal[eos:V=1.0000]
+    │       ├── crystal[eq:T=300.00,p=0.00010]
+    │       └── ... (other structures)
     ├── structures
     │   ├── crystal[eos:V=1.0000]
     │   ├── crystal[eq:T=300.00,p=0.00010]
