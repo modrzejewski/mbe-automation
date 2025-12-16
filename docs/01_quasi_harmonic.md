@@ -211,11 +211,11 @@ qha.hdf5
     │   │   ├── crystal[eq:T=300.00,p=0.00010]
     │   │   └── ...
     │   └── force_constants
-    │       ├── crystal[eos:V=1.0000]
+    │       ├── crystal[eq:T=300.00,p=0.00010]
     │       └── ...
     ├── structures
-    │   ├── crystal[eos:V=1.0000]
     │   ├── crystal[eq:T=300.00,p=0.00010]
+    │   ├── crystal[eos:V=1.0000]
     │   └── ... (other structures)
     ├── thermodynamics_equilibrium_volume
     └── thermodynamics_fixed_volume
