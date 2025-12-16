@@ -213,7 +213,7 @@ class Enthalpy:
         if isinstance(self.molecule, mbe_automation.storage.Structure):
             self.molecule = mbe_automation.storage.to_ase(self.molecule)
 
-        assert self.sampling_interaval_fs > self.time_step_fs
+        assert self.sampling_interval_fs > self.time_step_fs
         assert self.time_total_fs > self.sampling_interval_fs
         assert self.time_total_fs > self.time_equilibration_fs
         
