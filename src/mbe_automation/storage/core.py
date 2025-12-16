@@ -698,7 +698,7 @@ def save_trajectory(
             del f[key]
 
         group = f.require_group(key)
-        group.attrs["dataclass"] = "Trajectory|Structure"
+        group.attrs["dataclass"] = "Trajectory"
         group.attrs["ensemble"] = traj.ensemble
         group.attrs["n_frames"] = traj.n_frames
         group.attrs["n_atoms"] = traj.n_atoms
@@ -903,7 +903,7 @@ def save_molecular_crystal(
             del f[key]
         
         group = f.create_group(key)
-        group.attrs["dataclass"] = type(system).__name__
+        group.attrs["dataclass"] = "MolecularCrystal"
         group.attrs["n_molecules"] = system.n_molecules
         group.attrs["identical_composition"] = system.identical_composition
         group.attrs["central_molecule_index"] = system.central_molecule_index
@@ -991,7 +991,7 @@ def save_finite_subsystem(
             if key in f:
                 del f[key]  
             group = f.create_group(key)
-            group.attrs["dataclass"] = type(subsystem).__name__
+            group.attrs["dataclass"] = "FiniteSubsystem"
             group.attrs["n_molecules"] = subsystem.n_molecules
             group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
             
@@ -1068,7 +1068,7 @@ def save_unique_clusters(
         if key in f:
             del f[key]
         group = f.create_group(key)
-        group.attrs["dataclass"] = type(clusters).__name__
+        group.attrs["dataclass"] = "UniqueClusters"
         group.attrs["n_clusters"] = clusters.n_clusters
         group.create_dataset("molecule_indices", data=clusters.molecule_indices)
         group.create_dataset("weights", data=clusters.weights)
