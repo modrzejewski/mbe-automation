@@ -209,8 +209,8 @@ class Enthalpy:
                                    # 0 -> suppressed warnings
                                    #
     verbose: int = 0
-    save_plots: bool = True
-    save_csv: bool = True
+    save_plots: bool = False
+    save_csv: bool = False
 
     def __post_init__(self):
         if isinstance(self.crystal, mbe_automation.storage.Structure):
