@@ -84,7 +84,7 @@ class PySCFCalculator(Calculator):
             self,
             atoms=None,
             xc: str,
-            disp: str | None = None,
+            disp: str | None,
             basis: str,
             charge=0,
             spin=0,
