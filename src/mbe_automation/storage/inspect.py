@@ -133,7 +133,7 @@ class DatasetKeys:
     def finite_subsystems(self, n: int | None = None) -> DatasetKeys:
         return self._filter(lambda x: (
             x.dataclass == "FiniteSubsystem" and
-            x.contains_exactly_n_molecules==n if n is not None else True
+            (n is None or x.contains_exactly_n_molecules == n)
         ))
 
     def brillouin_zone_paths(self) -> DatasetKeys:
