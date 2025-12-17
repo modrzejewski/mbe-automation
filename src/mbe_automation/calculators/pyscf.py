@@ -78,7 +78,7 @@ def HF(
     max_memory_mb: Optional[int] = 64000,
 ) -> Calculator:
     """
-    Factory function for PySCF/GPU4PySCF calculators.
+    Factory function for PySCF/GPU4PySCF Hartree-Fock calculators.
     """
     assert basis in BASIS_SETS
 
