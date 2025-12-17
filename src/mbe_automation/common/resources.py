@@ -12,7 +12,7 @@ def get_cpu_resources() -> tuple[int, float]:
     if slurm_memory_mb:
         memory_gb = float(slurm_memory_mb) / 1024.0
     else:
-        memory_gb = psutil.virtual_memory().total / (1024.0 * 1024.0 * 1024.0)
+        memory_gb = psutil.virtual_memory().total / (1024.0**3)
         
     return cores, memory_gb
 
