@@ -54,8 +54,8 @@ Example output:
 properties.hdf5
 └── quasi_harmonic
     ├── phonons
-    │   └── crystal[opt:atoms,shape]
-    │       └── force_constants  <-- This group contains the data
+    │   └── force_constants
+    │       └── crystal[opt:atoms,shape]  <-- This group contains the data
     │           ├── force_constants (eV∕Å²)
     │           └── supercell_matrix
     ├── structures
@@ -72,7 +72,7 @@ import numpy as np
 from mbe_automation import ForceConstants
 
 dataset_path = "properties.hdf5"
-key = "quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"
+key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]"
 
 fc = ForceConstants.read(dataset=dataset_path, key=key)
 freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_point=np.array([0.0, 0.0, 0.0]))

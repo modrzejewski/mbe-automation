@@ -207,12 +207,15 @@ qha.hdf5
     ├── eos_interpolated
     ├── eos_sampled
     ├── phonons
-    │   ├── crystal[eos:V=1.0000]
-    │   ├── crystal[eq:T=300.00,p=0.00010]
-    │   └── ... (other structures)
+    │   ├── brillouin_zone_paths
+    │   │   ├── crystal[eq:T=300.00,p=0.00010]
+    │   │   └── ...
+    │   └── force_constants
+    │       ├── crystal[eq:T=300.00,p=0.00010]
+    │       └── ...
     ├── structures
-    │   ├── crystal[eos:V=1.0000]
     │   ├── crystal[eq:T=300.00,p=0.00010]
+    │   ├── crystal[eos:V=1.0000]
     │   └── ... (other structures)
     ├── thermodynamics_equilibrium_volume
     └── thermodynamics_fixed_volume
@@ -220,7 +223,7 @@ qha.hdf5
 
 - **`eos_sampled`**: Contains the raw data from the equation of state (EOS) calculations at various cell volumes.
 - **`eos_interpolated`**: Stores the fitted EOS curves and the calculated free energy minima at each temperature.
-- **`phonons`**: Group containing phonon calculations for each structure.
+- **`phonons`**: Group containing phonon calculations (force constants and Brillouin zone paths).
 - **`structures`**: Group containing geometric data of molecular and crystal structures.
 - **`thermodynamics_fixed_volume`**: Contains thermodynamic properties calculated at a single, fixed volume.
 - **`thermodynamics_equilibrium_volume`**: Contains the final thermodynamic properties calculated at the equilibrium volume for each temperature.
@@ -262,7 +265,7 @@ import mbe_automation
 # Plot the phonon band structure for the equilibrium structure at 300 K
 mbe_automation.dynamics.harmonic.display.band_structure(
     dataset="qha.hdf5",
-    key="quasi_harmonic/phonons/crystal[eq:T=300.00,p=0.00010]/brillouin_zone_path",
+    key="quasi_harmonic/phonons/brillouin_zone_paths/crystal[eq:T=300.00,p=0.00010]",
     save_path="band_structure_300K.png"
 )
 ```
