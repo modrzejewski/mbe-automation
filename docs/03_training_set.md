@@ -155,7 +155,7 @@ mbe_automation.run(phonon_sampling_config)
 | Parameter                 | Description                                                                          | Default Value |
 | ------------------------- | ------------------------------------------------------------------------------------ | ----------------- |
 | `force_constants_dataset` | Path to the HDF5 file containing the force constants. | `./properties.hdf5` |
-| `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | `"training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants"` |
+| `force_constants_key`     | Key within the HDF5 file where the force constants are stored.                     | `"training/quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]"` |
 | `calculator`              | MLIP calculator.                                                                 | -                 |
 | `features_calculator`     | Calculator used to compute feature vectors.                                      | `None`            |
 | `temperature_K`           | Temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
@@ -458,7 +458,7 @@ phonon_sampling_config = PhononSampling(
         freq_max_THz=8.0
     ),
     force_constants_dataset=dataset,
-    force_constants_key="training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants",
+    force_constants_key="training/quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]",
     amplitude_scan="random",
     time_step_fs=100.0,
     n_frames=20,
