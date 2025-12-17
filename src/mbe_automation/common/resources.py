@@ -5,7 +5,7 @@ import torch
 from .display import framed
 
 def get_cpu_resources() -> tuple[int, float]:
-    """Return allocated CPU cores and memory in GB."""
+    """Return allocated CPU cores and memory in GiB."""
     cores = len(psutil.Process().cpu_affinity())
     slurm_memory_mb = os.environ.get("SLURM_MEM_PER_NODE")
     
