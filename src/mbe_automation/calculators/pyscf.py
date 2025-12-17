@@ -3,10 +3,24 @@ import numpy as np
 from ase.calculators.calculator import Calculator, all_changes
 from pyscf.data.nist import BOHR, HARTREE2EV
 from pyscf.pbc.tools.pyscf_ase import ase_atoms_to_pyscf
+import torch
 import pyscf
-from gpu4pyscf import dft
-from gpu4pyscf.pbc import dft as pbc_dft
-from gpu4pyscf.dft.gen_grid import sg1_prune
+
+if torch.cuda.is_available():
+    try:
+        from gpu4pyscf import dft
+        from gpu4pyscf.pbc import dft as pbc_dft
+        from gpu4pyscf.dft.gen_grid import sg1_prune
+        GPU_AVAILABLE = True
+    except ImportError:
+        GPU_AVAILABLE = False
+else:
+    GPU_AVAILABLE = False
+
+if not GPU_AVAILABLE:
+    from pyscf import dft
+    from pyscf.pbc import dft as pbc_dft
+    from pyscf.dft.gen_grid import sg1_prune
 
 DFT_METHODS = [
     "wb97m-v",
