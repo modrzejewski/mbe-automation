@@ -41,7 +41,7 @@ XC_MAP = {
     "wb97x-d4": {"xc": "wb97x-d4"},
     "b3lyp-d3": {"xc": "b3lyp-d3bjatm"},
     "b3lyp-d4": {"xc": "b3lyp-d4"},
-    "r2scan-d4": {"xc": "r2scan", "disp": "d4"},
+    "r2scan-d4": {"xc": "r2scan-d4atm"},
     "pbe-d3": {"xc": "pbe-d3bjatm"},
     "pbe-d4": {"xc": "pbe-d4"},
 }
