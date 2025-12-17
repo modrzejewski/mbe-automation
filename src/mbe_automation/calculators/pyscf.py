@@ -250,12 +250,12 @@ class PySCFCalculator(Calculator):
                 if self.kpts is None:
                     mf = scf_mod.UHF(self.system)
                 else:
-                    mf = scf_mod.KUHF(self.system)
+                    mf = scf_mod.KUHF(self.system, kpts=self.system.make_kpts(self.kpts))
             else:
                 if self.kpts is None:
                     mf = scf_mod.RHF(self.system)
                 else:
-                    mf = scf_mod.KRHF(self.system)
+                    mf = scf_mod.KRHF(self.system, kpts=self.system.make_kpts(self.kpts))
         else:
             if self.spin != 0:
                 if self.kpts is None:
