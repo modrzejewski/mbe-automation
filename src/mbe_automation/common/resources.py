@@ -40,6 +40,6 @@ def print_computational_resources() -> None:
     if gpus:
         print(f"allocated GPUs               {len(gpus)}")
         for index, name, memory in gpus:
-            print(f"GPU {index}: {name}      | Memory: {memory:.2f} GB")
+            print(f'GPU {index}: {name}      | Memory: {memory:.2f} GiB')
     else:
         print("GPUs:                     None")
