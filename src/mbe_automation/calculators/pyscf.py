@@ -76,6 +76,7 @@ def HF(
     density_fit: bool = True, 
     auxbasis: Optional[str] = None,
     max_memory_mb: Optional[int] = 64000,
+    multigrid: bool = False,
 ) -> Calculator:
     """
     Factory function for PySCF/GPU4PySCF Hartree-Fock calculators.
@@ -93,6 +94,7 @@ def HF(
         density_fit=density_fit,
         auxbasis=auxbasis,
         max_memory_mb=max_memory_mb,
+        multigrid=multigrid,
     )
 
 def DFT(
@@ -275,10 +277,11 @@ class PySCFCalculator(Calculator):
         mf.conv_tol_grad = self.conv_tol_grad
         mf.max_cycle = self.max_cycle
 
-        if self.xc != "hf":
-            if self.pbc and self.multigrid:
-                mf._numint = MultiGridNumInt(self.system)
 
+        if self.pbc and self.multigrid:
+            mf._numint = MultiGridNumInt(self.system)
+
+        if self.xc != "hf":
             mf.grids.atom_grid = (150, 590)        # excellent quality for noncovalent interactions, used in beyond-rpa
             if self.xc == "wb97m-v":
                 mf.nlcgrids.atom_grid = (50, 194)  # sg-1 grid for the nonlocal correlation functional
