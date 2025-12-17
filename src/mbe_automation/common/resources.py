@@ -23,7 +23,7 @@ def get_gpu_resources() -> list[tuple[int, str, float]]:
         count = torch.cuda.device_count()
         for index in range(count):
             props = torch.cuda.get_device_properties(index)
-            memory_gb = props.total_memory / (1024.0 * 1024.0 * 1024.0)
+            memory_gb = props.total_memory / (1024.0**3)
             gpus.append((index, props.name, memory_gb))
     return gpus
 
