@@ -234,7 +234,7 @@ class PySCFCalculator(Calculator):
             common_kwargs['max_memory'] = self.max_memory_mb
 
         if self.pbc:
-            self.system = pyscf.pbc.gto.Cell(a=np.array(atoms.cell), **common_kwargs)
+            self.system = pyscf.pbc.M(a=np.array(atoms.cell), **common_kwargs)
         else:
             self.system = pyscf.M(**common_kwargs)
 
@@ -276,7 +276,7 @@ class PySCFCalculator(Calculator):
         mf.conv_tol = self.conv_tol
         mf.conv_tol_grad = self.conv_tol_grad
         mf.max_cycle = self.max_cycle
-
+        mf.chkfile = None # disable checkpoint file
 
         if self.pbc and self.multigrid:
             mf._numint = MultiGridNumInt(self.system)
