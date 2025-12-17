@@ -7,6 +7,7 @@ from ase import Atoms
 
 from mbe_automation.storage import Structure, to_ase
 import mbe_automation.common.display
+import mbe_automation.common.resources
 
 def atomic_energies(
         calculator: ASECalculator | MACECalculator,
@@ -59,6 +60,7 @@ def run_model(
             if not return_arrays: structure.feature_vectors_type = "atomic"
 
     if not silent:
+        mbe_automation.common.resources.print_computational_resources()
         mbe_automation.common.display.framed([
             "Properties for pre-computed structures"
         ])
