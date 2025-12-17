@@ -5,7 +5,7 @@ import torch
 from .display import framed
 
 def get_cpu_resources() -> tuple[int, float]:
-    """Return allocated CPU cores and memory in GiB."""
+    """Return allocated CPU cores and memory in GB."""
     cores = len(psutil.Process().cpu_affinity())
     slurm_memory_mb = os.environ.get("SLURM_MEM_PER_NODE")
     
@@ -40,6 +40,6 @@ def print_computational_resources() -> None:
     if gpus:
         print(f"allocated GPUs               {len(gpus)}")
         for index, name, memory in gpus:
-            print(f'GPU {index}: {name}      | Memory: {memory:.2f} GiB')
+            print(f'GPU {index}: {name}      | Memory: {memory:.2f} GB')
     else:
         print("GPUs:                     None")

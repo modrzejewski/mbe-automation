@@ -34,7 +34,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         warnings.filterwarnings("ignore", category=RuntimeWarning)
 
     mbe_automation.common.resources.print_computational_resources()
-        
+
     if config.thermal_expansion:
         mbe_automation.common.display.framed("Harmonic properties with thermal expansion")
     else:

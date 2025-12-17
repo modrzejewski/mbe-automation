@@ -112,7 +112,7 @@ def run(config: mbe_automation.configs.md.Enthalpy):
         warnings.filterwarnings("ignore", category=RuntimeWarning)
 
     mbe_automation.common.resources.print_computational_resources()
-        
+
     if config.crystal is None and config.molecule is None:
         raise ValueError("Both crystal and molecule undefined.")
 
