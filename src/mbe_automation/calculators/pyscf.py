@@ -6,6 +6,7 @@ from pyscf.pbc.tools.pyscf_ase import ase_atoms_to_pyscf
 import pyscf
 from gpu4pyscf import dft
 from gpu4pyscf.pbc import dft as pbc_dft
+from gpu4pyscf.dft.gen_grid import sg1_prune
 
 DFT_METHODS = [
     "wb97m-v",
@@ -201,7 +202,6 @@ class PySCFCalculator(Calculator):
         mf.max_cycle = self.max_cycle
 
         mf.grids.atom_grid = (150, 590)        # excellent quality for noncovalent interactions, used in beyond-rpa
-        mf.grids.prune = grid_mod.sg1_prune
         if self.xc == "wb97m-v":
             mf.nlcgrids.atom_grid = (50, 194)  # sg-1 grid for the nonlocal correlation functional
 

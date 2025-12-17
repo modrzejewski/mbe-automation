@@ -157,11 +157,14 @@ class Structure(_Structure):
 
     def extract_all_molecules(
             self,
-            bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+            bonding_algo: NearNeighbors | None = None,
             reference_frame_index: int = 0,
             calculator: ASECalculator | None = None,
     ) -> List[Structure]:
 
+        if bonding_algo is None:
+            bonding_algo = CutOffDictNN.from_preset("vesta_2019")
+        
         return [Structure(**vars(molecule)) for molecule in
                 mbe_automation.structure.clusters.extract_all_molecules(
                     crystal=self,
@@ -174,9 +177,12 @@ class Structure(_Structure):
             self,
             calculator: ASECalculator,
             energy_thresh: float = 1.0E-5, # eV/atom
-            bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+            bonding_algo: NearNeighbors | None = None,
             reference_frame_index: int = 0,
     ) -> List[Structure]:
+
+        if bonding_algo is None:
+            bonding_algo = CutOffDictNN.from_preset("vesta_2019")
 
         return [Structure(**vars(molecule)) for molecule in
                 mbe_automation.structure.clusters.extract_unique_molecules(
@@ -194,10 +200,13 @@ class Structure(_Structure):
             calculator: ASECalculator,
             config: Minimum,
             energy_thresh: float = 1.0E-5, # eV/atom
-            bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+            bonding_algo: NearNeighbors | None = None,
             reference_frame_index: int = 0,
             work_dir: Path | str = Path("./")
     ) -> None:
+
+        if bonding_algo is None:
+            bonding_algo = CutOffDictNN.from_preset("vesta_2019")
         
         mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
             dataset=dataset,

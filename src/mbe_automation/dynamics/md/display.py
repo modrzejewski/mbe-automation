@@ -163,7 +163,7 @@ def reblocking(
     time_equilibration_fs = df.attrs["time_equilibration (fs)"]
     production_mask = df["time (fs)"] >= time_equilibration_fs
     production_df = df[production_mask]
-    assert len(production_df) > 0
+    assert len(production_df) > 2
     
     times_fs = production_df["time (fs)"].to_numpy()
     interval_fs = times_fs[1] - times_fs[0]
