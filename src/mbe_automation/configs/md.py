@@ -150,6 +150,11 @@ class ClassicalMD:
                                    #
     supercell_diagonal: bool = False
 
+    def __post_init__(self):
+        assert self.sampling_interval_fs > self.time_step_fs
+        assert self.time_total_fs > self.sampling_interval_fs
+        assert self.time_total_fs > self.time_equilibration_fs
+
 @dataclass(kw_only=True)
 class Enthalpy:
                                    #
@@ -204,18 +209,14 @@ class Enthalpy:
                                    # 0 -> suppressed warnings
                                    #
     verbose: int = 0
-    save_plots: bool = True
-    save_csv: bool = True
+    save_plots: bool = False
+    save_csv: bool = False
 
     def __post_init__(self):
         if isinstance(self.crystal, mbe_automation.storage.Structure):
             self.crystal = mbe_automation.storage.to_ase(self.crystal)
         if isinstance(self.molecule, mbe_automation.storage.Structure):
             self.molecule = mbe_automation.storage.to_ase(self.molecule)
-
-        assert self.sampling_interval_fs > self.time_step_fs
-        assert self.time_total_fs > self.sampling_interval_fs
-        assert self.time_total_fs > self.time_equilibration_fs
         
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
         self.pressures_GPa = np.atleast_1d(self.pressures_GPa)
