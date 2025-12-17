@@ -171,8 +171,10 @@ class PySCFCalculator(Calculator):
         self.results['energy'] = self.method.e_tot * HARTREE2EV
 
         if 'forces' in properties:
-            grad_obj = self.method.Gradients()
-            forces = -grad_obj.kernel()
+            grad = self.method.Gradients()
+            grad.auxbasis_response = True
+            grad.grid_response = True
+            forces = -grad.kernel()
             self.results['forces'] = forces * (HARTREE2EV / BOHR)
             
 
