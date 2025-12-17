@@ -32,18 +32,22 @@ DFT_METHODS = [
     "b3lyp-d4",
     "pbe-d3",
     "pbe-d4",
+    "pbe0-d3",
+    "pbe0-d4",
     "r2scan-d4",
 ]
 
 XC_MAP = {
     "wb97m-v": {"xc": "wb97m-v"},
-    "wb97x-d3": {"xc": "wb97x-d3bj"},
+    "wb97x-d3": {"xc": "wb97x-d3bjatm"},
     "wb97x-d4": {"xc": "wb97x-d4"},
     "b3lyp-d3": {"xc": "b3lyp-d3bjatm"},
     "b3lyp-d4": {"xc": "b3lyp-d4"},
-    "r2scan-d4": {"xc": "r2scan-d4atm"},
+    "r2scan-d4": {"xc": "r2scan-d4"},
     "pbe-d3": {"xc": "pbe-d3bjatm"},
     "pbe-d4": {"xc": "pbe-d4"},
+    "pbe0-d3": {"xc": "pbe0-d3bjatm"},
+    "pbe0-d4": {"xc": "pbe0-d4"},
 }
 
 BASIS_SETS = [

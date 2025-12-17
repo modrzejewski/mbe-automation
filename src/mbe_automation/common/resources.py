@@ -34,12 +34,13 @@ def print_computational_resources() -> None:
 
     framed("Computational resources")
     
-    print(f"allocated CPU cores      {cores}")
-    print(f"memory per node          {memory_gb:.2f} GB")
+    print(f"{'allocated CPU cores':<25} {cores}")
+    print(f"{'memory per node':<25} {memory_gb:.2f} GB")
     
     if gpus:
-        print(f"allocated GPUs               {len(gpus)}")
+        print(f"{'allocated GPUs':<25} {len(gpus)}")
         for index, name, memory in gpus:
-            print(f'GPU {index}: {name}      | Memory: {memory:.2f} GB')
+            label = f"GPU {index}: {name}"
+            print(f"{label:<25} | Memory: {memory:.2f} GB")
     else:
-        print("GPUs:                     None")
+        print(f"{'GPUs':<25} None")
