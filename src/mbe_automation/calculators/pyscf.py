@@ -11,6 +11,7 @@ if torch.cuda.is_available():
         from gpu4pyscf import dft
         from gpu4pyscf.pbc import dft as pbc_dft
         from gpu4pyscf.dft.gen_grid import sg1_prune
+        from gpu4pyscf.pbc.dft.multigrid import MultiGridNumInt
         GPU_AVAILABLE = True
     except ImportError:
         GPU_AVAILABLE = False
@@ -21,6 +22,7 @@ if not GPU_AVAILABLE:
     from pyscf import dft
     from pyscf.pbc import dft as pbc_dft
     from pyscf.dft.gen_grid import sg1_prune
+    from pyscf.pbc.dft.multigrid import MultiGridNumInt2 as MultiGridNumInt # variant of MultGrid with gradients
 
 DFT_METHODS = [
     "wb97m-v",
@@ -66,7 +68,8 @@ def DFT(
     verbose: int = 0,
     density_fit: bool = True, 
     auxbasis: Optional[str] = None,
-    max_memory_mb: Optional[int] = 64000, 
+    max_memory_mb: Optional[int] = 64000,
+    multigrid: bool = False,
 ) -> Calculator:
     """
     Factory function for PySCF/GPU4PySCF calculators.
@@ -90,6 +93,7 @@ def DFT(
         density_fit=density_fit,
         auxbasis=auxbasis,
         max_memory_mb=max_memory_mb,
+        multigrid=multigrid,
     )
 
 class PySCFCalculator(Calculator):
@@ -110,7 +114,8 @@ class PySCFCalculator(Calculator):
             max_memory_mb: int | None = None,
             conv_tol: float = 1.0E-10,         # convergence threshold for energy
             conv_tol_grad: float = 1.0E-6,     # convergence threshold for orbital gradient
-            max_cycle: int = 128               # max number of SCF iterations
+            max_cycle: int = 128,              # max number of SCF iterations
+            multigrid: bool = False,
     ):
         """
         Based on the GPU4PySCF ASE interface, with the following
@@ -136,6 +141,7 @@ class PySCFCalculator(Calculator):
         self.conv_tol = conv_tol
         self.conv_tol_grad = conv_tol_grad
         self.max_cycle = max_cycle
+        self.multigrid = multigrid
         
         self.system = None
         self.method = None
@@ -214,6 +220,9 @@ class PySCFCalculator(Calculator):
         mf.conv_tol = self.conv_tol
         mf.conv_tol_grad = self.conv_tol_grad
         mf.max_cycle = self.max_cycle
+
+        if self.pbc and self.multigrid:
+            mf._numint = MultiGridNumInt(self.system)
 
         mf.grids.atom_grid = (150, 590)        # excellent quality for noncovalent interactions, used in beyond-rpa
         if self.xc == "wb97m-v":
