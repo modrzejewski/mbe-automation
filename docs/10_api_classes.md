@@ -1,4 +1,4 @@
-# API Classes
+# Data Classes for Physical Properties
 
 The core data structures of `mbe_automation` are available as Python classes. They can be imported directly from the top-level package:
 
