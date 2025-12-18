@@ -2,6 +2,16 @@
 
 The `mbe_automation.storage` module handles data persistence using hierarchical dataset files. It provides tools to inspect the file structure, query specific data groups using filters, and perform maintenance operations like copying or deleting data.
 
+*   [Inspecting Datasets](#inspecting-datasets)
+*   [Querying Data with DatasetKeys](#querying-data-with-datasetkeys)
+    *   [Initialization](#initialization)
+    *   [Available Filters](#available-filters)
+*   [Examples](#examples)
+    *   [1. Iterating Over Specific Data Types](#1-iterating-over-specific-data-types)
+    *   [2. Processing Finite Subsystems](#2-processing-finite-subsystems)
+    *   [3. Dataset Maintenance](#3-dataset-maintenance)
+    *   [4. Selecting Data for Training](#4-selecting-data-for-training)
+
 ## Inspecting Datasets
 
 The structure of a dataset file can be visualized using the `tree` function. This prints the hierarchy of groups, datasets, and their attributes.
@@ -11,7 +21,6 @@ import mbe_automation
 
 # Print the file hierarchy
 mbe_automation.tree("properties.hdf5")
-
 ```
 
 ## Querying Data with `DatasetKeys`
@@ -29,7 +38,6 @@ keys = DatasetKeys("properties.hdf5")
 # Iterate over all keys
 for key in keys:
     print(key)
-
 ```
 
 ### Available Filters
@@ -80,7 +88,6 @@ keys = DatasetKeys(dataset).trajectories().periodic()
 
 for key in keys:
     print(f"Found trajectory: {key}")
-
 ```
 
 ### 2. Processing Finite Subsystems
@@ -97,7 +104,6 @@ prefix = "training/md_sampling"
 for key in DatasetKeys(dataset).finite_subsystems(n=2).starts_with(prefix):
     cluster = FiniteSubsystem.read(dataset=dataset, key=key)
     # ... perform analysis or calculation ...
-
 ```
 
 ### 3. Dataset Maintenance
@@ -114,7 +120,6 @@ dataset = "old_data.hdf5"
 for key in DatasetKeys(dataset).molecular_crystals():
     print(f"Deleting: {key}")
     mbe_automation.storage.delete(dataset=dataset, key=key)
-
 ```
 
 ### 4. Selecting Data for Training
@@ -130,6 +135,4 @@ dataset = "training_set.hdf5"
 ready_keys = DatasetKeys(dataset).finite_subsystems().with_feature_vectors()
 
 print(f"Found {len(ready_keys)} clusters with precomputed features.")
-
 ```
-
