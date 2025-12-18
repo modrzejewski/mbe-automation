@@ -151,10 +151,10 @@ class DatasetKeys:
     def finite(self) -> DatasetKeys:
         return self._filter(lambda x: not x.is_periodic)
 
-    def feature_vectors(self) -> DatasetKeys:
+    def with_feature_vectors(self) -> DatasetKeys:
         return self._filter(lambda x: x.has_feature_vectors)
 
-    def delta_learning(self) -> DatasetKeys:
+    def with_delta_learning_data(self) -> DatasetKeys:
         return self._filter(lambda x: x.has_delta_learning_data)
 
 

@@ -6,7 +6,7 @@ def copy(
     key_source: str,
     dataset_target: Path | str,
     key_target: str,
-    overwrite: bool = True
+    overwrite: bool = False
 ):
     """Copy group or dataset from source storage to target."""
     path_source = Path(dataset_source).resolve()
@@ -29,7 +29,7 @@ def rename(
     dataset: Path | str,
     key_old: str,
     key_new: str,
-    overwrite: bool = True
+    overwrite: bool = False
 ):
     """Rename a data group in a dataset storage file."""
     path = Path(dataset).resolve()
