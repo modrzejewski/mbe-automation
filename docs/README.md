@@ -44,11 +44,11 @@ The general computational scheme facilitated by this program involves the follow
 
 The program integrates several scientific codes into a unified workflow, including:
 
-*   **MACE:** As the primary MLIP model for calculating energies and forces.
-*   **phonopy:** For phonon calculations and the analysis of vibrational properties.
-*   **pymatgen:** For crystal structure analysis and manipulation.
-*   **ASE:** For geometry relaxation and molecular dynamics simulations.
-*   **PySCF** and **GPU4PySCF:** For efficient mean-field electronic structure calculations.
+*   **MACE:** Primary MLIP model for energies and forces.
+*   **phonopy:** Phonon calculations and vibrational properties.
+*   **pymatgen:** Crystal structure analysis and manipulation.
+*   **ASE:** Geometry relaxation and molecular dynamics simulations.
+*   **PySCF** and **GPU4PySCF:** Mean-field electronic structure calculations.
 *   **MRCC** and **beyond-rpa**: High-fidelity data points from correlated wave-function theory.
 
 ## Table of Contents
