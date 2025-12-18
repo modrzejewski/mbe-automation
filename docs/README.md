@@ -48,6 +48,7 @@ The program integrates several scientific codes into a unified workflow, includi
 *   **phonopy:** For phonon calculations and the analysis of vibrational properties.
 *   **pymatgen:** For crystal structure analysis and manipulation.
 *   **ASE:** For geometry relaxation and molecular dynamics simulations.
+*   **PySCF** and **GPU4PySCF:** For efficient mean-field electronic structure calculations.
 *   **MRCC** and **beyond-rpa**: High-fidelity data points from correlated wave-function theory.
 
 ## Table of Contents
