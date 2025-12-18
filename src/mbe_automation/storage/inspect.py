@@ -162,6 +162,11 @@ class DatasetKeys:
         prefix = root_key.strip("/") + "/"
         return self._filter(lambda x: x.key.startswith(prefix))
 
+    def excludes(self, root_key: str) -> DatasetKeys:
+        """Select keys not under a specific root group."""
+        prefix = root_key.strip("/") + "/"
+        return self._filter(lambda x: not x.key.startswith(prefix))
+
 def tree(dataset: str):
     """
     Visualize the tree structure of a dataset file.
