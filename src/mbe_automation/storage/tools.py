@@ -24,7 +24,6 @@ def copy(
                     del target[key_target]
                 source.copy(key_source, target, name=key_target)
 
-
 def rename(
     dataset: Path | str,
     key_old: str,
@@ -37,3 +36,12 @@ def rename(
         if overwrite and key_new in f:
             del f[key_new]
         f.move(key_old, key_new)
+
+def delete(
+    dataset: Path | str,
+    key: str
+):
+    """Delete a data group from storage."""
+    path = Path(dataset).resolve()
+    with h5py.File(path, "a") as f:
+        del f[key]
