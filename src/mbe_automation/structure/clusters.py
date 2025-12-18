@@ -303,10 +303,30 @@ def detect_molecules(
     distances_from_center = np.array(distances_from_center)
     supercell_subset = []
     n_atoms_found = 0
-
+    #
+    # We must keep track of the atoms claimed to prevent
+    # the following scenario:
+    #
+    # If the geometry is such that a periodic image of Molecule A
+    # (from a neighboring cell) is spatially closer to the supercell
+    # center than Molecule B (which resides inside the central unit cell),
+    # the algorithm would select two images of Molecule A and zero
+    # images of Molecule B.
+    #
+    # By keeping track of claimed_atoms, we skip the image of Molecule A
+    # and accept Molecule B.
+    #
+    claimed_atoms = np.zeros(n_atoms_unit_cell, dtype=bool)
+    
     for i in np.argsort(distances_from_center):
-        if n_atoms_found < n_atoms_unit_cell:
-            atom_indices = contiguous_molecules[i]
+        if n_atoms_found >= n_atoms_unit_cell:
+            break
+        
+        atom_indices = contiguous_molecules[i]
+        unit_cell_indices = supercell_to_unit_cell[atom_indices]
+
+        if not np.any(claimed_atoms[unit_cell_indices]):
+            claimed_atoms[unit_cell_indices] = True
             supercell_subset.append(atom_indices)
             n_atoms_found += len(atom_indices)
     
