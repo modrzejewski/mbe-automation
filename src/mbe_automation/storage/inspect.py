@@ -157,6 +157,10 @@ class DatasetKeys:
     def with_delta_learning_data(self) -> DatasetKeys:
         return self._filter(lambda x: x.has_delta_learning_data)
 
+    def starts_with(self, root_key: str) -> DatasetKeys:
+        """Select keys under a specific root group."""
+        prefix = root_key.strip("/") + "/"
+        return self._filter(lambda x: x.key.startswith(prefix))
 
 def tree(dataset: str):
     """
