@@ -17,7 +17,7 @@ This chapter provides an overview of the physical content each class represents 
 
 ## Physical Content
 
-| Class | Physical Meaning |
+| Class | Description |
 | :--- | :--- |
 | **`ForceConstants`** | Represents interatomic force constants (typically 2nd order) derived from a crystal structure, used to compute phonon properties like frequencies and eigenvectors. |
 | **`Structure`** | Represents an atomistic structure (positions, atomic numbers, unit cell). It can hold a single frame or a sequence of frames (e.g., from a short trajectory or a collection of configurations). |
