@@ -34,6 +34,7 @@ from mbe_automation.storage.core import (
 from .tools import (
     copy,
     rename,
+    delete,
 )
 
 from mbe_automation.storage.inspect import tree, DatasetKeys
