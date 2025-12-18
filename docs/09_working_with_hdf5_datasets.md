@@ -41,8 +41,6 @@ print(keys)
 
 ### Available Filters
 
-The `DatasetKeys` class provides the following methods for filtering keys. These methods return a new `DatasetKeys` instance, allowing them to be chained together.
-
 **Type-Based Filters**
 
 | Filter | Description |
