@@ -8,8 +8,10 @@ import pyscf
 
 if torch.cuda.is_available():
     try:
+        from gpu4pyscf import scf        
         from gpu4pyscf import dft
         from gpu4pyscf.pbc import dft as pbc_dft
+        from gpu4pyscf.pbc import scf as pbc_scf
         from gpu4pyscf.dft.gen_grid import sg1_prune
         from gpu4pyscf.pbc.dft.multigrid import MultiGridNumInt
         GPU_AVAILABLE = True
@@ -19,8 +21,10 @@ else:
     GPU_AVAILABLE = False
 
 if not GPU_AVAILABLE:
+    from pyscf import scf
     from pyscf import dft
     from pyscf.pbc import dft as pbc_dft
+    from pyscf.pbc import scf as pbc_scf
     from pyscf.dft.gen_grid import sg1_prune
     from pyscf.pbc.dft.multigrid import MultiGridNumInt2 as MultiGridNumInt # variant of MultGrid with gradients
 
@@ -62,6 +66,36 @@ BASIS_SETS = [
     "def2-qzvpd",
     "def2-qzvppd",
 ]
+
+def HF(
+    basis: Literal[*BASIS_SETS] = "def2-tzvp", 
+    charge: int = 0,
+    spin: int = 0,
+    kpts: Optional[List[int]] = None,
+    verbose: int = 0,
+    density_fit: bool = True, 
+    auxbasis: Optional[str] = None,
+    max_memory_mb: Optional[int] = 64000,
+    multigrid: bool = False,
+) -> Calculator:
+    """
+    Factory function for PySCF/GPU4PySCF Hartree-Fock calculators.
+    """
+    assert basis in BASIS_SETS
+
+    return PySCFCalculator(
+        xc="hf",
+        disp=None,
+        basis=basis,
+        charge=charge,
+        spin=spin,
+        kpts=kpts,
+        verbose=verbose,
+        density_fit=density_fit,
+        auxbasis=auxbasis,
+        max_memory_mb=max_memory_mb,
+        multigrid=multigrid,
+    )
 
 def DFT(
     model_name: str = "r2scan-d4", 
@@ -176,8 +210,10 @@ class PySCFCalculator(Calculator):
 
         if 'forces' in properties:
             grad = self.method.Gradients()
-            grad.auxbasis_response = True
-            grad.grid_response = True
+            if self.density_fit:
+                grad.auxbasis_response = True
+            if self.xc != "hf":
+                grad.grid_response = True
             forces = -grad.kernel()
             self.results['forces'] = forces * (HARTREE2EV / BOHR)
             
@@ -198,41 +234,57 @@ class PySCFCalculator(Calculator):
             common_kwargs['max_memory'] = self.max_memory_mb
 
         if self.pbc:
-            self.system = pyscf.pbc.gto.Cell(a=np.array(atoms.cell), **common_kwargs)
+            self.system = pyscf.pbc.M(a=np.array(atoms.cell), **common_kwargs)
         else:
             self.system = pyscf.M(**common_kwargs)
 
         if self.pbc:
+            scf_mod = pbc_scf
             dft_mod = pbc_dft
             grid_mod = pbc_dft.gen_grid
         else:
+            scf_mod = scf
             dft_mod = dft
             grid_mod = dft.gen_grid
 
-        if self.spin != 0:
-            if self.kpts is None:
-                mf = dft_mod.UKS(self.system, xc=self.xc)
+        if self.xc == "hf":
+            if self.spin != 0:
+                if self.kpts is None:
+                    mf = scf_mod.UHF(self.system)
+                else:
+                    mf = scf_mod.KUHF(self.system, kpts=self.system.make_kpts(self.kpts))
             else:
-                mf = dft_mod.KUKS(self.system, xc=self.xc, kpts=self.system.make_kpts(self.kpts))
+                if self.kpts is None:
+                    mf = scf_mod.RHF(self.system)
+                else:
+                    mf = scf_mod.KRHF(self.system, kpts=self.system.make_kpts(self.kpts))
         else:
-            if self.kpts is None:
-                mf = dft_mod.RKS(self.system, xc=self.xc)
+            if self.spin != 0:
+                if self.kpts is None:
+                    mf = dft_mod.UKS(self.system, xc=self.xc)
+                else:
+                    mf = dft_mod.KUKS(self.system, xc=self.xc, kpts=self.system.make_kpts(self.kpts))
             else:
-                mf = dft_mod.KRKS(self.system, xc=self.xc, kpts=self.system.make_kpts(self.kpts))
+                if self.kpts is None:
+                    mf = dft_mod.RKS(self.system, xc=self.xc)
+                else:
+                    mf = dft_mod.KRKS(self.system, xc=self.xc, kpts=self.system.make_kpts(self.kpts))
 
-        if self.disp is not None:
+        if self.xc != "hf" and self.disp is not None:
             mf.disp = self.disp
 
         mf.conv_tol = self.conv_tol
         mf.conv_tol_grad = self.conv_tol_grad
         mf.max_cycle = self.max_cycle
+        mf.chkfile = None # disable checkpoint file
 
         if self.pbc and self.multigrid:
             mf._numint = MultiGridNumInt(self.system)
 
-        mf.grids.atom_grid = (150, 590)        # excellent quality for noncovalent interactions, used in beyond-rpa
-        if self.xc == "wb97m-v":
-            mf.nlcgrids.atom_grid = (50, 194)  # sg-1 grid for the nonlocal correlation functional
+        if self.xc != "hf":
+            mf.grids.atom_grid = (150, 590)        # excellent quality for noncovalent interactions, used in beyond-rpa
+            if self.xc == "wb97m-v":
+                mf.nlcgrids.atom_grid = (50, 194)  # sg-1 grid for the nonlocal correlation functional
 
         if self.density_fit:
             if self.auxbasis:
