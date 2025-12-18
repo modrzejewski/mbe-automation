@@ -138,8 +138,8 @@ for key in DatasetKeys(dataset).finite_subsystems(n=2).starts_with(prefix):
 This example demonstrates how to delete specific groups of data using filters.
 
 ```python
-import mbe_automation
 from mbe_automation import DatasetKeys
+from mbe_automation.storage import delete
 
 dataset = "old_data.hdf5"
 
