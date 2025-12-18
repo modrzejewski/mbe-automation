@@ -32,7 +32,7 @@ The following table summarizes the key methods available across these classes.
 
 | Method | Description | Available In |
 | :--- | :--- | :--- |
-| **`read`** | Factory method to load the object from an HDF5 dataset (wrapper around `mbe_automation.storage`). | `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
+| **`read`** | Method to load the object from an HDF5 dataset (wrapper around `mbe_automation.storage`). | `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`save`** | Saves the object to an HDF5 dataset. | `MolecularCrystal`, `FiniteSubsystem` |
 | **`subsample`** | Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`run_model`** | Executes a calculator (e.g., MACE, HF, DFT) on fixed, precomputed structures to compute energies, forces, and feature vectors. | `Structure`, `Trajectory`, `FiniteSubsystem` |
