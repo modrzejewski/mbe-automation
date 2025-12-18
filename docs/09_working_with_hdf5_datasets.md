@@ -48,7 +48,7 @@ print(keys)
 | `DatasetKeys.structures()` | Selects `Structure` and `Trajectory` objects. |
 | `DatasetKeys.trajectories()` | Selects `Trajectory` objects (e.g., from MD simulations). |
 | `DatasetKeys.molecular_crystals()` | Selects `MolecularCrystal` objects (analyzed periodic systems). |
-| `DatasetKeys.finite_subsystems(n)` | Selects `FiniteSubsystem` objects (extracted clusters). Optional `n` filters by cluster size (number of molecules). |
+| `DatasetKeys.finite_subsystems(n)` | Selects `FiniteSubsystem` objects (clusters extracted from a periodic system). Optional `n` filters by cluster size (number of molecules). |
 | `DatasetKeys.force_constants()` | Selects `ForceConstants` objects (phonons). |
 | `DatasetKeys.brillouin_zone_paths()` | Selects `BrillouinZonePath` objects (band structures). |
 | `DatasetKeys.eos_curves()` | Selects `EOSCurves` objects (equations of state). |
@@ -66,8 +66,8 @@ print(keys)
 
 | Filter | Description |
 | --- | --- |
-| `DatasetKeys.starts_with(prefix)` | Selects keys that start with the given string. |
-| `DatasetKeys.excludes(prefix)` | Selects keys that do **not** start with the given string. |
+| `DatasetKeys.starts_with(root_key)` | Selects keys that start with the given `root_key` string. |
+| `DatasetKeys.excludes(root_key)` | Selects keys that do not start with the given `root_key` string. |
 
 ## Examples
 
@@ -157,26 +157,22 @@ This example selects finite clusters that have feature vectors, subsamples them 
 from mbe_automation import DatasetKeys, FiniteSubsystem, Dataset
 
 dataset_file = "training_set.hdf5"
-
-# 1. Select keys: Finite subsystems with precomputed feature vectors
-keys = DatasetKeys(dataset_file).finite_subsystems().with_feature_vectors()
-
 training_dataset = Dataset()
 
-for key in keys:
-    # 2. Read the subsystem
+for key in DatasetKeys(dataset_file).finite_subsystems().with_feature_vectors():
     subsystem = FiniteSubsystem.read(dataset=dataset_file, key=key)
 
-    # 3. Subsample: Select 10 diverse frames using farthest point sampling
+    # Subsample: Select 10 diverse frames using farthest point sampling
     subsampled_subsystem = subsystem.subsample(n=10)
 
-    # 4. Add to the dataset collection
+    # Add to the dataset collection. Unlike Structure, Dataset can gather
+    # systems which differ by the number of atoms. You can combine finite
+    # clusters and PBC structures too.
     training_dataset.append(subsampled_subsystem)
 
-# 5. Export the aggregated dataset to MACE XYZ format
+# Export the aggregated dataset to MACE XYZ format
 training_dataset.to_mace_dataset(
-    save_path="training_data.xyz",
-    learning_strategy="direct"
+    save_path="training_data.xyz"
 )
 
 print(f"Exported {len(training_dataset.structures)} subsampled structures to 'training_data.xyz'.")
