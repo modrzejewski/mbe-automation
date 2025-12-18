@@ -7,7 +7,7 @@ def copy(
     dataset_target: Path | str,
     key_target: str,
     overwrite: bool = False
-):
+) -> None:
     """Copy group or dataset from source storage to target."""
     path_source = Path(dataset_source).resolve()
     path_target = Path(dataset_target).resolve()
@@ -29,7 +29,7 @@ def rename(
     key_old: str,
     key_new: str,
     overwrite: bool = False
-):
+) -> None:
     """Rename a data group in a dataset storage file."""
     path = Path(dataset).resolve()
     with h5py.File(path, "a") as f:
@@ -40,7 +40,7 @@ def rename(
 def delete(
     dataset: Path | str,
     key: str
-):
+) -> None:
     """Delete a data group from storage."""
     path = Path(dataset).resolve()
     with h5py.File(path, "a") as f:
