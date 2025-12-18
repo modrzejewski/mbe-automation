@@ -147,13 +147,26 @@ class Structure(_Structure):
             exec_params=exec_params,
         )
 
-    def detect_molecules(
+    def to_molecular_crystal(
             self,
+            reference_frame_index: int = 0,
+            assert_identical_composition: bool = True,
+            bonding_algo: NearNeighbors | None = None,
     ) -> MolecularCrystal:
 
+        if not self.periodic:
+            raise ValueError("Cannot convert a finite structure to a molecular crystal.")
+        
         return MolecularCrystal(**vars(
-            mbe_automation.structure.clusters.detect_molecules(system=self)
+            mbe_automation.structure.clusters.detect_molecules(
+                system=self,
+                reference_frame_index=reference_frame_index,
+                assert_identical_composition=assert_identical_composition,
+                bonding_algo=bonding_algo,
+            )
         ))
+
+    detect_molecules = to_molecular_crystal # synonym
 
     def extract_all_molecules(
             self,
@@ -301,7 +314,7 @@ class MolecularCrystal(_MolecularCrystal):
             max_distances_to_central_molecule=self.max_distances_to_central_molecule
         )
 
-    def extract_finite_subsystem(
+    def extract_finite_subsystems(
             self,
             filter: FiniteSubsystemFilter | None = None,
     ) -> List[FiniteSubsystem]:
@@ -314,6 +327,8 @@ class MolecularCrystal(_MolecularCrystal):
             filter=filter
         )
         return [FiniteSubsystem(**vars(s)) for s in clusters]
+
+    extract_finite_subsystem = extract_finite_subsystems # synonym
 
 @dataclass(kw_only=True)
 class FiniteSubsystem(_FiniteSubsystem):
