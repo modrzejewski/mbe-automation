@@ -231,12 +231,16 @@ def detect_molecules(
         system: mbe_automation.storage.Structure,
         reference_frame_index: int = 0,
         assert_identical_composition: bool = True,
-        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+        bonding_algo: NearNeighbors | None = None,
         validate_pbc_structure: bool = False
 ) -> mbe_automation.storage.MolecularCrystal:
     """
     Identify molecules in a periodic Structure.
     """
+
+    if bonding_algo is None:
+        bonding_algo = CutOffDictNN.from_preset("vesta_2019")
+    
     mbe_automation.common.display.framed("Molecule detection")
     print(f"n_frames                {system.n_frames}")
     print(f"reference_frame_index   {reference_frame_index}")
@@ -674,11 +678,15 @@ def extract_relaxed_unique_molecules(
 
 def extract_finite_subsystem(
         system: mbe_automation.storage.MolecularCrystal,
-        filter: FiniteSubsystemFilter=FiniteSubsystemFilter()
+        filter: FiniteSubsystemFilter | None = None,
 ) -> List[mbe_automation.storage.FiniteSubsystem]:
     """
     Extract symmetry-unique clusters from a MolecularCrystal.
     """
+    
+    if filter is None:
+        filter = FiniteSubsystemFilter()
+    
     mbe_automation.common.display.framed("Finite subsystem")
     finite_subsystems = []
     
