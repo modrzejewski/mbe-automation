@@ -45,7 +45,5 @@ The following table summarizes the key methods available across these classes.
 | **`append`** | Adds a structure or subsystem to the dataset collection. | `Dataset` |
 
 ### Usage Notes
-
-*   **`read` vs `save`**: While `read` is universally available to load data produced by workflows, `save` is explicitly exposed on classes where intermediate saving is common during custom processing scripts (like `FiniteSubsystem`).
 *   **`subsample`**: Requires feature vectors to be present (computed via `run_model` or during an MD simulation) to calculate distances in chemical space.
 *   **`run_model`**: Can be used to evaluate ground truth (energies and forces) or to generate descriptors (feature vectors) for subsampling.
