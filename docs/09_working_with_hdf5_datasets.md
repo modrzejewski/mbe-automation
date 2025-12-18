@@ -75,18 +75,48 @@ The `DatasetKeys` class provides the following methods for filtering keys. These
 
 ### 1. Iterating Over Specific Data Types
 
-This example iterates over all periodic trajectories in the dataset.
+This example demonstrates how to iterate over periodic trajectories, convert them into molecular crystals (analyzing connectivity), extract finite subsystems (clusters), and save the results back to the HDF5 file.
 
 ```python
-from mbe_automation import DatasetKeys
+from mbe_automation import Structure, DatasetKeys
+import numpy as np
+from mbe_automation.configs.clusters import FiniteSubsystemFilter
 
-dataset = "properties.hdf5"
+dataset = "urea.hdf5"
 
-# Select only periodic trajectories
-keys = DatasetKeys(dataset).trajectories().periodic()
+# Define a filter to extract clusters with sizes from 1 to 16 molecules
+filter = FiniteSubsystemFilter(n_molecules=np.arange(1, 17))
 
-for key in keys:
-    print(f"Found trajectory: {key}")
+# Iterate over all periodic trajectories in the dataset
+for key in DatasetKeys(dataset).trajectories().periodic():
+    print(f"Processing {key}")
+
+    # Read the trajectory as a Structure object
+    crystal = Structure.read(dataset=dataset, key=key)
+
+    # Determine new storage keys based on the original key
+    root_key = key.split(sep="/")[0]
+    system_label = key.split(sep="/")[-1]
+
+    # Convert the periodic structure to a molecular crystal (detecting molecules)
+    molecular_crystal = crystal.to_molecular_crystal()
+
+    # Extract finite subsystems (clusters) based on the filter
+    finite_subsystems = molecular_crystal.extract_finite_subsystems(filter)
+
+    # Save the analyzed molecular crystal
+    molecular_crystal.save(
+        dataset=dataset,
+        key=f"{root_key}/molecular_crystals/{system_label}"
+    )
+
+    # Save each extracted subsystem
+    for subsystem in finite_subsystems:
+        n_molecules = subsystem.n_molecules
+        subsystem.save(
+            dataset=dataset,
+            key=f"{root_key}/finite_subsystems/n={n_molecules}/{system_label}"
+        )
 ```
 
 ### 2. Processing Finite Subsystems
