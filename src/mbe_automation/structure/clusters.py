@@ -304,13 +304,19 @@ def detect_molecules(
     supercell_subset = []
     n_atoms_found = 0
 
+    covered_atom_indices = set()
     for i in np.argsort(distances_from_center):
         if n_atoms_found < n_atoms_unit_cell:
             atom_indices = contiguous_molecules[i]
-            supercell_subset.append(atom_indices)
-            n_atoms_found += len(atom_indices)
+            mapped_indices = supercell_to_unit_cell[atom_indices]
+
+            if covered_atom_indices.isdisjoint(mapped_indices):
+                supercell_subset.append(atom_indices)
+                covered_atom_indices.update(mapped_indices)
+                n_atoms_found += len(atom_indices)
     
-    assert n_atoms_found == n_atoms_unit_cell
+    if n_atoms_found != n_atoms_unit_cell:
+        raise RuntimeError("Could not find a set of molecules covering the unit cell exactly.")
 
     grouped_indices = []
     for x in supercell_subset:
