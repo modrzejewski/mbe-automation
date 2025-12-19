@@ -2,7 +2,7 @@
 from mbe_automation.storage.core import (
     BrillouinZonePath,
     EOSCurves,
-    DeltaTargetBaseline,
+    LevelsOfTheory,
     Structure,
     Trajectory,
     ForceConstants,

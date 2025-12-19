@@ -47,10 +47,10 @@ def _target_energies(
     e = []
     for i, structure in enumerate(structures):
         if (
-                structure.delta is not None and
-                structure.delta.E_pot_target is not None
+                structure.levels_of_theory is not None and
+                "delta/target" in structure.levels_of_theory.energies
         ):
-            e.append(structure.delta.E_pot_target)
+            e.append(structure.levels_of_theory.energies["delta/target"])
 
         else:
             raise ValueError(f"Target energies not available in structure {i}.")
@@ -64,10 +64,10 @@ def _baseline_energies(
     e = []
     for i, structure in enumerate(structures):
         if (
-                structure.delta is not None and
-                structure.delta.E_pot_baseline is not None
+                structure.levels_of_theory is not None and
+                "delta/baseline" in structure.levels_of_theory.energies
         ):
-            e.append(structure.delta.E_pot_baseline)
+            e.append(structure.levels_of_theory.energies["delta/baseline"])
 
         else:
             raise ValueError(f"Baseline energies not available in structure {i}.")
@@ -80,10 +80,10 @@ def _baseline_forces(
     f = []
     for structure in structures:
         if (
-                structure.delta is not None and
-                structure.delta.forces_baseline is not None
+                structure.levels_of_theory is not None and
+                "delta/baseline" in structure.levels_of_theory.forces
         ):
-            f.append(structure.delta.forces_baseline)
+            f.append(structure.levels_of_theory.forces["delta/baseline"])
 
     if len(f) > 0 and len(f) < len(structures):
         raise ValueError("Missing baseline forces in a subset of structures.")
@@ -96,10 +96,10 @@ def _target_forces(
     f = []
     for structure in structures:
         if (
-                structure.delta is not None and
-                structure.delta.forces_target is not None
+                structure.levels_of_theory is not None and
+                "delta/target" in structure.levels_of_theory.forces
         ):
-            f.append(structure.delta.forces_target)
+            f.append(structure.levels_of_theory.forces["delta/target"])
 
     if len(f) > 0 and len(f) < len(structures):
         raise ValueError("Missing target forces in a subset of structures.")
@@ -112,12 +112,12 @@ def _atomic_energies(
     e = {}
     for structure in structures:
         if (
-                structure.delta is not None and 
-                structure.delta.E_atomic_baseline is not None
+                structure.levels_of_theory is not None and
+                "delta/baseline" in structure.levels_of_theory.atomic_energies
         ):
             z_map = structure.z_map
             for z in structure.unique_elements:
-                val = structure.delta.E_atomic_baseline[z_map[z]]
+                val = structure.levels_of_theory.atomic_energies["delta/baseline"][z_map[z]]
                 if z in e and not np.isclose(e[z], val):
                     raise ValueError(f"Dataset includes inconsistent baseline atomic energies for Z={z}.")
                 e[z] = val
@@ -178,12 +178,12 @@ def _energy_shifts_reference_molecule(
         reference_frame_index: int = 0,
 ) -> npt.NDArray[np.float64]:
 
-    assert molecule.delta is not None
-    assert molecule.delta.E_pot_baseline is not None
-    assert molecule.delta.E_pot_target is not None
+    assert molecule.levels_of_theory is not None
+    assert "delta/baseline" in molecule.levels_of_theory.energies
+    assert "delta/target" in molecule.levels_of_theory.energies
 
-    E_baseline = molecule.delta.E_pot_baseline[reference_frame_index] # eV/atom
-    E_target = molecule.delta.E_pot_target[reference_frame_index] # eV/atom
+    E_baseline = molecule.levels_of_theory.energies["delta/baseline"][reference_frame_index] # eV/atom
+    E_target = molecule.levels_of_theory.energies["delta/target"][reference_frame_index] # eV/atom
     E_delta = E_target - E_baseline
     return np.full(stats.n_elements, fill_value=E_delta)
 
@@ -340,8 +340,8 @@ def export_to_mace(
     if reference_energy_type == "reference_molecule":
         E_atomic_shifts = np.zeros(stats.n_elements)
         Delta_E_pot_molecule = (
-            reference_molecule.delta.E_pot_target
-            - reference_molecule.delta.E_pot_baseline
+            reference_molecule.levels_of_theory.energies["delta/target"]
+            - reference_molecule.levels_of_theory.energies["delta/baseline"]
         )
             
     elif reference_energy_type != "none":

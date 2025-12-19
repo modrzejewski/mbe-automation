@@ -1,7 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Tuple, Literal, overload
+from typing import List, Tuple, Literal, overload, Dict
 import pandas as pd
 import phonopy
 from phonopy import Phonopy
@@ -35,30 +35,24 @@ class EOSCurves:
     V_min: npt.NDArray[np.floating]
     G_min: npt.NDArray[np.floating]
 
-@dataclass(kw_only=True)
-class DeltaTargetBaseline:
-    E_pot_baseline: npt.NDArray[np.floating] | None = None # eV/atom
-    forces_baseline: npt.NDArray[np.floating] | None = None # eV/Angs
-    E_pot_target: npt.NDArray[np.floating] | None = None # eV/atom
-    forces_target: npt.NDArray[np.floating] | None = None # eV/Angs
-    E_atomic_baseline: npt.NDArray[np.float64] | None = None # eV/atom
+@dataclass
+class LevelsOfTheory:
+    energies: Dict[str, npt.NDArray[np.floating]] = field(default_factory=dict)
+    forces: Dict[str, npt.NDArray[np.floating]] = field(default_factory=dict)
+    atomic_energies: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
 
-    def copy(self) -> DeltaTargetBaseline:
-        return DeltaTargetBaseline(
-            E_pot_baseline=(self.E_pot_baseline.copy() if self.E_pot_baseline is not None else None),
-            forces_baseline=(self.forces_baseline.copy() if self.forces_baseline is not None else None),
-            E_pot_target=(self.E_pot_target.copy() if self.E_pot_target is not None else None),
-            forces_target=(self.forces_target.copy() if self.forces_target is not None else None),
-            E_atomic_baseline=(self.E_atomic_baseline.copy() if self.E_atomic_baseline is not None else None),
+    def copy(self) -> LevelsOfTheory:
+        return LevelsOfTheory(
+            energies={k: v.copy() for k, v in self.energies.items()},
+            forces={k: v.copy() for k, v in self.forces.items()},
+            atomic_energies={k: v.copy() for k, v in self.atomic_energies.items()},
         )
 
-    def select_frames(self, indices: npt.NDArray[np.integer]) -> DeltaTargetBaseline:
-        return DeltaTargetBaseline(
-            E_pot_baseline=(self.E_pot_baseline[indices] if self.E_pot_baseline is not None else None),
-            forces_baseline=(self.forces_baseline[indices] if self.forces_baseline is not None else None),
-            E_pot_target=(self.E_pot_target[indices] if self.E_pot_target is not None else None),
-            forces_target=(self.forces_target[indices] if self.forces_target is not None else None),
-            E_atomic_baseline=self.E_atomic_baseline, # composition is the same in all frames
+    def select_frames(self, indices: npt.NDArray[np.integer]) -> LevelsOfTheory:
+        return LevelsOfTheory(
+            energies={k: v[indices] for k, v in self.energies.items()},
+            forces={k: v[indices] for k, v in self.forces.items()},
+            atomic_energies=self.atomic_energies, # composition is the same in all frames
         )
         
 @dataclass
@@ -72,7 +66,7 @@ class Structure:
     periodic: bool = False
     E_pot: npt.NDArray[np.floating] | None = None
     forces: npt.NDArray[np.floating] | None = None
-    delta: DeltaTargetBaseline | None = None
+    levels_of_theory: LevelsOfTheory | None = None
     feature_vectors: npt.NDArray[np.floating] | None = None
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "none"
     
@@ -90,7 +84,7 @@ class Structure:
             periodic=self.periodic,
             E_pot=(self.E_pot.copy() if self.E_pot is not None else None),
             forces=(self.forces.copy() if self.forces is not None else None),
-            delta=(self.delta.copy() if self.delta is not None else None),
+            levels_of_theory=(self.levels_of_theory.copy() if self.levels_of_theory is not None else None),
             feature_vectors=(
                 self.feature_vectors.copy() 
                 if self.feature_vectors_type != "none" else None
@@ -517,7 +511,7 @@ def _save_structure(
         forces: npt.NDArray[np.floating] | None=None,
         feature_vectors: npt.NDArray[np.floating] | None=None,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        delta: DeltaTargetBaseline | None=None,
+        levels_of_theory: LevelsOfTheory | None=None,
 ):
     if positions.ndim == 2:
         n_frames = 1
@@ -569,8 +563,8 @@ def _save_structure(
                 name="forces (eV∕Å)",
                 data=forces
             )
-        if delta is not None:
-            _save_delta_target_baseline(f, f"{key}/delta", delta)
+        if levels_of_theory is not None:
+            _save_levels_of_theory(f, f"{key}/levels_of_theory", levels_of_theory)
 
         group.attrs["dataclass"] = "Structure"
         group.attrs["n_frames"] = n_frames
@@ -594,7 +588,7 @@ def save_structure(
     forces: npt.NDArray[np.floating] | None = None,
     feature_vectors: npt.NDArray[np.floating] | None = None,
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-    delta: DeltaTargetBaseline | None = None,
+    levels_of_theory: LevelsOfTheory | None = None,
 ) -> None: ...
 
 def save_structure(*, dataset: str, key: str, **kwargs):
@@ -628,7 +622,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             forces=structure.forces,
             feature_vectors=structure.feature_vectors,
             feature_vectors_type=structure.feature_vectors_type,
-            delta=structure.delta,
+            levels_of_theory=structure.levels_of_theory,
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -642,7 +636,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             E_pot=kwargs.get("E_pot"),
             forces=kwargs.get("forces"),
             feature_vectors=kwargs.get("feature_vectors"),
-            delta=kwargs.get("delta"),
+            levels_of_theory=kwargs.get("levels_of_theory"),
             feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
         )
     else:
@@ -681,7 +675,7 @@ def read_structure(dataset, key):
                 group["forces (eV∕Å)"][...]
                 if "forces (eV∕Å)" in group else None
             ),
-            delta=_read_delta_target_baseline(f, key=f"{key}/delta"),
+            levels_of_theory=_read_levels_of_theory(f, key=f"{key}/levels_of_theory", old_key=f"{key}/delta"),
         )
     return structure
 
@@ -1161,68 +1155,104 @@ def _save_only(
 
         if "delta" in quantities:
 
-            if structure.delta is None:
+            if structure.levels_of_theory is None:
                 raise RuntimeError(
                     "Delta learning data are not present in the Structure object."
                 )
 
-            _save_delta_target_baseline(f, f"{key}/delta", structure.delta)
+            _save_levels_of_theory(f, f"{key}/levels_of_theory", structure.levels_of_theory)
             
     return
 
 
-def _save_delta_target_baseline(
+def _save_levels_of_theory(
         f: h5py.File,
         key: str,
-        delta: DeltaTargetBaseline,
+        levels: LevelsOfTheory,
 ) -> None:
 
     group = f.require_group(key)
 
-    if delta.forces_baseline is not None:
-        if "forces_baseline (eV∕Å)" in group: del group["forces_baseline (eV∕Å)"]
-        group.create_dataset("forces_baseline (eV∕Å)", data=delta.forces_baseline)
+    stored_levels = set()
 
-    if delta.forces_target is not None:
-        if "forces_target (eV∕Å)" in group: del group["forces_target (eV∕Å)"]
-        group.create_dataset("forces_target (eV∕Å)", data=delta.forces_target)
+    # Save energies
+    for name, energy in levels.energies.items():
+        ds_name = f"E_pot_{name} (eV∕atom)"
+        if ds_name in group: del group[ds_name]
+        group.create_dataset(ds_name, data=energy)
+        stored_levels.add(name)
 
-    if delta.E_pot_baseline is not None:
-        if "E_pot_baseline (eV∕atom)" in group: del group["E_pot_baseline (eV∕atom)"]
-        group.create_dataset(name="E_pot_baseline (eV∕atom)", data=delta.E_pot_baseline)
+    # Save forces
+    for name, forces in levels.forces.items():
+        ds_name = f"forces_{name} (eV∕Å)"
+        if ds_name in group: del group[ds_name]
+        group.create_dataset(ds_name, data=forces)
+        stored_levels.add(name)
 
-    if delta.E_pot_target is not None:
-        if "E_pot_target (eV∕atom)" in group: del group["E_pot_target (eV∕atom)"]
-        group.create_dataset(name="E_pot_target (eV∕atom)", data=delta.E_pot_target)
+    # Save atomic energies
+    for name, atomic_energies in levels.atomic_energies.items():
+        ds_name = f"E_atomic_{name} (eV∕atom)"
+        if ds_name in group: del group[ds_name]
+        group.create_dataset(ds_name, data=atomic_energies)
+        stored_levels.add(name)
 
-    if delta.E_atomic_baseline is not None:
-        if "E_atomic_baseline (eV∕atom)" in group: del group["E_atomic_baseline (eV∕atom)"]
-        group.create_dataset(name="E_atomic_baseline (eV∕atom)", data=delta.E_atomic_baseline)
+    # Store list of levels
+    group.attrs["levels"] = sorted(list(stored_levels))
 
     return
 
 
-def _read_delta_target_baseline(f: h5py.File, key: str) -> DeltaTargetBaseline | None:
+def _read_levels_of_theory(f: h5py.File, key: str, old_key: str | None = None) -> LevelsOfTheory | None:
 
     if key in f:
-        group = f[key]        
-        delta = DeltaTargetBaseline(
-            forces_baseline=(
-                group["forces_baseline (eV∕Å)"][...] if "forces_baseline (eV∕Å)" in group else None),
-            forces_target=(
-                group["forces_target (eV∕Å)"][...] if "forces_target (eV∕Å)" in group else None),
-            E_pot_baseline=(
-                group["E_pot_baseline (eV∕atom)"][...] if "E_pot_baseline (eV∕atom)" in group else None
-            ),
-            E_pot_target=(
-                group["E_pot_target (eV∕atom)"][...] if "E_pot_target (eV∕atom)" in group else None
-            ),
-            E_atomic_baseline=(
-                group["E_atomic_baseline (eV∕atom)"][...] if "E_atomic_baseline (eV∕atom)" in group else None
-            ),
+        group = f[key]
+        levels_list = group.attrs.get("levels", [])
+
+        energies = {}
+        forces = {}
+        atomic_energies = {}
+
+        for name in levels_list:
+            if f"E_pot_{name} (eV∕atom)" in group:
+                energies[name] = group[f"E_pot_{name} (eV∕atom)"][...]
+            if f"forces_{name} (eV∕Å)" in group:
+                forces[name] = group[f"forces_{name} (eV∕Å)"][...]
+            if f"E_atomic_{name} (eV∕atom)" in group:
+                atomic_energies[name] = group[f"E_atomic_{name} (eV∕atom)"][...]
+
+        levels = LevelsOfTheory(
+            energies=energies,
+            forces=forces,
+            atomic_energies=atomic_energies
+        )
+
+    elif old_key is not None and old_key in f:
+        # Backward compatibility
+        group = f[old_key]
+        energies = {}
+        forces = {}
+        atomic_energies = {}
+
+        if "E_pot_baseline (eV∕atom)" in group:
+            energies["delta/baseline"] = group["E_pot_baseline (eV∕atom)"][...]
+        if "E_pot_target (eV∕atom)" in group:
+            energies["delta/target"] = group["E_pot_target (eV∕atom)"][...]
+
+        if "forces_baseline (eV∕Å)" in group:
+            forces["delta/baseline"] = group["forces_baseline (eV∕Å)"][...]
+        if "forces_target (eV∕Å)" in group:
+            forces["delta/target"] = group["forces_target (eV∕Å)"][...]
+
+        if "E_atomic_baseline (eV∕atom)" in group:
+            atomic_energies["delta/baseline"] = group["E_atomic_baseline (eV∕atom)"][...]
+
+        levels = LevelsOfTheory(
+            energies=energies,
+            forces=forces,
+            atomic_energies=atomic_energies
         )
     else:
-        delta = None
+        levels = None
 
-    return delta
+    return levels
 

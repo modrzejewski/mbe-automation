@@ -134,7 +134,7 @@ class Structure(_Structure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
+            level_of_theory: str="default",
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -261,7 +261,7 @@ class Trajectory(_Trajectory):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
+            level_of_theory: str="default",
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -374,7 +374,7 @@ class FiniteSubsystem(_FiniteSubsystem):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
+            level_of_theory: str="default",
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -495,9 +495,9 @@ def _select_frames(
                 if struct.feature_vectors is not None else None
             ),
             feature_vectors_type=struct.feature_vectors_type,
-            delta=(
-                struct.delta.select_frames(indices)
-                if struct.delta is not None else None
+            levels_of_theory=(
+                struct.levels_of_theory.select_frames(indices)
+                if struct.levels_of_theory is not None else None
             )
         )
 
@@ -664,7 +664,7 @@ def _run_model(
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        level_of_theory: Literal[*LEVELS_OF_THEORY] = "default",
+        level_of_theory: str = "default",
         exec_params: ParallelCPU | None = None,
 ) -> None:
     
@@ -693,16 +693,12 @@ def _run_model(
         if energies: structure.E_pot = E_pot
         if forces: structure.forces = F
 
-    if level_of_theory != "default" and structure.delta is None:
-        structure.delta = mbe_automation.storage.DeltaTargetBaseline()
+    if level_of_theory != "default" and structure.levels_of_theory is None:
+        structure.levels_of_theory = mbe_automation.storage.LevelsOfTheory()
 
-    if level_of_theory == "delta/baseline":
-        if energies: structure.delta.E_pot_baseline = E_pot
-        if forces: structure.delta.forces_baseline = F
-
-    if level_of_theory == "delta/target":
-        if energies: structure.delta.E_pot_target = E_pot
-        if forces: structure.delta.forces_target = F
+    if level_of_theory != "default":
+        if energies: structure.levels_of_theory.energies[level_of_theory] = E_pot
+        if forces: structure.levels_of_theory.forces[level_of_theory] = F
 
     if level_of_theory == "delta/baseline" and energies:
         unique_elements = structure.unique_elements
@@ -710,7 +706,7 @@ def _run_model(
             calculator=calculator,
             z_numbers=unique_elements,
         )
-        structure.delta.E_atomic_baseline = E_atomic_baseline
+        structure.levels_of_theory.atomic_energies["delta/baseline"] = E_atomic_baseline
 
     return
 
