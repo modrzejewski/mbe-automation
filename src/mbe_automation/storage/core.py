@@ -675,7 +675,7 @@ def read_structure(dataset, key):
                 group["forces (eV∕Å)"][...]
                 if "forces (eV∕Å)" in group else None
             ),
-            levels_of_theory=_read_levels_of_theory(f, key=f"{key}/levels_of_theory", old_key=f"{key}/delta"),
+            levels_of_theory=_read_levels_of_theory(f, key=f"{key}/levels_of_theory"),
         )
     return structure
 
@@ -1202,7 +1202,7 @@ def _save_levels_of_theory(
     return
 
 
-def _read_levels_of_theory(f: h5py.File, key: str, old_key: str | None = None) -> LevelsOfTheory | None:
+def _read_levels_of_theory(f: h5py.File, key: str) -> LevelsOfTheory | None:
 
     if key in f:
         group = f[key]
@@ -1219,32 +1219,6 @@ def _read_levels_of_theory(f: h5py.File, key: str, old_key: str | None = None) -
                 forces[name] = group[f"forces_{name} (eV∕Å)"][...]
             if f"E_atomic_{name} (eV∕atom)" in group:
                 atomic_energies[name] = group[f"E_atomic_{name} (eV∕atom)"][...]
-
-        levels = LevelsOfTheory(
-            energies=energies,
-            forces=forces,
-            atomic_energies=atomic_energies
-        )
-
-    elif old_key is not None and old_key in f:
-        # Backward compatibility
-        group = f[old_key]
-        energies = {}
-        forces = {}
-        atomic_energies = {}
-
-        if "E_pot_baseline (eV∕atom)" in group:
-            energies["delta/baseline"] = group["E_pot_baseline (eV∕atom)"][...]
-        if "E_pot_target (eV∕atom)" in group:
-            energies["delta/target"] = group["E_pot_target (eV∕atom)"][...]
-
-        if "forces_baseline (eV∕Å)" in group:
-            forces["delta/baseline"] = group["forces_baseline (eV∕Å)"][...]
-        if "forces_target (eV∕Å)" in group:
-            forces["delta/target"] = group["forces_target (eV∕Å)"][...]
-
-        if "E_atomic_baseline (eV∕atom)" in group:
-            atomic_energies["delta/baseline"] = group["E_atomic_baseline (eV∕atom)"][...]
 
         levels = LevelsOfTheory(
             energies=energies,
