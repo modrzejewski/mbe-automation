@@ -47,10 +47,10 @@ def _target_energies(
     e = []
     for i, structure in enumerate(structures):
         if (
-                structure.levels_of_theory is not None and
-                "delta/target" in structure.levels_of_theory.energies
+                structure.ground_truth is not None and
+                "delta/target" in structure.ground_truth.energies
         ):
-            e.append(structure.levels_of_theory.energies["delta/target"])
+            e.append(structure.ground_truth.energies["delta/target"])
 
         else:
             raise ValueError(f"Target energies not available in structure {i}.")
@@ -64,10 +64,10 @@ def _baseline_energies(
     e = []
     for i, structure in enumerate(structures):
         if (
-                structure.levels_of_theory is not None and
-                "delta/baseline" in structure.levels_of_theory.energies
+                structure.ground_truth is not None and
+                "delta/baseline" in structure.ground_truth.energies
         ):
-            e.append(structure.levels_of_theory.energies["delta/baseline"])
+            e.append(structure.ground_truth.energies["delta/baseline"])
 
         else:
             raise ValueError(f"Baseline energies not available in structure {i}.")
@@ -80,10 +80,10 @@ def _baseline_forces(
     f = []
     for structure in structures:
         if (
-                structure.levels_of_theory is not None and
-                "delta/baseline" in structure.levels_of_theory.forces
+                structure.ground_truth is not None and
+                "delta/baseline" in structure.ground_truth.forces
         ):
-            f.append(structure.levels_of_theory.forces["delta/baseline"])
+            f.append(structure.ground_truth.forces["delta/baseline"])
 
     if len(f) > 0 and len(f) < len(structures):
         raise ValueError("Missing baseline forces in a subset of structures.")
@@ -96,10 +96,10 @@ def _target_forces(
     f = []
     for structure in structures:
         if (
-                structure.levels_of_theory is not None and
-                "delta/target" in structure.levels_of_theory.forces
+                structure.ground_truth is not None and
+                "delta/target" in structure.ground_truth.forces
         ):
-            f.append(structure.levels_of_theory.forces["delta/target"])
+            f.append(structure.ground_truth.forces["delta/target"])
 
     if len(f) > 0 and len(f) < len(structures):
         raise ValueError("Missing target forces in a subset of structures.")
@@ -111,7 +111,7 @@ def _atomic_energies(
 ) -> npt.NDArray[np.float64]:
 
     raise NotImplementedError(
-        "Atomic energies are not currently stored in LevelsOfTheory. "
+        "Atomic energies are not currently stored in GroundTruth. "
         "A new mechanism for handling atomic energies will be implemented in the future."
     )
 
@@ -165,12 +165,12 @@ def _energy_shifts_reference_molecule(
         reference_frame_index: int = 0,
 ) -> npt.NDArray[np.float64]:
 
-    assert molecule.levels_of_theory is not None
-    assert "delta/baseline" in molecule.levels_of_theory.energies
-    assert "delta/target" in molecule.levels_of_theory.energies
+    assert molecule.ground_truth is not None
+    assert "delta/baseline" in molecule.ground_truth.energies
+    assert "delta/target" in molecule.ground_truth.energies
 
-    E_baseline = molecule.levels_of_theory.energies["delta/baseline"][reference_frame_index] # eV/atom
-    E_target = molecule.levels_of_theory.energies["delta/target"][reference_frame_index] # eV/atom
+    E_baseline = molecule.ground_truth.energies["delta/baseline"][reference_frame_index] # eV/atom
+    E_target = molecule.ground_truth.energies["delta/target"][reference_frame_index] # eV/atom
     E_delta = E_target - E_baseline
     return np.full(stats.n_elements, fill_value=E_delta)
 
@@ -327,8 +327,8 @@ def export_to_mace(
     if reference_energy_type == "reference_molecule":
         E_atomic_shifts = np.zeros(stats.n_elements)
         Delta_E_pot_molecule = (
-            reference_molecule.levels_of_theory.energies["delta/target"]
-            - reference_molecule.levels_of_theory.energies["delta/baseline"]
+            reference_molecule.ground_truth.energies["delta/target"]
+            - reference_molecule.ground_truth.energies["delta/baseline"]
         )
             
     elif reference_energy_type != "none":
