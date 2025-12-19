@@ -36,18 +36,18 @@ class EOSCurves:
     G_min: npt.NDArray[np.floating]
 
 @dataclass
-class LevelsOfTheory:
+class GroundTruth:
     energies: Dict[str, npt.NDArray[np.floating]] = field(default_factory=dict)
     forces: Dict[str, npt.NDArray[np.floating]] = field(default_factory=dict)
 
-    def copy(self) -> LevelsOfTheory:
-        return LevelsOfTheory(
+    def copy(self) -> GroundTruth:
+        return GroundTruth(
             energies={k: v.copy() for k, v in self.energies.items()},
             forces={k: v.copy() for k, v in self.forces.items()},
         )
 
-    def select_frames(self, indices: npt.NDArray[np.integer]) -> LevelsOfTheory:
-        return LevelsOfTheory(
+    def select_frames(self, indices: npt.NDArray[np.integer]) -> GroundTruth:
+        return GroundTruth(
             energies={k: v[indices] for k, v in self.energies.items()},
             forces={k: v[indices] for k, v in self.forces.items()},
         )
@@ -63,7 +63,7 @@ class Structure:
     periodic: bool = False
     E_pot: npt.NDArray[np.floating] | None = None
     forces: npt.NDArray[np.floating] | None = None
-    levels_of_theory: LevelsOfTheory | None = None
+    ground_truth: GroundTruth | None = None
     feature_vectors: npt.NDArray[np.floating] | None = None
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "none"
     
@@ -81,7 +81,7 @@ class Structure:
             periodic=self.periodic,
             E_pot=(self.E_pot.copy() if self.E_pot is not None else None),
             forces=(self.forces.copy() if self.forces is not None else None),
-            levels_of_theory=(self.levels_of_theory.copy() if self.levels_of_theory is not None else None),
+            ground_truth=(self.ground_truth.copy() if self.ground_truth is not None else None),
             feature_vectors=(
                 self.feature_vectors.copy() 
                 if self.feature_vectors_type != "none" else None
@@ -508,7 +508,7 @@ def _save_structure(
         forces: npt.NDArray[np.floating] | None=None,
         feature_vectors: npt.NDArray[np.floating] | None=None,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        levels_of_theory: LevelsOfTheory | None=None,
+        ground_truth: GroundTruth | None=None,
 ):
     if positions.ndim == 2:
         n_frames = 1
@@ -560,8 +560,8 @@ def _save_structure(
                 name="forces (eV∕Å)",
                 data=forces
             )
-        if levels_of_theory is not None:
-            _save_levels_of_theory(f, f"{key}/levels_of_theory", levels_of_theory)
+        if ground_truth is not None:
+            _save_ground_truth(f, f"{key}/ground_truth", ground_truth)
 
         group.attrs["dataclass"] = "Structure"
         group.attrs["n_frames"] = n_frames
@@ -585,7 +585,7 @@ def save_structure(
     forces: npt.NDArray[np.floating] | None = None,
     feature_vectors: npt.NDArray[np.floating] | None = None,
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-    levels_of_theory: LevelsOfTheory | None = None,
+    ground_truth: GroundTruth | None = None,
 ) -> None: ...
 
 def save_structure(*, dataset: str, key: str, **kwargs):
@@ -619,7 +619,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             forces=structure.forces,
             feature_vectors=structure.feature_vectors,
             feature_vectors_type=structure.feature_vectors_type,
-            levels_of_theory=structure.levels_of_theory,
+            ground_truth=structure.ground_truth,
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -633,7 +633,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             E_pot=kwargs.get("E_pot"),
             forces=kwargs.get("forces"),
             feature_vectors=kwargs.get("feature_vectors"),
-            levels_of_theory=kwargs.get("levels_of_theory"),
+            ground_truth=kwargs.get("ground_truth"),
             feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
         )
     else:
@@ -672,7 +672,7 @@ def read_structure(dataset, key):
                 group["forces (eV∕Å)"][...]
                 if "forces (eV∕Å)" in group else None
             ),
-            levels_of_theory=_read_levels_of_theory(f, key=f"{key}/levels_of_theory"),
+            ground_truth=_read_ground_truth(f, key=f"{key}/ground_truth"),
         )
     return structure
 
@@ -1152,64 +1152,64 @@ def _save_only(
 
         if "delta" in quantities:
 
-            if structure.levels_of_theory is None:
+            if structure.ground_truth is None:
                 raise RuntimeError(
                     "Delta learning data are not present in the Structure object."
                 )
 
-            _save_levels_of_theory(f, f"{key}/levels_of_theory", structure.levels_of_theory)
+            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth)
             
     return
 
 
-def _save_levels_of_theory(
+def _save_ground_truth(
         f: h5py.File,
         key: str,
-        levels_of_theory: LevelsOfTheory,
+        ground_truth: GroundTruth,
 ) -> None:
 
     group = f.require_group(key)
 
-    stored_levels = set()
+    levels_of_theory = set()
 
-    for name, energy in levels_of_theory.energies.items():
+    for name, energy in ground_truth.energies.items():
         ds_name = f"E_{name} (eV∕atom)"
         if ds_name in group: del group[ds_name]
         group.create_dataset(ds_name, data=energy)
-        stored_levels.add(name)
+        levels_of_theory.add(name)
 
-    for name, forces in levels_of_theory.forces.items():
+    for name, forces in ground_truth.forces.items():
         ds_name = f"forces_{name} (eV∕Å)"
         if ds_name in group: del group[ds_name]
         group.create_dataset(ds_name, data=forces)
-        stored_levels.add(name)
+        levels_of_theory.add(name)
 
-    group.attrs["levels_of_theory"] = sorted(list(stored_levels))
+    group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
 
     return
 
 
-def _read_levels_of_theory(f: h5py.File, key: str) -> LevelsOfTheory | None:
+def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
 
     if key in f:
         group = f[key]
-        stored_levels = group.attrs.get("levels_of_theory", [])
+        levels_of_theory = group.attrs.get("levels_of_theory", [])
 
         energies = {}
         forces = {}
 
-        for name in stored_levels:
+        for name in levels_of_theory:
             if f"E_{name} (eV∕atom)" in group:
                 energies[name] = group[f"E_{name} (eV∕atom)"][...]
             if f"forces_{name} (eV∕Å)" in group:
                 forces[name] = group[f"forces_{name} (eV∕Å)"][...]
 
-        levels_of_theory = LevelsOfTheory(
+        ground_truth = GroundTruth(
             energies=energies,
             forces=forces,
         )
     else:
-        levels_of_theory = None
+        ground_truth = None
 
-    return levels_of_theory
+    return ground_truth
 

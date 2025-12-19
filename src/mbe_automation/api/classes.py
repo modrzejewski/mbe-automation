@@ -495,9 +495,9 @@ def _select_frames(
                 if struct.feature_vectors is not None else None
             ),
             feature_vectors_type=struct.feature_vectors_type,
-            levels_of_theory=(
-                struct.levels_of_theory.select_frames(indices)
-                if struct.levels_of_theory is not None else None
+            ground_truth=(
+                struct.ground_truth.select_frames(indices)
+                if struct.ground_truth is not None else None
             )
         )
 
@@ -693,12 +693,12 @@ def _run_model(
         if energies: structure.E_pot = E_pot
         if forces: structure.forces = F
 
-    if level_of_theory != "default" and structure.levels_of_theory is None:
-        structure.levels_of_theory = mbe_automation.storage.LevelsOfTheory()
+    if level_of_theory != "default" and structure.ground_truth is None:
+        structure.ground_truth = mbe_automation.storage.GroundTruth()
 
     if level_of_theory != "default":
-        if energies: structure.levels_of_theory.energies[level_of_theory] = E_pot
-        if forces: structure.levels_of_theory.forces[level_of_theory] = F
+        if energies: structure.ground_truth.energies[level_of_theory] = E_pot
+        if forces: structure.ground_truth.forces[level_of_theory] = F
 
     return
 
