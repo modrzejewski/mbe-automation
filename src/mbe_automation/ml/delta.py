@@ -109,24 +109,11 @@ def _target_forces(
 def _atomic_energies(
         structures: List[Structure]
 ) -> npt.NDArray[np.float64]:
-    e = {}
-    for structure in structures:
-        if (
-                structure.levels_of_theory is not None and
-                "delta/baseline" in structure.levels_of_theory.atomic_energies
-        ):
-            z_map = structure.z_map
-            for z in structure.unique_elements:
-                val = structure.levels_of_theory.atomic_energies["delta/baseline"][z_map[z]]
-                if z in e and not np.isclose(e[z], val):
-                    raise ValueError(f"Dataset includes inconsistent baseline atomic energies for Z={z}.")
-                e[z] = val
 
-    unique_elements = _unique_elements(structures)
-    for z in unique_elements:
-        if z not in e: raise ValueError(f"Missing atomic energy for Z={z}.")
-
-    return np.array([e[z] for z in unique_elements])
+    raise NotImplementedError(
+        "Atomic energies are not currently stored in LevelsOfTheory. "
+        "A new mechanism for handling atomic energies will be implemented in the future."
+    )
 
 def _statistics(structures: List[Structure]) -> DataStats:
     """

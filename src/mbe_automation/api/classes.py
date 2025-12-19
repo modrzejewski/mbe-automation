@@ -700,14 +700,6 @@ def _run_model(
         if energies: structure.levels_of_theory.energies[level_of_theory] = E_pot
         if forces: structure.levels_of_theory.forces[level_of_theory] = F
 
-    if level_of_theory == "delta/baseline" and energies:
-        unique_elements = structure.unique_elements
-        E_atomic_baseline = mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=unique_elements,
-        )
-        structure.levels_of_theory.atomic_energies["delta/baseline"] = E_atomic_baseline
-
     return
 
 def _to_mace_dataset(

@@ -39,20 +39,17 @@ class EOSCurves:
 class LevelsOfTheory:
     energies: Dict[str, npt.NDArray[np.floating]] = field(default_factory=dict)
     forces: Dict[str, npt.NDArray[np.floating]] = field(default_factory=dict)
-    atomic_energies: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
 
     def copy(self) -> LevelsOfTheory:
         return LevelsOfTheory(
             energies={k: v.copy() for k, v in self.energies.items()},
             forces={k: v.copy() for k, v in self.forces.items()},
-            atomic_energies={k: v.copy() for k, v in self.atomic_energies.items()},
         )
 
     def select_frames(self, indices: npt.NDArray[np.integer]) -> LevelsOfTheory:
         return LevelsOfTheory(
             energies={k: v[indices] for k, v in self.energies.items()},
             forces={k: v[indices] for k, v in self.forces.items()},
-            atomic_energies=self.atomic_energies, # composition is the same in all frames
         )
         
 @dataclass
@@ -1189,13 +1186,6 @@ def _save_levels_of_theory(
         group.create_dataset(ds_name, data=forces)
         stored_levels.add(name)
 
-    # Save atomic energies
-    for name, atomic_energies in levels.atomic_energies.items():
-        ds_name = f"E_atomic_{name} (eV∕atom)"
-        if ds_name in group: del group[ds_name]
-        group.create_dataset(ds_name, data=atomic_energies)
-        stored_levels.add(name)
-
     # Store list of levels
     group.attrs["levels"] = sorted(list(stored_levels))
 
@@ -1210,20 +1200,16 @@ def _read_levels_of_theory(f: h5py.File, key: str) -> LevelsOfTheory | None:
 
         energies = {}
         forces = {}
-        atomic_energies = {}
 
         for name in levels_list:
             if f"E_pot_{name} (eV∕atom)" in group:
                 energies[name] = group[f"E_pot_{name} (eV∕atom)"][...]
             if f"forces_{name} (eV∕Å)" in group:
                 forces[name] = group[f"forces_{name} (eV∕Å)"][...]
-            if f"E_atomic_{name} (eV∕atom)" in group:
-                atomic_energies[name] = group[f"E_atomic_{name} (eV∕atom)"][...]
 
         levels = LevelsOfTheory(
             energies=energies,
             forces=forces,
-            atomic_energies=atomic_energies
         )
     else:
         levels = None
