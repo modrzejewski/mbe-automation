@@ -53,18 +53,21 @@ The program integrates several scientific codes into a unified workflow, includi
 
 ## Table of Contents
 
-### Installation
+### Setup
 
 *   [Installation Guide](./00_installation.md)
 
 ### Basics
 
-*   [Quasi-Harmonic Calculation](./01_quasi_harmonic.md)
-*   [Molecular Dynamics](./02_molecular_dynamics.md)
-*   [Training Set Creation](./03_training_set.md)
-*   [Data Classes for Physical Properties](./10_api_classes.md)
+*   [API Data Classes](./10_api_classes.md)
 *   [Working with HDF5 Datasets](./09_working_with_hdf5_datasets.md)
 *   [Computational Bottlenecks](./06_bottlenecks.md)
+
+### Workflows
+
+*   [Quasi-Harmonic Calculation](./01_quasi_harmonic.md)
+*   [Molecular Dynamics](./02_molecular_dynamics.md)
+*   [MD sampling and phonon sampling](./03_training_set.md)
 
 ### Cookbooks
 
