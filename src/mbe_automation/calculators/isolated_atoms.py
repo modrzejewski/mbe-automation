@@ -13,6 +13,26 @@ def ground_state_spin(z: int) -> int:
     
     Uses the electronic configuration from pyscf.data module.
     """
+    #
+    # The CONFIGURATION data is a list of
+    # four-element lists with numbers of electrons
+    # for s, p, d, f angular momenta, respectively.
+    #
+    # CONFIGURATION = [
+    # [ 0, 0, 0, 0],     #  0  GHOST
+    # [ 1, 0, 0, 0],     #  1  H
+    # [ 2, 0, 0, 0],     #  2  He
+    # [ 3, 0, 0, 0],     #  3  Li
+    # [ 4, 0, 0, 0],     #  4  Be
+    # [ 4, 1, 0, 0],     #  5  B
+    # [ 4, 2, 0, 0],     #  6  C
+    # [ 4, 3, 0, 0],     #  7  N
+    # [ 4, 4, 0, 0],     #  8  O
+    # [ 4, 5, 0, 0],     #  9  F
+    # [ 4, 6, 0, 0],     # 10  Ne
+    # [ 5, 6, 0, 0],     # 11  Na
+    # ... ]
+    #
     config = pyscf.data.elements.CONFIGURATION[z]
     
     unpaired_total = 0
@@ -32,10 +52,10 @@ def ground_state_spin(z: int) -> int:
 def atomic_energies(
         calculator: DFT | HF | MACECalculator,
         z_numbers: npt.NDArray[np.integer],
-) -> npt.NDArray[np.floating]:
+) -> dict[np.int64, np.float64]:
 
     n_elements = len(z_numbers)
-    E_atomic = np.zeros(n_elements)
+    E_atomic = {}
     for i, z in enumerate(z_numbers):
         isolated_atom = ase.Atoms(
             numbers=[z],
@@ -43,6 +63,6 @@ def atomic_energies(
         )
         isolated_atom.info["spin"] = ground_state_spin(z)
         isolated_atom.calc = calculator
-        E_atomic[i] = isolated_atom.get_potential_energy()
+        E_atomic[z] = isolated_atom.get_potential_energy()
 
     return E_atomic

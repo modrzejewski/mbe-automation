@@ -233,6 +233,16 @@ class Structure(_Structure):
             work_dir=work_dir,
         )
 
+    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
+        """
+        Calculate ground-state energies for all unique elements
+        represented in the structure.
+        """
+        return mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=self.unique_elements,
+        )
+
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory):
     @classmethod
@@ -272,6 +282,16 @@ class Trajectory(_Trajectory):
             feature_vectors_type=feature_vectors_type,
             level_of_theory=level_of_theory,
             exec_params=exec_params,
+        )
+
+    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
+        """
+        Calculate ground-state energies for all unique elements
+        represented in the structure.
+        """
+        return mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=self.unique_elements,
         )
 
 @dataclass(kw_only=True)
@@ -329,6 +349,16 @@ class MolecularCrystal(_MolecularCrystal):
         return [FiniteSubsystem(**vars(s)) for s in clusters]
 
     extract_finite_subsystem = extract_finite_subsystems # synonym
+
+    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
+        """
+        Calculate ground-state energies for all unique elements
+        represented in the structure.
+        """
+        return mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=self.unique_elements,
+        )
 
 @dataclass(kw_only=True)
 class FiniteSubsystem(_FiniteSubsystem):
@@ -419,6 +449,16 @@ class FiniteSubsystem(_FiniteSubsystem):
             reference_frame_index=reference_frame_index,
         )
 
+    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
+        """
+        Calculate ground-state energies for all unique elements
+        represented in the structure.
+        """
+        return mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=self.unique_elements,
+        )
+
 @dataclass
 class Dataset:
     """
@@ -451,6 +491,20 @@ class Dataset:
             reference_energy_type=reference_energy_type,
             reference_molecule=reference_molecule,
             reference_frame_index=reference_frame_index,
+        )
+
+    @property
+    def unique_elements(self) -> npt.NDArray[np.int64]:
+        return _unique_elements(self.structures)
+
+    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
+        """
+        Calculate ground-state energies for all unique elements
+        represented in the structures.
+        """
+        return mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=self.unique_elements,
         )
     
 def _select_frames(
@@ -740,3 +794,13 @@ def _to_mace_dataset(
         )
 
     return
+
+def _unique_elements(
+        structures: List[Structure | FiniteSubsystem]
+) -> npt.NDArray[np.int64]:
+    """
+    Return a sorted list of Z numbers for a Structure.
+    """
+    unique_elements = [structure.unique_elements for structure in structures]
+    return np.unique(np.concatenate(unique_elements))
+

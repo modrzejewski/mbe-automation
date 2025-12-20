@@ -115,14 +115,6 @@ class Structure:
     def unique_elements(self) -> npt.NDArray[np.int64]:
         return np.unique(np.atleast_2d(self.atomic_numbers)[0])
 
-    @property
-    def z_map(self) -> npt.NDArray[np.int64]:
-        unique_elements = self.unique_elements
-        n_elements = len(unique_elements)
-        x = np.full(np.max(unique_elements) + 1, -1, dtype=np.int64)
-        x[unique_elements] = np.arange(n_elements)
-        return x
-
 @dataclass
 class ForceConstants:
     """Harmonic force constants model."""
@@ -239,6 +231,10 @@ class MolecularCrystal:
         atom_indices = np.concatenate([self.index_map[i] for i in molecule_indices])
         return self.supercell.atomic_numbers[atom_indices]
 
+    @property
+    def unique_elements(self) -> npt.NDArray[np.int64]:
+        return self.supercell.unique_elements
+
     def positions(
             self,
             molecule_indices: npt.NDArray[np.integer],
@@ -269,6 +265,10 @@ class FiniteSubsystem:
     cluster_of_molecules: Structure
     molecule_indices: npt.NDArray[np.integer]
     n_molecules: int
+
+    @property
+    def unique_elements(self) -> npt.NDArray[np.int64]:
+        return self.cluster_of_molecules.unique_elements
     
 def save_data_frame(
         dataset: str,
