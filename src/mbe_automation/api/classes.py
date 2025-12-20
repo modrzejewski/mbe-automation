@@ -29,6 +29,27 @@ from mbe_automation.ml.core import REFERENCE_ENERGY_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
+class _AtomicEnergiesCalc:
+    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
+        """
+        Calculate ground-state energies for all unique isolated atoms
+        represented in the structure. Spin is selected automatically
+        based on the ground-state configurations of isolated atoms
+        defined in pyscf.data.elements.CONFIGURATION.
+
+        This is the function that you need to generate isolated
+        atomic baseline data for machine learning interatomic
+        potentials.
+
+        Remember to define the calculator with exactly the same
+        settings (basis set, integral approximations, thresholds)
+        as for the main dataset calculation.
+        """
+        return mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=self.unique_elements,
+        )
+
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
     @classmethod
@@ -48,7 +69,7 @@ class ForceConstants(_ForceConstants):
         )
 
 @dataclass(kw_only=True)
-class Structure(_Structure):
+class Structure(_Structure, _AtomicEnergiesCalc):
     @classmethod
     def read(
             cls,
@@ -233,18 +254,8 @@ class Structure(_Structure):
             work_dir=work_dir,
         )
 
-    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
-        """
-        Calculate ground-state energies for all unique elements
-        represented in the structure.
-        """
-        return mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=self.unique_elements,
-        )
-
 @dataclass(kw_only=True)
-class Trajectory(_Trajectory):
+class Trajectory(_Trajectory, _AtomicEnergiesCalc):
     @classmethod
     def read(
             cls,
@@ -284,18 +295,8 @@ class Trajectory(_Trajectory):
             exec_params=exec_params,
         )
 
-    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
-        """
-        Calculate ground-state energies for all unique elements
-        represented in the structure.
-        """
-        return mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=self.unique_elements,
-        )
-
 @dataclass(kw_only=True)
-class MolecularCrystal(_MolecularCrystal):
+class MolecularCrystal(_MolecularCrystal, _AtomicEnergiesCalc):
     def save(
             self,
             dataset: str,
@@ -350,18 +351,8 @@ class MolecularCrystal(_MolecularCrystal):
 
     extract_finite_subsystem = extract_finite_subsystems # synonym
 
-    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
-        """
-        Calculate ground-state energies for all unique elements
-        represented in the structure.
-        """
-        return mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=self.unique_elements,
-        )
-
 @dataclass(kw_only=True)
-class FiniteSubsystem(_FiniteSubsystem):
+class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc):
     @classmethod
     def read(
             cls,
@@ -449,18 +440,8 @@ class FiniteSubsystem(_FiniteSubsystem):
             reference_frame_index=reference_frame_index,
         )
 
-    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
-        """
-        Calculate ground-state energies for all unique elements
-        represented in the structure.
-        """
-        return mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=self.unique_elements,
-        )
-
 @dataclass
-class Dataset:
+class Dataset(_AtomicEnergiesCalc):
     """
     Collection of atomistic structures or finite subsystems
     for machine learning tasks.
@@ -497,16 +478,6 @@ class Dataset:
     def unique_elements(self) -> npt.NDArray[np.int64]:
         return _unique_elements(self.structures)
 
-    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
-        """
-        Calculate ground-state energies for all unique elements
-        represented in the structures.
-        """
-        return mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=self.unique_elements,
-        )
-    
 def _select_frames(
         struct: _Structure,
         indices: npt.NDArray[np.integer]
