@@ -43,6 +43,8 @@ The following table summarizes the key methods available across these classes.
 | **`extract_finite_subsystems`** | Extracts finite clusters of molecules (e.g., dimers, trimers) based on distance or number criteria. | `MolecularCrystal` |
 | **`frequencies_and_...`** | Calculates phonon frequencies and eigenvectors at a given k-point. | `ForceConstants` |
 | **`append`** | Adds a structure or subsystem to the dataset collection. | `Dataset` |
+| **`unique_elements`** | Returns a sorted array of unique atomic numbers present in the object. | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem`, `Dataset` |
+| **`atomic_energies`** | Calculates ground-state energies for all unique isolated atoms (used for generating MLIP baselines). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem`, `Dataset` |
 
 ### Usage Notes
 *   **`subsample`**: Requires feature vectors to be present (computed via `run_model` or during an MD simulation) to calculate distances in chemical space.
