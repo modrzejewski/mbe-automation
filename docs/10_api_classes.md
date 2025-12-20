@@ -19,12 +19,12 @@ This chapter provides an overview of the physical content each class represents 
 
 | Class | Description |
 | :--- | :--- |
-| **`ForceConstants`** | Represents interatomic force constants (typically 2nd order) derived from a crystal structure, used to compute phonon properties like frequencies and eigenvectors. |
-| **`Structure`** | Represents an atomistic structure (positions, atomic numbers, unit cell). It can hold a single frame or a sequence of frames (e.g., from a short trajectory or a collection of configurations). |
+| **`ForceConstants`** | Represents 2nd order force constants used to compute phonon properties like frequencies and dynamical matrix eigenvectors. |
+| **`Structure`** | Represents an atomistic structure (positions, atomic numbers, unit cell). Can hold a single frame or a sequence of frames of equal size (e.g., from a short trajectory or a collection of configurations). |
 | **`Trajectory`** | Represents the time-evolution of an atomistic system, typically resulting from a Molecular Dynamics simulation. It includes time-dependent properties like positions, velocities, kinetic energies, and thermodynamic variables. |
-| **`MolecularCrystal`** | Represents a periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). It serves as a bridge between the periodic crystal and its finite molecular components. |
-| **`FiniteSubsystem`** | Represents a finite cluster of molecules extracted from a periodic crystal or trajectory. It is used to study local interactions or to generate training data for fragment-based methods. |
-| **`Dataset`** | A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. It is primarily used to aggregate data for generating machine learning training sets. |
+| **`MolecularCrystal`** | Represents a periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). Serves as an intermediate necessary for finite cluster extraction. |
+| **`FiniteSubsystem`** | Represents a finite cluster of molecules extracted from a periodic structure or trajectory. Used to generate training data for fragment-based methods. |
+| **`Dataset`** | A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets. |
 
 ## Methods Summary
 
