@@ -127,6 +127,8 @@ def to_xyz_training_set(
         atomic_energies_available = True
         
         if delta_learning:
+            assert isinstance(atomic_energies, dict[str, dict[np.int64, np.float64]])
+            
             atomic_numbers_target, E_atomic_target = _process_atomic_energies(
                 atomic_energies[level_of_theory["target"]]
             )
