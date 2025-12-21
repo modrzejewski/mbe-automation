@@ -60,7 +60,7 @@ def atomic_energies(
             numbers=[z],
             pbc=False
         )
-        isolated_atom.info["spin"] = ground_state_spin(z)
+        isolated_atom.info["n_unpaired_electrons"] = ground_state_spin(z)
         isolated_atom.calc = calculator
         E_atomic[z] = isolated_atom.get_potential_energy()
 

@@ -208,7 +208,7 @@ class PySCFCalculator(Calculator):
     def _initialize_backend(self, atoms):
         pbc = atoms.pbc.any()
         charge = atoms.info.get("charge", 0)
-        spin = atoms.info.get("spin", 0)
+        spin = atoms.info.get("n_unpaired_electrons", 0)
 
         common_kwargs = {
             'atom': ase_atoms_to_pyscf(atoms),
