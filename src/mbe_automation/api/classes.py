@@ -722,7 +722,7 @@ def _to_mace_dataset(
         dataset: List[Structure|FiniteSubsystem],
         save_path: str,
         level_of_theory: str | dict[Literal["target", "baseline"], str],
-        atomic_energies: dict[np.int64, np.float64] | None = None,
+        atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
 ) -> None:
 
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
