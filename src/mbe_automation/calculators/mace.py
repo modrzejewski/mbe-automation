@@ -8,7 +8,7 @@ class MACE(MACECalculator):
             self,
             model_path,
             device: str | None = None,
-            head: str = "defult",
+            head: str = "default",
     ):
         if device is None:
             if torch.cuda.is_available():
