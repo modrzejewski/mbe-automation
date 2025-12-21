@@ -3,9 +3,9 @@ import numpy as np
 import numpy.typing as npt
 import pyscf
 import ase
+from ase.calculators.calculator import Calculator
 from mace.calculators import MACECalculator
 
-from mbe_automation.calculators.pyscf import DFT, HF
 
 def ground_state_spin(z: int) -> int:
     """
@@ -50,9 +50,16 @@ def ground_state_spin(z: int) -> int:
 
 
 def atomic_energies(
-        calculator: DFT | HF | MACECalculator,
+        calculator: Calculator | MACECalculator,
         z_numbers: npt.NDArray[np.integer],
 ) -> dict[np.int64, np.float64]:
+
+    if not isinstance(calculator, (Calculator, MACECalculator)):
+        raise TypeError(
+            f"Expected an instantiated calculator, got {type(calculator).__name__}. "
+            "If you are passing a factory function (like DFT or HF), "
+            "please call it to create an instance first."
+        )
 
     E_atomic = {}
     for z in z_numbers:
