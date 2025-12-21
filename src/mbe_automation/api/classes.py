@@ -31,7 +31,7 @@ from mbe_automation.storage.core import DATA_FOR_TRAINING
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 class _AtomicEnergiesCalc:
-    def atomic_energies(self, calculator) -> dict[np.int64, np.float64]:
+    def atomic_energies(self, calculator: CALCULATORS) -> dict[np.int64, np.float64]:
         """
         Calculate ground-state energies for all unique isolated atoms
         represented in the structure. Spin is selected automatically
