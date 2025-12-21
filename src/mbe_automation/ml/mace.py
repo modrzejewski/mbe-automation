@@ -65,7 +65,7 @@ def _get_forces(
 ) -> npt.NDArray[np.float64]:
     
     if structure.ground_truth is not None:
-        forces = structure.ground_truth.get(level_of_theory)
+        forces = structure.ground_truth.forces.get(level_of_theory)
     else:
         forces = None
 
