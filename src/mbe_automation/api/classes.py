@@ -724,7 +724,19 @@ def _to_mace_dataset(
         level_of_theory: str | dict[Literal["target", "baseline"], str],
         atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
 ) -> None:
+    """
+    Export dataset to training files readable by MACE.
 
+    Args:
+        save_path: Path to save the XYZ training file.
+        level_of_theory: The level of theory to use for energies and forces.
+            Can be a string for direct learning, or a dict with "target" and
+            "baseline" keys for delta learning.
+        atomic_energies: A dictionary of ground-state energies for isolated
+            atoms, used to generate a baseline superposition of atomic shifts
+            in MACE.
+    """
+    
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
     structures = []
