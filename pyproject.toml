@@ -42,6 +42,7 @@ gpu-cuda11 = [
   "cuequivariance-ops-torch-cu11",
   "gpu4pyscf-cuda11x",
   "cutensor-cu11",
+  "ray",
 ]
 # For CUDA 12.X environments
 gpu-cuda12 = [
@@ -50,4 +51,5 @@ gpu-cuda12 = [
   "cuequivariance-ops-torch-cu12",
   "gpu4pyscf-cuda12x",
   "cutensor-cu12",
+  "ray",
 ]
