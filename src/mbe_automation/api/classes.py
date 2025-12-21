@@ -734,32 +734,32 @@ def _to_mace_dataset(
     )
     
 def _statistics(
-        systems: List[Structure | FiniteSubsystem],
-        level_of_theory: str
+    systems: List[Structure | FiniteSubsystem],
+    level_of_theory: str
 ) -> None:
-        """
-        Print mean and standard deviation of energy per atom.
-        """
+    """
+    Print mean and standard deviation of energy per atom.
+    """
 
-        mbe_automation.common.display.framed([
-            "Dataset statistics"
-        ])
-        
-        energies = []
-        for i, x in enumerate(systems):
-            struct = x.cluster_of_molecules if isinstance(x, FiniteSubsystem) else x
+    mbe_automation.common.display.framed([
+        "Dataset statistics"
+    ])
 
-            if struct.ground_truth is None:
-                raise ValueError(f"Ground truth data missing in structure {i}.")
-            
-            E_i = struct.ground_truth.energies.get(level_of_theory)
+    energies = []
+    for i, x in enumerate(systems):
+        struct = x.cluster_of_molecules if isinstance(x, FiniteSubsystem) else x
 
-            if E_i is None:
-                raise ValueError(f"Missing energies in structure {i}.")
+        if struct.ground_truth is None:
+            raise ValueError(f"Ground truth data missing in structure {i}.")
 
-            energies.append(E_i)
+        E_i = struct.ground_truth.energies.get(level_of_theory)
 
-        data = np.concatenate(energies)
-        
-        print(f"Mean energy: {np.mean(data):.5f} eV/atom")
-        print(f"Std energy:  {np.std(data):.5f} eV/atom")
+        if E_i is None:
+            raise ValueError(f"Missing energies in structure {i}.")
+
+        energies.append(E_i)
+
+    data = np.concatenate(energies)
+
+    print(f"Mean energy: {np.mean(data):.5f} eV/atom")
+    print(f"Std energy:  {np.std(data):.5f} eV/atom")
