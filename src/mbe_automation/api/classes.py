@@ -734,7 +734,7 @@ def _to_mace_dataset(
     )
     
 def _statistics(
-        systems: List[Structure | FiniteSubsystem]
+        systems: List[Structure | FiniteSubsystem],
         level_of_theory: str
 ) -> None:
         """
