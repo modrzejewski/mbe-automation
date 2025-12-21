@@ -770,7 +770,7 @@ def _unique_elements(
         structures: List[Structure | FiniteSubsystem]
 ) -> npt.NDArray[np.int64]:
     """
-    Return a sorted list of Z numbers for a Structure.
+    Return a sorted NumPy array of unique Z numbers for a list of structures.
     """
     unique_elements = [structure.unique_elements for structure in structures]
     return np.unique(np.concatenate(unique_elements))
