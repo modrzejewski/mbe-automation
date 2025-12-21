@@ -56,7 +56,7 @@ def atomic_energies(
 
     n_elements = len(z_numbers)
     E_atomic = {}
-    for i, z in enumerate(z_numbers):
+    for z in z_numbers:
         isolated_atom = ase.Atoms(
             numbers=[z],
             pbc=False
