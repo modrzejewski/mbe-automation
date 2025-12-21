@@ -85,6 +85,7 @@ def HF(
         xc="hf",
         disp=None,
         basis=basis,
+        level_of_theory=f"hf_{basis}",
         kpts=kpts,
         verbose=verbose,
         density_fit=density_fit,
@@ -118,6 +119,7 @@ def DFT(
         xc=xc,
         disp=disp,
         basis=basis,
+        level_of_theory=f"{xc}_{basis}",
         kpts=kpts,
         verbose=verbose,
         density_fit=density_fit,
@@ -134,6 +136,7 @@ class PySCFCalculator(Calculator):
             xc: str,
             disp: str | None,
             basis: str,
+            level_of_theory: str,
             atoms=None,
             kpts=None,
             verbose=0,
@@ -159,6 +162,7 @@ class PySCFCalculator(Calculator):
         self.xc = xc
         self.disp = disp
         self.basis = basis
+        self.level_of_theory = level_of_theory
         self.kpts = kpts
         self.verbose = verbose
         self.density_fit = density_fit

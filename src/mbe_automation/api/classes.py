@@ -23,6 +23,7 @@ import mbe_automation.dynamics.harmonic.modes
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
 import mbe_automation.calculators
+from mbe_automation.calculators import CALCULATORS
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES, LEVELS_OF_THEORY
 from mbe_automation.ml.core import REFERENCE_ENERGY_TYPES
@@ -668,13 +669,20 @@ def _subsample_trajectory(
 
 def _run_model(
         structure: _Structure,
-        calculator: ASECalculator | MACECalculator,
+        calculator: CALCULATORS,
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
         level_of_theory: str = "default",
         exec_params: ParallelCPU | None = None,
 ) -> None:
+
+    if not isinstance(calculator, CALCULATORS):
+        valid_names = [x.__name__ for x in typing.get_args(CALCULATORS)]
+        raise TypeError(
+            f"Invalid calculator. Expected one of {valid_names}, "
+            f"got {type(calculator).__name__}."
+        )
     
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
     
