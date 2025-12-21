@@ -53,7 +53,7 @@ def _get_energies(
 ) -> npt.NDArray[np.float64] | None:
 
     if structure.ground_truth is not None:
-        energies = structure.ground_truth.get(level_of_theory)
+        energies = structure.ground_truth.energies.get(level_of_theory)
     else:
         energies = None
 
