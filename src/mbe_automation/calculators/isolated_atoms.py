@@ -54,7 +54,6 @@ def atomic_energies(
         z_numbers: npt.NDArray[np.integer],
 ) -> dict[np.int64, np.float64]:
 
-    n_elements = len(z_numbers)
     E_atomic = {}
     for z in z_numbers:
         isolated_atom = ase.Atoms(

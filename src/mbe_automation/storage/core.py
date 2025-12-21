@@ -16,6 +16,13 @@ DATA_FOR_TRAINING = [
     "forces",
     "delta",
 ]
+#
+# Character used as a replacement for ordinary slash "/",
+# which is a reserved character for HDF5 tree structure.
+# By using the unicode character, we avoid an unintentional
+# creation of HDF5 subgroups.
+#
+UNICODE_DIVISION_SLASH = "∕"
 
 @dataclass
 class BrillouinZonePath:
@@ -65,7 +72,7 @@ class Structure:
     forces: npt.NDArray[np.floating] | None = None
     ground_truth: GroundTruth | None = None
     feature_vectors: npt.NDArray[np.floating] | None = None
-    feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "none"
+    feature_vectors_type: str = "none"
     
     def __post_init__(self):
         self.periodic = (self.cell_vectors is not None)
@@ -507,7 +514,7 @@ def _save_structure(
         E_pot: npt.NDArray[np.floating] | None=None,
         forces: npt.NDArray[np.floating] | None=None,
         feature_vectors: npt.NDArray[np.floating] | None=None,
-        feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
+        feature_vectors_type: str="none",
         ground_truth: GroundTruth | None=None,
 ):
     if positions.ndim == 2:
@@ -1173,13 +1180,15 @@ def _save_ground_truth(
     levels_of_theory = set()
 
     for name, energy in ground_truth.energies.items():
-        ds_name = f"E_{name} (eV∕atom)"
-        if ds_name in group: del group[ds_name]
-        group.create_dataset(ds_name, data=energy)
+        sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
+        sanitized_quantity_name = f"E_{sanitized_method_name} (eV∕atom)"
+        if sanitized_quantity_name in group: del group[sanitized_quantity_name]
+        group.create_dataset(sanitized_quantity_name, data=energy)
         levels_of_theory.add(name)
 
     for name, forces in ground_truth.forces.items():
-        ds_name = f"forces_{name} (eV∕Å)"
+        sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
+        ds_name = f"forces_{sanitized_method_name} (eV∕Å)"
         if ds_name in group: del group[ds_name]
         group.create_dataset(ds_name, data=forces)
         levels_of_theory.add(name)
@@ -1199,10 +1208,11 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
         forces = {}
 
         for name in levels_of_theory:
-            if f"E_{name} (eV∕atom)" in group:
-                energies[name] = group[f"E_{name} (eV∕atom)"][...]
-            if f"forces_{name} (eV∕Å)" in group:
-                forces[name] = group[f"forces_{name} (eV∕Å)"][...]
+            sanitized_name = name.replace("/", UNICODE_DIVISION_SLASH)
+            if f"E_{sanitized_name} (eV∕atom)" in group:
+                energies[name] = group[f"E_{sanitized_name} (eV∕atom)"][...]
+            if f"forces_{sanitized_name} (eV∕Å)" in group:
+                forces[name] = group[f"forces_{sanitized_name} (eV∕Å)"][...]
 
         ground_truth = GroundTruth(
             energies=energies,
