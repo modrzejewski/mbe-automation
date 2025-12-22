@@ -10,7 +10,7 @@ class DatasetKey:
     key: str
     is_periodic: bool
     has_feature_vectors: bool | None
-    has_delta_learning_data: bool | None
+    has_ground_truth: bool | None
     contains_exactly_n_molecules: int | None
     dataclass: Literal[
         "Structure",
@@ -61,25 +61,25 @@ class DatasetKeys:
             
             if dataclass_attr == "Structure" or dataclass_attr == "Trajectory":
                 has_feature_vectors = "feature_vectors" in obj
-                has_delta_learning_data = "delta" in obj
+                has_ground_truth = "ground_truth" in obj
                 is_periodic = bool(obj.attrs.get("periodic", False))
                 contains_exactly_n_molecules = None
 
             elif dataclass_attr == "MolecularCrystal":
                 has_feature_vectors = "feature_vectors" in obj["supercell"]
-                has_delta_learning_data = "delta" in obj["supercell"]
+                has_ground_truth = "ground_truth" in obj["supercell"]
                 is_periodic = True
                 contains_exactly_n_molecules = obj.attrs.get("n_molecules")
 
             elif dataclass_attr == "FiniteSubsystem":
                 has_feature_vectors = "feature_vectors" in obj["cluster_of_molecules"]
-                has_delta_learning_data = "delta" in obj["cluster_of_molecules"]
+                has_ground_truth = "ground_truth" in obj["cluster_of_molecules"]
                 is_periodic = False
                 contains_exactly_n_molecules = obj.attrs.get("n_molecules")
 
             elif dataclass_attr in ["ForceConstants", "BrillouinZonePath", "EOSCurves"]:
                 has_feature_vectors = None
-                has_delta_learning_data = None
+                has_ground_truth = None
                 is_periodic = True
                 contains_exactly_n_molecules = None
 
@@ -87,7 +87,7 @@ class DatasetKeys:
                 key=name,
                 is_periodic=is_periodic,
                 has_feature_vectors=has_feature_vectors,
-                has_delta_learning_data=has_delta_learning_data,
+                has_ground_truth=has_ground_truth,
                 contains_exactly_n_molecules=contains_exactly_n_molecules,
                 dataclass=dataclass_attr
             ))
@@ -154,8 +154,8 @@ class DatasetKeys:
     def with_feature_vectors(self) -> DatasetKeys:
         return self._filter(lambda x: x.has_feature_vectors)
 
-    def with_delta_learning_data(self) -> DatasetKeys:
-        return self._filter(lambda x: x.has_delta_learning_data)
+    def with_ground_truth(self) -> DatasetKeys:
+        return self._filter(lambda x: x.has_ground_truth)
 
     def starts_with(self, root_key: str) -> DatasetKeys:
         """Select keys under a specific root group."""

@@ -60,7 +60,7 @@ print(keys)
 | `DatasetKeys.periodic()` | Selects systems with periodic boundary conditions. |
 | `DatasetKeys.finite()` | Selects non-periodic systems (e.g., isolated molecules or clusters). |
 | `DatasetKeys.with_feature_vectors()` | Selects entries that contain computed MLIP feature vectors. |
-| `DatasetKeys.with_delta_learning_data()` | Selects entries that contain reference data for delta learning. |
+| `DatasetKeys.with_ground_truth()` | Selects entries that contain ground truth reference data. |
 
 **Path-Based Filters**
 
