@@ -59,8 +59,7 @@ Run a molecular dynamics simulation to generate structures of a molecular crysta
 **Input:** `step_1.py`
 
 ```python
-from mace.calculators import MACECalculator
-import os.path
+from mbe_automation.calculators import MACE
 import numpy as np
 
 import mbe_automation
@@ -68,14 +67,12 @@ from mbe_automation.configs.md import Enthalpy, ClassicalMD
 
 crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
 
-calculator = MACECalculator(
-   model_paths=os.path.expanduser("~/models/mace/mace-mh-1.model"),
+calculator = MACE(
+   model_path="~/models/mace/mace-mh-1.model",
    head="omol",
-   device="cuda",
 )
 
-work_dir = "urea"
-dataset = f"{work_dir}/md_structures.hdf5"
+dataset = "md_structures.hdf5"
 
 pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
@@ -94,7 +91,6 @@ config = Enthalpy(
     md_crystal=md_config,
     temperatures_K=temperatures_K,
     pressures_GPa=pressures_GPa,
-    work_dir=work_dir,
     dataset=dataset,
     root_key="training/md"
 )
@@ -108,24 +104,21 @@ Calculate feature vectors for every frame in the generated trajectories to enabl
 **Input:** `step_2.py`
 
 ```python
-from mace.calculators import MACECalculator
-import os.path
+from mbe_automation.calculators import MACE
 import numpy as np
 import itertools
 
 import mbe_automation
 from mbe_automation import Structure, Dataset
 
-work_dir = "urea"
-dataset = f"{work_dir}/md_structures.hdf5"
+dataset = "md_structures.hdf5"
 
 pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
 
-mace_calc = MACECalculator(
-    model_paths=os.path.expanduser("~/models/mace/mace-mh-1.model"),
+mace_calc = MACE(
+    model_path="~/models/mace/mace-mh-1.model",
     head="omol",
-    device="cuda"
 )
 
 for T, p in itertools.product(temperatures_K, pressures_GPa):
@@ -164,8 +157,7 @@ import mbe_automation
 from mbe_automation import Structure
 from mbe_automation.calculators.dftb import DFTB3_D4
 
-work_dir = "urea"
-dataset = f"{work_dir}/md_structures.hdf5"
+dataset = "md_structures.hdf5"
 crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
 calculator = DFTB3_D4(crystal.get_chemical_symbols())
 
@@ -209,8 +201,7 @@ import itertools
 import mbe_automation
 from mbe_automation import Structure
 
-work_dir = "urea"
-dataset = f"{work_dir}/md_structures.hdf5"
+dataset = "md_structures.hdf5"
 
 pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
@@ -233,15 +224,15 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
     test_set.append(test)
 
 train_set.to_mace_dataset(
-    save_path="urea/train_pbc.xyz",
+    save_path="train_pbc.xyz",
     learning_strategy="direct"
 )
 val_set.to_mace_dataset(
-    save_path="urea/validate_pbc.xyz",
+    save_path="validate_pbc.xyz",
     learning_strategy="direct"
 )
 test_set.to_mace_dataset(
-    save_path="urea/test_pbc.xyz",
+    save_path="test_pbc.xyz",
     learning_strategy="direct"
 )
 
@@ -261,8 +252,7 @@ import itertools
 import mbe_automation
 from mbe_automation import Structure
 
-work_dir = "urea"
-dataset = f"{work_dir}/md_structures.hdf5"
+dataset = "md_structures.hdf5"
 
 pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
@@ -299,12 +289,10 @@ Compute feature vectors for the finite clusters to enable diverse subsampling.
 **Input:** `step_6.py`
 
 ```python
-from mace.calculators import MACECalculator
-import os.path
 import numpy as np
 import itertools
 
-import mbe_automation
+from mbe_automation.calculators import MACE
 from mbe_automation import Structure, FiniteSubsystem, Dataset
 
 work_dir = "urea"
@@ -314,10 +302,9 @@ pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
 cluster_sizes = [1, 2, 3, 4, 5, 6, 7, 8]
 
-mace_calc = MACECalculator(
-    model_paths=os.path.expanduser("~/models/mace/mace-mh-1.model"),
-    head="omol",
-    device="cuda"
+mace_calc = MACE(
+    model_path="~/models/mace/mace-mh-1.model",
+    head="omol"
 )
 
 for T, p in itertools.product(temperatures_K, pressures_GPa):
@@ -359,8 +346,7 @@ import mbe_automation
 from mbe_automation import Structure, FiniteSubsystem
 from mbe_automation.calculators.dftb import DFTB3_D4
 
-work_dir = "urea"
-dataset = f"{work_dir}/md_structures.hdf5"
+dataset = "md_structures.hdf5"
 crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
 calculator = DFTB3_D4(crystal.get_chemical_symbols())
 
@@ -404,8 +390,7 @@ import itertools
 import mbe_automation
 from mbe_automation import Structure, FiniteSubsystem
 
-work_dir = "urea"
-dataset = f"{work_dir}/md_structures.hdf5"
+dataset = "md_structures.hdf5"
 
 pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
@@ -431,15 +416,15 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
         test_set.append(test)
 
 train_set.to_mace_dataset(
-    save_path="./urea/train_finite_clusters.xyz",
+    save_path="train_finite_clusters.xyz",
     learning_strategy="direct"
 )
 val_set.to_mace_dataset(
-    save_path="./urea/validate_finite_clusters.xyz",
+    save_path="validate_finite_clusters.xyz",
     learning_strategy="direct"
 )
 test_set.to_mace_dataset(
-    save_path="./urea/test_finite_clusters.xyz",
+    save_path="test_finite_clusters.xyz",
     learning_strategy="direct"
 )
 
@@ -469,9 +454,9 @@ source ~/.virtualenvs/compute-env/bin/activate
 
 python -m mace.cli.run_train \
     --name="urea_dftb3_d4" \
-    --train_file="urea/train_pbc.xyz urea/train_finite_clusters.xyz" \
-    --valid_file="urea/validate_pbc.xyz urea/validate_finite_clusters.xyz" \
-    --test_file="urea/test_pbc.xyz urea/test_finite_clusters.xyz" \
+    --train_file="train_pbc.xyz train_finite_clusters.xyz" \
+    --valid_file="validate_pbc.xyz validate_finite_clusters.xyz" \
+    --test_file="test_pbc.xyz test_finite_clusters.xyz" \
     --E0s="average" \
     --model="MACE" \
     --num_interactions=2 \
