@@ -253,7 +253,6 @@ import mbe_automation
 from mbe_automation import Structure
 
 dataset = "md_structures.hdf5"
-dataset = "md_structures.hdf5"
 
 pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
