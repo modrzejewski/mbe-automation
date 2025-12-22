@@ -305,7 +305,7 @@ from mbe_automation.calculators.dftb import DFTB3_D4
 
 dataset = "md_structures.hdf5"
 crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
-calculator = DFTB3_D4(crystal.get_chemical_symbols())
+calculator = DFTB3_D4()
 
 for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().starts_with("all_md_frames"):
     print(f"Processing {key}")
