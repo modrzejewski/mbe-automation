@@ -16,7 +16,7 @@ The initial setup requires importing the necessary modules and defining the syst
 ```python
 import numpy as np
 import os.path
-import mace.calculators
+from mbe_automation.calculators import MACE
 import torch
 
 import mbe_automation.configs
@@ -27,8 +27,8 @@ xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
 work_dir = os.path.abspath(os.path.dirname(__file__))
 
-mace_calc = mace.calculators.MACECalculator(
-    model_paths=os.path.expanduser("path/to/your/model.model"),
+mace_calc = MACE(
+    model_path="path/to/your/model.model",
     default_dtype="float64",
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )
@@ -215,7 +215,7 @@ properties.hdf5
 ```python
 import numpy as np
 import os.path
-import mace.calculators
+from mbe_automation.calculators import MACE
 import torch
 
 import mbe_automation.configs
@@ -226,8 +226,8 @@ xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
 work_dir = os.path.abspath(os.path.dirname(__file__))
 
-mace_calc = mace.calculators.MACECalculator(
-    model_paths=os.path.expanduser("path/to/your/model.model"),
+mace_calc = MACE(
+    model_path="path/to/your/model.model",
     default_dtype="float64",
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )

@@ -27,7 +27,7 @@ The initial setup involves importing the necessary modules and defining the para
 ```python
 import numpy as np
 import os.path
-import mace.calculators
+from mbe_automation.calculators import MACE
 import torch
 
 import mbe_automation
@@ -44,8 +44,8 @@ temperature_K = 298.15
 work_dir = os.path.abspath(os.path.dirname(__file__))
 dataset = os.path.join(work_dir, "training_set.hdf5")
 
-mace_calc = mace.calculators.MACECalculator(
-    model_paths=os.path.expanduser(mlip_parameter_file),
+mace_calc = MACE(
+    model_path=mlip_parameter_file,
     default_dtype="float64",
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )
@@ -387,7 +387,7 @@ For a detailed discussion of performance considerations, see the [Computational 
 ```python
 import numpy as np
 import os.path
-import mace.calculators
+from mbe_automation.calculators import MACE
 import torch
 
 import mbe_automation
@@ -404,8 +404,8 @@ temperature_K = 298.15
 work_dir = os.path.abspath(os.path.dirname(__file__))
 dataset = os.path.join(work_dir, "training_set.hdf5")
 
-mace_calc = mace.calculators.MACECalculator(
-    model_paths=os.path.expanduser(mlip_parameter_file),
+mace_calc = MACE(
+    model_path=mlip_parameter_file,
     default_dtype="float64",
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )

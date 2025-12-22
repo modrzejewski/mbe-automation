@@ -59,7 +59,7 @@ Run a molecular dynamics simulation to generate structures of a molecular crysta
 **Input:** `step_1.py`
 
 ```python
-from mace.calculators import MACECalculator
+from mbe_automation.calculators import MACE
 import os.path
 import numpy as np
 
@@ -68,8 +68,8 @@ from mbe_automation.configs.md import Enthalpy, ClassicalMD
 
 crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
 
-calculator = MACECalculator(
-   model_paths=os.path.expanduser("~/models/mace/mace-mh-1.model"),
+calculator = MACE(
+   model_path="~/models/mace/mace-mh-1.model",
    head="omol",
    device="cuda",
 )
@@ -108,7 +108,7 @@ Calculate feature vectors for every frame in the generated trajectories to enabl
 **Input:** `step_2.py`
 
 ```python
-from mace.calculators import MACECalculator
+from mbe_automation.calculators import MACE
 import os.path
 import numpy as np
 import itertools
@@ -122,8 +122,8 @@ dataset = f"{work_dir}/md_structures.hdf5"
 pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
 
-mace_calc = MACECalculator(
-    model_paths=os.path.expanduser("~/models/mace/mace-mh-1.model"),
+mace_calc = MACE(
+    model_path="~/models/mace/mace-mh-1.model",
     head="omol",
     device="cuda"
 )

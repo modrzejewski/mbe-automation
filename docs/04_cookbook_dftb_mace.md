@@ -11,7 +11,7 @@ This cookbook demonstrates how to run a Molecular Dynamics (MD) simulation using
 ## Complete Example
 
 ```python
-from mace.calculators import MACECalculator
+from mbe_automation.calculators import MACE
 
 import mbe_automation
 from mbe_automation.storage import Trajectory
@@ -72,8 +72,8 @@ trajectory = Trajectory.read(
 
 # Initialize the MACE calculator for feature extraction.
 # Using a placeholder model path here.
-mace_calc = MACECalculator(
-    model_paths="/path/to/mace.model",
+mace_calc = MACE(
+    model_path="/path/to/mace.model",
     device="cpu"
 )
 

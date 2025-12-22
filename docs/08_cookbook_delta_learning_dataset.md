@@ -18,7 +18,7 @@ First, we set up the necessary imports and configuration variables. We specify t
 import os
 import itertools
 import numpy as np
-from mace.calculators import MACECalculator
+from mbe_automation.calculators import MACE
 
 import mbe_automation
 from mbe_automation import Structure, Dataset, FiniteSubsystem
@@ -43,8 +43,8 @@ ref = Structure.read(dataset=dataset_path, key="training/dftb3_d4/structures/mol
 
 # Initialize Calculators
 # Baseline: MACE model
-baseline_calc = MACECalculator(
-    model_paths=os.path.expanduser("~/models/mace/mace-mh-1.model"),
+baseline_calc = MACE(
+    model_path="~/models/mace/mace-mh-1.model",
     head="omol"
 )
 

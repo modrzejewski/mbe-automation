@@ -8,7 +8,7 @@ To perform this analysis, you first need to generate a properties dataset using 
 
 ```python
 import numpy as np
-import mace.calculators
+from mbe_automation.calculators import MACE
 import torch
 
 import mbe_automation
@@ -16,8 +16,8 @@ from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "solid.xyz"
 
-mace_calc = mace.calculators.MACECalculator(
-    model_paths="model.model",
+mace_calc = MACE(
+    model_path="model.model",
     default_dtype="float64",
     device=("cuda" if torch.cuda.is_available() else "cpu")
 )
