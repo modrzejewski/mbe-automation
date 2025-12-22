@@ -103,17 +103,21 @@ class DFTBCalculator(ASE_DFTBCalculator):
             self,
             level_of_theory: str,
             backend,
+            work_dir: Path = Path("."),
     ):
         super().__init__()
         self.level_of_theory = level_of_theory
         self._initialize_backend = backend
+        self.model_independent_params = {
+            "directory": str(work_dir.resolve())
+        }
 
     def calculate(self, atoms=None, properties=['energy', 'forces'], system_changes=all_changes):
         current_atoms = atoms if atoms is not None else self.atoms
         if current_atoms is None:
              raise ValueError("Atoms object must be provided to DFTBCalculator.calculate.")
 
-        super().__init__(**self._initialize_backend(current_atoms))
+        super().__init__(**self._initialize_backend(current_atoms), **self.model_independent_params)
         n_unpaired_electrons = current_atoms.info.get("n_unpaired_electrons", 0)
         if n_unpaired_electrons > 0:
             self.nspin = 2
@@ -121,7 +125,7 @@ class DFTBCalculator(ASE_DFTBCalculator):
             self.nspin = 1
         super().calculate(current_atoms, properties, system_changes)
         
-    def for_relaxation(
+    def ase_calc_for_relaxation(
             self,
             system: ase.Atoms,
             optimize_lattice_vectors=True,
@@ -149,16 +153,16 @@ class DFTBCalculator(ASE_DFTBCalculator):
         if optimize_lattice_vectors:
             driver_config["Driver_Pressure [Pa]"] = pressure_Pa
 
-        params = self._initialize_backend(system)
-        params.update(driver_config)
+        params = {
+            **self._initialize_backend(system),
+            **self.model_independent_params,
+            **driver_config,
+        }
+        params["directory"] = work_dir.resolve()
 
-        return ASE_DFTBCalculator(
-            **params, 
-            directory=work_dir
-        )
+        return ASE_DFTBCalculator(**params)
 
 def _params_charge(systems: ase.Atoms):
-
     params = {}
     charge = system.info.get("charge", 0)
     if charge > 0:
@@ -170,11 +174,11 @@ def _params_spin(system: ase.Atoms):
     params = {}
     n_unpaired = system.info.get("n_unpaired_electrons", 0)
     if n_unpaired > 0:
-        params["Hamiltonian_SpinPolarization_"] = "Colinear"
+        params["Hamiltonian_SpinPolarization_"] = "Colinear"  
         params["Hamiltonian_SpinPolarization_UnpairedElectrons"] = n_unpaired_electrons
 
     return params
-
+    
 def _params_GFN_xTB(method: str, system: ase.Atoms):
     kpts = [1, 1, 1]
     scc_tolerance = SCC_TOLERANCE
@@ -330,7 +334,7 @@ def relax(
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     
-    calc = calculator.for_relaxation(
+    calc = calculator.ase_calc_for_relaxation(
         system=system,
         optimize_lattice_vectors=optimize_lattice_vectors,
         pressure_GPa=pressure_GPa,
