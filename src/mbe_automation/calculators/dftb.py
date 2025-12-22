@@ -120,9 +120,7 @@ class DFTBCalculator(ASE_DFTBCalculator):
         super().__init__(**self._initialize_backend(current_atoms), **self.model_independent_params)
         n_unpaired_electrons = current_atoms.info.get("n_unpaired_electrons", 0)
         if n_unpaired_electrons > 0:
-            self.nspin = 2
-        else:
-            self.nspin = 1
+            raise ValueError("Spin unpolarized systems are not supported by DFTBCalculator.")
         super().calculate(current_atoms, properties, system_changes)
         
     def ase_calc_for_relaxation(
@@ -170,15 +168,6 @@ def _params_charge(system: ase.Atoms):
 
     return params
 
-def _params_spin(system: ase.Atoms):
-    params = {}
-    n_unpaired = system.info.get("n_unpaired_electrons", 0)
-    if n_unpaired > 0:
-        params["Hamiltonian_SpinPolarization_"] = "Colinear"  
-        params["Hamiltonian_SpinPolarization_UnpairedElectrons"] = n_unpaired
-
-    return params
-    
 def _params_GFN_xTB(method: str, system: ase.Atoms):
     kpts = [1, 1, 1]
     scc_tolerance = SCC_TOLERANCE
@@ -187,7 +176,6 @@ def _params_GFN_xTB(method: str, system: ase.Atoms):
         "Hamiltonian_Method": method,
         "Hamiltonian_SCCTolerance": scc_tolerance,
         "Hamiltonian_MaxSCCIterations": 250,
-        **_params_spin(system),
         **_params_charge(system),
         "ParserOptions_": "",
         "ParserOptions_ParserVersion": 10,
@@ -244,7 +232,6 @@ def _params_DFTB_Plus_MBD(system: ase.Atoms):
         "Hamiltonian_Dispersion_": 'MBD',
         "Hamiltonian_Dispersion_Beta": 0.83,
         "Hamiltonian_Dispersion_KGrid": "1 1 1",
-        **_params_spin(system),
         **_params_charge(system),
         "ParserOptions_": "",
         "ParserOptions_ParserVersion": 10,
@@ -310,7 +297,6 @@ def _params_DFTB3_D4(system: ase.Atoms):
         "Hamiltonian_Dispersion_s9": 1.0,       # enables 3-body disp
         "Hamiltonian_Dispersion_a1": 0.5523240,
         "Hamiltonian_Dispersion_a2": 4.3537076,
-        **_params_spin(system),
         **_params_charge(system),
         "Parallel_": "",
         "Parallel_UseOmpThreads": "Yes",
