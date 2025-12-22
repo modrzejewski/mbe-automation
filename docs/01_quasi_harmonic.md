@@ -300,10 +300,10 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 mbe_automation.run(properties_config)
 ```
 
-### SLURM Script (`mace-gpu.py`)
+### Bash Script (`run.sh`)
 
-```python
-#!/usr/bin/env python3
+```bash
+#!/bin/bash
 #SBATCH --job-name="MACE"
 #SBATCH -A pl0415-02
 #SBATCH --partition=tesla
@@ -314,25 +314,11 @@ mbe_automation.run(properties_config)
 #SBATCH --time=24:00:00
 #SBATCH --mem=180gb
 
-import os
-import os.path
-import sys
-import subprocess
+export OMP_NUM_THREADS=8
+export MKL_NUM_THREADS=8
 
-InpScript = "quasi_harmonic.py"
-LogFile = "quasi_harmonic.log"
+module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
+source ~/.virtualenvs/compute-env/bin/activate
 
-os.environ["OMP_NUM_THREADS"] = "8"
-os.environ["MKL_NUM_THREADS"] = "8"
-
-virtual_environment = os.path.expanduser("~/.virtualenvs/compute-env")
-virtual_environment = os.path.realpath(virtual_environment)
-activate_env = os.path.realpath(os.path.join(virtual_environment, "bin", "activate"))
-cmd = f"module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10 && . {activate_env} && python {InpScript}"
-
-with open(LogFile, "w") as log_file:
-    process = subprocess.Popen(cmd, shell=True, stdout=log_file,
-                               stderr=subprocess.STDOUT, bufsize=1,
-                               universal_newlines=True)
-    process.communicate()
+python quasi_harmonic.py > quasi_harmonic.log 2>&1
 ```

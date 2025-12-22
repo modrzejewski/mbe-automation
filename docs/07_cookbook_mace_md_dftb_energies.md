@@ -435,7 +435,7 @@ print("All calculations completed")
 
 Train the MACE model using all generated data files (both PBC and finite clusters).
 
-**Job Submission Script:** `train_mace.sh`
+**Bash Script:** `train_mace.sh`
 
 ```bash
 #!/bin/bash
@@ -487,9 +487,11 @@ python -m mace.cli.run_train \
 
 ## Computational Resources
 
-### GPU Job Submission (Steps 1, 2, 5, 6)
+### GPU Tasks (Steps 1, 2, 5, 6)
 
-Use this SLURM script to run the GPU-intensive steps.
+Use this script to run the GPU-intensive steps.
+
+**Bash Script:** `run_gpu_tasks.sh`
 
 ```bash
 #!/bin/bash
@@ -518,9 +520,11 @@ python step_5.py > step_5.log 2>&1
 python step_6.py > step_6.log 2>&1
 ```
 
-### CPU Job Submission (Steps 3, 4, 7, 8)
+### CPU Tasks (Steps 3, 4, 7, 8)
 
-Use this SLURM script to run the CPU-intensive labeling and export steps.
+Use this script to run the CPU-intensive labeling and export steps.
+
+**Bash Script:** `run_cpu_tasks.sh`
 
 ```bash
 #!/bin/bash
