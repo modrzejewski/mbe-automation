@@ -190,7 +190,7 @@ train_set = Dataset()
 val_set = Dataset()
 test_set = Dataset()
  
-for key in DatasetKeys(dataset).structures().periodic().with_ground_truth():
+for key in DatasetKeys(dataset).structures().periodic().with_ground_truth().starts_with("subsampled_md_frames"):
     print(f"Processing {key}")
 
     subsampled_frames = Structure.read(
@@ -203,9 +203,9 @@ for key in DatasetKeys(dataset).structures().periodic().with_ground_truth():
     val_set.append(validate)
     test_set.append(test)
 
-train_set.to_mace_dataset("train_pbc.xyz")
-val_set.to_mace_dataset("validate_pbc.xyz")
-test_set.to_mace_dataset("test_pbc.xyz")
+train_set.to_mace_dataset("train_pbc.xyz", level_of_theory="dftb3-d4")
+val_set.to_mace_dataset("validate_pbc.xyz", level_of_theory="dftb3-d4")
+test_set.to_mace_dataset("test_pbc.xyz", level_of_theory="dftb3-d4")
 
 print("All calculations completed")
 ```
@@ -307,7 +307,7 @@ dataset = "md_structures.hdf5"
 crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
 calculator = DFTB3_D4(crystal.get_chemical_symbols())
 
-for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().starts_with("all_md_frames")
+for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().starts_with("all_md_frames"):
     print(f"Processing {key}")
 
     cluster = FiniteSubsystem.read(
@@ -348,7 +348,7 @@ train_set = Dataset()
 val_set = Dataset()
 test_set = Dataset()
 
-keys = DatasetKeys(dataset).finite_subsystems().with_ground_truth().starts_with("training/dftb3_d4")
+keys = DatasetKeys(dataset).finite_subsystems().with_ground_truth().starts_with("subsampled_md_frames")
 
 for key in keys:
     print(f"Processing {key}")
@@ -364,9 +364,9 @@ for key in keys:
     val_set.append(validate)
     test_set.append(test)
 
-train_set.to_mace_dataset("train_finite_clusters.xyz")
-val_set.to_mace_dataset("validate_finite_clusters.xyz")
-test_set.to_mace_dataset("test_finite_clusters.xyz")
+train_set.to_mace_dataset("train_finite_clusters.xyz", level_of_theory="dftb3-d4")
+val_set.to_mace_dataset("validate_finite_clusters.xyz", level_of_theory="dftb3-d4")
+test_set.to_mace_dataset("test_finite_clusters.xyz", level_of_theory="dftb3-d4")
 
 print("All calculations completed")
 ```

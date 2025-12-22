@@ -1,8 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 import ase
-from ase.calculators.dftb import Dftb
-from ase.calculators.calculator import all_changes
+from ase.calculators.dftb import Dftb as ASE_DFTBCalculator
 import os.path
 import numpy as np
 
@@ -78,54 +77,47 @@ HUBBARD_DERIVATIVES_3OB_3_1 = {
 #
 HCORRECTION_EXPONENT_3OB_3_1 = 4.00
 
-class DFTBCalculator(Dftb):
+def params_dir_3ob_3_1():
+    """Get the absolute path to the skfiles parameter directory."""
+
+    current_file_path = Path(__file__).resolve()
+    #
+    # Navigate up to the project root
+    #    .parent -> .../calculators
+    #    .parent -> .../src/mbe_automation
+    #    .parent -> .../src
+    #    .parent -> .../mbe-automation
+    #
+    project_root = current_file_path.parent.parent.parent.parent
+    skfiles_dir = project_root / "params" / "dftb" / "3ob-3-1" / "skfiles"
+
+    return skfiles_dir
+
+class DFTBCalculator(ASE_DFTBCalculator):
     """
-    Extended DFTB+ calculator with support for internal geometry relaxation.
+    DFTB+ calculator with a stateless initialization.
     """
 
     def __init__(
             self,
-            level_of_theory: str = "semiempirical",
-            manage_3ob_params: bool = False,
-            **kwargs
+            level_of_theory: str,
+            backend,
     ):
-        
+        super().__init__()
         self.level_of_theory = level_of_theory
-        self.manage_3ob_params = manage_3ob_params
-        super().__init__(**kwargs)
+        self._initialize_backend = backend
 
     def calculate(self, atoms=None, properties=['energy', 'forces'], system_changes=all_changes):
         current_atoms = atoms if atoms is not None else self.atoms
         if current_atoms is None:
-             raise ValueError("Atoms object must be provided to calculate.")
+             raise ValueError("Atoms object must be provided to DFTBCalculator.calculate.")
 
-        self._initialize_backend(current_atoms)
+        super().__init__(**self._initialize_backend(current_atoms))
         super().calculate(current_atoms, properties, system_changes)
 
-    def _initialize_backend(self, atoms):
-        if self.manage_3ob_params:
-            # First, clean up any existing element-specific parameters to avoid
-            # crashing DFTB+ with parameters for elements not present in the structure.
-            keys_to_remove = []
-            for key in self.parameters:
-                if key.startswith('Hamiltonian_MaxAngularMomentum_') or \
-                   key.startswith('Hamiltonian_HubbardDerivs_'):
-                    keys_to_remove.append(key)
-
-            for key in keys_to_remove:
-                del self.parameters[key]
-
-            # Then, populate parameters for the current elements
-            unique_elements = np.unique(atoms.get_chemical_symbols())
-            for element in unique_elements:
-                if element in MAX_ANGULAR_MOMENTA_3OB_3_1:
-                    self.parameters[f'Hamiltonian_MaxAngularMomentum_{element}'] = MAX_ANGULAR_MOMENTA_3OB_3_1[element]
-                    self.parameters[f'Hamiltonian_HubbardDerivs_{element}'] = HUBBARD_DERIVATIVES_3OB_3_1[element]
-                else:
-                    print(f"Warning: No predefined MaxAngularMomentum/HubbardDerivs params for element {element}. Please add it manually.")
-    
     def for_relaxation(
             self,
+            system: ase.Atoms,
             optimize_lattice_vectors=True,
             pressure_GPa=0.0,
             max_force_on_atom=1.0E-3,
@@ -151,91 +143,87 @@ class DFTBCalculator(Dftb):
         if optimize_lattice_vectors:
             driver_config["Driver_Pressure [Pa]"] = pressure_Pa
 
-        new_parameters = self.parameters.copy()
-        new_parameters.update(driver_config)
+        params = self._initialize_backend(system)
+        params.update(driver_config)
 
-        return DFTBCalculator(
-            level_of_theory=self.level_of_theory,
-            manage_3ob_params=self.manage_3ob_params,
-            atoms=self.atoms,
-            kpts=self.kpts,
-            directory=work_dir,
-            **new_parameters
+        return ASE_DFTBCalculator(
+            **params,
+            directory=work_dir
         )
 
-def params_dir_3ob_3_1():
-    """Get the absolute path to the skfiles parameter directory."""
-    
-    current_file_path = Path(__file__).resolve()
-    #
-    # Navigate up to the project root
-    #    .parent -> .../calculators
-    #    .parent -> .../src/mbe_automation
-    #    .parent -> .../src
-    #    .parent -> .../mbe-automation
-    #
-    project_root = current_file_path.parent.parent.parent.parent
-    skfiles_dir = project_root / "params" / "dftb" / "3ob-3-1" / "skfiles"
-    
-    return skfiles_dir
 
-
-def _GFN_xTB(method):
+def _params_GFN_xTB(method: str, system: ase.Atoms):
     kpts = [1, 1, 1]
     scc_tolerance = SCC_TOLERANCE
-    return DFTBCalculator(
-        level_of_theory=method.lower(),
-        Hamiltonian_="xTB",
-        Hamiltonian_Method=method,
-        Hamiltonian_SCCTolerance=scc_tolerance,
-        Hamiltonian_MaxSCCIterations=250,
-        ParserOptions_ = "",
-        ParserOptions_ParserVersion = 10,
-        Parallel_ = "",
-        Parallel_UseOmpThreads = "Yes",
-        kpts=kpts
-    )
+    return {
+        "Hamiltonian_": "xTB",
+        "Hamiltonian_Method": method,
+        "Hamiltonian_SCCTolerance": scc_tolerance,
+        "Hamiltonian_MaxSCCIterations": 250,
+        "ParserOptions_": "",
+        "ParserOptions_ParserVersion": 10,
+        "Parallel_": "",
+        "Parallel_UseOmpThreads": "Yes",
+        "kpts": kpts
+    }
 
+def _params_GFN1_xTB(system: ase.Atoms):
+    return _GFN_xTB("GFN1-xTB", system)
 
-def GFN1_xTB():
-    return _GFN_xTB("GFN1-xTB")
+def _params_GFN2_xTB(system: ase.Atoms):
+    return _GFN_xTB("GFN2-xTB", system)
 
-def GFN2_xTB():
-    return _GFN_xTB("GFN2-xTB")
+def _params_DFTB_Plus_MBD(system: ase.Atoms):
 
-def DFTB_Plus_MBD():
-
+    elements = system.get_chemical_symbols()
     kpts = [1, 1, 1]
     params_dir = params_dir_3ob_3_1()
     params_dir_str = f"{params_dir}{os.path.sep}"
     scc_tolerance = SCC_TOLERANCE
     
-    return DFTBCalculator(
-        level_of_theory="dftb3+mbd",
-        manage_3ob_params=True,
-        Hamiltonian_ThirdOrderFull='Yes',
-        Hamiltonian_MaxAngularMomentum_="",
-        Hamiltonian_HubbardDerivs_="",
-        Hamiltonian_SCC='Yes',
-        Hamiltonian_HCorrection_='Damping',
-        Hamiltonian_HCorrection_Exponent = HCORRECTION_EXPONENT_3OB_3_1,
-        Hamiltonian_SlaterKosterFiles_='Type2FileNames',
-        Hamiltonian_SlaterKosterFiles_Prefix=params_dir_str,
-        Hamiltonian_SlaterKosterFiles_Separator='-',
-        Hamiltonian_SlaterKosterFiles_Suffix='.skf',
-        Hamiltonian_SCCTolerance=scc_tolerance,    
-        Hamiltonian_Dispersion_='MBD',
-        Hamiltonian_Dispersion_Beta = 0.83,
-        Hamiltonian_Dispersion_KGrid = "1 1 1",
-        ParserOptions_ = "",
-        ParserOptions_ParserVersion = 10,
-        Parallel_ = "",
-        Parallel_UseOmpThreads = "Yes",
-        kpts=kpts
-    )
+    # Get unique elements in the structure
+    unique_elements = np.unique(elements)
+    #
+    # Select parameters from the full set
+    #
+    max_angular_momentum_params = {}
+    hubbard_params = {}
+    for element in unique_elements:
+        if element in MAX_ANGULAR_MOMENTA_3OB_3_1:
+            key = f'Hamiltonian_MaxAngularMomentum_{element}'
+            max_angular_momentum_params[key] = MAX_ANGULAR_MOMENTA_3OB_3_1[element]
+            key = f'Hamiltonian_HubbardDerivs_{element}'
+            hubbard_params[key] = HUBBARD_DERIVATIVES_3OB_3_1[element]
+        else:
+            raise ValueError(f"Missing MaxAngularMomentum/HubbardDerivs params "
+                             f"for element {element}.")
+
+    return {
+        "Hamiltonian_ThirdOrderFull": 'Yes',
+        "Hamiltonian_MaxAngularMomentum_": "",
+        **max_angular_momentum_params,
+        "Hamiltonian_HubbardDerivs_": "",
+        **hubbard_params,
+        "Hamiltonian_SCC": 'Yes',
+        "Hamiltonian_HCorrection_": 'Damping',
+        "Hamiltonian_HCorrection_Exponent": HCORRECTION_EXPONENT_3OB_3_1,
+        "Hamiltonian_SlaterKosterFiles_": 'Type2FileNames',
+        "Hamiltonian_SlaterKosterFiles_Prefix": params_dir_str,
+        "Hamiltonian_SlaterKosterFiles_Separator": '-',
+        "Hamiltonian_SlaterKosterFiles_Suffix": '.skf',
+        "Hamiltonian_SCCTolerance": scc_tolerance,
+        "Hamiltonian_Dispersion_": 'MBD',
+        "Hamiltonian_Dispersion_Beta": 0.83,
+        "Hamiltonian_Dispersion_KGrid": "1 1 1",
+        "ParserOptions_": "",
+        "ParserOptions_ParserVersion": 10,
+        "Parallel_": "",
+        "Parallel_UseOmpThreads": "Yes",
+        "kpts": kpts
+    }
 
 
-def DFTB3_D4():
+def _params_DFTB3_D4(system: ase.Atoms):
     #
     # DFTB3-D4/3ob Hamiltonian applied by Ludik et al. in First-principles
     # Models of Polymorphism of Pharmaceuticals: Maximizing the Accuracy-to-Cost
@@ -249,38 +237,54 @@ def DFTB3_D4():
     # (2) DFT-D4 damping factors: Supporting info of J. Chem. Phys. 152, 124101 (2020);
     # doi: 10.1063/1.5143190
     #
+    elements = system.get_chemical_symbols()
     kpts = [1, 1, 1]
     params_dir = params_dir_3ob_3_1()
     params_dir_str = f"{params_dir}{os.path.sep}"
     scc_tolerance = SCC_TOLERANCE
     
-    return DFTBCalculator(
-        level_of_theory="dftb3-d4",
-        manage_3ob_params=True,
-        Hamiltonian_ThirdOrderFull='Yes',
-        Hamiltonian_MaxAngularMomentum_="",
-        Hamiltonian_HubbardDerivs_="",
-        Hamiltonian_SCC='Yes',
-        Hamiltonian_HCorrection_='Damping',
-        Hamiltonian_HCorrection_Exponent = HCORRECTION_EXPONENT_3OB_3_1,
-        Hamiltonian_SlaterKosterFiles_='Type2FileNames',
-        Hamiltonian_SlaterKosterFiles_Prefix=params_dir_str,
-        Hamiltonian_SlaterKosterFiles_Separator='-',
-        Hamiltonian_SlaterKosterFiles_Suffix='.skf',
-        Hamiltonian_SCCTolerance=scc_tolerance,    
-        Hamiltonian_Dispersion_='DFTD4',
-        Hamiltonian_Dispersion_s6 = 1.0,
-        Hamiltonian_Dispersion_s8 = 0.6635015,
-        Hamiltonian_Dispersion_s9 = 1.0,       # enables 3-body disp
-        Hamiltonian_Dispersion_a1 = 0.5523240,
-        Hamiltonian_Dispersion_a2 = 4.3537076,
-        Parallel_ = "",
-        Parallel_UseOmpThreads = "Yes",
-        kpts=kpts,
-        ParserOptions_ = "",
-        ParserOptions_ParserVersion = 12,
-    )
+    # Get unique elements in the structure
+    unique_elements = np.unique(elements)
 
+    # Create max_angular_momentum parameters dynamically
+    max_angular_momentum_params = {}
+    hubbard_params = {}
+    for element in unique_elements:
+        if element in MAX_ANGULAR_MOMENTA_3OB_3_1:
+            key = f'Hamiltonian_MaxAngularMomentum_{element}'
+            max_angular_momentum_params[key] = MAX_ANGULAR_MOMENTA_3OB_3_1[element]
+            key = f'Hamiltonian_HubbardDerivs_{element}'
+            hubbard_params[key] = HUBBARD_DERIVATIVES_3OB_3_1[element]
+        else:
+            raise ValueError(f"Missing MaxAngularMomentum/HubbardDerivs "
+                             f"params for element {element}.")
+
+    return {
+        "Hamiltonian_ThirdOrderFull": 'Yes',
+        "Hamiltonian_MaxAngularMomentum_": "",
+        **max_angular_momentum_params,
+        "Hamiltonian_HubbardDerivs_": "",
+        **hubbard_params,
+        "Hamiltonian_SCC": 'Yes',
+        "Hamiltonian_HCorrection_": 'Damping',
+        "Hamiltonian_HCorrection_Exponent": HCORRECTION_EXPONENT_3OB_3_1,
+        "Hamiltonian_SlaterKosterFiles_": 'Type2FileNames',
+        "Hamiltonian_SlaterKosterFiles_Prefix": params_dir_str,
+        "Hamiltonian_SlaterKosterFiles_Separator": '-',
+        "Hamiltonian_SlaterKosterFiles_Suffix": '.skf',
+        "Hamiltonian_SCCTolerance": scc_tolerance,
+        "Hamiltonian_Dispersion_": 'DFTD4',
+        "Hamiltonian_Dispersion_s6": 1.0,
+        "Hamiltonian_Dispersion_s8": 0.6635015,
+        "Hamiltonian_Dispersion_s9": 1.0,       # enables 3-body disp
+        "Hamiltonian_Dispersion_a1": 0.5523240,
+        "Hamiltonian_Dispersion_a2": 4.3537076,
+        "Parallel_": "",
+        "Parallel_UseOmpThreads": "Yes",
+        "kpts": kpts,
+        "ParserOptions_": "",
+        "ParserOptions_ParserVersion": 12,
+    }
 
 def relax(
         system: ase.Atoms,
@@ -298,6 +302,7 @@ def relax(
     work_dir.mkdir(parents=True, exist_ok=True)
     
     calc = calculator.for_relaxation(
+        system=system,
         optimize_lattice_vectors=optimize_lattice_vectors,
         pressure_GPa=pressure_GPa,
         max_force_on_atom=max_force_on_atom,
@@ -318,3 +323,27 @@ def relax(
         raise RuntimeError("Relaxation with dftb+ failed. No output geometry was generated.")
         
     return relaxed_system
+
+def GFN1_xTB():
+    return DFTBCalculator(
+        level_of_theory="gfn1-xtb",
+        backend=_params_GFN1_xTB
+    )
+
+def GFN2_xTB():
+    return DFTBCalculator(
+        level_of_theory="gfn2-xtb",
+        backend=_params_GFN2_xTB
+    )
+
+def DFTB_Plus_MBD():
+    return DFTBCalculator(
+        level_of_theory="dftb+mbd",
+        backend=_params_DFTB_Plus_MBD
+    )
+
+def DFTB3_D4():
+    return DFTBCalculator(
+        level_of_theory="dftb3-d4",
+        backend=_params_DFTB3_D4
+    )
