@@ -69,8 +69,6 @@ BASIS_SETS = [
 
 def HF(
     basis: Literal[*BASIS_SETS] = "def2-tzvp", 
-    charge: int = 0,
-    spin: int = 0,
     kpts: Optional[List[int]] = None,
     verbose: int = 0,
     density_fit: bool = True, 
@@ -87,8 +85,7 @@ def HF(
         xc="hf",
         disp=None,
         basis=basis,
-        charge=charge,
-        spin=spin,
+        level_of_theory=f"hf_{basis}",
         kpts=kpts,
         verbose=verbose,
         density_fit=density_fit,
@@ -100,8 +97,6 @@ def HF(
 def DFT(
     model_name: str = "r2scan-d4", 
     basis: Literal[*BASIS_SETS] = "def2-tzvp", 
-    charge: int = 0,
-    spin: int = 0,
     kpts: Optional[List[int]] = None,
     verbose: int = 0,
     density_fit: bool = True, 
@@ -124,8 +119,7 @@ def DFT(
         xc=xc,
         disp=disp,
         basis=basis,
-        charge=charge,
-        spin=spin,
+        level_of_theory=f"{xc}_{basis}",
         kpts=kpts,
         verbose=verbose,
         density_fit=density_fit,
@@ -142,9 +136,8 @@ class PySCFCalculator(Calculator):
             xc: str,
             disp: str | None,
             basis: str,
+            level_of_theory: str,
             atoms=None,
-            charge=0,
-            spin=0,
             kpts=None,
             verbose=0,
             density_fit=True, 
@@ -169,8 +162,7 @@ class PySCFCalculator(Calculator):
         self.xc = xc
         self.disp = disp
         self.basis = basis
-        self.charge = charge
-        self.spin = spin
+        self.level_of_theory = level_of_theory
         self.kpts = kpts
         self.verbose = verbose
         self.density_fit = density_fit
@@ -183,7 +175,6 @@ class PySCFCalculator(Calculator):
         
         self.system = None
         self.method = None
-        self.pbc = False
         
         if atoms is not None:
             self._initialize_backend(atoms)
@@ -219,13 +210,15 @@ class PySCFCalculator(Calculator):
             
 
     def _initialize_backend(self, atoms):
-        self.pbc = atoms.pbc.any()
+        pbc = atoms.pbc.any()
+        charge = atoms.info.get("charge", 0)
+        spin = atoms.info.get("n_unpaired_electrons", 0)
 
         common_kwargs = {
             'atom': ase_atoms_to_pyscf(atoms),
             'basis': self.basis,
-            'charge': self.charge,
-            'spin': self.spin,
+            'charge': charge,
+            'spin': spin,
             'verbose': self.verbose,
             'unit': 'Angstrom'
         }
@@ -233,12 +226,12 @@ class PySCFCalculator(Calculator):
         if self.max_memory_mb is not None:
             common_kwargs['max_memory'] = self.max_memory_mb
 
-        if self.pbc:
+        if pbc:
             self.system = pyscf.pbc.M(a=np.array(atoms.cell), **common_kwargs)
         else:
             self.system = pyscf.M(**common_kwargs)
 
-        if self.pbc:
+        if pbc:
             scf_mod = pbc_scf
             dft_mod = pbc_dft
             grid_mod = pbc_dft.gen_grid
@@ -248,7 +241,7 @@ class PySCFCalculator(Calculator):
             grid_mod = dft.gen_grid
 
         if self.xc == "hf":
-            if self.spin != 0:
+            if spin != 0:
                 if self.kpts is None:
                     mf = scf_mod.UHF(self.system)
                 else:
@@ -259,7 +252,7 @@ class PySCFCalculator(Calculator):
                 else:
                     mf = scf_mod.KRHF(self.system, kpts=self.system.make_kpts(self.kpts))
         else:
-            if self.spin != 0:
+            if spin != 0:
                 if self.kpts is None:
                     mf = dft_mod.UKS(self.system, xc=self.xc)
                 else:
@@ -278,7 +271,7 @@ class PySCFCalculator(Calculator):
         mf.max_cycle = self.max_cycle
         mf.chkfile = None # disable checkpoint file
 
-        if self.pbc and self.multigrid:
+        if pbc and self.multigrid:
             mf._numint = MultiGridNumInt(self.system)
 
         if self.xc != "hf":

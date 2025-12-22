@@ -15,9 +15,7 @@ The initial setup requires importing the necessary modules and defining the syst
 
 ```python
 import numpy as np
-import os.path
-import mace.calculators
-import torch
+from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
 import mbe_automation.workflows
@@ -25,13 +23,8 @@ from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
-work_dir = os.path.abspath(os.path.dirname(__file__))
 
-mace_calc = mace.calculators.MACECalculator(
-    model_paths=os.path.expanduser("path/to/your/model.model"),
-    default_dtype="float64",
-    device=("cuda" if torch.cuda.is_available() else "cpu")
-)
+mace_calc = MACE(model_path="path/to/your/mace.model")
 ```
 
 ## NPT/NVT Propagation
@@ -40,13 +33,12 @@ The MD workflow is configured using the `Enthalpy` and `ClassicalMD` classes fro
 
 ```python
 md_config = mbe_automation.configs.md.Enthalpy(
-    molecule=from_xyz_file(os.path.join(work_dir, xyz_molecule)),
-    crystal=from_xyz_file(os.path.join(work_dir, xyz_solid)),
+    molecule=from_xyz_file(xyz_molecule),
+    crystal=from_xyz_file(xyz_solid),
     calculator=mace_calc,
     temperatures_K=np.array([298.15]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
-    work_dir=os.path.join(work_dir, "properties"),
-    dataset=os.path.join(work_dir, "properties.hdf5"),
+    dataset="properties.hdf5",
 
     md_molecule=mbe_automation.configs.md.ClassicalMD(
         ensemble="NVT",
@@ -214,9 +206,7 @@ properties.hdf5
 
 ```python
 import numpy as np
-import os.path
-import mace.calculators
-import torch
+from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
 import mbe_automation.workflows
@@ -224,22 +214,16 @@ from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
-work_dir = os.path.abspath(os.path.dirname(__file__))
 
-mace_calc = mace.calculators.MACECalculator(
-    model_paths=os.path.expanduser("path/to/your/model.model"),
-    default_dtype="float64",
-    device=("cuda" if torch.cuda.is_available() else "cpu")
-)
+mace_calc = MACE(model_path="path/to/your/model.model")
 
 md_config = mbe_automation.configs.md.Enthalpy(
-    molecule=from_xyz_file(os.path.join(work_dir, xyz_molecule)),
-    crystal=from_xyz_file(os.path.join(work_dir, xyz_solid)),
+    molecule=from_xyz_file(xyz_molecule),
+    crystal=from_xyz_file(xyz_solid),
     calculator=mace_calc,
     temperatures_K=np.array([298.15]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
-    work_dir=os.path.join(work_dir, "properties"),
-    dataset=os.path.join(work_dir, "properties.hdf5"),
+    dataset="properties.hdf5",
 
     md_molecule=mbe_automation.configs.md.ClassicalMD(
         ensemble="NVT",

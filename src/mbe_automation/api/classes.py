@@ -4,12 +4,12 @@ from typing import Tuple, Literal, Sequence, List
 from pathlib import Path
 import numpy as np
 import numpy.typing as npt
-from mace.calculators import MACECalculator
 import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 
 import mbe_automation.storage
+import mbe_automation.common
 from mbe_automation.configs.execution import ParallelCPU
 from mbe_automation.configs.clusters import FiniteSubsystemFilter
 from mbe_automation.configs.structure import Minimum
@@ -21,13 +21,48 @@ from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 import mbe_automation.dynamics.harmonic.modes
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
-import mbe_automation.ml.delta
 import mbe_automation.calculators
+from mbe_automation.calculators import CALCULATORS
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES, LEVELS_OF_THEORY
 from mbe_automation.ml.core import REFERENCE_ENERGY_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
+
+class _AtomicEnergiesCalc:
+    def atomic_energies(self, calculator: CALCULATORS) -> dict[np.int64, np.float64]:
+        """
+        Calculate ground-state energies for all unique isolated atoms
+        represented in the structure. Spin is selected automatically
+        based on the ground-state configurations of isolated atoms
+        according to pyscf.data.elements.CONFIGURATION.
+
+        This is the function that you need to generate isolated
+        atomic baseline data for machine learning interatomic
+        potentials.
+
+        Remember to define the calculator with exactly the same
+        settings (basis set, integral approximations)
+        as for the main dataset calculation.
+        """
+        return mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=self.unique_elements,
+        )
+
+class _TrainingStructure:
+    def to_mace_dataset(
+            self,
+            save_path: str,
+            level_of_theory: str | dict[Literal["target", "baseline"], str],
+            atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
+    ) -> None:
+        _to_mace_dataset(
+            dataset=[self],
+            save_path=save_path,
+            level_of_theory=level_of_theory,
+            atomic_energies=atomic_energies,
+        )
 
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
@@ -48,7 +83,7 @@ class ForceConstants(_ForceConstants):
         )
 
 @dataclass(kw_only=True)
-class Structure(_Structure):
+class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
     @classmethod
     def read(
             cls,
@@ -111,30 +146,13 @@ class Structure(_Structure):
             Structure(**vars(x)) for x in _split_frames(self, fractions, rng)
         ]
 
-    def to_mace_dataset(
-            self,
-            save_path: str,
-            learning_strategy: Literal["direct", "delta"] = "direct",
-            reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
-            reference_molecule: Structure | None = None,
-            reference_frame_index: int = 0,
-    ) -> None:
-        _to_mace_dataset(
-            dataset=[self],
-            save_path=save_path,
-            learning_strategy=learning_strategy,
-            reference_energy_type=reference_energy_type,
-            reference_molecule=reference_molecule,
-            reference_frame_index=reference_frame_index,
-        )
-
     def run_model(
             self,
-            calculator: ASECalculator | MACECalculator,
+            calculator: CALCULATORS,
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
+            level_of_theory: str | None = None,
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -234,7 +252,7 @@ class Structure(_Structure):
         )
 
 @dataclass(kw_only=True)
-class Trajectory(_Trajectory):
+class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
     @classmethod
     def read(
             cls,
@@ -257,11 +275,11 @@ class Trajectory(_Trajectory):
 
     def run_model(
             self,
-            calculator: ASECalculator | MACECalculator,
+            calculator: CALCULATORS,
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
+            level_of_theory: str | None = None,
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -275,7 +293,7 @@ class Trajectory(_Trajectory):
         )
 
 @dataclass(kw_only=True)
-class MolecularCrystal(_MolecularCrystal):
+class MolecularCrystal(_MolecularCrystal, _AtomicEnergiesCalc):
     def save(
             self,
             dataset: str,
@@ -331,7 +349,7 @@ class MolecularCrystal(_MolecularCrystal):
     extract_finite_subsystem = extract_finite_subsystems # synonym
 
 @dataclass(kw_only=True)
-class FiniteSubsystem(_FiniteSubsystem):
+class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure):
     @classmethod
     def read(
             cls,
@@ -370,11 +388,11 @@ class FiniteSubsystem(_FiniteSubsystem):
 
     def run_model(
             self,
-            calculator: ASECalculator | MACECalculator,
+            calculator: CALCULATORS,
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: Literal[*LEVELS_OF_THEORY]="default",
+            level_of_theory: str | None = None,
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -402,25 +420,8 @@ class FiniteSubsystem(_FiniteSubsystem):
             for s in _split_frames(self.cluster_of_molecules, fractions, rng)
         ]
 
-    def to_mace_dataset(
-            self,
-            save_path: str,
-            learning_strategy: Literal["direct", "delta"] = "direct",
-            reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
-            reference_molecule: Structure | None = None,
-            reference_frame_index: int = 0,
-    ) -> None:
-        _to_mace_dataset(
-            dataset=[self],
-            save_path=save_path,
-            learning_strategy=learning_strategy,
-            reference_energy_type=reference_energy_type,
-            reference_molecule=reference_molecule,
-            reference_frame_index=reference_frame_index,
-        )
-
 @dataclass
-class Dataset:
+class Dataset(_AtomicEnergiesCalc):
     """
     Collection of atomistic structures or finite subsystems
     for machine learning tasks.
@@ -433,26 +434,33 @@ class Dataset:
         """
         self.structures.append(structure)
 
+    def statistics(self, level_of_theory: str) -> None:
+        _statistics(
+            systems=self.structures,
+            level_of_theory=level_of_theory,
+        )
+
     def to_mace_dataset(
             self,
             save_path: str,
-            learning_strategy: Literal["direct", "delta"],
-            reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES] = "none",
-            reference_molecule: Structure | None = None,
-            reference_frame_index: int = 0,
+            level_of_theory: str | dict[Literal["target", "baseline"], str],
+            atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
     ) -> None:
-        """
-        Export dataset to training files readable by MACE.
-        """
         _to_mace_dataset(
             dataset=self.structures,
             save_path=save_path,
-            learning_strategy=learning_strategy,
-            reference_energy_type=reference_energy_type,
-            reference_molecule=reference_molecule,
-            reference_frame_index=reference_frame_index,
+            level_of_theory=level_of_theory,
+            atomic_energies=atomic_energies,
         )
-    
+
+    @property
+    def unique_elements(self) -> npt.NDArray[np.int64]:
+        """
+        Return a sorted NumPy array of unique Z numbers for a list of structures.
+        """
+        unique_elements = [structure.unique_elements for structure in self.structures]
+        return np.unique(np.concatenate(unique_elements))
+
 def _select_frames(
         struct: _Structure,
         indices: npt.NDArray[np.integer]
@@ -495,9 +503,9 @@ def _select_frames(
                 if struct.feature_vectors is not None else None
             ),
             feature_vectors_type=struct.feature_vectors_type,
-            delta=(
-                struct.delta.select_frames(indices)
-                if struct.delta is not None else None
+            ground_truth=(
+                struct.ground_truth.select_frames(indices)
+                if struct.ground_truth is not None else None
             )
         )
 
@@ -660,16 +668,42 @@ def _subsample_trajectory(
 
 def _run_model(
         structure: _Structure,
-        calculator: ASECalculator | MACECalculator,
+        calculator: CALCULATORS,
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        level_of_theory: Literal[*LEVELS_OF_THEORY] = "default",
+        level_of_theory: str | None = None,
         exec_params: ParallelCPU | None = None,
 ) -> None:
+
+    if not isinstance(calculator, CALCULATORS):
+        valid_names = [x.__name__ for x in typing.get_args(CALCULATORS)]
+        raise TypeError(
+            f"Invalid calculator. Expected one of {valid_names}, "
+            f"got {type(calculator).__name__}. \n"
+            f"Use a class imported from mbe_automation.calculators."
+        )
     
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
-    
+
+    if (energies or forces) and structure.ground_truth is None:
+        structure.ground_truth = mbe_automation.storage.GroundTruth()
+
+    if level_of_theory is None:
+        level_of_theory = calculator.level_of_theory
+
+    if energies and level_of_theory in structure.ground_truth.energies:
+        raise ValueError(
+            f"{level_of_theory} data already present in ground_truth.energies. "
+            f"Specify a custom level_of_theory or run a different model if it's a mistake."
+        )
+
+    if forces and level_of_theory in structure.ground_truth.forces:
+        raise ValueError(
+            f"{level_of_theory} data already present in ground_truth.forces. "
+            f"Specify a custom level_of_theory or run a different model if it's a mistake."
+        )
+
     if exec_params is None:
         exec_params = ParallelCPU.recommended()
 
@@ -689,40 +723,32 @@ def _run_model(
         structure.feature_vectors = d
         structure.feature_vectors_type = feature_vectors_type
 
-    if level_of_theory == "default":
-        if energies: structure.E_pot = E_pot
-        if forces: structure.forces = F
-
-    if level_of_theory != "default" and structure.delta is None:
-        structure.delta = mbe_automation.storage.DeltaTargetBaseline()
-
-    if level_of_theory == "delta/baseline":
-        if energies: structure.delta.E_pot_baseline = E_pot
-        if forces: structure.delta.forces_baseline = F
-
-    if level_of_theory == "delta/target":
-        if energies: structure.delta.E_pot_target = E_pot
-        if forces: structure.delta.forces_target = F
-
-    if level_of_theory == "delta/baseline" and energies:
-        unique_elements = structure.unique_elements
-        E_atomic_baseline = mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=unique_elements,
-        )
-        structure.delta.E_atomic_baseline = E_atomic_baseline
+    if energies:
+        structure.ground_truth.energies[level_of_theory] = E_pot
+    if forces:
+        structure.ground_truth.forces[level_of_theory] = F
 
     return
 
 def _to_mace_dataset(
-        dataset: List[Structure|FiniteSubsystem],            
+        dataset: List[Structure|FiniteSubsystem],
         save_path: str,
-        learning_strategy: Literal["direct", "delta"] = "direct",
-        reference_energy_type: Literal[*REFERENCE_ENERGY_TYPES]="none",
-        reference_molecule: Structure | None = None,
-        reference_frame_index: int = 0,
+        level_of_theory: str | dict[Literal["target", "baseline"], str],
+        atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
 ) -> None:
+    """
+    Export dataset to training files readable by MACE.
 
+    Args:
+        save_path: Path to save the XYZ training file.
+        level_of_theory: The level of theory to use for energies and forces.
+            Can be a string for direct learning, or a dict with "target" and
+            "baseline" keys for delta learning.
+        atomic_energies: A dictionary of ground-state energies for isolated
+            atoms, used to generate a baseline superposition of atomic shifts
+            in MACE.
+    """
+    
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
     structures = []
@@ -731,24 +757,41 @@ def _to_mace_dataset(
             structures.append(x.cluster_of_molecules)
         else:
             structures.append(x)
-            
-    if learning_strategy == "direct":
-        for i, x in enumerate(structures):
-            mbe_automation.ml.mace.to_xyz_training_set(
-                structure=x,
-                save_path=save_path,
-                append=(i>0),
-                E_pot=(x.E_pot if x.E_pot is not None else None),
-                forces=(x.forces if x.forces is not None else None),
-            )
 
-    elif learning_strategy == "delta":
-        mbe_automation.ml.delta.export_to_mace(
-            structures=structures,
-            save_path=save_path,
-            reference_energy_type=reference_energy_type,
-            reference_molecule=reference_molecule,
-            reference_frame_index=reference_frame_index,
-        )
+    mbe_automation.ml.mace.to_xyz_training_set(
+        structures=structures,
+        level_of_theory=level_of_theory,
+        save_path=save_path,
+        atomic_energies=atomic_energies,
+    )
+    
+def _statistics(
+    systems: List[Structure | FiniteSubsystem],
+    level_of_theory: str
+) -> None:
+    """
+    Print mean and standard deviation of energy per atom.
+    """
 
-    return
+    mbe_automation.common.display.framed([
+        "Dataset statistics"
+    ])
+
+    energies = []
+    for i, x in enumerate(systems):
+        struct = x.cluster_of_molecules if isinstance(x, FiniteSubsystem) else x
+
+        if struct.ground_truth is None:
+            raise ValueError(f"Ground truth data missing in structure {i}.")
+
+        E_i = struct.ground_truth.energies.get(level_of_theory)
+
+        if E_i is None:
+            raise ValueError(f"Missing energies in structure {i}.")
+
+        energies.append(E_i)
+
+    data = np.concatenate(energies)
+
+    print(f"Mean energy: {np.mean(data):.5f} eV/atom")
+    print(f"Std energy:  {np.std(data):.5f} eV/atom")

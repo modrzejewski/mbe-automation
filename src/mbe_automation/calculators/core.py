@@ -8,23 +8,6 @@ from ase import Atoms
 from mbe_automation.storage import Structure, to_ase
 import mbe_automation.common.display
 import mbe_automation.common.resources
-
-def atomic_energies(
-        calculator: ASECalculator | MACECalculator,
-        z_numbers: npt.NDArray[np.integer],
-) -> npt.NDArray[np.floating]:
-
-    n_elements = len(z_numbers)
-    E_atomic = np.zeros(n_elements)
-    for i, z in enumerate(z_numbers):
-        isolated_atom = Atoms(
-            numbers=[z],
-            pbc=False
-        )
-        isolated_atom.calc = calculator
-        E_atomic[i] = isolated_atom.get_potential_energy()
-
-    return E_atomic
     
 def run_model(
         structure: Structure,

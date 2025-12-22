@@ -1,7 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Tuple, Literal, overload
+from typing import List, Tuple, Literal, overload, Dict
 import pandas as pd
 import phonopy
 from phonopy import Phonopy
@@ -14,8 +14,15 @@ DATA_FOR_TRAINING = [
     "feature_vectors",
     "potential_energies",
     "forces",
-    "delta",
+    "ground_truth",
 ]
+#
+# Character used as a replacement for ordinary slash "/",
+# which is a reserved character for HDF5 tree structure.
+# By using the unicode character, we avoid an unintentional
+# creation of HDF5 subgroups.
+#
+UNICODE_DIVISION_SLASH = "∕"
 
 @dataclass
 class BrillouinZonePath:
@@ -35,30 +42,21 @@ class EOSCurves:
     V_min: npt.NDArray[np.floating]
     G_min: npt.NDArray[np.floating]
 
-@dataclass(kw_only=True)
-class DeltaTargetBaseline:
-    E_pot_baseline: npt.NDArray[np.floating] | None = None # eV/atom
-    forces_baseline: npt.NDArray[np.floating] | None = None # eV/Angs
-    E_pot_target: npt.NDArray[np.floating] | None = None # eV/atom
-    forces_target: npt.NDArray[np.floating] | None = None # eV/Angs
-    E_atomic_baseline: npt.NDArray[np.float64] | None = None # eV/atom
+@dataclass
+class GroundTruth:
+    energies: Dict[str, npt.NDArray[np.floating]] = field(default_factory=dict)
+    forces: Dict[str, npt.NDArray[np.floating]] = field(default_factory=dict)
 
-    def copy(self) -> DeltaTargetBaseline:
-        return DeltaTargetBaseline(
-            E_pot_baseline=(self.E_pot_baseline.copy() if self.E_pot_baseline is not None else None),
-            forces_baseline=(self.forces_baseline.copy() if self.forces_baseline is not None else None),
-            E_pot_target=(self.E_pot_target.copy() if self.E_pot_target is not None else None),
-            forces_target=(self.forces_target.copy() if self.forces_target is not None else None),
-            E_atomic_baseline=(self.E_atomic_baseline.copy() if self.E_atomic_baseline is not None else None),
+    def copy(self) -> GroundTruth:
+        return GroundTruth(
+            energies={k: v.copy() for k, v in self.energies.items()},
+            forces={k: v.copy() for k, v in self.forces.items()},
         )
 
-    def select_frames(self, indices: npt.NDArray[np.integer]) -> DeltaTargetBaseline:
-        return DeltaTargetBaseline(
-            E_pot_baseline=(self.E_pot_baseline[indices] if self.E_pot_baseline is not None else None),
-            forces_baseline=(self.forces_baseline[indices] if self.forces_baseline is not None else None),
-            E_pot_target=(self.E_pot_target[indices] if self.E_pot_target is not None else None),
-            forces_target=(self.forces_target[indices] if self.forces_target is not None else None),
-            E_atomic_baseline=self.E_atomic_baseline, # composition is the same in all frames
+    def select_frames(self, indices: npt.NDArray[np.integer]) -> GroundTruth:
+        return GroundTruth(
+            energies={k: v[indices] for k, v in self.energies.items()},
+            forces={k: v[indices] for k, v in self.forces.items()},
         )
         
 @dataclass
@@ -72,9 +70,10 @@ class Structure:
     periodic: bool = False
     E_pot: npt.NDArray[np.floating] | None = None
     forces: npt.NDArray[np.floating] | None = None
-    delta: DeltaTargetBaseline | None = None
+    ground_truth: GroundTruth | None = None
     feature_vectors: npt.NDArray[np.floating] | None = None
-    feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "none"
+    feature_vectors_type: str = "none"
+    level_of_theory: str | None = None
     
     def __post_init__(self):
         self.periodic = (self.cell_vectors is not None)
@@ -90,12 +89,13 @@ class Structure:
             periodic=self.periodic,
             E_pot=(self.E_pot.copy() if self.E_pot is not None else None),
             forces=(self.forces.copy() if self.forces is not None else None),
-            delta=(self.delta.copy() if self.delta is not None else None),
+            ground_truth=(self.ground_truth.copy() if self.ground_truth is not None else None),
             feature_vectors=(
                 self.feature_vectors.copy() 
                 if self.feature_vectors_type != "none" else None
             ),
             feature_vectors_type=self.feature_vectors_type,
+            level_of_theory=self.level_of_theory,
         )
     
     def save(
@@ -123,14 +123,6 @@ class Structure:
     @property
     def unique_elements(self) -> npt.NDArray[np.int64]:
         return np.unique(np.atleast_2d(self.atomic_numbers)[0])
-
-    @property
-    def z_map(self) -> npt.NDArray[np.int64]:
-        unique_elements = self.unique_elements
-        n_elements = len(unique_elements)
-        x = np.full(np.max(unique_elements) + 1, -1, dtype=np.int64)
-        x[unique_elements] = np.arange(n_elements)
-        return x
 
 @dataclass
 class ForceConstants:
@@ -168,7 +160,8 @@ class Trajectory(Structure):
             target_temperature: float,
             target_pressure: float | None = None,
             n_removed_trans_dof: int = 0,
-            n_removed_rot_dof: int = 0
+            n_removed_rot_dof: int = 0,
+            level_of_theory: str | None = None,
     ):
         if ensemble == "NPT" and target_pressure is None:
             raise ValueError("Target pressure must be specified for the NPT ensemble")
@@ -196,7 +189,8 @@ class Trajectory(Structure):
             target_temperature=target_temperature,
             target_pressure=target_pressure,
             n_removed_trans_dof=n_removed_trans_dof,
-            n_removed_rot_dof=n_removed_rot_dof
+            n_removed_rot_dof=n_removed_rot_dof,
+            level_of_theory=level_of_theory,
         )
 
     def save(
@@ -248,6 +242,10 @@ class MolecularCrystal:
         atom_indices = np.concatenate([self.index_map[i] for i in molecule_indices])
         return self.supercell.atomic_numbers[atom_indices]
 
+    @property
+    def unique_elements(self) -> npt.NDArray[np.int64]:
+        return self.supercell.unique_elements
+
     def positions(
             self,
             molecule_indices: npt.NDArray[np.integer],
@@ -278,6 +276,10 @@ class FiniteSubsystem:
     cluster_of_molecules: Structure
     molecule_indices: npt.NDArray[np.integer]
     n_molecules: int
+
+    @property
+    def unique_elements(self) -> npt.NDArray[np.int64]:
+        return self.cluster_of_molecules.unique_elements
     
 def save_data_frame(
         dataset: str,
@@ -516,8 +518,9 @@ def _save_structure(
         E_pot: npt.NDArray[np.floating] | None=None,
         forces: npt.NDArray[np.floating] | None=None,
         feature_vectors: npt.NDArray[np.floating] | None=None,
-        feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        delta: DeltaTargetBaseline | None=None,
+        feature_vectors_type: str="none",
+        ground_truth: GroundTruth | None=None,
+        level_of_theory: str | None = None,
 ):
     if positions.ndim == 2:
         n_frames = 1
@@ -569,14 +572,16 @@ def _save_structure(
                 name="forces (eV∕Å)",
                 data=forces
             )
-        if delta is not None:
-            _save_delta_target_baseline(f, f"{key}/delta", delta)
+        if ground_truth is not None:
+            _save_ground_truth(f, f"{key}/ground_truth", ground_truth)
 
         group.attrs["dataclass"] = "Structure"
         group.attrs["n_frames"] = n_frames
         group.attrs["n_atoms"] = n_atoms
         group.attrs["periodic"] = is_periodic
         group.attrs["feature_vectors_type"] = feature_vectors_type
+        if level_of_theory is not None:
+            group.attrs["level_of_theory"] = level_of_theory
 
 @overload
 def save_structure(*, dataset: str, key: str, structure: Structure) -> None: ...
@@ -594,7 +599,8 @@ def save_structure(
     forces: npt.NDArray[np.floating] | None = None,
     feature_vectors: npt.NDArray[np.floating] | None = None,
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-    delta: DeltaTargetBaseline | None = None,
+    ground_truth: GroundTruth | None = None,
+    level_of_theory: str | None = None,
 ) -> None: ...
 
 def save_structure(*, dataset: str, key: str, **kwargs):
@@ -628,7 +634,8 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             forces=structure.forces,
             feature_vectors=structure.feature_vectors,
             feature_vectors_type=structure.feature_vectors_type,
-            delta=structure.delta,
+            ground_truth=structure.ground_truth,
+            level_of_theory=structure.level_of_theory,
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -642,8 +649,9 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             E_pot=kwargs.get("E_pot"),
             forces=kwargs.get("forces"),
             feature_vectors=kwargs.get("feature_vectors"),
-            delta=kwargs.get("delta"),
+            ground_truth=kwargs.get("ground_truth"),
             feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
+            level_of_theory=kwargs.get("level_of_theory"),
         )
     else:
         raise ValueError(
@@ -657,6 +665,7 @@ def read_structure(dataset, key):
         group = f[key]
         is_periodic = group.attrs["periodic"]
         feature_vectors_type = group.attrs["feature_vectors_type"]
+        level_of_theory = group.attrs.get("level_of_theory")
         structure = Structure(
             positions=group["positions (Å)"][...],
             atomic_numbers=group["atomic_numbers"][...],
@@ -681,7 +690,8 @@ def read_structure(dataset, key):
                 group["forces (eV∕Å)"][...]
                 if "forces (eV∕Å)" in group else None
             ),
-            delta=_read_delta_target_baseline(f, key=f"{key}/delta"),
+            ground_truth=_read_ground_truth(f, key=f"{key}/ground_truth"),
+            level_of_theory=level_of_theory,
         )
     return structure
 
@@ -710,6 +720,9 @@ def save_trajectory(
         group.attrs["n_removed_rot_dof"] = traj.n_removed_rot_dof
         if traj.ensemble == "NPT":
             group.attrs["target_pressure (GPa)"] = traj.target_pressure
+
+        if traj.level_of_theory is not None:
+            group.attrs["level_of_theory"] = traj.level_of_theory
 
         group.create_dataset(
             name="time (fs)",
@@ -784,6 +797,7 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
         is_periodic = group.attrs["periodic"]
         feature_vectors_type = group.attrs["feature_vectors_type"]
         ensemble = group.attrs["ensemble"]
+        level_of_theory = group.attrs.get("level_of_theory")
         traj = Trajectory(
             ensemble=ensemble,
             positions=group["positions (Å)"][...],
@@ -812,7 +826,8 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             target_pressure=(group.attrs["target_pressure (GPa)"] if ensemble=="NPT" else None),
             time_equilibration=group.attrs["time_equilibration (fs)"],
             n_removed_trans_dof=group.attrs["n_removed_trans_dof"],
-            n_removed_rot_dof=group.attrs["n_removed_rot_dof"]
+            n_removed_rot_dof=group.attrs["n_removed_rot_dof"],
+            level_of_theory=level_of_theory,
         )
         
     return traj
@@ -1159,70 +1174,68 @@ def _save_only(
                 data=structure.forces
             )
 
-        if "delta" in quantities:
+        if "ground_truth" in quantities:
 
-            if structure.delta is None:
+            if structure.ground_truth is None:
                 raise RuntimeError(
-                    "Delta learning data are not present in the Structure object."
+                    "Ground truth data are not present in the Structure object."
                 )
 
-            _save_delta_target_baseline(f, f"{key}/delta", structure.delta)
+            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth)
             
     return
 
 
-def _save_delta_target_baseline(
+def _save_ground_truth(
         f: h5py.File,
         key: str,
-        delta: DeltaTargetBaseline,
+        ground_truth: GroundTruth,
 ) -> None:
 
     group = f.require_group(key)
 
-    if delta.forces_baseline is not None:
-        if "forces_baseline (eV∕Å)" in group: del group["forces_baseline (eV∕Å)"]
-        group.create_dataset("forces_baseline (eV∕Å)", data=delta.forces_baseline)
+    levels_of_theory = set()
 
-    if delta.forces_target is not None:
-        if "forces_target (eV∕Å)" in group: del group["forces_target (eV∕Å)"]
-        group.create_dataset("forces_target (eV∕Å)", data=delta.forces_target)
+    for name, energy in ground_truth.energies.items():
+        sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
+        sanitized_quantity_name = f"E_{sanitized_method_name} (eV∕atom)"
+        if sanitized_quantity_name in group: del group[sanitized_quantity_name]
+        group.create_dataset(sanitized_quantity_name, data=energy)
+        levels_of_theory.add(name)
 
-    if delta.E_pot_baseline is not None:
-        if "E_pot_baseline (eV∕atom)" in group: del group["E_pot_baseline (eV∕atom)"]
-        group.create_dataset(name="E_pot_baseline (eV∕atom)", data=delta.E_pot_baseline)
+    for name, forces in ground_truth.forces.items():
+        sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
+        ds_name = f"forces_{sanitized_method_name} (eV∕Å)"
+        if ds_name in group: del group[ds_name]
+        group.create_dataset(ds_name, data=forces)
+        levels_of_theory.add(name)
 
-    if delta.E_pot_target is not None:
-        if "E_pot_target (eV∕atom)" in group: del group["E_pot_target (eV∕atom)"]
-        group.create_dataset(name="E_pot_target (eV∕atom)", data=delta.E_pot_target)
-
-    if delta.E_atomic_baseline is not None:
-        if "E_atomic_baseline (eV∕atom)" in group: del group["E_atomic_baseline (eV∕atom)"]
-        group.create_dataset(name="E_atomic_baseline (eV∕atom)", data=delta.E_atomic_baseline)
+    group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
 
     return
 
 
-def _read_delta_target_baseline(f: h5py.File, key: str) -> DeltaTargetBaseline | None:
+def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
 
     if key in f:
-        group = f[key]        
-        delta = DeltaTargetBaseline(
-            forces_baseline=(
-                group["forces_baseline (eV∕Å)"][...] if "forces_baseline (eV∕Å)" in group else None),
-            forces_target=(
-                group["forces_target (eV∕Å)"][...] if "forces_target (eV∕Å)" in group else None),
-            E_pot_baseline=(
-                group["E_pot_baseline (eV∕atom)"][...] if "E_pot_baseline (eV∕atom)" in group else None
-            ),
-            E_pot_target=(
-                group["E_pot_target (eV∕atom)"][...] if "E_pot_target (eV∕atom)" in group else None
-            ),
-            E_atomic_baseline=(
-                group["E_atomic_baseline (eV∕atom)"][...] if "E_atomic_baseline (eV∕atom)" in group else None
-            ),
+        group = f[key]
+        levels_of_theory = group.attrs.get("levels_of_theory", [])
+
+        energies = {}
+        forces = {}
+
+        for name in levels_of_theory:
+            sanitized_name = name.replace("/", UNICODE_DIVISION_SLASH)
+            if f"E_{sanitized_name} (eV∕atom)" in group:
+                energies[name] = group[f"E_{sanitized_name} (eV∕atom)"][...]
+            if f"forces_{sanitized_name} (eV∕Å)" in group:
+                forces[name] = group[f"forces_{sanitized_name} (eV∕Å)"][...]
+
+        ground_truth = GroundTruth(
+            energies=energies,
+            forces=forces,
         )
     else:
-        delta = None
+        ground_truth = None
 
-    return delta
-
+    return ground_truth
