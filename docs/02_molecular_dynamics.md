@@ -26,7 +26,7 @@ xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
 work_dir = os.path.abspath(os.path.dirname(__file__))
 
-mace_calc = MACE(model_path="path/to/your/model.model")
+mace_calc = MACE(model_path="path/to/your/mace.model")
 ```
 
 ## NPT/NVT Propagation
