@@ -16,11 +16,7 @@ from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "solid.xyz"
 
-mace_calc = MACE(
-    model_path="model.model",
-    default_dtype="float64",
-    device=("cuda" if torch.cuda.is_available() else "cpu")
-)
+mace_calc = MACE(model_path="model.model")
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",

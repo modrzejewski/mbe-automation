@@ -44,11 +44,7 @@ temperature_K = 298.15
 work_dir = os.path.abspath(os.path.dirname(__file__))
 dataset = os.path.join(work_dir, "training_set.hdf5")
 
-mace_calc = MACE(
-    model_path=mlip_parameter_file,
-    default_dtype="float64",
-    device=("cuda" if torch.cuda.is_available() else "cpu")
-)
+mace_calc = MACE(model_path=mlip_parameter_file)
 ```
 
 ## Step 1: MD Sampling
@@ -404,11 +400,7 @@ temperature_K = 298.15
 work_dir = os.path.abspath(os.path.dirname(__file__))
 dataset = os.path.join(work_dir, "training_set.hdf5")
 
-mace_calc = MACE(
-    model_path=mlip_parameter_file,
-    default_dtype="float64",
-    device=("cuda" if torch.cuda.is_available() else "cpu")
-)
+mace_calc = MACE(model_path=mlip_parameter_file)
 
 md_sampling_config = MDSampling(
     crystal=from_xyz_file(xyz_solid),

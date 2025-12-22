@@ -27,11 +27,7 @@ xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
 work_dir = os.path.abspath(os.path.dirname(__file__))
 
-mace_calc = MACE(
-    model_path="path/to/your/model.model",
-    default_dtype="float64",
-    device=("cuda" if torch.cuda.is_available() else "cpu")
-)
+mace_calc = MACE(model_path="path/to/your/model.model")
 ```
 
 ## NPT/NVT Propagation
@@ -226,11 +222,7 @@ xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
 work_dir = os.path.abspath(os.path.dirname(__file__))
 
-mace_calc = MACE(
-    model_path="path/to/your/model.model",
-    default_dtype="float64",
-    device=("cuda" if torch.cuda.is_available() else "cpu")
-)
+mace_calc = MACE(model_path="path/to/your/model.model")
 
 md_config = mbe_automation.configs.md.Enthalpy(
     molecule=from_xyz_file(os.path.join(work_dir, xyz_molecule)),

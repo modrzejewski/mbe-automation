@@ -71,7 +71,6 @@ crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
 calculator = MACE(
    model_path="~/models/mace/mace-mh-1.model",
    head="omol",
-   device="cuda",
 )
 
 work_dir = "urea"
@@ -125,7 +124,6 @@ temperatures_K = np.array([300.0])
 mace_calc = MACE(
     model_path="~/models/mace/mace-mh-1.model",
     head="omol",
-    device="cuda"
 )
 
 for T, p in itertools.product(temperatures_K, pressures_GPa):

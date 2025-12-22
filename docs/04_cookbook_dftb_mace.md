@@ -72,10 +72,7 @@ trajectory = Trajectory.read(
 
 # Initialize the MACE calculator for feature extraction.
 # Using a placeholder model path here.
-mace_calc = MACE(
-    model_path="/path/to/mace.model",
-    device="cpu"
-)
+mace_calc = MACE(model_path="/path/to/mace.model")
 
 # Calculate feature vectors for all frames in the trajectory.
 # We disable energy/force calculation since we only want features.
