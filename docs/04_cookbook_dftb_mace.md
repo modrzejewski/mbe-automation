@@ -5,7 +5,7 @@ This cookbook demonstrates how to run a Molecular Dynamics (MD) simulation using
 ## Workflow Overview
 
 1.  **Setup**: Initialize the crystal structure and the DFTB+ calculator.
-2.  **MD Simulation**: Configure and run the MD workflow using `mbe_automation.workflows.md`. This saves the trajectory to an HDF5 file.
+2.  **MD Simulation**: Configure and run the MD workflow using `mbe_automation.run`. This saves the trajectory to an HDF5 file.
 3.  **Feature Extraction**: Load the trajectory, calculate feature vectors using MACE, and update the HDF5 file.
 
 ## Complete Example

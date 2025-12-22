@@ -18,7 +18,6 @@ import numpy as np
 from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
-import mbe_automation.workflows
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "path/to/your/solid.xyz"
@@ -209,7 +208,6 @@ import numpy as np
 from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
-import mbe_automation.workflows
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "path/to/your/solid.xyz"
