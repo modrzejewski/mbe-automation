@@ -162,7 +162,7 @@ class DFTBCalculator(ASE_DFTBCalculator):
 
         return ASE_DFTBCalculator(**params)
 
-def _params_charge(systems: ase.Atoms):
+def _params_charge(system: ase.Atoms):
     params = {}
     charge = system.info.get("charge", 0)
     if charge > 0:
