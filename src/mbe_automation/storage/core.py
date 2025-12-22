@@ -73,6 +73,7 @@ class Structure:
     ground_truth: GroundTruth | None = None
     feature_vectors: npt.NDArray[np.floating] | None = None
     feature_vectors_type: str = "none"
+    level_of_theory: str | None = None
     
     def __post_init__(self):
         self.periodic = (self.cell_vectors is not None)
@@ -94,6 +95,7 @@ class Structure:
                 if self.feature_vectors_type != "none" else None
             ),
             feature_vectors_type=self.feature_vectors_type,
+            level_of_theory=self.level_of_theory,
         )
     
     def save(
@@ -158,7 +160,8 @@ class Trajectory(Structure):
             target_temperature: float,
             target_pressure: float | None = None,
             n_removed_trans_dof: int = 0,
-            n_removed_rot_dof: int = 0
+            n_removed_rot_dof: int = 0,
+            level_of_theory: str | None = None,
     ):
         if ensemble == "NPT" and target_pressure is None:
             raise ValueError("Target pressure must be specified for the NPT ensemble")
@@ -186,7 +189,8 @@ class Trajectory(Structure):
             target_temperature=target_temperature,
             target_pressure=target_pressure,
             n_removed_trans_dof=n_removed_trans_dof,
-            n_removed_rot_dof=n_removed_rot_dof
+            n_removed_rot_dof=n_removed_rot_dof,
+            level_of_theory=level_of_theory,
         )
 
     def save(
@@ -516,6 +520,7 @@ def _save_structure(
         feature_vectors: npt.NDArray[np.floating] | None=None,
         feature_vectors_type: str="none",
         ground_truth: GroundTruth | None=None,
+        level_of_theory: str | None = None,
 ):
     if positions.ndim == 2:
         n_frames = 1
@@ -575,6 +580,8 @@ def _save_structure(
         group.attrs["n_atoms"] = n_atoms
         group.attrs["periodic"] = is_periodic
         group.attrs["feature_vectors_type"] = feature_vectors_type
+        if level_of_theory is not None:
+            group.attrs["level_of_theory"] = level_of_theory
 
 @overload
 def save_structure(*, dataset: str, key: str, structure: Structure) -> None: ...
@@ -593,6 +600,7 @@ def save_structure(
     feature_vectors: npt.NDArray[np.floating] | None = None,
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
     ground_truth: GroundTruth | None = None,
+    level_of_theory: str | None = None,
 ) -> None: ...
 
 def save_structure(*, dataset: str, key: str, **kwargs):
@@ -627,6 +635,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             feature_vectors=structure.feature_vectors,
             feature_vectors_type=structure.feature_vectors_type,
             ground_truth=structure.ground_truth,
+            level_of_theory=structure.level_of_theory,
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -642,6 +651,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             feature_vectors=kwargs.get("feature_vectors"),
             ground_truth=kwargs.get("ground_truth"),
             feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
+            level_of_theory=kwargs.get("level_of_theory"),
         )
     else:
         raise ValueError(
@@ -655,6 +665,7 @@ def read_structure(dataset, key):
         group = f[key]
         is_periodic = group.attrs["periodic"]
         feature_vectors_type = group.attrs["feature_vectors_type"]
+        level_of_theory = group.attrs.get("level_of_theory")
         structure = Structure(
             positions=group["positions (Å)"][...],
             atomic_numbers=group["atomic_numbers"][...],
@@ -680,6 +691,7 @@ def read_structure(dataset, key):
                 if "forces (eV∕Å)" in group else None
             ),
             ground_truth=_read_ground_truth(f, key=f"{key}/ground_truth"),
+            level_of_theory=level_of_theory,
         )
     return structure
 
@@ -708,6 +720,9 @@ def save_trajectory(
         group.attrs["n_removed_rot_dof"] = traj.n_removed_rot_dof
         if traj.ensemble == "NPT":
             group.attrs["target_pressure (GPa)"] = traj.target_pressure
+
+        if traj.level_of_theory is not None:
+            group.attrs["level_of_theory"] = traj.level_of_theory
 
         group.create_dataset(
             name="time (fs)",
@@ -782,6 +797,7 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
         is_periodic = group.attrs["periodic"]
         feature_vectors_type = group.attrs["feature_vectors_type"]
         ensemble = group.attrs["ensemble"]
+        level_of_theory = group.attrs.get("level_of_theory")
         traj = Trajectory(
             ensemble=ensemble,
             positions=group["positions (Å)"][...],
@@ -810,7 +826,8 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             target_pressure=(group.attrs["target_pressure (GPa)"] if ensemble=="NPT" else None),
             time_equilibration=group.attrs["time_equilibration (fs)"],
             n_removed_trans_dof=group.attrs["n_removed_trans_dof"],
-            n_removed_rot_dof=group.attrs["n_removed_rot_dof"]
+            n_removed_rot_dof=group.attrs["n_removed_rot_dof"],
+            level_of_theory=level_of_theory,
         )
         
     return traj
@@ -1222,4 +1239,3 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
         ground_truth = None
 
     return ground_truth
-
