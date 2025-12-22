@@ -4,7 +4,6 @@ from typing import Tuple, Literal, Sequence, List
 from pathlib import Path
 import numpy as np
 import numpy.typing as npt
-from mace.calculators import MACECalculator
 import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
@@ -36,14 +35,14 @@ class _AtomicEnergiesCalc:
         Calculate ground-state energies for all unique isolated atoms
         represented in the structure. Spin is selected automatically
         based on the ground-state configurations of isolated atoms
-        defined in pyscf.data.elements.CONFIGURATION.
+        according to pyscf.data.elements.CONFIGURATION.
 
         This is the function that you need to generate isolated
         atomic baseline data for machine learning interatomic
         potentials.
 
         Remember to define the calculator with exactly the same
-        settings (basis set, integral approximations, thresholds)
+        settings (basis set, integral approximations)
         as for the main dataset calculation.
         """
         return mbe_automation.calculators.atomic_energies(
@@ -149,11 +148,11 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
 
     def run_model(
             self,
-            calculator: ASECalculator | MACECalculator,
+            calculator: CALCULATORS,
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: str="default",
+            level_of_theory: str | None = None,
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -276,11 +275,11 @@ class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
 
     def run_model(
             self,
-            calculator: ASECalculator | MACECalculator,
+            calculator: CALCULATORS,
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: str="default",
+            level_of_theory: str | None = None,
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -389,11 +388,11 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
 
     def run_model(
             self,
-            calculator: ASECalculator | MACECalculator,
+            calculator: CALCULATORS,
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: str="default",
+            level_of_theory: str | None = None,
             exec_params: ParallelCPU | None = None,
     ) -> None:
         _run_model(
@@ -673,7 +672,7 @@ def _run_model(
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        level_of_theory: str = "default",
+        level_of_theory: str | None = None,
         exec_params: ParallelCPU | None = None,
 ) -> None:
 
@@ -681,11 +680,30 @@ def _run_model(
         valid_names = [x.__name__ for x in typing.get_args(CALCULATORS)]
         raise TypeError(
             f"Invalid calculator. Expected one of {valid_names}, "
-            f"got {type(calculator).__name__}."
+            f"got {type(calculator).__name__}. \n"
+            f"Use a class imported from mbe_automation.calculators."
         )
     
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
-    
+
+    if (energies or forces) and structure.ground_truth is None:
+        structure.ground_truth = mbe_automation.storage.GroundTruth()
+
+    if level_of_theory is None:
+        level_of_theory = calculator.level_of_theory
+
+    if energies and mbe_automation.storage.ground_truth.energies:
+        raise ValueError(
+            f"{level_of_theory} data already present in ground_truth.energies. "
+            f"Specify a custom level_of_theory or run a different model if it's a mistake."
+        )
+
+    if forces and mbe_automation.storage.ground_truth.energies:
+        raise ValueError(
+            f"{level_of_theory} data already present in ground_truth.forces. "
+            f"Specify a custom level_of_theory or run a different model if it's a mistake."
+        )
+
     if exec_params is None:
         exec_params = ParallelCPU.recommended()
 
@@ -705,16 +723,10 @@ def _run_model(
         structure.feature_vectors = d
         structure.feature_vectors_type = feature_vectors_type
 
-    if level_of_theory == "default":
-        if energies: structure.E_pot = E_pot
-        if forces: structure.forces = F
-
-    if level_of_theory != "default" and structure.ground_truth is None:
-        structure.ground_truth = mbe_automation.storage.GroundTruth()
-
-    if level_of_theory != "default":
-        if energies: structure.ground_truth.energies[level_of_theory] = E_pot
-        if forces: structure.ground_truth.forces[level_of_theory] = F
+    if energies:
+        structure.ground_truth.energies[level_of_theory] = E_pot
+    if forces:
+        structure.ground_truth.forces[level_of_theory] = F
 
     return
 

@@ -119,7 +119,7 @@ def to_xyz_training_set(
     delta_learning = isinstance(level_of_theory, dict)
 
     if delta_learning:
-        if not ("target" in level_of_theory and "baseline" in level_of_theory):
+        if not isinstance(level_of_theory, dict[Literal["target", "baseline"], str]):
             raise ValueError("level_of_theory must specify target and baseline methods.")
     
     if atomic_energies is not None:
