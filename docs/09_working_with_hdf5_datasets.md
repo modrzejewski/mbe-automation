@@ -59,7 +59,7 @@ print(keys)
 | --- | --- |
 | `DatasetKeys.periodic()` | Selects systems with periodic boundary conditions. |
 | `DatasetKeys.finite()` | Selects non-periodic systems (e.g., isolated molecules or clusters). |
-| `DatasetKeys.with_feature_vectors()` | Selects entries that contain computed MLIP feature vectors. |
+| `DatasetKeys.with_ground_truth()` | Selects entries that contain ground truth data (energies/forces). |
 | `DatasetKeys.with_delta_learning_data()` | Selects entries that contain reference data for delta learning. |
 
 **Path-Based Filters**
@@ -159,7 +159,7 @@ from mbe_automation import DatasetKeys, FiniteSubsystem, Dataset
 dataset_file = "training_set.hdf5"
 training_dataset = Dataset()
 
-for key in DatasetKeys(dataset_file).finite_subsystems().with_feature_vectors():
+for key in DatasetKeys(dataset_file).finite_subsystems().with_ground_truth():
     subsystem = FiniteSubsystem.read(dataset=dataset_file, key=key)
 
     # Subsample: Select 10 diverse frames using farthest point sampling

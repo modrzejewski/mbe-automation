@@ -9,7 +9,7 @@ from typing import Set, List, Literal, Iterator
 class DatasetKey:
     key: str
     is_periodic: bool
-    has_feature_vectors: bool | None
+    has_ground_truth: bool | None
     has_delta_learning_data: bool | None
     contains_exactly_n_molecules: int | None
     dataclass: Literal[
@@ -60,25 +60,25 @@ class DatasetKeys:
                     return
             
             if dataclass_attr == "Structure" or dataclass_attr == "Trajectory":
-                has_feature_vectors = "feature_vectors" in obj
+                has_ground_truth = "ground_truth" in obj
                 has_delta_learning_data = "delta" in obj
                 is_periodic = bool(obj.attrs.get("periodic", False))
                 contains_exactly_n_molecules = None
 
             elif dataclass_attr == "MolecularCrystal":
-                has_feature_vectors = "feature_vectors" in obj["supercell"]
+                has_ground_truth = "ground_truth" in obj["supercell"]
                 has_delta_learning_data = "delta" in obj["supercell"]
                 is_periodic = True
                 contains_exactly_n_molecules = obj.attrs.get("n_molecules")
 
             elif dataclass_attr == "FiniteSubsystem":
-                has_feature_vectors = "feature_vectors" in obj["cluster_of_molecules"]
+                has_ground_truth = "ground_truth" in obj["cluster_of_molecules"]
                 has_delta_learning_data = "delta" in obj["cluster_of_molecules"]
                 is_periodic = False
                 contains_exactly_n_molecules = obj.attrs.get("n_molecules")
 
             elif dataclass_attr in ["ForceConstants", "BrillouinZonePath", "EOSCurves"]:
-                has_feature_vectors = None
+                has_ground_truth = None
                 has_delta_learning_data = None
                 is_periodic = True
                 contains_exactly_n_molecules = None
@@ -86,7 +86,7 @@ class DatasetKeys:
             self._items.append(DatasetKey(
                 key=name,
                 is_periodic=is_periodic,
-                has_feature_vectors=has_feature_vectors,
+                has_ground_truth=has_ground_truth,
                 has_delta_learning_data=has_delta_learning_data,
                 contains_exactly_n_molecules=contains_exactly_n_molecules,
                 dataclass=dataclass_attr
@@ -151,8 +151,8 @@ class DatasetKeys:
     def finite(self) -> DatasetKeys:
         return self._filter(lambda x: not x.is_periodic)
 
-    def with_feature_vectors(self) -> DatasetKeys:
-        return self._filter(lambda x: x.has_feature_vectors)
+    def with_ground_truth(self) -> DatasetKeys:
+        return self._filter(lambda x: x.has_ground_truth)
 
     def with_delta_learning_data(self) -> DatasetKeys:
         return self._filter(lambda x: x.has_delta_learning_data)
@@ -216,4 +216,3 @@ def tree(dataset: str):
                 print_recursive(name, obj, "", is_last)
     except Exception as e:
         print(f"Error reading dataset file: {e}")
-
