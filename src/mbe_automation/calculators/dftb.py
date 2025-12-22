@@ -104,6 +104,18 @@ class DFTBCalculator(Dftb):
 
     def _initialize_backend(self, atoms):
         if self.manage_3ob_params:
+            # First, clean up any existing element-specific parameters to avoid
+            # crashing DFTB+ with parameters for elements not present in the structure.
+            keys_to_remove = []
+            for key in self.parameters:
+                if key.startswith('Hamiltonian_MaxAngularMomentum_') or \
+                   key.startswith('Hamiltonian_HubbardDerivs_'):
+                    keys_to_remove.append(key)
+
+            for key in keys_to_remove:
+                del self.parameters[key]
+
+            # Then, populate parameters for the current elements
             unique_elements = np.unique(atoms.get_chemical_symbols())
             for element in unique_elements:
                 if element in MAX_ANGULAR_MOMENTA_3OB_3_1:
