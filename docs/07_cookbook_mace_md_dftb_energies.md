@@ -289,11 +289,10 @@ Compute feature vectors for the finite clusters to enable diverse subsampling.
 **Input:** `step_6.py`
 
 ```python
-from mace.calculators import MACECalculator
 import numpy as np
 import itertools
 
-import mbe_automation
+from mbe_automation.calculators import MACE
 from mbe_automation import Structure, FiniteSubsystem, Dataset
 
 work_dir = "urea"
@@ -303,10 +302,9 @@ pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
 temperatures_K = np.array([300.0])
 cluster_sizes = [1, 2, 3, 4, 5, 6, 7, 8]
 
-mace_calc = MACECalculator(
-    model_paths=os.path.expanduser("~/models/mace/mace-mh-1.model"),
-    head="omol",
-    device="cuda"
+mace_calc = MACE(
+    model_path="~/models/mace/mace-mh-1.model",
+    head="omol"
 )
 
 for T, p in itertools.product(temperatures_K, pressures_GPa):
