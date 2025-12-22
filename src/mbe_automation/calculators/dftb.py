@@ -175,7 +175,7 @@ def _params_spin(system: ase.Atoms):
     n_unpaired = system.info.get("n_unpaired_electrons", 0)
     if n_unpaired > 0:
         params["Hamiltonian_SpinPolarization_"] = "Colinear"  
-        params["Hamiltonian_SpinPolarization_UnpairedElectrons"] = n_unpaired_electrons
+        params["Hamiltonian_SpinPolarization_UnpairedElectrons"] = n_unpaired
 
     return params
     
