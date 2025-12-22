@@ -2,6 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 import ase
 from ase.calculators.dftb import Dftb
+from ase.calculators.calculator import all_changes
 import os.path
 import numpy as np
 
@@ -85,11 +86,31 @@ class DFTBCalculator(Dftb):
     def __init__(
             self,
             level_of_theory: str = "semiempirical",
+            manage_3ob_params: bool = False,
             **kwargs
     ):
         
         self.level_of_theory = level_of_theory
+        self.manage_3ob_params = manage_3ob_params
         super().__init__(**kwargs)
+
+    def calculate(self, atoms=None, properties=['energy', 'forces'], system_changes=all_changes):
+        current_atoms = atoms if atoms is not None else self.atoms
+        if current_atoms is None:
+             raise ValueError("Atoms object must be provided to calculate.")
+
+        self._initialize_backend(current_atoms)
+        super().calculate(current_atoms, properties, system_changes)
+
+    def _initialize_backend(self, atoms):
+        if self.manage_3ob_params:
+            unique_elements = np.unique(atoms.get_chemical_symbols())
+            for element in unique_elements:
+                if element in MAX_ANGULAR_MOMENTA_3OB_3_1:
+                    self.parameters[f'Hamiltonian_MaxAngularMomentum_{element}'] = MAX_ANGULAR_MOMENTA_3OB_3_1[element]
+                    self.parameters[f'Hamiltonian_HubbardDerivs_{element}'] = HUBBARD_DERIVATIVES_3OB_3_1[element]
+                else:
+                    print(f"Warning: No predefined MaxAngularMomentum/HubbardDerivs params for element {element}. Please add it manually.")
     
     def for_relaxation(
             self,
@@ -123,6 +144,7 @@ class DFTBCalculator(Dftb):
 
         return DFTBCalculator(
             level_of_theory=self.level_of_theory,
+            manage_3ob_params=self.manage_3ob_params,
             atoms=self.atoms,
             kpts=self.kpts,
             directory=work_dir,
@@ -169,36 +191,19 @@ def GFN1_xTB():
 def GFN2_xTB():
     return _GFN_xTB("GFN2-xTB")
 
-def DFTB_Plus_MBD(elements):
+def DFTB_Plus_MBD():
 
     kpts = [1, 1, 1]
     params_dir = params_dir_3ob_3_1()
     params_dir_str = f"{params_dir}{os.path.sep}"
     scc_tolerance = SCC_TOLERANCE
     
-    # Get unique elements in the structure
-    unique_elements = np.unique(elements)
-    #
-    # Select parameters from the full set
-    #
-    max_angular_momentum_params = {}
-    hubbard_params = {}
-    for element in unique_elements:
-        if element in MAX_ANGULAR_MOMENTA_3OB_3_1:
-            key = f'Hamiltonian_MaxAngularMomentum_{element}'
-            max_angular_momentum_params[key] = MAX_ANGULAR_MOMENTA_3OB_3_1[element]
-            key = f'Hamiltonian_HubbardDerivs_{element}'
-            hubbard_params[key] = HUBBARD_DERIVATIVES_3OB_3_1[element]
-        else:
-            print(f"Warning: No predefined MaxAngularMomentum/HubbardDerivs params for element {element}. Please add it manually.")
-
     return DFTBCalculator(
         level_of_theory="dftb3+mbd",
+        manage_3ob_params=True,
         Hamiltonian_ThirdOrderFull='Yes',
         Hamiltonian_MaxAngularMomentum_="",
-        **max_angular_momentum_params,
         Hamiltonian_HubbardDerivs_="",
-        **hubbard_params,
         Hamiltonian_SCC='Yes',
         Hamiltonian_HCorrection_='Damping',
         Hamiltonian_HCorrection_Exponent = HCORRECTION_EXPONENT_3OB_3_1,
@@ -218,7 +223,7 @@ def DFTB_Plus_MBD(elements):
     )
 
 
-def DFTB3_D4(elements):
+def DFTB3_D4():
     #
     # DFTB3-D4/3ob Hamiltonian applied by Ludik et al. in First-principles
     # Models of Polymorphism of Pharmaceuticals: Maximizing the Accuracy-to-Cost
@@ -237,28 +242,12 @@ def DFTB3_D4(elements):
     params_dir_str = f"{params_dir}{os.path.sep}"
     scc_tolerance = SCC_TOLERANCE
     
-    # Get unique elements in the structure
-    unique_elements = np.unique(elements)
-    
-    # Create max_angular_momentum parameters dynamically
-    max_angular_momentum_params = {}
-    hubbard_params = {}
-    for element in unique_elements:
-        if element in MAX_ANGULAR_MOMENTA_3OB_3_1:
-            key = f'Hamiltonian_MaxAngularMomentum_{element}'
-            max_angular_momentum_params[key] = MAX_ANGULAR_MOMENTA_3OB_3_1[element]
-            key = f'Hamiltonian_HubbardDerivs_{element}'
-            hubbard_params[key] = HUBBARD_DERIVATIVES_3OB_3_1[element]
-        else:
-            print(f"Warning: No predefined MaxAngularMomentum/HubbardDerivs params for element {element}. Please add it manually.")
-
     return DFTBCalculator(
         level_of_theory="dftb3-d4",
+        manage_3ob_params=True,
         Hamiltonian_ThirdOrderFull='Yes',
         Hamiltonian_MaxAngularMomentum_="",
-        **max_angular_momentum_params,
         Hamiltonian_HubbardDerivs_="",
-        **hubbard_params,
         Hamiltonian_SCC='Yes',
         Hamiltonian_HCorrection_='Damping',
         Hamiltonian_HCorrection_Exponent = HCORRECTION_EXPONENT_3OB_3_1,
