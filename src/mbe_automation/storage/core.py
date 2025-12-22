@@ -14,7 +14,7 @@ DATA_FOR_TRAINING = [
     "feature_vectors",
     "potential_energies",
     "forces",
-    "delta",
+    "ground_truth",
 ]
 #
 # Character used as a replacement for ordinary slash "/",
@@ -1157,11 +1157,11 @@ def _save_only(
                 data=structure.forces
             )
 
-        if "delta" in quantities:
+        if "ground_truth" in quantities:
 
             if structure.ground_truth is None:
                 raise RuntimeError(
-                    "Delta learning data are not present in the Structure object."
+                    "Ground truth data are not present in the Structure object."
                 )
 
             _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth)
