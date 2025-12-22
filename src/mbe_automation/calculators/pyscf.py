@@ -59,6 +59,7 @@ BASIS_SETS = [
     "def2-svpd",
     "def2-tzvp",
     "def2-tzvpp",
+    "def2-mtzvpp", # basis set used in r2SCAN-3c
     "def2-tzvpd",
     "def2-tzvppd",
     "def2-qzvp",
