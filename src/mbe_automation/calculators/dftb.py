@@ -2,6 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 import ase
 from ase.calculators.dftb import Dftb as ASE_DFTBCalculator
+from ase.calculators.calculator import all_changes
 import os.path
 import numpy as np
 
@@ -111,7 +112,7 @@ class DFTBCalculator(ASE_DFTBCalculator):
         if current_atoms is None:
              raise ValueError("Atoms object must be provided to DFTBCalculator.calculate.")
 
-        super().init(_initialize_backend(current_atoms))
+        super().init(**self._initialize_backend(current_atoms))
         super().calculate(current_atoms, properties, system_changes)
         
     def for_relaxation(
@@ -167,10 +168,10 @@ def _params_GFN_xTB(method: str, system: ase.Atoms):
     }
 
 def _params_GFN1_xTB(system: ase.Atoms):
-    return _GFN_xTB("GFN1-xTB", system)
+    return _params_GFN_xTB("GFN1-xTB", system)
 
 def _params_GFN2_xTB(system: ase.Atoms):
-    return _GFN_xTB("GFN2-xTB", system)
+    return _params_GFN_xTB("GFN2-xTB", system)
 
 def _params_DFTB_Plus_MBD(system: ase.Atoms):
 
@@ -194,8 +195,8 @@ def _params_DFTB_Plus_MBD(system: ase.Atoms):
             key = f'Hamiltonian_HubbardDerivs_{element}'
             hubbard_params[key] = HUBBARD_DERIVATIVES_3OB_3_1[element]
         else:
-            raise ValueError(f"Missing MaxAngularMomentum/HubbardDerivs params "
-                             f"for element {element}.")
+            raise ValueError(f"Missing MaxAngularMomentum/HubbardDerivs "
+                             f"params for element {element}.")
 
     return {
         "Hamiltonian_ThirdOrderFull": 'Yes',
@@ -346,4 +347,3 @@ def DFTB3_D4():
         level_of_theory="dftb3-d4",
         backend=_params_DFTB3_D4
     )
-

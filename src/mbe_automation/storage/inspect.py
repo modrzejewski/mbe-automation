@@ -11,6 +11,7 @@ class DatasetKey:
     is_periodic: bool
     has_feature_vectors: bool | None
     has_ground_truth: bool | None
+    ground_truth_levels: List[str] | None
     contains_exactly_n_molecules: int | None
     dataclass: Literal[
         "Structure",
@@ -49,6 +50,11 @@ class DatasetKeys:
             self._items = []
 
     def _load_from_file(self, filename: str):
+        def _get_levels(group):
+            if "levels_of_theory" in group.attrs:
+                return list(group.attrs["levels_of_theory"])
+            return []
+
         def visit_func(name, obj):
             dataclass_attr = obj.attrs.get("dataclass")
             if not dataclass_attr:
@@ -59,21 +65,29 @@ class DatasetKeys:
                 if parent_dataclass in ["FiniteSubsystem", "MolecularCrystal", "ForceConstants"]:
                     return
             
+            ground_truth_levels = None
+
             if dataclass_attr == "Structure" or dataclass_attr == "Trajectory":
                 has_feature_vectors = "feature_vectors" in obj
                 has_ground_truth = "ground_truth" in obj
+                if has_ground_truth:
+                    ground_truth_levels = _get_levels(obj["ground_truth"])
                 is_periodic = bool(obj.attrs.get("periodic", False))
                 contains_exactly_n_molecules = None
 
             elif dataclass_attr == "MolecularCrystal":
                 has_feature_vectors = "feature_vectors" in obj["supercell"]
                 has_ground_truth = "ground_truth" in obj["supercell"]
+                if has_ground_truth:
+                    ground_truth_levels = _get_levels(obj["supercell"]["ground_truth"])
                 is_periodic = True
                 contains_exactly_n_molecules = obj.attrs.get("n_molecules")
 
             elif dataclass_attr == "FiniteSubsystem":
                 has_feature_vectors = "feature_vectors" in obj["cluster_of_molecules"]
                 has_ground_truth = "ground_truth" in obj["cluster_of_molecules"]
+                if has_ground_truth:
+                    ground_truth_levels = _get_levels(obj["cluster_of_molecules"]["ground_truth"])
                 is_periodic = False
                 contains_exactly_n_molecules = obj.attrs.get("n_molecules")
 
@@ -88,6 +102,7 @@ class DatasetKeys:
                 is_periodic=is_periodic,
                 has_feature_vectors=has_feature_vectors,
                 has_ground_truth=has_ground_truth,
+                ground_truth_levels=ground_truth_levels,
                 contains_exactly_n_molecules=contains_exactly_n_molecules,
                 dataclass=dataclass_attr
             ))
@@ -154,8 +169,11 @@ class DatasetKeys:
     def with_feature_vectors(self) -> DatasetKeys:
         return self._filter(lambda x: x.has_feature_vectors)
 
-    def with_ground_truth(self) -> DatasetKeys:
-        return self._filter(lambda x: x.has_ground_truth)
+    def with_ground_truth(self, level_of_theory: str | None = None) -> DatasetKeys:
+        if level_of_theory is None:
+            return self._filter(lambda x: x.has_ground_truth)
+        else:
+            return self._filter(lambda x: x.has_ground_truth and x.ground_truth_levels and level_of_theory in x.ground_truth_levels)
 
     def starts_with(self, root_key: str) -> DatasetKeys:
         """Select keys under a specific root group."""
@@ -216,4 +234,3 @@ def tree(dataset: str):
                 print_recursive(name, obj, "", is_last)
     except Exception as e:
         print(f"Error reading dataset file: {e}")
-
