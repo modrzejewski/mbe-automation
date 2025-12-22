@@ -92,7 +92,7 @@ config = Enthalpy(
     temperatures_K=temperatures_K,
     pressures_GPa=pressures_GPa,
     dataset=dataset,
-    root_key="training/md"
+    root_key="all_md_frames"
 )
 mbe_automation.run(config)
 ```
@@ -115,9 +115,7 @@ mace_calc = MACE(
     head="omol",
 )
 
-keys = DatasetKeys(dataset).trajectories().periodic().starts_with("training/md")
-
-for key in keys:
+for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_frames"):
     frames = Structure.read(
         dataset=dataset,
         key=key
@@ -152,12 +150,11 @@ dataset = "md_structures.hdf5"
 crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
 calculator = DFTB3_D4(crystal.get_chemical_symbols())
 
-keys = DatasetKeys(dataset).trajectories().periodic().with_feature_vectors().starts_with("training/md")
-
-for key in keys:
+for key in DatasetKeys(dataset).trajectories().periodic().with_feature_vectors().starts_with("all_md_frames"):
     print(f"Processing {key}")
 
-    write_key = key.replace("training/md/trajectories", "training/dftb3_d4/structures") + "/subsampled_frames"
+    system_label = key.split(sep="/")[-1]
+    write_key = f"subsampled_md_frames/structures/{system_label}"
 
     subsampled_frames = Structure.read(
         dataset=dataset,
@@ -192,10 +189,8 @@ dataset = "md_structures.hdf5"
 train_set = Dataset()
 val_set = Dataset()
 test_set = Dataset()
-
-keys = DatasetKeys(dataset).structures().periodic().with_ground_truth().starts_with("training/dftb3_d4")
-
-for key in keys:
+ 
+for key in DatasetKeys(dataset).structures().periodic().with_ground_truth():
     print(f"Processing {key}")
 
     subsampled_frames = Structure.read(
@@ -236,9 +231,7 @@ from mbe_automation import Structure, DatasetKeys
 
 dataset = "md_structures.hdf5"
 
-keys = DatasetKeys(dataset).trajectories().periodic().starts_with("training/md")
-
-for key in keys:
+for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_frames"):
     print(f"Generating finite clusters for {key}")
     
     pbc_frames = Structure.read(
@@ -246,20 +239,20 @@ for key in keys:
         key=key
     )
     molecular_crystal = pbc_frames.detect_molecules()
-    clusters = molecular_crystal.extract_finite_subsystem()
+    clusters = molecular_crystal.extract_finite_subsystems()
 
-    crystal_key = key.replace("trajectories", "structures")
+    system_label = key.split(sep="/")[-1]
 
     molecular_crystal.save(
         dataset=dataset,
-        key=crystal_key
+        key=f"all_md_frames/molecular_crystals/{system_label}"
     )
     
     for cluster in clusters:
         n_molecules = cluster.n_molecules
         cluster.save(
             dataset=dataset,
-            key=f"{crystal_key}/finite/n={n_molecules}"
+            key=f"all_md_frames/finite_subsystems/n={n_molecules}/{system_label}"
         )
         
 print("All calculations completed")
@@ -282,7 +275,7 @@ mace_calc = MACE(
     head="omol"
 )
 
-keys = DatasetKeys(dataset).finite_subsystems().starts_with("training/md")
+keys = DatasetKeys(dataset).finite_subsystems().starts_with("all_md_frames")
 
 for key in keys:
     print(f"Processing {key}")
@@ -323,12 +316,8 @@ dataset = "md_structures.hdf5"
 crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
 calculator = DFTB3_D4(crystal.get_chemical_symbols())
 
-keys = DatasetKeys(dataset).finite_subsystems().with_feature_vectors().starts_with("training/md")
-
-for key in keys:
+for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().starts_with("all_md_frames")
     print(f"Processing {key}")
-
-    write_key = key.replace("training/md", "training/dftb3_d4")
 
     cluster = FiniteSubsystem.read(
         dataset=dataset,
@@ -341,9 +330,12 @@ for key in keys:
         forces=True
     )
 
+    system_label = key.split(sep="/")[-1]
+    n_molecules = cluster.n_molecules
+
     cluster.save(
         dataset=dataset,
-        key=write_key
+        key=f"subsampled_md_frames/finite_subsystems/n={n_molecules}/{system_label}"
     )
     
 print("All calculations completed")
