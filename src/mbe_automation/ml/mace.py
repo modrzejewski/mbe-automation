@@ -119,7 +119,7 @@ def to_xyz_training_set(
     delta_learning = isinstance(level_of_theory, dict)
 
     if delta_learning:
-        if not isinstance(level_of_theory, dict[Literal["target", "baseline"], str]):
+        if not ("target" in level_of_theory and "baseline" in level_of_theory):
             raise ValueError("level_of_theory must specify target and baseline methods.")
     
     if atomic_energies is not None:
@@ -127,7 +127,12 @@ def to_xyz_training_set(
         atomic_energies_available = True
         
         if delta_learning:
-            assert isinstance(atomic_energies, dict[str, dict[np.int64, np.float64]])
+            assert (
+                isinstance(atomic_energies, dict) and
+                level_of_theory["target"] in atomic_energies and
+                level_of_theory["baseline"] in atomic_energies
+            ), ("atomic_energies must a dictionary which contains data "
+                "for target and baseline levels of theory.")
             
             atomic_numbers_target, E_atomic_target = _process_atomic_energies(
                 atomic_energies[level_of_theory["target"]]
