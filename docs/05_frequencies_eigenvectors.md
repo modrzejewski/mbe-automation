@@ -9,7 +9,6 @@ To perform this analysis, you first need to generate a properties dataset using 
 ```python
 import numpy as np
 from mbe_automation.calculators import MACE
-import torch
 
 import mbe_automation
 from mbe_automation.storage import from_xyz_file

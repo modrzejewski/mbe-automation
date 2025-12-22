@@ -18,7 +18,6 @@ The initial setup involves importing the necessary modules and defining the syst
 import numpy as np
 import os.path
 from mbe_automation.calculators import MACE
-import torch
 
 import mbe_automation.configs
 import mbe_automation.workflows
@@ -274,7 +273,6 @@ mbe_automation.dynamics.harmonic.display.band_structure(
 import numpy as np
 import os.path
 from mbe_automation.calculators import MACE
-import torch
 
 import mbe_automation.configs
 import mbe_automation.workflows

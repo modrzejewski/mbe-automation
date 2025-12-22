@@ -28,7 +28,6 @@ The initial setup involves importing the necessary modules and defining the para
 import numpy as np
 import os.path
 from mbe_automation.calculators import MACE
-import torch
 
 import mbe_automation
 from mbe_automation.configs.md import ClassicalMD
@@ -384,7 +383,6 @@ For a detailed discussion of performance considerations, see the [Computational 
 import numpy as np
 import os.path
 from mbe_automation.calculators import MACE
-import torch
 
 import mbe_automation
 from mbe_automation.configs.md import ClassicalMD

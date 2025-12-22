@@ -15,7 +15,6 @@ This cookbook demonstrates how to create a dataset for **Delta Learning** using 
 First, we set up the necessary imports and configuration variables. We specify the HDF5 dataset containing our structures and define the thermodynamic conditions (temperature and pressure) and cluster sizes we wish to process.
 
 ```python
-import os
 import itertools
 import numpy as np
 from mbe_automation.calculators import MACE

@@ -60,7 +60,6 @@ Run a molecular dynamics simulation to generate structures of a molecular crysta
 
 ```python
 from mbe_automation.calculators import MACE
-import os.path
 import numpy as np
 
 import mbe_automation
@@ -108,7 +107,6 @@ Calculate feature vectors for every frame in the generated trajectories to enabl
 
 ```python
 from mbe_automation.calculators import MACE
-import os.path
 import numpy as np
 import itertools
 
@@ -298,7 +296,6 @@ Compute feature vectors for the finite clusters to enable diverse subsampling.
 
 ```python
 from mace.calculators import MACECalculator
-import os.path
 import numpy as np
 import itertools
 

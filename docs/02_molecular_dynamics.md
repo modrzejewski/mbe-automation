@@ -17,7 +17,6 @@ The initial setup requires importing the necessary modules and defining the syst
 import numpy as np
 import os.path
 from mbe_automation.calculators import MACE
-import torch
 
 import mbe_automation.configs
 import mbe_automation.workflows
@@ -212,7 +211,6 @@ properties.hdf5
 import numpy as np
 import os.path
 from mbe_automation.calculators import MACE
-import torch
 
 import mbe_automation.configs
 import mbe_automation.workflows
