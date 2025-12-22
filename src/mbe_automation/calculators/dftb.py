@@ -95,7 +95,7 @@ def params_dir_3ob_3_1():
 
 class DFTBCalculator(ASE_DFTBCalculator):
     """
-    DFTB+ calculator
+    DFTB+ calculator with a stateless initialization.
     """
 
     def __init__(
