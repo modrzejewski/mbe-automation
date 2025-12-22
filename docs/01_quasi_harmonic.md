@@ -19,7 +19,6 @@ import numpy as np
 from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
-import mbe_automation.workflows
 # Import Minimum if you need to customize relaxation parameters
 from mbe_automation.configs.structure import Minimum
 from mbe_automation.storage import from_xyz_file
@@ -271,7 +270,6 @@ import numpy as np
 from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
-import mbe_automation.workflows
 from mbe_automation.configs.structure import Minimum
 from mbe_automation.storage import from_xyz_file
 
