@@ -4,11 +4,11 @@ import numpy as np
 import numpy.typing as npt
 import pyscf
 import ase
-from mace.calculators import MACECalculator
+from mbe_automation.calculators.pyscf import PySCFCalculator
+from mbe_automation.calculators.dftb import DFTBCalculator
+from mbe_automation.calculators.mace import MACE
 
-from mbe_automation.calculators.pyscf import DFT, HF
-
-SUPPORTED_CALCULATORS = MACECalculator | DFT | HF
+SUPPORTED_CALCULATORS = PySCFCalculator | DFTBCalculator | MACE
 
 def ground_state_spin(z: int) -> int:
     """
