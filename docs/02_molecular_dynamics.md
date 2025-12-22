@@ -247,39 +247,18 @@ md_config = mbe_automation.configs.md.Enthalpy(
 mbe_automation.run(md_config)
 ```
 
-### SLURM Script (`mace-gpu.py`)
+### Bash Script (`run.sh`)
 
-```python
-#!/usr/bin/env python3
-#SBATCH --job-name="MACE"
-#SBATCH -A pl0415-02
-#SBATCH --partition=tesla
-#SBATCH --nodes 1
-#SBATCH --ntasks-per-node=1 --constraint=h100
-#SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --time=24:00:00
-#SBATCH --mem=180gb
+```bash
+#!/bin/bash
 
-import os
-import os.path
-import sys
-import subprocess
+# Setup environment
+export OMP_NUM_THREADS=8
+export MKL_NUM_THREADS=8
 
-InpScript = "md.py"
-LogFile = "md.log"
+module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
+source ~/.virtualenvs/compute-env/bin/activate
 
-os.environ["OMP_NUM_THREADS"] = "8"
-os.environ["MKL_NUM_THREADS"] = "8"
-
-virtual_environment = os.path.expanduser("~/.virtualenvs/compute-env")
-virtual_environment = os.path.realpath(virtual_environment)
-activate_env = os.path.realpath(os.path.join(virtual_environment, "bin", "activate"))
-cmd = f"module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10 && . {activate_env} && python {InpScript}"
-
-with open(LogFile, "w") as log_file:
-    process = subprocess.Popen(cmd, shell=True, stdout=log_file,
-                               stderr=subprocess.STDOUT, bufsize=1,
-                               universal_newlines=True)
-    process.communicate()
+# Run the script
+python md.py > md.log 2>&1
 ```

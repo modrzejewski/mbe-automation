@@ -435,23 +435,16 @@ print("All calculations completed")
 
 Train the MACE model using all generated data files (both PBC and finite clusters).
 
-**Job Submission Script:** `train_mace.sh`
+**Bash Script:** `train_mace.sh`
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="MACE_Train"
-#SBATCH -A pl0415-02
-#SBATCH --partition=tesla --constraint=h100
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --time=48:00:00
-#SBATCH --mem=180gb
 
+# Setup environment
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
+# Run training
 python -m mace.cli.run_train \
     --name="urea_dftb3_d4" \
     --train_file="train_pbc.xyz train_finite_clusters.xyz" \
@@ -487,22 +480,16 @@ python -m mace.cli.run_train \
 
 ## Computational Resources
 
-### GPU Job Submission (Steps 1, 2, 5, 6)
+### GPU Tasks (Steps 1, 2, 5, 6)
 
-Use this SLURM script to run the GPU-intensive steps.
+Use this script to run the GPU-intensive steps.
+
+**Bash Script:** `run_gpu_tasks.sh`
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="MACE_MD_Gen"
-#SBATCH -A pl0415-02
-#SBATCH --partition=tesla --constraint=h100
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --time=24:00:00
-#SBATCH --mem=180gb
 
+# Setup environment
 export OMP_NUM_THREADS=8
 export MKL_NUM_THREADS=8
 
@@ -518,21 +505,16 @@ python step_5.py > step_5.log 2>&1
 python step_6.py > step_6.log 2>&1
 ```
 
-### CPU Job Submission (Steps 3, 4, 7, 8)
+### CPU Tasks (Steps 3, 4, 7, 8)
 
-Use this SLURM script to run the CPU-intensive labeling and export steps.
+Use this script to run the CPU-intensive labeling and export steps.
+
+**Bash Script:** `run_cpu_tasks.sh`
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="ref_energies_forces"
-#SBATCH -A pl0415-02
-#SBATCH --partition=altair
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=48
-#SBATCH --time=48:00:00
-#SBATCH --mem=180gb
 
+# Setup environment
 module load oneAPI python/3.11.9-gcc-11.5.0-5l7rvgy
 source ~/.virtualenvs/compute-env/bin/activate
 
