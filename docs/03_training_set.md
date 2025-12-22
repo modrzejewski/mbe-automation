@@ -388,7 +388,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "path/to/your/solid.xyz"
-mlip_parameter_file = "path/to/your/model.model"
+mlip_parameter_file = "path/to/your/mace.model"
 temperature_K = 298.15
 dataset = "training_set.hdf5"
 
