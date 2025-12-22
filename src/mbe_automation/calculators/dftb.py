@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 import ase
+from ase.calculators.calculator import all_changes
 from ase.calculators.dftb import Dftb as ASE_DFTBCalculator
 import os.path
 import numpy as np
