@@ -102,7 +102,8 @@ class DFTBCalculator(ASE_DFTBCalculator):
             self,
             level_of_theory: str,
             backend,
-    ):        
+    ):
+        super().__init__()
         self.level_of_theory = level_of_theory
         self._initialize_backend = backend
 
@@ -111,7 +112,7 @@ class DFTBCalculator(ASE_DFTBCalculator):
         if current_atoms is None:
              raise ValueError("Atoms object must be provided to DFTBCalculator.calculate.")
 
-        super().init(_initialize_backend(current_atoms))
+        super().__init__(**_initialize_backend(current_atoms))
         super().calculate(current_atoms, properties, system_changes)
         
     def for_relaxation(
