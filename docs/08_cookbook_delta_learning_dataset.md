@@ -145,12 +145,19 @@ Finally, once the datasets are generated, you can train a Delta Learning MACE mo
 
 ```bash
 #!/bin/bash
+#SBATCH --job-name="MACE_Train"
+#SBATCH -A pl0415-02
+#SBATCH --partition=tesla --constraint=h100
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --mem=180gb
 
-# Setup environment
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
-# Run training
 python -m mace.cli.run_train \
     --name="urea_dftb3_d4_delta" \
     --train_file="datasets_11.12.2025/delta_train_clusters.xyz" \

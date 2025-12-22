@@ -439,12 +439,19 @@ Train the MACE model using all generated data files (both PBC and finite cluster
 
 ```bash
 #!/bin/bash
+#SBATCH --job-name="MACE_Train"
+#SBATCH -A pl0415-02
+#SBATCH --partition=tesla --constraint=h100
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=48:00:00
+#SBATCH --mem=180gb
 
-# Setup environment
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
-# Run training
 python -m mace.cli.run_train \
     --name="urea_dftb3_d4" \
     --train_file="train_pbc.xyz train_finite_clusters.xyz" \
@@ -488,8 +495,16 @@ Use this script to run the GPU-intensive steps.
 
 ```bash
 #!/bin/bash
+#SBATCH --job-name="MACE_MD_Gen"
+#SBATCH -A pl0415-02
+#SBATCH --partition=tesla --constraint=h100
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --mem=180gb
 
-# Setup environment
 export OMP_NUM_THREADS=8
 export MKL_NUM_THREADS=8
 
@@ -513,8 +528,15 @@ Use this script to run the CPU-intensive labeling and export steps.
 
 ```bash
 #!/bin/bash
+#SBATCH --job-name="ref_energies_forces"
+#SBATCH -A pl0415-02
+#SBATCH --partition=altair
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=48
+#SBATCH --time=48:00:00
+#SBATCH --mem=180gb
 
-# Setup environment
 module load oneAPI python/3.11.9-gcc-11.5.0-5l7rvgy
 source ~/.virtualenvs/compute-env/bin/activate
 

@@ -304,14 +304,21 @@ mbe_automation.run(properties_config)
 
 ```bash
 #!/bin/bash
+#SBATCH --job-name="MACE"
+#SBATCH -A pl0415-02
+#SBATCH --partition=tesla
+#SBATCH --nodes 1
+#SBATCH --ntasks-per-node=1 --constraint=h100
+#SBATCH --gpus-per-node=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=24:00:00
+#SBATCH --mem=180gb
 
-# Setup environment
 export OMP_NUM_THREADS=8
 export MKL_NUM_THREADS=8
 
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
-# Run the script
 python quasi_harmonic.py > quasi_harmonic.log 2>&1
 ```
