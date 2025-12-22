@@ -26,7 +26,6 @@ The initial setup involves importing the necessary modules and defining the para
 
 ```python
 import numpy as np
-import os.path
 from mbe_automation.calculators import MACE
 
 import mbe_automation
@@ -40,8 +39,7 @@ from mbe_automation.storage import from_xyz_file
 xyz_solid = "path/to/your/solid.xyz"
 mlip_parameter_file = "path/to/your/mace.model"
 temperature_K = 298.15
-work_dir = os.path.abspath(os.path.dirname(__file__))
-dataset = os.path.join(work_dir, "training_set.hdf5")
+dataset = "training_set.hdf5"
 
 mace_calc = MACE(model_path=mlip_parameter_file)
 ```
@@ -67,7 +65,6 @@ md_sampling_config = MDSampling(
         sampling_interval_fs=1000.0,
         supercell_radius=10.0,
     ),
-    work_dir=os.path.join(work_dir, "md_sampling"),
     dataset=dataset,
     root_key="training/md_sampling"
 )
@@ -113,7 +110,6 @@ phonon_sampling_config = PhononSampling(
     amplitude_scan="random",
     time_step_fs=100.0,
     n_frames=20,
-    work_dir=os.path.join(work_dir, "phonon_sampling"),
     dataset=dataset,
     root_key="training/phonon_sampling"
 )
@@ -381,7 +377,6 @@ For a detailed discussion of performance considerations, see the [Computational 
 
 ```python
 import numpy as np
-import os.path
 from mbe_automation.calculators import MACE
 
 import mbe_automation
@@ -395,8 +390,7 @@ from mbe_automation.storage import from_xyz_file
 xyz_solid = "path/to/your/solid.xyz"
 mlip_parameter_file = "path/to/your/model.model"
 temperature_K = 298.15
-work_dir = os.path.abspath(os.path.dirname(__file__))
-dataset = os.path.join(work_dir, "training_set.hdf5")
+dataset = "training_set.hdf5"
 
 mace_calc = MACE(model_path=mlip_parameter_file)
 
@@ -417,7 +411,6 @@ md_sampling_config = MDSampling(
         sampling_interval_fs=1000.0,
         supercell_radius=10.0,
     ),
-    work_dir=os.path.join(work_dir, "md_sampling"),
     dataset=dataset,
     root_key="training/md_sampling"
 )
@@ -452,7 +445,6 @@ phonon_sampling_config = PhononSampling(
     amplitude_scan="random",
     time_step_fs=100.0,
     n_frames=20,
-    work_dir=os.path.join(work_dir, "phonon_sampling"),
     dataset=dataset,
     root_key="training/phonon_sampling"
 )

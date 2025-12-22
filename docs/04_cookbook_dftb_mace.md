@@ -45,7 +45,6 @@ config = Enthalpy(
     md_crystal=md_config,
     temperatures_K=np.array([300.0]),
     pressures_GPa=np.array([0.0001]),
-    work_dir="dftb_md_workdir",
     dataset="dftb_trajectory.hdf5",
     root_key="md_run",
     verbose=1

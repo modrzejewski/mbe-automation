@@ -16,7 +16,6 @@ The initial setup involves importing the necessary modules and defining the syst
 
 ```python
 import numpy as np
-import os.path
 from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
@@ -27,7 +26,6 @@ from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
-work_dir = os.path.abspath(os.path.dirname(__file__))
 
 mace_calc = MACE(model_path="path/to/your/mace.model")
 ```
@@ -50,8 +48,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
-    work_dir=os.path.join(work_dir, "properties"),
-    dataset=os.path.join(work_dir, "properties.hdf5"),
+    dataset="properties.hdf5",
     relaxation=relaxation_config
 )
 ```
@@ -271,7 +268,6 @@ mbe_automation.dynamics.harmonic.display.band_structure(
 
 ```python
 import numpy as np
-import os.path
 from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
@@ -281,7 +277,6 @@ from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
-work_dir = os.path.abspath(os.path.dirname(__file__))
 
 mace_calc = MACE(model_path="path/to/your/model.model")
 
@@ -298,8 +293,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
-    work_dir=os.path.join(work_dir, "properties"),
-    dataset=os.path.join(work_dir, "properties.hdf5"),
+    dataset="properties.hdf5",
     relaxation=relaxation_config
 )
 
