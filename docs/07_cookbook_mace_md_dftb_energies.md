@@ -203,18 +203,9 @@ for key in DatasetKeys(dataset).structures().periodic().with_ground_truth():
     val_set.append(validate)
     test_set.append(test)
 
-train_set.to_mace_dataset(
-    save_path="train_pbc.xyz",
-    learning_strategy="direct"
-)
-val_set.to_mace_dataset(
-    save_path="validate_pbc.xyz",
-    learning_strategy="direct"
-)
-test_set.to_mace_dataset(
-    save_path="test_pbc.xyz",
-    learning_strategy="direct"
-)
+train_set.to_mace_dataset("train_pbc.xyz")
+val_set.to_mace_dataset("validate_pbc.xyz")
+test_set.to_mace_dataset("test_pbc.xyz")
 
 print("All calculations completed")
 ```
@@ -373,18 +364,9 @@ for key in keys:
     val_set.append(validate)
     test_set.append(test)
 
-train_set.to_mace_dataset(
-    save_path="train_finite_clusters.xyz",
-    learning_strategy="direct"
-)
-val_set.to_mace_dataset(
-    save_path="validate_finite_clusters.xyz",
-    learning_strategy="direct"
-)
-test_set.to_mace_dataset(
-    save_path="test_finite_clusters.xyz",
-    learning_strategy="direct"
-)
+train_set.to_mace_dataset("train_finite_clusters.xyz")
+val_set.to_mace_dataset("validate_finite_clusters.xyz")
+test_set.to_mace_dataset("test_finite_clusters.xyz")
 
 print("All calculations completed")
 ```
