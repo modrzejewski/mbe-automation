@@ -19,9 +19,9 @@ class MACE(MACECalculator):
         self.model_path = Path(model_path).expanduser()
         
         if head != "default":
-            self.level_of_theory = f"{model_path.stem}_{head}"
+            self.level_of_theory = f"{self.model_path.stem}_{head}"
         else:
-            self.level_of_theory = f"{model_path.stem}"
+            self.level_of_theory = f"{self.model_path.stem}"
 
         super().__init__(
             model_paths=str(self.model_path),

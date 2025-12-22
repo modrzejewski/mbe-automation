@@ -692,13 +692,13 @@ def _run_model(
     if level_of_theory is None:
         level_of_theory = calculator.level_of_theory
 
-    if energies and mbe_automation.storage.ground_truth.energies:
+    if energies and level_of_theory in structure.ground_truth.energies:
         raise ValueError(
             f"{level_of_theory} data already present in ground_truth.energies. "
             f"Specify a custom level_of_theory or run a different model if it's a mistake."
         )
 
-    if forces and mbe_automation.storage.ground_truth.energies:
+    if forces and level_of_theory in structure.ground_truth.forces:
         raise ValueError(
             f"{level_of_theory} data already present in ground_truth.forces. "
             f"Specify a custom level_of_theory or run a different model if it's a mistake."
