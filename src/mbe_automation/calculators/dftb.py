@@ -193,10 +193,10 @@ def _params_GFN_xTB(method: str, system: ase.Atoms):
     }
 
 def _params_GFN1_xTB(system: ase.Atoms):
-    return _GFN_xTB("GFN1-xTB", system)
+    return _params_GFN_xTB("GFN1-xTB", system)
 
 def _params_GFN2_xTB(system: ase.Atoms):
-    return _GFN_xTB("GFN2-xTB", system)
+    return _params_GFN_xTB("GFN2-xTB", system)
 
 def _params_DFTB_Plus_MBD(system: ase.Atoms):
 
@@ -220,8 +220,8 @@ def _params_DFTB_Plus_MBD(system: ase.Atoms):
             key = f'Hamiltonian_HubbardDerivs_{element}'
             hubbard_params[key] = HUBBARD_DERIVATIVES_3OB_3_1[element]
         else:
-            raise ValueError(f"Missing MaxAngularMomentum/HubbardDerivs params "
-                             f"for element {element}.")
+            raise ValueError(f"Missing MaxAngularMomentum/HubbardDerivs "
+                             f"params for element {element}.")
 
     return {
         "Hamiltonian_ThirdOrderFull": 'Yes',
