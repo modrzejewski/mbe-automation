@@ -114,6 +114,11 @@ class DFTBCalculator(ASE_DFTBCalculator):
              raise ValueError("Atoms object must be provided to DFTBCalculator.calculate.")
 
         super().__init__(**self._initialize_backend(current_atoms))
+        n_unpaired_electrons = current_atoms.info.get("n_unpaired_electrons", 0)
+        if n_unpaired_electrons > 0:
+            self.nspin = 2
+        else:
+            self.nspin = 1
         super().calculate(current_atoms, properties, system_changes)
         
     def for_relaxation(
@@ -152,7 +157,24 @@ class DFTBCalculator(ASE_DFTBCalculator):
             directory=work_dir
         )
 
+def _params_charge(systems: ase.Atoms):
 
+    params = {}
+    charge = system.info.get("charge", 0)
+    if charge > 0:
+        params["Hamiltonian_Charge"] = charge
+
+    return params
+
+def _params_spin(system: ase.Atoms):
+    params = {}
+    n_unpaired = system.info.get("n_unpaired_electrons", 0)
+    if n_unpaired > 0:
+        params["Hamiltonian_SpinPolarization_"] = "Colinear"  
+        params["Hamiltonian_UnpairedElectrons"] = n_unpaired_electrons
+
+    return params
+    
 def _params_GFN_xTB(method: str, system: ase.Atoms):
     kpts = [1, 1, 1]
     scc_tolerance = SCC_TOLERANCE
@@ -161,6 +183,8 @@ def _params_GFN_xTB(method: str, system: ase.Atoms):
         "Hamiltonian_Method": method,
         "Hamiltonian_SCCTolerance": scc_tolerance,
         "Hamiltonian_MaxSCCIterations": 250,
+        **params_spin(system),
+        **params_charge(system),
         "ParserOptions_": "",
         "ParserOptions_ParserVersion": 10,
         "Parallel_": "",
@@ -216,6 +240,8 @@ def _params_DFTB_Plus_MBD(system: ase.Atoms):
         "Hamiltonian_Dispersion_": 'MBD',
         "Hamiltonian_Dispersion_Beta": 0.83,
         "Hamiltonian_Dispersion_KGrid": "1 1 1",
+        **params_spin(system),
+        **params_charge(system),
         "ParserOptions_": "",
         "ParserOptions_ParserVersion": 10,
         "Parallel_": "",
@@ -280,6 +306,8 @@ def _params_DFTB3_D4(system: ase.Atoms):
         "Hamiltonian_Dispersion_s9": 1.0,       # enables 3-body disp
         "Hamiltonian_Dispersion_a1": 0.5523240,
         "Hamiltonian_Dispersion_a2": 4.3537076,
+        **params_spin(system),
+        **params_charge(system),
         "Parallel_": "",
         "Parallel_UseOmpThreads": "Yes",
         "kpts": kpts,
