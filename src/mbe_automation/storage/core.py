@@ -1282,9 +1282,9 @@ def _hard_link_to_ground_truth(
             if sanitized_storage_name in ground_truth: del ground_truth[sanitized_storage_name]
             ground_truth[sanitized_storage_name] = struct[struct_forces_key]
         
-        levels_of_theory = ground_truth.attrs.get("levels_of_theory", [])
+        levels_of_theory = list(ground_truth.attrs.get("levels_of_theory", []))
         if level_of_theory not in levels_of_theory:
             levels_of_theory.append(level_of_theory)
-            group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
+            ground_truth.attrs["levels_of_theory"] = sorted(levels_of_theory)
         
     return
