@@ -139,9 +139,9 @@ test_clusters.to_mace_dataset(
 
 ## Model Training
 
-Finally, once the datasets are generated, you can train a Delta Learning MACE model. Below is an example SLURM script that submits a training job.
+Finally, once the datasets are generated, you can train a Delta Learning MACE model. Below is an example Bash script that runs the training.
 
-**Script:** `train.sh`
+**Bash Script:** `train.sh`
 
 ```bash
 #!/bin/bash

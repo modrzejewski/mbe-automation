@@ -92,7 +92,7 @@ config = Enthalpy(
     temperatures_K=temperatures_K,
     pressures_GPa=pressures_GPa,
     dataset=dataset,
-    root_key="training/md"
+    root_key="all_md_frames"
 )
 mbe_automation.run(config)
 ```
@@ -105,28 +105,20 @@ Calculate feature vectors for every frame in the generated trajectories to enabl
 
 ```python
 from mbe_automation.calculators import MACE
-import numpy as np
-import itertools
-
 import mbe_automation
-from mbe_automation import Structure, Dataset
+from mbe_automation import Structure, DatasetKeys
 
 dataset = "md_structures.hdf5"
-
-pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
-temperatures_K = np.array([300.0])
 
 mace_calc = MACE(
     model_path="~/models/mace/mace-mh-1.model",
     head="omol",
 )
 
-for T, p in itertools.product(temperatures_K, pressures_GPa):
-    traj_key = f"training/md/trajectories/crystal[dyn:T={T:.2f},p={p:.5f}]"
-
+for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_frames"):
     frames = Structure.read(
         dataset=dataset,
-        key=traj_key
+        key=key
     )
 
     frames.run_model(
@@ -138,7 +130,7 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
 
     frames.save(
         dataset=dataset,
-        key=traj_key,
+        key=key,
         only=["feature_vectors"]
     )
 ```
@@ -150,29 +142,23 @@ Select a diverse subset of configurations and compute the reference energies and
 **Input:** `step_3.py`
 
 ```python
-import numpy as np
-import itertools
-
 import mbe_automation
-from mbe_automation import Structure
+from mbe_automation import Structure, DatasetKeys
 from mbe_automation.calculators.dftb import DFTB3_D4
 
 dataset = "md_structures.hdf5"
 crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
-calculator = DFTB3_D4(crystal.get_chemical_symbols())
+calculator = DFTB3_D4()
 
-pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
-temperatures_K = np.array([300.0])
+for key in DatasetKeys(dataset).trajectories().periodic().with_feature_vectors().starts_with("all_md_frames"):
+    print(f"Processing {key}")
 
-for T, p in itertools.product(temperatures_K, pressures_GPa):
-    print(f"Processing structures for T={T:.2f} K p={p:.5f} GPa")
-
-    read_key = f"training/md/trajectories/crystal[dyn:T={T:.2f},p={p:.5f}]"
-    write_key = f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/subsampled_frames"
+    system_label = key.split(sep="/")[-1]
+    write_key = f"subsampled_md_frames/structures/{system_label}"
 
     subsampled_frames = Structure.read(
         dataset=dataset,
-        key=read_key
+        key=key
     ).subsample(n=500)
 
     subsampled_frames.run_model(
@@ -195,27 +181,21 @@ Split the labeled periodic samples into training (90%), validation (5%), and tes
 **Input:** `step_4.py`
 
 ```python
-import numpy as np
-import itertools
-
 import mbe_automation
-from mbe_automation import Structure
+from mbe_automation import Structure, Dataset, DatasetKeys
 
 dataset = "md_structures.hdf5"
-
-pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
-temperatures_K = np.array([300.0])
 
 train_set = Dataset()
 val_set = Dataset()
 test_set = Dataset()
-
-for T, p in itertools.product(temperatures_K, pressures_GPa):
-    print(f"Processing structures for T={T:.2f} K p={p:.5f} GPa")
+ 
+for key in DatasetKeys(dataset).structures().periodic().with_ground_truth().starts_with("subsampled_md_frames"):
+    print(f"Processing {key}")
 
     subsampled_frames = Structure.read(
         dataset=dataset,
-        key=f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/subsampled_frames"
+        key=key
     )
     train, validate, test = subsampled_frames.random_split([0.90, 0.05, 0.05])
 
@@ -223,18 +203,9 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
     val_set.append(validate)
     test_set.append(test)
 
-train_set.to_mace_dataset(
-    save_path="train_pbc.xyz",
-    learning_strategy="direct"
-)
-val_set.to_mace_dataset(
-    save_path="validate_pbc.xyz",
-    learning_strategy="direct"
-)
-test_set.to_mace_dataset(
-    save_path="test_pbc.xyz",
-    learning_strategy="direct"
-)
+train_set.to_mace_dataset("train_pbc.xyz", level_of_theory="dftb3-d4")
+val_set.to_mace_dataset("validate_pbc.xyz", level_of_theory="dftb3-d4")
+test_set.to_mace_dataset("test_pbc.xyz", level_of_theory="dftb3-d4")
 
 print("All calculations completed")
 ```
@@ -246,37 +217,33 @@ Read the periodic MD trajectory, detect molecules, and extract finite clusters o
 **Input:** `step_5.py`
 
 ```python
-import numpy as np
-import itertools
-
 import mbe_automation
-from mbe_automation import Structure
+from mbe_automation import Structure, DatasetKeys
 
 dataset = "md_structures.hdf5"
 
-pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
-temperatures_K = np.array([300.0])
-
-for T, p in itertools.product(temperatures_K, pressures_GPa):
-    print(f"Generating finite clusters for T={T:.2f} K p={p:.5f} GPa")
+for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_frames"):
+    print(f"Generating finite clusters for {key}")
     
     pbc_frames = Structure.read(
         dataset=dataset,
-        key=f"training/md/trajectories/crystal[dyn:T={T:.2f},p={p:.5f}]"
+        key=key
     )
     molecular_crystal = pbc_frames.detect_molecules()
-    clusters = molecular_crystal.extract_finite_subsystem()
+    clusters = molecular_crystal.extract_finite_subsystems()
+
+    system_label = key.split(sep="/")[-1]
 
     molecular_crystal.save(
         dataset=dataset,
-        key=f"training/md/structures/crystal[dyn:T={T:.2f},p={p:.5f}]"
+        key=f"all_md_frames/molecular_crystals/{system_label}"
     )
     
     for cluster in clusters:
         n_molecules = cluster.n_molecules
         cluster.save(
             dataset=dataset,
-            key=f"training/md/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
+            key=f"all_md_frames/finite_subsystems/n={n_molecules}/{system_label}"
         )
         
 print("All calculations completed")
@@ -289,45 +256,38 @@ Compute feature vectors for the finite clusters to enable diverse subsampling.
 **Input:** `step_6.py`
 
 ```python
-import numpy as np
-import itertools
-
 from mbe_automation.calculators import MACE
-from mbe_automation import Structure, FiniteSubsystem, Dataset
+from mbe_automation import Structure, FiniteSubsystem, DatasetKeys
 
-work_dir = "urea"
-dataset = f"{work_dir}/md_structures.hdf5"
-
-pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
-temperatures_K = np.array([300.0])
-cluster_sizes = [1, 2, 3, 4, 5, 6, 7, 8]
+dataset = "md_structures.hdf5"
 
 mace_calc = MACE(
     model_path="~/models/mace/mace-mh-1.model",
     head="omol"
 )
 
-for T, p in itertools.product(temperatures_K, pressures_GPa):
-    for n_molecules in cluster_sizes:
-        print(f"T={T:.2f} K p={p:.5f} GPa n_molecules={n_molecules}")
-        
-        cluster = FiniteSubsystem.read(
-            dataset=dataset,
-            key=f"training/md/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
-        )
+keys = DatasetKeys(dataset).finite_subsystems().starts_with("all_md_frames")
 
-        cluster.run_model(
-            calculator=mace_calc,
-            energies=False,
-            forces=False,
-            feature_vectors_type="averaged_environments"
-        )
+for key in keys:
+    print(f"Processing {key}")
 
-        cluster.save(
-            dataset=dataset,
-            key=f"training/md/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}",
-            only=["feature_vectors"]
-        )
+    cluster = FiniteSubsystem.read(
+        dataset=dataset,
+        key=key
+    )
+
+    cluster.run_model(
+        calculator=mace_calc,
+        energies=False,
+        forces=False,
+        feature_vectors_type="averaged_environments"
+    )
+
+    cluster.save(
+        dataset=dataset,
+        key=key,
+        only=["feature_vectors"]
+    )
     
 print("All calculations completed")
 ```
@@ -339,40 +299,35 @@ Subsample the finite cluster trajectories and calculate reference energies and f
 **Input:** `step_7.py`
 
 ```python
-import numpy as np
-import itertools
-
 import mbe_automation
-from mbe_automation import Structure, FiniteSubsystem
+from mbe_automation import Structure, FiniteSubsystem, DatasetKeys
 from mbe_automation.calculators.dftb import DFTB3_D4
 
 dataset = "md_structures.hdf5"
 crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
-calculator = DFTB3_D4(crystal.get_chemical_symbols())
+calculator = DFTB3_D4()
 
-pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
-temperatures_K = np.array([300.0])
-cluster_sizes = [1, 2, 3, 4, 5, 6, 7, 8]
+for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().starts_with("all_md_frames"):
+    print(f"Processing {key}")
 
-for T, p in itertools.product(temperatures_K, pressures_GPa):
-    for n_molecules in cluster_sizes:
-        print(f"T={T:.2f} K p={p:.5f} GPa n_molecules={n_molecules}")
-        
-        cluster = FiniteSubsystem.read(
-            dataset=dataset,
-            key=f"training/md/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
-        ).subsample(n=100)
+    cluster = FiniteSubsystem.read(
+        dataset=dataset,
+        key=key
+    ).subsample(n=100)
 
-        cluster.run_model(
-            calculator=calculator,
-            energies=True,
-            forces=True
-        )
+    cluster.run_model(
+        calculator=calculator,
+        energies=True,
+        forces=True
+    )
 
-        cluster.save(
-            dataset=dataset,
-            key=f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
-        )
+    system_label = key.split(sep="/")[-1]
+    n_molecules = cluster.n_molecules
+
+    cluster.save(
+        dataset=dataset,
+        key=f"subsampled_md_frames/finite_subsystems/n={n_molecules}/{system_label}"
+    )
     
 print("All calculations completed")
 ```
@@ -384,49 +339,34 @@ Split the labeled cluster samples into training (90%), validation (5%), and test
 **Input:** `step_8.py`
 
 ```python
-import numpy as np
-import itertools
-
 import mbe_automation
-from mbe_automation import Structure, FiniteSubsystem
+from mbe_automation import Structure, FiniteSubsystem, Dataset, DatasetKeys
 
 dataset = "md_structures.hdf5"
-
-pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
-temperatures_K = np.array([300.0])
-cluster_sizes = [1, 2, 3, 4, 5, 6, 7, 8]
 
 train_set = Dataset()
 val_set = Dataset()
 test_set = Dataset()
 
-for T, p in itertools.product(temperatures_K, pressures_GPa):
-    for n_molecules in cluster_sizes:
-        print(f"T={T:.2f} K p={p:.5f} GPa n_molecules={n_molecules}")
+keys = DatasetKeys(dataset).finite_subsystems().with_ground_truth().starts_with("subsampled_md_frames")
 
-        clusters = FiniteSubsystem.read(
-            dataset=dataset,
-            key=f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
-        )
+for key in keys:
+    print(f"Processing {key}")
 
-        train, validate, test = clusters.random_split([0.90, 0.05, 0.05])
+    clusters = FiniteSubsystem.read(
+        dataset=dataset,
+        key=key
+    )
 
-        train_set.append(train)
-        val_set.append(validate)
-        test_set.append(test)
+    train, validate, test = clusters.random_split([0.90, 0.05, 0.05])
 
-train_set.to_mace_dataset(
-    save_path="train_finite_clusters.xyz",
-    learning_strategy="direct"
-)
-val_set.to_mace_dataset(
-    save_path="validate_finite_clusters.xyz",
-    learning_strategy="direct"
-)
-test_set.to_mace_dataset(
-    save_path="test_finite_clusters.xyz",
-    learning_strategy="direct"
-)
+    train_set.append(train)
+    val_set.append(validate)
+    test_set.append(test)
+
+train_set.to_mace_dataset("train_finite_clusters.xyz", level_of_theory="dftb3-d4")
+val_set.to_mace_dataset("validate_finite_clusters.xyz", level_of_theory="dftb3-d4")
+test_set.to_mace_dataset("test_finite_clusters.xyz", level_of_theory="dftb3-d4")
 
 print("All calculations completed")
 ```
@@ -435,7 +375,7 @@ print("All calculations completed")
 
 Train the MACE model using all generated data files (both PBC and finite clusters).
 
-**Job Submission Script:** `train_mace.sh`
+**Bash Script:** `train_mace.sh`
 
 ```bash
 #!/bin/bash
@@ -487,9 +427,11 @@ python -m mace.cli.run_train \
 
 ## Computational Resources
 
-### GPU Job Submission (Steps 1, 2, 5, 6)
+### GPU Tasks (Steps 1, 2, 5, 6)
 
-Use this SLURM script to run the GPU-intensive steps.
+Use this script to run the GPU-intensive steps.
+
+**Bash Script:** `run_gpu_tasks.sh`
 
 ```bash
 #!/bin/bash
@@ -518,9 +460,11 @@ python step_5.py > step_5.log 2>&1
 python step_6.py > step_6.log 2>&1
 ```
 
-### CPU Job Submission (Steps 3, 4, 7, 8)
+### CPU Tasks (Steps 3, 4, 7, 8)
 
-Use this SLURM script to run the CPU-intensive labeling and export steps.
+Use this script to run the CPU-intensive labeling and export steps.
+
+**Bash Script:** `run_cpu_tasks.sh`
 
 ```bash
 #!/bin/bash
