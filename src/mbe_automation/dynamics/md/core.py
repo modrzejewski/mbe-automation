@@ -18,6 +18,7 @@ from  mbe_automation.configs.md import ClassicalMD
 import mbe_automation.storage
 import mbe_automation.structure.molecule
 import mbe_automation.dynamics.md.csvr
+import mbe_automation.calculators
 
 def get_velocities(
     system: ase.Atoms,
@@ -90,7 +91,7 @@ def get_velocities(
 def run(
         system: ase.Atoms,
         supercell_matrix: npt.NDArray[np.integer] | None,
-        calculator: ASECalculator,
+        calculator: mbe_automation.calculators.CALCULATORS,
         target_temperature_K: float,
         target_pressure_GPa: float | None,
         md: ClassicalMD,
@@ -223,7 +224,8 @@ def run(
         target_pressure=(target_pressure_GPa if md.ensemble=="NPT" else None),
         time_equilibration=md.time_equilibration_fs,
         n_removed_trans_dof=n_removed_trans_dof,
-        n_removed_rot_dof=n_removed_rot_dof
+        n_removed_rot_dof=n_removed_rot_dof,
+        level_of_theory=calculator.level_of_theory,
     )
     masses = init_conf.get_masses()
     total_mass = np.sum(masses)

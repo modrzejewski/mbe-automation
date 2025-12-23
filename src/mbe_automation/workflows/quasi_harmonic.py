@@ -164,7 +164,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         work_dir=config.work_dir,
         dataset=config.dataset,
         root_key=config.root_key,
-        system_label=relaxed_crystal_label
+        system_label=relaxed_crystal_label,
+        level_of_theory=config.calculator.level_of_theory,
     )
     
     if config.molecule is not None:
@@ -311,7 +312,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             work_dir=config.work_dir,
             dataset=config.dataset,
             root_key=config.root_key,
-            system_label=label_crystal
+            system_label=label_crystal,
+            level_of_theory=config.calculator.level_of_theory,
         )
         df_crystal_T.index = [i] # map current dataframe to temperature T
         data_frames_at_T.append(df_crystal_T)

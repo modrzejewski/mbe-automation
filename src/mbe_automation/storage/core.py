@@ -583,6 +583,11 @@ def _save_structure(
         if level_of_theory is not None:
             group.attrs["level_of_theory"] = level_of_theory
 
+        _hard_link_to_ground_truth(
+            f=f,
+            struct_key=key,
+        )
+
 @overload
 def save_structure(*, dataset: str, key: str, structure: Structure) -> None: ...
 
@@ -788,7 +793,14 @@ def save_trajectory(
                 name="feature_vectors",
                 data=traj.feature_vectors
             )
-      
+
+        if traj.ground_truth is not None:
+            _save_ground_truth(f, f"{key}/ground_truth", traj.ground_truth)
+
+        _hard_link_to_ground_truth(
+            f=f,
+            struct_key=key,
+        )
 
 def read_trajectory(dataset: str, key: str) -> Trajectory:
     
@@ -827,6 +839,7 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             time_equilibration=group.attrs["time_equilibration (fs)"],
             n_removed_trans_dof=group.attrs["n_removed_trans_dof"],
             n_removed_rot_dof=group.attrs["n_removed_rot_dof"],
+            ground_truth=_read_ground_truth(f, key=f"{key}/ground_truth"),
             level_of_theory=level_of_theory,
         )
         
@@ -1185,7 +1198,6 @@ def _save_only(
             
     return
 
-
 def _save_ground_truth(
         f: h5py.File,
         key: str,
@@ -1214,7 +1226,6 @@ def _save_ground_truth(
 
     return
 
-
 def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
 
     if key in f:
@@ -1239,3 +1250,41 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
         ground_truth = None
 
     return ground_truth
+            
+def _hard_link_to_ground_truth(
+        f: h5py.File,
+        struct_key: str,
+) -> None:
+    """
+    Let X be the model (level of theory) applied to obtain
+    the structural data. Hard link the energies and forces
+    from X to the ground truth object.
+    """
+    struct_energies_key = "E_pot (eV∕atom)"
+    struct_forces_key = "forces (eV∕Å)"
+    struct = f[struct_key]
+
+    level_of_theory = struct.attrs.get("level_of_theory") # level of theory applied to obtain the structural data
+    energies_present = struct_energies_key in struct
+    forces_present = struct_forces_key in struct
+
+    if level_of_theory is not None and (energies_present or forces_present):
+        ground_truth =  f.require_group(f"{key}/ground_truth")
+        sanitized_method_name = level_of_theory.replace("/", UNICODE_DIVISION_SLASH)
+    
+        if energies_present:
+            sanitized_storage_name = f"E_{sanitized_method_name} (eV∕atom)"
+            if sanitized_storage_name in ground_truth: del ground_truth[sanitized_storage_name]
+            ground_truth[sanitized_storage_name] = struct[struct_energies_key]
+
+        if forces_present:
+            sanitized_storage_name = f"forces_{sanitized_method_name} (eV∕Å)"
+            if sanitized_storage_name in ground_truth: del ground_truth[sanitized_storage_name]
+            ground_truth[sanitized_storage_name] = struct[struct_forces_key]
+        
+        levels_of_theory = ground_truth.attrs.get("levels_of_theory", [])
+        if level_of_theory not in levels_of_theory:
+            levels_of_theory.append(level_of_theory)
+            group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
+        
+    return

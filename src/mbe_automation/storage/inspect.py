@@ -9,6 +9,7 @@ from typing import Set, List, Literal, Iterator
 class DatasetKey:
     key: str
     is_periodic: bool
+    level_of_theory: str | None
     has_feature_vectors: bool | None
     has_ground_truth: bool | None
     ground_truth_levels: List[str] | None
@@ -74,6 +75,7 @@ class DatasetKeys:
                     ground_truth_levels = _get_levels(obj["ground_truth"])
                 is_periodic = bool(obj.attrs.get("periodic", False))
                 contains_exactly_n_molecules = None
+                level_of_theory = obj.attrs.get("level_of_theory")
 
             elif dataclass_attr == "MolecularCrystal":
                 has_feature_vectors = "feature_vectors" in obj["supercell"]
@@ -82,6 +84,7 @@ class DatasetKeys:
                     ground_truth_levels = _get_levels(obj["supercell"]["ground_truth"])
                 is_periodic = True
                 contains_exactly_n_molecules = obj.attrs.get("n_molecules")
+                level_of_theory = None
 
             elif dataclass_attr == "FiniteSubsystem":
                 has_feature_vectors = "feature_vectors" in obj["cluster_of_molecules"]
@@ -90,13 +93,15 @@ class DatasetKeys:
                     ground_truth_levels = _get_levels(obj["cluster_of_molecules"]["ground_truth"])
                 is_periodic = False
                 contains_exactly_n_molecules = obj.attrs.get("n_molecules")
+                level_of_theory = None
 
             elif dataclass_attr in ["ForceConstants", "BrillouinZonePath", "EOSCurves"]:
                 has_feature_vectors = None
                 has_ground_truth = None
                 is_periodic = True
                 contains_exactly_n_molecules = None
-
+                level_of_theory = None
+                
             self._items.append(DatasetKey(
                 key=name,
                 is_periodic=is_periodic,
@@ -104,7 +109,8 @@ class DatasetKeys:
                 has_ground_truth=has_ground_truth,
                 ground_truth_levels=ground_truth_levels,
                 contains_exactly_n_molecules=contains_exactly_n_molecules,
-                dataclass=dataclass_attr
+                dataclass=dataclass_attr,
+                level_of_theory=level_of_theory,
             ))
 
         with h5py.File(filename, "r") as f:
@@ -136,8 +142,17 @@ class DatasetKeys:
         filtered_items = [item for item in self._items if func(item)]
         return DatasetKeys(_items=filtered_items)
 
-    def structures(self) -> DatasetKeys:
-        return self._filter(lambda x: x.dataclass in ["Structure", "Trajectory"])
+    def structures(self, level_of_theory: str | None = None) -> DatasetKeys:
+        if level_of_theory is None:
+            return self._filter(lambda x: x.dataclass in ["Structure", "Trajectory"])
+        else:
+            return self._filter(
+                lambda x: (
+                    x.dataclass in ["Structure", "Trajectory"] and
+                    x.level_of_theory is not None and
+                    x.level_of_theory == level_of_theory
+                )
+            )
 
     def trajectories(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "Trajectory")

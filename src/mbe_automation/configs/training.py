@@ -13,6 +13,7 @@ from .clusters import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, AMPLITUDE_SCAN_MODES
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
 import mbe_automation.storage
+import mbe_automation.calculators
 
 @dataclass(kw_only=True)
 class PhononSampling:
@@ -23,8 +24,8 @@ class PhononSampling:
                                    # (1) energies and forces
                                    # (2) feature vectors
                                    #
-    calculator: ASECalculator
-    features_calculator: MACECalculator | None = None
+    calculator: mbe_automation.calculators.CALCULATORS
+    features_calculator: mbe_automation.calculators.CALCULATORS | None = None
                                    #
                                    # Rules how to select a subset
                                    # from the full set of phonons
@@ -163,8 +164,8 @@ class MDSampling:
                                    # (1) energies and forces
                                    # (2) feature vectors
                                    #
-    calculator: ASECalculator
-    features_calculator: MACECalculator | None = None
+    calculator: mbe_automation.calculators.CALCULATORS
+    features_calculator: mbe_automation.calculators.CALCULATORS | None = None
                                    #
                                    # Type of the feature vectors for each frame
                                    # of sampled periodic or finite system.
