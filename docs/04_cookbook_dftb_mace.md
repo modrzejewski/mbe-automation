@@ -11,7 +11,7 @@ This cookbook demonstrates how to run a Molecular Dynamics (MD) simulation using
 ## Complete Example
 
 ```python
-from mace.calculators import MACECalculator
+from mbe_automation.calculators import MACE
 
 import mbe_automation
 from mbe_automation.storage import Trajectory
@@ -45,7 +45,6 @@ config = Enthalpy(
     md_crystal=md_config,
     temperatures_K=np.array([300.0]),
     pressures_GPa=np.array([0.0001]),
-    work_dir="dftb_md_workdir",
     dataset="dftb_trajectory.hdf5",
     root_key="md_run",
     verbose=1
@@ -72,10 +71,7 @@ trajectory = Trajectory.read(
 
 # Initialize the MACE calculator for feature extraction.
 # Using a placeholder model path here.
-mace_calc = MACECalculator(
-    model_paths="/path/to/mace.model",
-    device="cpu"
-)
+mace_calc = MACE(model_path="/path/to/mace.model")
 
 # Calculate feature vectors for all frames in the trajectory.
 # We disable energy/force calculation since we only want features.

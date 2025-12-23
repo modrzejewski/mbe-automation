@@ -1,11 +1,14 @@
 from __future__ import annotations
+import typing
 import numpy as np
 import numpy.typing as npt
 import pyscf
 import ase
-from mace.calculators import MACECalculator
+from mbe_automation.calculators.pyscf import PySCFCalculator
+from mbe_automation.calculators.dftb import DFTBCalculator
+from mbe_automation.calculators.mace import MACE
 
-from mbe_automation.calculators.pyscf import DFT, HF
+SUPPORTED_CALCULATORS = PySCFCalculator | DFTBCalculator | MACE
 
 def ground_state_spin(z: int) -> int:
     """
@@ -50,18 +53,24 @@ def ground_state_spin(z: int) -> int:
 
 
 def atomic_energies(
-        calculator: DFT | HF | MACECalculator,
+        calculator: SUPPORTED_CALCULATORS,
         z_numbers: npt.NDArray[np.integer],
 ) -> dict[np.int64, np.float64]:
 
-    n_elements = len(z_numbers)
+    if not isinstance(calculator, SUPPORTED_CALCULATORS):
+        valid_names = [x.__name__ for x in typing.get_args(SUPPORTED_CALCULATORS)]
+        raise TypeError(
+            f"Expected one of {valid_names}, "
+            f"got {type(calculator).__name__}."
+        )
+    
     E_atomic = {}
-    for i, z in enumerate(z_numbers):
+    for z in z_numbers:
         isolated_atom = ase.Atoms(
             numbers=[z],
             pbc=False
         )
-        isolated_atom.info["spin"] = ground_state_spin(z)
+        isolated_atom.info["n_unpaired_electrons"] = ground_state_spin(z)
         isolated_atom.calc = calculator
         E_atomic[z] = isolated_atom.get_potential_energy()
 

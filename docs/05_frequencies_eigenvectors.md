@@ -8,19 +8,14 @@ To perform this analysis, you first need to generate a properties dataset using 
 
 ```python
 import numpy as np
-import mace.calculators
-import torch
+from mbe_automation.calculators import MACE
 
 import mbe_automation
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "solid.xyz"
 
-mace_calc = mace.calculators.MACECalculator(
-    model_paths="model.model",
-    default_dtype="float64",
-    device=("cuda" if torch.cuda.is_available() else "cpu")
-)
+mace_calc = MACE(model_path="mace.model")
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",

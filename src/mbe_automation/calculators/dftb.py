@@ -82,6 +82,15 @@ class DFTBCalculator(Dftb):
     Extended DFTB+ calculator with support for internal geometry relaxation.
     """
 
+    def __init__(
+            self,
+            level_of_theory: str = "semiempirical",
+            **kwargs
+    ):
+        
+        self.level_of_theory = level_of_theory
+        super().__init__(**kwargs)
+    
     def for_relaxation(
             self,
             optimize_lattice_vectors=True,
@@ -113,6 +122,7 @@ class DFTBCalculator(Dftb):
         new_parameters.update(driver_config)
 
         return DFTBCalculator(
+            level_of_theory=self.level_of_theory,
             atoms=self.atoms,
             kpts=self.kpts,
             directory=work_dir,
@@ -140,6 +150,7 @@ def _GFN_xTB(method):
     kpts = [1, 1, 1]
     scc_tolerance = SCC_TOLERANCE
     return DFTBCalculator(
+        level_of_theory=method.lower(),
         Hamiltonian_="xTB",
         Hamiltonian_Method=method,
         Hamiltonian_SCCTolerance=scc_tolerance,
@@ -182,6 +193,7 @@ def DFTB_Plus_MBD(elements):
             print(f"Warning: No predefined MaxAngularMomentum/HubbardDerivs params for element {element}. Please add it manually.")
 
     return DFTBCalculator(
+        level_of_theory="dftb3+mbd",
         Hamiltonian_ThirdOrderFull='Yes',
         Hamiltonian_MaxAngularMomentum_="",
         **max_angular_momentum_params,
@@ -241,6 +253,7 @@ def DFTB3_D4(elements):
             print(f"Warning: No predefined MaxAngularMomentum/HubbardDerivs params for element {element}. Please add it manually.")
 
     return DFTBCalculator(
+        level_of_theory="dftb3-d4",
         Hamiltonian_ThirdOrderFull='Yes',
         Hamiltonian_MaxAngularMomentum_="",
         **max_angular_momentum_params,
