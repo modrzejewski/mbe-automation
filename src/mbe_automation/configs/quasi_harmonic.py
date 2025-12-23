@@ -264,7 +264,6 @@ class FreeEnergy:
     save_xyz: bool = True
 
     def __post_init__(self):
-        # Support for Structure objects from documentation examples
         if isinstance(self.crystal, mbe_automation.storage.Structure):
             self.crystal = mbe_automation.storage.to_ase(self.crystal)
         if isinstance(self.molecule, mbe_automation.storage.Structure):
