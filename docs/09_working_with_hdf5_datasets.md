@@ -60,7 +60,7 @@ print(keys)
 | `DatasetKeys.periodic()` | Selects systems with periodic boundary conditions. |
 | `DatasetKeys.finite()` | Selects non-periodic systems (e.g., isolated molecules or clusters). |
 | `DatasetKeys.with_feature_vectors()` | Selects entries that contain computed MLIP feature vectors. |
-| `DatasetKeys.with_ground_truth()` | Selects entries that contain ground truth reference data. |
+| `DatasetKeys.with_ground_truth()` | Selects entries that contain ground truth reference data. Optionally, specify `level_of_theory` to filter by a specific theory. |
 
 **Path-Based Filters**
 
@@ -172,7 +172,8 @@ for key in DatasetKeys(dataset_file).finite_subsystems().with_feature_vectors():
 
 # Export the aggregated dataset to MACE XYZ format
 training_dataset.to_mace_dataset(
-    save_path="training_data.xyz"
+    save_path="training_data.xyz",
+    level_of_theory="r2scan-d4_def2-tzvpp"  # Specify the level of theory to export
 )
 
 print(f"Exported {len(training_dataset.structures)} subsampled structures to 'training_data.xyz'.")
