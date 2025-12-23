@@ -1269,7 +1269,7 @@ def _hard_link_to_ground_truth(
     forces_present = struct_forces_key in struct
 
     if level_of_theory is not None and (energies_present or forces_present):
-        ground_truth =  f.require_group(f"{key}/ground_truth")
+        ground_truth =  f.require_group(f"{struct_key}/ground_truth")
         sanitized_method_name = level_of_theory.replace("/", UNICODE_DIVISION_SLASH)
     
         if energies_present:
