@@ -11,7 +11,7 @@ import numpy as np
 from mbe_automation.calculators import MACE
 
 import mbe_automation
-from mbe_automation.storage import from_xyz_file
+from mbe_automation import Structure
 
 xyz_solid = "solid.xyz"
 
@@ -19,7 +19,7 @@ mace_calc = MACE(model_path="mace.model")
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=from_xyz_file(xyz_solid),
+    crystal=Structure.from_xyz_file(xyz_solid),
     temperatures_K=np.array([300.0]),
     calculator=mace_calc,
     supercell_radius=24.0,

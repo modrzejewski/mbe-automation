@@ -21,7 +21,7 @@ from mbe_automation.calculators import MACE
 import mbe_automation.configs
 # Import Minimum if you need to customize relaxation parameters
 from mbe_automation.configs.structure import Minimum
-from mbe_automation.storage import from_xyz_file
+from mbe_automation import Structure
 
 xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
@@ -42,8 +42,8 @@ relaxation_config = Minimum(
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=from_xyz_file(xyz_solid),
-    molecule=from_xyz_file(xyz_molecule),
+    crystal=Structure.from_xyz_file(xyz_solid),
+    molecule=Structure.from_xyz_file(xyz_molecule),
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
@@ -271,7 +271,7 @@ from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
-from mbe_automation.storage import from_xyz_file
+from mbe_automation import Structure
 
 xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
@@ -286,8 +286,8 @@ relaxation_config = Minimum(
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=from_xyz_file(xyz_solid),
-    molecule=from_xyz_file(xyz_molecule),
+    crystal=Structure.from_xyz_file(xyz_solid),
+    molecule=Structure.from_xyz_file(xyz_molecule),
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
