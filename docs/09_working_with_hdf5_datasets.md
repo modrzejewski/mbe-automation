@@ -171,9 +171,14 @@ for key in DatasetKeys(dataset_file).finite_subsystems().with_feature_vectors():
     training_dataset.append(subsampled_subsystem)
 
 # Export the aggregated dataset to MACE XYZ format
+# level_of_theory is a string which characterizes the electronic
+# structure approximation and basis set employed to generate
+# the ground truth data. Available as calculator.level_of_theory
+# after initialization.
+#
 training_dataset.to_mace_dataset(
     save_path="training_data.xyz",
-    level_of_theory="r2scan-d4_def2-tzvpp"  # Specify the level of theory to export
+    level_of_theory="r2scan-d4_def2-tzvpp"
 )
 
 print(f"Exported {len(training_dataset.structures)} subsampled structures to 'training_data.xyz'.")
