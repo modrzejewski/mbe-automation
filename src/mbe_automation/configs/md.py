@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
-from mbe_automation.storage import Structure as StorageStructure, to_ase
+import mbe_automation.storage
 from .structure import Minimum
 
 @dataclass(kw_only=True)
@@ -164,11 +164,11 @@ class Enthalpy:
                                    #
                                    # Initial structure of crystal
                                    #
-    crystal: ase.Atoms | StorageStructure | None = None
+    crystal: ase.Atoms | mbe_automation.storage.Structure | None = None
                                    #
                                    # Initial structure of molecule
                                    #
-    molecule: ase.Atoms | StorageStructure | None = None
+    molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
                                    #
                                    # Parameters of the MD propagation
                                    #
@@ -214,10 +214,10 @@ class Enthalpy:
 
     def __post_init__(self):
         # Support for Structure objects from documentation examples
-        if isinstance(self.crystal, StorageStructure):
-            self.crystal = to_ase(self.crystal)
-        if isinstance(self.molecule, StorageStructure):
-            self.molecule = to_ase(self.molecule)
+        if isinstance(self.crystal, mbe_automation.storage.Structure):
+            self.crystal = mbe_automation.storage.to_ase(self.crystal)
+        if isinstance(self.molecule, mbe_automation.storage.Structure):
+            self.molecule = mbe_automation.storage.to_ase(self.molecule)
         
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
         self.pressures_GPa = np.atleast_1d(self.pressures_GPa)

@@ -9,7 +9,7 @@ import numpy.typing as npt
 
 from mbe_automation.configs.recommended import KNOWN_MODELS
 from mbe_automation.configs.structure import Minimum
-from mbe_automation.storage import Structure as StorageStructure, to_ase
+import mbe_automation.storage
 
 EOS_SAMPLING_ALGOS = ["volume", "pressure", "uniform_scaling"]
 EQUATIONS_OF_STATE = ["birch_murnaghan", "vinet", "polynomial", "spline"]
@@ -28,8 +28,8 @@ class FreeEnergy:
                                    # Initial, nonrelaxed structures of crystal
                                    # and isolated molecule
                                    #
-    crystal: ase.Atoms | StorageStructure
-    molecule: ase.Atoms | StorageStructure | None = None
+    crystal: ase.Atoms | mbe_automation.storage.Structure
+    molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
                                    #
                                    # Volumetric thermal expansion
                                    #
@@ -265,10 +265,10 @@ class FreeEnergy:
 
     def __post_init__(self):
         # Support for Structure objects from documentation examples
-        if isinstance(self.crystal, StorageStructure):
-            self.crystal = to_ase(self.crystal)
-        if isinstance(self.molecule, StorageStructure):
-            self.molecule = to_ase(self.molecule)
+        if isinstance(self.crystal, mbe_automation.storage.Structure):
+            self.crystal = mbe_automation.storage.to_ase(self.crystal)
+        if isinstance(self.molecule, mbe_automation.storage.Structure):
+            self.molecule = mbe_automation.storage.to_ase(self.molecule)
         
         if (
                 self.thermal_expansion and
@@ -286,8 +286,8 @@ class FreeEnergy:
             cls,
             model_name: Literal[*KNOWN_MODELS],
             calculator: ASECalculator,
-            crystal: ase.Atoms | StorageStructure,
-            molecule: ase.Atoms | StorageStructure | None = None,
+            crystal: ase.Atoms | mbe_automation.storage.Structure,
+            molecule: ase.Atoms | mbe_automation.storage.Structure | None = None,
             **kwargs
     ):
         """
