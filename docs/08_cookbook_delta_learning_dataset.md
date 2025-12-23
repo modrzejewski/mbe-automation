@@ -47,8 +47,8 @@ baseline_calc = MACE(
     head="omol"
 )
 
-# Target: DFTB3-D4 (using chemical symbols from reference)
-target_calc = DFTB3_D4(ref.to_ase_atoms().get_chemical_symbols())
+# Target: DFTB3-D4
+target_calc = DFTB3_D4()
 
 # Compute reference energies
 # This stores E_baseline and E_target in the structure's delta attribute

@@ -64,8 +64,9 @@ import numpy as np
 
 import mbe_automation
 from mbe_automation.configs.md import Enthalpy, ClassicalMD
+from mbe_automation import Structure
 
-crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
+crystal = Structure.from_xyz_file("urea_x23_geometry.xyz")
 
 calculator = MACE(
    model_path="~/models/mace/mace-mh-1.model",
@@ -147,7 +148,7 @@ from mbe_automation import Structure, DatasetKeys
 from mbe_automation.calculators.dftb import DFTB3_D4
 
 dataset = "md_structures.hdf5"
-crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
+crystal = Structure.from_xyz_file("urea_x23_geometry.xyz")
 calculator = DFTB3_D4()
 
 for key in DatasetKeys(dataset).trajectories().periodic().with_feature_vectors().starts_with("all_md_frames"):
@@ -304,7 +305,7 @@ from mbe_automation import Structure, FiniteSubsystem, DatasetKeys
 from mbe_automation.calculators.dftb import DFTB3_D4
 
 dataset = "md_structures.hdf5"
-crystal = mbe_automation.storage.from_xyz_file("urea_x23_geometry.xyz")
+crystal = Structure.from_xyz_file("urea_x23_geometry.xyz")
 calculator = DFTB3_D4()
 
 for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().starts_with("all_md_frames"):

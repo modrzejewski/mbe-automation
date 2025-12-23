@@ -28,7 +28,7 @@ class FreeEnergy:
                                    # Initial, nonrelaxed structures of crystal
                                    # and isolated molecule
                                    #
-    crystal: ase.Atoms | mbe_automation.storage.Structure    
+    crystal: ase.Atoms | mbe_automation.storage.Structure
     molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
                                    #
                                    # Volumetric thermal expansion
@@ -264,7 +264,6 @@ class FreeEnergy:
     save_xyz: bool = True
 
     def __post_init__(self):
-
         if isinstance(self.crystal, mbe_automation.storage.Structure):
             self.crystal = mbe_automation.storage.to_ase(self.crystal)
         if isinstance(self.molecule, mbe_automation.storage.Structure):
