@@ -12,7 +12,7 @@ from .md import ClassicalMD
 from .clusters import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, AMPLITUDE_SCAN_MODES
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
-import mbe_automation.storage
+from mbe_automation.storage import Structure as StorageStructure, to_ase
 
 @dataclass(kw_only=True)
 class PhononSampling:
@@ -157,7 +157,7 @@ class MDSampling:
                                    #
                                    # Initial structure
                                    #
-    crystal: ase.Atoms | mbe_automation.storage.Structure
+    crystal: ase.Atoms | StorageStructure
                                    #
                                    # Calculators used for
                                    # (1) energies and forces
@@ -220,8 +220,8 @@ class MDSampling:
     save_csv: bool = True
 
     def __post_init__(self):
-        if isinstance(self.crystal, mbe_automation.storage.Structure):
-            self.crystal = mbe_automation.storage.to_ase(self.crystal)
+        if isinstance(self.crystal, StorageStructure):
+            self.crystal = to_ase(self.crystal)
 
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
         self.pressures_GPa = np.atleast_1d(self.pressures_GPa)

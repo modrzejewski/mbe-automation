@@ -24,8 +24,7 @@ from mbe_automation.calculators.dftb import DFTB3_D4
 crystal = mbe_automation.Structure.from_xyz_file("input.xyz")
 
 # Initialize the DFTB3-D4 calculator.
-# We pass the chemical symbols so it can load the appropriate parameters.
-calculator = DFTB3_D4(crystal.to_ase_atoms().get_chemical_symbols())
+calculator = DFTB3_D4()
 
 # 2. Configure and Run MD Workflow
 # --------------------------------
