@@ -1,6 +1,22 @@
 from pathlib import Path
 import h5py
 
+from .inspect import DatasetKeys
+
+def save_level_of_theory(
+        dataset: Path | str,
+        root_key: str,
+        level_of_theory: str
+) -> None:
+    keys = DatasetKeys(dataset).structures().starts_with(root_key)
+    
+    with h5py.File(Path(dataset).resolve(), "a") as f:
+        for key in keys:
+            group = f[key]
+            group.attrs["level_of_theory"] = level_of_theory
+
+    return
+
 def copy(
     dataset_source: Path | str,
     key_source: str,

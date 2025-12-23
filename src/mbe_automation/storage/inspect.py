@@ -30,7 +30,7 @@ class DatasetKeys:
     """
     _items: List[DatasetKey] = field(default_factory=list)
 
-    def __init__(self, dataset: str | None = None, *, _items: List[DatasetKey] = None):
+    def __init__(self, dataset: str | Path | None = None, *, _items: List[DatasetKey] = None):
         """
         Load keys from a dataset file.
         
@@ -43,13 +43,13 @@ class DatasetKeys:
         elif dataset:
             self._items = []
             if Path(dataset).exists():
-                self._load_from_file(dataset)
+                self._load_from_file(Path(dataset).resolve())
             else:
                 raise FileNotFoundError(f"Error: File '{dataset}' not found.")
         else:
             self._items = []
 
-    def _load_from_file(self, filename: str):
+    def _load_from_file(self, filename: str | Path):
         def _get_levels(group):
             if "levels_of_theory" in group.attrs:
                 return list(group.attrs["levels_of_theory"])
