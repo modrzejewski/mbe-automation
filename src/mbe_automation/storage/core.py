@@ -120,6 +120,18 @@ class Structure:
                 quantities=only,
             )
 
+    def energies_at_level_of_theory(
+            self,
+            level_of_theory: str
+    ) -> npt.NDArray[np.float64] | None:
+        return _energies_at_level_of_theory(self, level_of_theory)
+
+    def forces_at_level_of_theory(
+            self,
+            level_of_theory: str
+    ) -> npt.NDArray[np.float64] | None:
+        return _forces_at_level_of_theory(self, level_of_theory)
+
     @property
     def unique_elements(self) -> npt.NDArray[np.int64]:
         return np.unique(np.atleast_2d(self.atomic_numbers)[0])
@@ -583,11 +595,6 @@ def _save_structure(
         if level_of_theory is not None:
             group.attrs["level_of_theory"] = level_of_theory
 
-        _hard_link_to_ground_truth(
-            f=f,
-            struct_key=key,
-        )
-
 @overload
 def save_structure(*, dataset: str, key: str, structure: Structure) -> None: ...
 
@@ -797,10 +804,6 @@ def save_trajectory(
         if traj.ground_truth is not None:
             _save_ground_truth(f, f"{key}/ground_truth", traj.ground_truth)
 
-        _hard_link_to_ground_truth(
-            f=f,
-            struct_key=key,
-        )
 
 def read_trajectory(dataset: str, key: str) -> Trajectory:
     
@@ -1251,40 +1254,63 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
 
     return ground_truth
             
-def _hard_link_to_ground_truth(
-        f: h5py.File,
-        struct_key: str,
-) -> None:
+def _energies_at_level_of_theory(
+        structure: Structure,
+        level_of_theory: str,
+) -> npt.NDArray[np.float64] | None:
     """
-    Let X be the model (level of theory) applied to obtain
-    the structural data. Hard link the energies and forces
-    from X to the ground truth object.
+    Return energies at a given level of theory or None
+    if energies are not present. level_of_theory can
+    be either a ground truth method or the method used
+    to obtain the geometry.
     """
-    struct_energies_key = "E_pot (eV∕atom)"
-    struct_forces_key = "forces (eV∕Å)"
-    struct = f[struct_key]
-
-    level_of_theory = struct.attrs.get("level_of_theory") # level of theory applied to obtain the structural data
-    energies_present = struct_energies_key in struct
-    forces_present = struct_forces_key in struct
-
-    if level_of_theory is not None and (energies_present or forces_present):
-        ground_truth =  f.require_group(f"{struct_key}/ground_truth")
-        sanitized_method_name = level_of_theory.replace("/", UNICODE_DIVISION_SLASH)
+    from_ground_truth = (
+        structure.ground_truth is not None and
+        level_of_theory in structure.ground_truth.energies
+    )
     
-        if energies_present:
-            sanitized_storage_name = f"E_{sanitized_method_name} (eV∕atom)"
-            if sanitized_storage_name in ground_truth: del ground_truth[sanitized_storage_name]
-            ground_truth[sanitized_storage_name] = struct[struct_energies_key]
+    from_structure = (
+        structure.level_of_theory is not None and
+        structure.level_of_theory == level_of_theory and
+        structure.E_pot is not None
+    )
+    
+    if from_ground_truth:
+        energies = structure.ground_truth.energies[level_of_theory]
+    elif from_structure:
+        energies = structure.E_pot
+    else:
+        energies = None
+    
+    return energies
 
-        if forces_present:
-            sanitized_storage_name = f"forces_{sanitized_method_name} (eV∕Å)"
-            if sanitized_storage_name in ground_truth: del ground_truth[sanitized_storage_name]
-            ground_truth[sanitized_storage_name] = struct[struct_forces_key]
-        
-        levels_of_theory = list(ground_truth.attrs.get("levels_of_theory", []))
-        if level_of_theory not in levels_of_theory:
-            levels_of_theory.append(level_of_theory)
-            ground_truth.attrs["levels_of_theory"] = sorted(levels_of_theory)
-        
-    return
+def _forces_at_level_of_theory(
+        structure: Structure,
+        level_of_theory: str,
+) -> npt.NDArray[np.float64] | None:
+    """
+    Return forces at a given level of theory or None
+    if forces are not present. level_of_theory can
+    be either a ground truth method or the method used
+    to obtain the geometry.
+    """
+    
+    from_ground_truth = (
+        structure.ground_truth is not None and
+        level_of_theory in structure.ground_truth.forces
+    )
+    
+    from_structure = (
+        structure.level_of_theory is not None and
+        structure.level_of_theory == level_of_theory and
+        structure.forces is not None
+    )
+
+    if from_ground_truth:
+        forces = structure.ground_truth.forces[level_of_theory]
+    elif from_structure:
+        forces = structure.forces
+    else:
+        forces = None
+    
+    return forces
