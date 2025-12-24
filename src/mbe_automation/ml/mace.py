@@ -11,8 +11,8 @@ from mbe_automation.storage import Structure
 def _to_xyz_training_set(
         structure: Structure,
         save_path: str,
-        E_pot: npt.NDArray[np.float64] | None = None, # eV/atom
-        forces: npt.NDArray[np.float64] | None = None, # eV/Angs
+        E_pot: npt.NDArray[np.float64] | None, # eV/atom
+        forces: npt.NDArray[np.float64] | None, # eV/Angs
         append: bool = False,
         config_type: Literal["Default", "IsolatedAtom"] = "Default",
         energy_key = "REF_energy",
@@ -22,6 +22,7 @@ def _to_xyz_training_set(
     Convert Structure and its energies/forces to an xyz training
     set file with MACE-compatible data keys.
     """
+    assert (E_pot is not None) or (forces is not None)
     if E_pot is not None: assert len(E_pot) == structure.n_frames
     if forces is not None: assert len(forces) == structure.n_frames
     
@@ -46,30 +47,6 @@ def _to_xyz_training_set(
         format="extxyz",
         append=append
     )
-
-def _get_energies(
-        structure: Structure,
-        level_of_theory: str,
-) -> npt.NDArray[np.float64] | None:
-
-    if structure.ground_truth is not None:
-        energies = structure.ground_truth.energies.get(level_of_theory)
-    else:
-        energies = None
-
-    return energies
-
-def _get_forces(
-        structure: Structure,
-        level_of_theory: str,
-) -> npt.NDArray[np.float64]:
-    
-    if structure.ground_truth is not None:
-        forces = structure.ground_truth.forces.get(level_of_theory)
-    else:
-        forces = None
-
-    return forces
     
 def _save_atomic_energies(
         save_path: str,
@@ -121,6 +98,10 @@ def to_xyz_training_set(
     if delta_learning:
         if not ("target" in level_of_theory and "baseline" in level_of_theory):
             raise ValueError("level_of_theory must specify target and baseline methods.")
+        target = level_of_theory["target"]
+        baseline = level_of_theory["baseline"]
+    else:
+        target = level_of_theory
     
     if atomic_energies is not None:
         assert len(atomic_energies) > 0
@@ -129,16 +110,16 @@ def to_xyz_training_set(
         if delta_learning:
             assert (
                 isinstance(atomic_energies, dict) and
-                level_of_theory["target"] in atomic_energies and
-                level_of_theory["baseline"] in atomic_energies
+                target in atomic_energies and
+                baseline in atomic_energies
             ), ("atomic_energies must a dictionary which contains data "
                 "for target and baseline levels of theory.")
             
             atomic_numbers_target, E_atomic_target = _process_atomic_energies(
-                atomic_energies[level_of_theory["target"]]
+                atomic_energies[target]
             )
             atomic_numbers_baseline, E_atomic_baseline = _process_atomic_energies(
-                atomic_energies[level_of_theory["baseline"]]
+                atomic_energies[baseline]
             )
             
             if not np.array_equal(atomic_numbers_target, atomic_numbers_baseline):
@@ -152,7 +133,6 @@ def to_xyz_training_set(
             atomic_numbers, E_atomic = _process_atomic_energies(
                 atomic_energies
             )
-            
     else:
         atomic_energies_available = False
 
@@ -164,11 +144,12 @@ def to_xyz_training_set(
         )
 
     for i, structure in enumerate(structures):
+        energies_target = structure.energies_at_level_of_theory(target) # rank (n_frames, ) eV/atom
+        forces_target = structure.forces_at_level_of_theory(target) # rank (n_frames, n_atoms, 3) eV/Angs
+
         if delta_learning:
-            energies_target = _get_energies(structure, level_of_theory["target"])
-            forces_target = _get_forces(structure, level_of_theory["target"])
-            energies_baseline = _get_energies(structure, level_of_theory["baseline"])
-            forces_baseline = _get_forces(structure, level_of_theory["baseline"])
+            energies_baseline = structure.energies_at_level_of_theory(baseline)
+            forces_baseline = structure.forces_at_level_of_theory(baseline)
 
             if (energies_target is not None and energies_baseline is not None):
                 energies = energies_target - energies_baseline
@@ -181,11 +162,11 @@ def to_xyz_training_set(
                 forces = None
             
         else:
-            energies = _get_energies(structure, level_of_theory) # rank (n_frames, ) eV/atom
-            forces = _get_forces(structure, level_of_theory) # rank (n_frames, n_atoms, 3) eV/Angs
+            energies = energies_target
+            forces = forces_target
 
         if (energies is None and forces is None):
-            raise ValueError(f"Structure {i} contains no ground truth data.")
+            raise ValueError(f"Structure {i} does not contain requested data.")
         
         _to_xyz_training_set(
             structure=structure,

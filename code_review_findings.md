@@ -1,62 +1,73 @@
-# Code Review: Ground Truth Operations
+# Code Review: Ground Truth Operations (Revised)
 
 ## Summary
-This review focuses on the implementation of `ground_truth` operations (read/write/modify) within `Structure`, `Trajectory`, and related classes. The review identifies a **critical data loss issue** in trajectory subsampling and a **synchronization risk** during partial updates (`save(only=...)`).
+This review analyzes the `ground_truth` operations in the `machine-learning` branch. While recent changes simplified the handling of `level_of_theory` by centralizing results into `ground_truth`, several critical integration issues remain, particularly regarding data persistence and object initialization.
 
 ## Critical Issues
 
 ### 1. Data Loss in Trajectory Subsampling
 **Severity:** **CRITICAL**
-**Location:** `src/mbe_automation/api/classes.py` -> `_subsample_trajectory`
+**Location:** `src/mbe_automation/api/classes.py` -> `_subsample_trajectory` (lines ~620-660)
 
-When subsampling a `Trajectory` object (e.g., via `Trajectory.subsample`), a new `_Trajectory` object is instantiated to hold the selected frames. The constructor call for this new object **omits the `ground_truth` argument**.
+The `_subsample_trajectory` function constructs a new `_Trajectory` object representing the subset of frames. However, it fails to pass the `ground_truth` argument to the constructor.
+*   **Consequence:** The returned `Trajectory` object has `ground_truth=None`. Any calculated energies/forces associated with the original trajectory are lost during subsampling.
+*   **Fix Required:** Slice the ground truth object and pass it to the constructor:
+    ```python
+    ground_truth=(
+        traj.ground_truth.select_frames(selected_indices)
+        if traj.ground_truth is not None else None
+    )
+    ```
 
-*   **Consequence:** The subsampled trajectory object loses all ground truth data (energies/forces for different levels of theory), resetting `ground_truth` to `None`.
-*   **Fix Required:** Pass `ground_truth=traj.ground_truth.select_frames(selected_indices) if traj.ground_truth is not None else None` to the `_Trajectory` constructor.
+### 2. Broken Save Workflow for 'potential_energies'
+**Severity:** **CRITICAL**
+**Location:** `src/mbe_automation/storage/core.py` -> `_save_only` vs `src/mbe_automation/api/classes.py` -> `_run_model`
 
-### 2. Inconsistent Updates with `_save_only`
-**Severity:** **SEVERE**
-**Location:** `src/mbe_automation/storage/core.py` -> `_save_only`
+The `_run_model` method now exclusively updates `structure.ground_truth` and leaves `structure.E_pot` and `structure.forces` as `None` (or stale). However, `_save_only` explicitly raises a `RuntimeError` if `only=["potential_energies"]` is requested but `structure.E_pot` is `None`.
 
-The `_save_only` function allows updating specific datasets (e.g., `only=['potential_energies']`) in an existing HDF5 group. However, it fails to maintain the "hard link" between the active `level_of_theory` and the `ground_truth` group.
-
-*   **Scenario:** A user updates `potential_energies` for a structure with `level_of_theory="DFT"`, calling `save(..., only=['potential_energies'])`.
-*   **Issue:** The `E_pot` dataset is updated in the structure root, but the corresponding entry in the `ground_truth` group (`ground_truth/E_DFT...`) is **not updated**.
-*   **Consequence:** Data desynchronization. The `ground_truth` archive becomes stale and no longer matches the "active" data for that level of theory.
-*   **Fix Required:** `_save_only` must either:
-    1.  Automatically imply `ground_truth` update when `potential_energies` or `forces` are modified and a `level_of_theory` is set.
-    2.  Explicitly call `_hard_link_to_ground_truth` after updates.
+*   **Scenario:**
+    ```python
+    structure.run_model(calc, energies=True) # Updates ground_truth, E_pot remains None
+    structure.save(..., only=["potential_energies"]) # Raises RuntimeError
+    ```
+*   **Consequence:** The standard workflow for saving calculation results is broken. Users must now know to save `ground_truth` instead, but the error message is misleading.
+*   **Fix Required:**
+    1.  Update `structure.E_pot` / `forces` in `_run_model` to reflect the latest calculation (mirroring the data).
+    2.  Or, modify `_save_only` to pull from `ground_truth` if `E_pot` is missing but a valid `level_of_theory` is active.
 
 ## Major Issues
 
-### 3. Missing `ground_truth` in `Trajectory.empty`
+### 3. "Zombie" Fields: `E_pot` and `forces`
+**Severity:** **MAJOR**
+**Location:** `src/mbe_automation/storage/core.py` -> `Structure` dataclass
+
+The `Structure` dataclass retains `E_pot` and `forces` fields, but the primary calculation engine (`_run_model`) no longer updates them.
+*   **Consequence:** These fields become unreliable ("zombie" data). They might hold `None` or data loaded from a file, but they do not reflect the in-memory state after a calculation. Accessing `structure.E_pot` directly is now a trap for developers.
+*   **Fix Required:** Either deprecate these fields and use properties that proxy to `ground_truth`, or ensure they are kept in sync as the "active" level of theory data.
+
+### 4. Missing `ground_truth` in `Trajectory.empty`
 **Severity:** **MAJOR**
 **Location:** `src/mbe_automation/storage/core.py` -> `Trajectory.empty`
 
-The factory method `Trajectory.empty` creates a new trajectory instance but does not accept a `ground_truth` argument.
+The factory method `Trajectory.empty` initializes a new trajectory but does not accept a `ground_truth` argument.
+*   **Consequence:** Prevents initializing an empty trajectory with a pre-existing or known ground truth container.
+*   **Fix Required:** Add `ground_truth: GroundTruth | None = None` to the arguments and pass it to the constructor.
 
-*   **Consequence:** Users cannot initialize a fresh `Trajectory` with existing ground truth data using this method. They must instantiate the class manually or set `ground_truth` after creation, which breaks the factory pattern's utility.
-*   **Fix Required:** Add `ground_truth: GroundTruth | None = None` to the `Trajectory.empty` signature and pass it to the constructor.
+## Minor Issues
 
-## Minor Issues & Suggestions
-
-### 4. Redundant Logic in `_hard_link_to_ground_truth`
+### 5. `from_ase_atoms` Ignores Ground Truth
 **Severity:** Minor
-**Location:** `src/mbe_automation/storage/core.py`
+**Location:** `src/mbe_automation/storage/views.py` -> `from_ase_atoms`
 
-`_hard_link_to_ground_truth` deletes the existing key in the `ground_truth` group before writing. This is technically redundant if `h5py`'s standard overwrite mechanics (or a check for existence) were used, but more importantly, it creates a momentary state where data is deleted before being re-written. If the write fails (e.g., disk quota), data is lost.
-
-### 5. `Structure.save` Documentation
-**Severity:** Minor
-**Location:** `src/mbe_automation/storage/core.py`
-
-The docstring for `Structure.save` (and `Trajectory.save`) mentions the `only` argument but does not warn users that omitting `ground_truth` from the `only` list while updating energies/forces might lead to inconsistent ground truth records in HDF5.
+When converting from ASE Atoms (used by `Structure.from_xyz_file`), the function does not parse energy/force information (e.g., `REF_energy`, `REF_forces` arrays/info) into the `Structure` or its `ground_truth`.
+*   **Consequence:** Loading training data from XYZ files results in structures without their ground truth labels.
 
 ## Findings Table
 
 | File Path | Line Number (approx) | Severity | Description |
 | :--- | :--- | :--- | :--- |
-| `src/mbe_automation/api/classes.py` | 620-645 | **CRITICAL** | `_subsample_trajectory` constructor call missing `ground_truth`. |
-| `src/mbe_automation/storage/core.py` | 1180-1230 | **SEVERE** | `_save_only` fails to call `_hard_link_to_ground_truth`. |
-| `src/mbe_automation/storage/core.py` | 134 | **MAJOR** | `Trajectory.empty` missing `ground_truth` argument. |
-| `src/mbe_automation/storage/core.py` | 1286 | Minor | `_hard_link_to_ground_truth` deletes data before writing (risk of data loss on failure). |
+| `src/mbe_automation/api/classes.py` | 650 | **CRITICAL** | `_subsample_trajectory` drops `ground_truth`. |
+| `src/mbe_automation/storage/core.py` | 1190 | **CRITICAL** | `_save_only` raises RuntimeError for `potential_energies` because `run_model` doesn't populate `E_pot`. |
+| `src/mbe_automation/storage/core.py` | 60 | **MAJOR** | `Structure.E_pot` / `forces` are not updated by calculations, leading to stale data. |
+| `src/mbe_automation/storage/core.py` | 150 | **MAJOR** | `Trajectory.empty` factory missing `ground_truth`. |
+| `src/mbe_automation/storage/views.py` | 15 | Minor | `from_ase_atoms` fails to import energy/forces from ASE object. |
