@@ -60,7 +60,7 @@ class GroundTruth:
 @dataclass
 class Structure:
     """
-    Main data storage class for gemetric data and the corresponding
+    Main data storage class for geometric data and the corresponding
     energies and forces.
 
     Data generated with the theoretical model applied
