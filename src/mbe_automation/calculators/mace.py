@@ -23,10 +23,24 @@ class MACE(MACECalculator):
         else:
             self.level_of_theory = f"{self.model_path.stem}"
 
+        self.device = device
+        self.head = head
+
         super().__init__(
             model_paths=str(self.model_path),
             device=device,
             head=head,
             default_dtype="float64",
         )
+
+    def serialize(self) -> tuple:
+        """
+        Returns the class and arguments required to reconstruct the calculator.
+        Used for passing the calculator to Ray workers.
+        """
+        return MACE, {
+            "model_path": self.model_path,
+            "device": self.device,
+            "head": self.head,
+        }
         

@@ -180,6 +180,27 @@ class PySCFCalculator(Calculator):
         if atoms is not None:
             self._initialize_backend(atoms)
 
+    def serialize(self) -> tuple:
+        """
+        Returns the class and arguments required to reconstruct the calculator.
+        Used for passing the calculator to Ray workers.
+        """
+        return PySCFCalculator, {
+            "xc": self.xc,
+            "disp": self.disp,
+            "basis": self.basis,
+            "level_of_theory": self.level_of_theory,
+            "kpts": self.kpts,
+            "verbose": self.verbose,
+            "density_fit": self.density_fit,
+            "auxbasis": self.auxbasis,
+            "max_memory_mb": self.max_memory_mb,
+            "conv_tol": self.conv_tol,
+            "conv_tol_grad": self.conv_tol_grad,
+            "max_cycle": self.max_cycle,
+            "multigrid": self.multigrid,
+        }
+
     def calculate(self, atoms=None, properties=['energy', 'forces'], system_changes=all_changes):
         current_atoms = atoms if atoms is not None else self.atoms
         if current_atoms is None:
