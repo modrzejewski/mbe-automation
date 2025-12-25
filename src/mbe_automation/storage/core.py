@@ -59,6 +59,26 @@ class GroundTruth:
         
 @dataclass
 class Structure:
+    """
+    Main data storage class for gemetric data and the corresponding
+    energies and forces.
+
+    Data generated with the theoretical model applied
+    at the structure generation stage:
+
+    Structure.positions
+    Structure.E_pot
+    Structure.forces
+
+    Data generated for fixed, precomputed structures
+    via a call to run_model
+
+    Structure.ground_truth
+
+    It is expected that ground truth object is populated by
+    data points from expensive models which cannot be used
+    for structure generation.
+    """
     positions: npt.NDArray[np.floating]
     atomic_numbers: npt.NDArray[np.integer]
     masses: npt.NDArray[np.floating]
@@ -1256,13 +1276,13 @@ def _available_energies(
             "ground_truth" in restrict_to and
             structure.ground_truth is not None
     ):
-        methods.append([x for x in structure.ground_truth.energies])
+        methods.extend([x for x in structure.ground_truth.energies])
 
     return methods
 
 def _available_forces(
         structure: Structure,
-        restrict_to: list[Literal["ground_truth", "struture_generation"]] | None = None
+        restrict_to: list[Literal["ground_truth", "structure_generation"]] | None = None
 ) -> list[str]:
     """
     Assemble a list of methods (levels of theory) for which
@@ -1273,7 +1293,7 @@ def _available_forces(
 
     methods = []
     if (
-            "structure_genration" in restrict_to and
+            "structure_generation" in restrict_to and
             structure.level_of_theory is not None and
             structure.forces is not None
     ):
@@ -1291,7 +1311,7 @@ def _available_forces(
         # Levels of theory used to generate energies and
         # forces on a precomputed geometry
         #
-        methods.append([x for x in structure.ground_truth.forces])
+        methods.extend([x for x in structure.ground_truth.forces])
 
     return methods
 

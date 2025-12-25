@@ -652,7 +652,7 @@ def _subsample_trajectory(
             feature_vectors=traj.feature_vectors[selected_indices],
             feature_vectors_type=traj.feature_vectors_type,
             ground_truth=(
-                traj.ground_truth.select_frames(indices)
+                traj.ground_truth.select_frames(selected_indices)
                 if traj.ground_truth is not None else None
             ),
             pressure=(
