@@ -12,8 +12,6 @@ import os
 
 DATA_FOR_TRAINING = [
     "feature_vectors",
-    "potential_energies",
-    "forces",
     "ground_truth",
 ]
 #
@@ -131,6 +129,18 @@ class Structure:
             level_of_theory: str
     ) -> npt.NDArray[np.float64] | None:
         return _forces_at_level_of_theory(self, level_of_theory)
+
+    def available_energies(
+            self,
+            restrict_to: list[Literal["ground_truth", "structure_generation"]] | None = None
+    ) -> list[str]:
+        return _available_energies(self, restrict_to)
+
+    def available_forces(
+            self,
+            restrict_to: list[Literal["ground_truth", "structure_generation"]] | None = None
+    ) -> list[str]:
+        return _available_forces(self, restrict_to)
 
     @property
     def unique_elements(self) -> npt.NDArray[np.int64]:
@@ -1145,8 +1155,7 @@ def _save_only(
             
             if structure.feature_vectors is None:
                 raise RuntimeError(
-                    "Feature vectors are not present in the Structure object. "
-                    "Execute run_model to compute the required data."
+                    "Feature vectors not present, cannot save requested data."
                 )
 
             if "feature_vectors" in group:
@@ -1160,41 +1169,11 @@ def _save_only(
                 
             group.attrs["feature_vectors_type"] = structure.feature_vectors_type
 
-        if "potential_energies" in quantities:
-
-            if structure.E_pot is None:
-                raise RuntimeError(
-                    "Potential energies are not present in the Structure object."
-                )
-            
-            if "E_pot (eV∕atom)" in group:
-                del group["E_pot (eV∕atom)"]
-
-            group.create_dataset(
-                name="E_pot (eV∕atom)",
-                data=structure.E_pot
-            )
-
-        if "forces" in quantities:
-
-            if structure.forces is None:
-                raise RuntimeError(
-                    "Forces are not present in the Structure object."
-                )
-
-            if "forces (eV∕Å)" in group:
-                del group["forces (eV∕Å)"]
-
-            group.create_dataset(
-                name="forces (eV∕Å)",
-                data=structure.forces
-            )
-
         if "ground_truth" in quantities:
 
             if structure.ground_truth is None:
                 raise RuntimeError(
-                    "Ground truth data are not present in the Structure object."
+                    "Ground truth not present, cannot save requested data."
                 )
 
             _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth)
@@ -1253,7 +1232,69 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
         ground_truth = None
 
     return ground_truth
-            
+
+def _available_energies(
+        structure: Structure,
+        restrict_to: list[Literal["ground_truth", "structure_generation"]] | None = None
+) -> list[str]:
+    """
+    Assemble a list of methods (levels of theory) for which
+    energies are available in a given structure.
+    """
+    if restrict_to is None:
+        restrict_to = ["ground_truth", "structure_generation"]
+
+    methods = []
+    if (
+            "structure_generation" in restrict_to and
+            structure.level_of_theory is not None and
+            structure.E_pot is not None
+    ):
+        methods.append(structure.level_of_theory)
+
+    if (
+            "ground_truth" in restrict_to and
+            structure.ground_truth is not None
+    ):
+        methods.append([x for x in structure.ground_truth.energies])
+
+    return methods
+
+def _available_forces(
+        structure: Structure,
+        restrict_to: list[Literal["ground_truth", "struture_generation"]] | None = None
+) -> list[str]:
+    """
+    Assemble a list of methods (levels of theory) for which
+    forces are available in a given structure.
+    """
+    if restrict_to is None:
+        restrict_to = ["ground_truth", "structure_generation"]
+
+    methods = []
+    if (
+            "structure_genration" in restrict_to and
+            structure.level_of_theory is not None and
+            structure.forces is not None
+    ):
+        #
+        # Level of theory used to generate the geometry
+        # via relaxation or molecular dynamics
+        #
+        methods.append(structure.level_of_theory)
+
+    if (
+            "ground_truth" in restrict_to and
+            structure.ground_truth is not None
+    ):
+        #
+        # Levels of theory used to generate energies and
+        # forces on a precomputed geometry
+        #
+        methods.append([x for x in structure.ground_truth.forces])
+
+    return methods
+
 def _energies_at_level_of_theory(
         structure: Structure,
         level_of_theory: str,
@@ -1299,7 +1340,7 @@ def _forces_at_level_of_theory(
         structure.ground_truth is not None and
         level_of_theory in structure.ground_truth.forces
     )
-    
+
     from_structure = (
         structure.level_of_theory is not None and
         structure.level_of_theory == level_of_theory and
