@@ -24,8 +24,7 @@ import mbe_automation.ml.mace
 import mbe_automation.calculators
 from mbe_automation.calculators import CALCULATORS
 import mbe_automation.structure.clusters
-from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES, LEVELS_OF_THEORY
-from mbe_automation.ml.core import REFERENCE_ENERGY_TYPES
+from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
@@ -152,8 +151,8 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: str | None = None,
             exec_params: ParallelCPU | None = None,
+            overwrite: bool = False
     ) -> None:
         _run_model(
             structure=self,
@@ -161,8 +160,8 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
-            level_of_theory=level_of_theory,
             exec_params=exec_params,
+            overwrite=overwrite,
         )
 
     def to_molecular_crystal(
@@ -279,8 +278,8 @@ class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: str | None = None,
             exec_params: ParallelCPU | None = None,
+            overwrite: bool = False,
     ) -> None:
         _run_model(
             structure=self,
@@ -288,8 +287,8 @@ class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
-            level_of_theory=level_of_theory,
             exec_params=exec_params,
+            overwrite=overwrite,
         )
 
 @dataclass(kw_only=True)
@@ -392,8 +391,8 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            level_of_theory: str | None = None,
             exec_params: ParallelCPU | None = None,
+            overwrite: bool = False,
     ) -> None:
         _run_model(
             structure=self.cluster_of_molecules,
@@ -401,8 +400,8 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             energies=energies,
             forces=forces,
             feature_vectors_type=feature_vectors_type,
-            level_of_theory=level_of_theory,
             exec_params=exec_params,
+            overwrite=overwrite,
         )
 
     def random_split(
@@ -652,6 +651,10 @@ def _subsample_trajectory(
             ),
             feature_vectors=traj.feature_vectors[selected_indices],
             feature_vectors_type=traj.feature_vectors_type,
+            ground_truth=(
+                traj.ground_truth.select_frames(indices)
+                if traj.ground_truth is not None else None
+            ),
             pressure=(
                 traj.pressure[selected_indices] 
                 if traj.pressure is not None else None
@@ -672,37 +675,76 @@ def _run_model(
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        level_of_theory: str | None = None,
         exec_params: ParallelCPU | None = None,
+        overwrite: bool = False,
 ) -> None:
-
+    """
+    Generate energies, forces, and feature vectors for a series of structure
+    frames.
+    
+    (1) Energies and forces computed with this function
+        are stored as ground truth. Ground truth data consists of multiple
+        series of energies and forces tagged by the level_of_theory attribute
+        extracted from the calculator. Make sure that this attribute is descriptive
+        enough to identify the theoretical model.
+    (2) If feature vectors were not computed at the structure generation stage,
+        they can be generated here to enable subsampling in the feature space.
+        
+    """
     if not isinstance(calculator, CALCULATORS):
         valid_names = [x.__name__ for x in typing.get_args(CALCULATORS)]
         raise TypeError(
             f"Invalid calculator. Expected one of {valid_names}, "
             f"got {type(calculator).__name__}. \n"
-            f"Use a class imported from mbe_automation.calculators."
+            f"Import a calculator class from mbe_automation.calculators."
         )
     
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
 
+    level_of_theory = calculator.level_of_theory
+
+    if (
+            (energies and level_of_theory in structure.available_energies("structure_generation")) or
+            (forces and level_of_theory in structure.available_forces("structure_generation"))
+    ):
+        raise ValueError(
+            f"run_model cannot be used to update the energies and forces computed during "
+            f"the structure generation stage (level_of_theory = {level_of_theory}). "
+            f"Use run_model to compute ground truth with alternative methods on fixed, "
+            f"precomputed structures. "
+        )
+
+    if (
+            energies and
+            level_of_theory in structure.available_energies("ground_truth") and
+            not overwrite
+    ):
+        raise ValueError(
+            f"Structure already contains energies computed with {level_of_theory}. "
+            f"Use a different calculator or set overwrite=True."
+        )
+
+    if (
+            forces and
+            level_of_theory in structure.available_forces("ground_truth") and
+            not overwrite
+    ):
+        raise ValueError(
+            f"Structure already contains forces computed with {level_of_theory}. "
+            f"Use a different caclulator or set overwrite=True."
+        )
+
+    if (
+            feature_vectors_type != "none" and
+            structure.feature_vectors_type != "none" and
+            not overwrite
+    ):
+        raise ValueError(
+            "Structure already contains feature vectors. Set overwrite=True to confirm your choice."
+        )
+
     if (energies or forces) and structure.ground_truth is None:
         structure.ground_truth = mbe_automation.storage.GroundTruth()
-
-    if level_of_theory is None:
-        level_of_theory = calculator.level_of_theory
-
-    if energies and level_of_theory in structure.ground_truth.energies:
-        raise ValueError(
-            f"{level_of_theory} data already present in ground_truth.energies. "
-            f"Specify a custom level_of_theory or run a different model if it's a mistake."
-        )
-
-    if forces and level_of_theory in structure.ground_truth.forces:
-        raise ValueError(
-            f"{level_of_theory} data already present in ground_truth.forces. "
-            f"Specify a custom level_of_theory or run a different model if it's a mistake."
-        )
 
     if exec_params is None:
         exec_params = ParallelCPU.recommended()
@@ -723,10 +765,8 @@ def _run_model(
         structure.feature_vectors = d
         structure.feature_vectors_type = feature_vectors_type
 
-    if energies:
-        structure.ground_truth.energies[level_of_theory] = E_pot
-    if forces:
-        structure.ground_truth.forces[level_of_theory] = F
+    if energies: structure.ground_truth.energies[level_of_theory] = E_pot
+    if forces: structure.ground_truth.forces[level_of_theory] = F
 
     return
 
