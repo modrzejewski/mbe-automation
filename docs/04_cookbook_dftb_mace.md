@@ -21,11 +21,10 @@ from mbe_automation.calculators.dftb import DFTB3_D4
 # 1. Setup Structure and Calculator
 # ---------------------------------
 # Load your initial structure
-crystal = mbe_automation.storage.from_xyz_file("input.xyz")
+crystal = mbe_automation.Structure.from_xyz_file("input.xyz")
 
 # Initialize the DFTB3-D4 calculator.
-# We pass the chemical symbols so it can load the appropriate parameters.
-calculator = DFTB3_D4(crystal.get_chemical_symbols())
+calculator = DFTB3_D4()
 
 # 2. Configure and Run MD Workflow
 # --------------------------------

@@ -14,6 +14,7 @@ import warnings
 import torch
 
 import mbe_automation.calculators.dftb
+import mbe_automation.calculators
 import mbe_automation.structure.crystal
 import mbe_automation.configs.structure
 import mbe_automation.common
@@ -122,11 +123,11 @@ def _crystal_optimizer_ase(
 
 def crystal(
         unit_cell: ase.Atoms,
-        calculator: ASECalculator,
+        calculator: mbe_automation.calculators.CALCULATORS,
         config: mbe_automation.configs.structure.Minimum,
         work_dir: Path | str = Path("./"),
         key: str | None = None
-):
+) -> ase.Atoms:
 
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -349,7 +350,7 @@ def _isolated_molecule(
 
 def isolated_molecule(
         molecule: ase.Atoms | mbe_automation.storage.Structure,
-        calculator: ASECalculator,
+        calculator: mbe_automation.calculators.CALCULATORS,
         config: mbe_automation.configs.structure.Minimum,
         work_dir: Path | str = Path("./"),
         key: str | None = None,
@@ -373,6 +374,7 @@ def isolated_molecule(
             cell_vectors=None,
             n_frames=1,
             n_atoms=molecule.n_atoms,
+            level_of_theory=calculator.level_of_theory,
         )
         
         return relaxed_molecule

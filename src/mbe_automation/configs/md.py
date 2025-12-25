@@ -8,6 +8,7 @@ import numpy.typing as npt
 
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
 import mbe_automation.storage
+from mbe_automation.calculators import CALCULATORS
 from .structure import Minimum
 
 @dataclass(kw_only=True)
@@ -160,7 +161,7 @@ class Enthalpy:
                                    #
                                    # Energy and forces calculator
                                    #
-    calculator: ASECalculator
+    calculator: mbe_automation.calculators.CALCULATORS
                                    #
                                    # Initial structure of crystal
                                    #

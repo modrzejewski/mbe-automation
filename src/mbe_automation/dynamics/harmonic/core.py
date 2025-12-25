@@ -340,7 +340,8 @@ def equilibrium_curve(
             work_dir=work_dir,
             dataset=dataset,
             root_key=root_key,
-            system_label=label
+            system_label=label,
+            level_of_theory=calculator.level_of_theory,
         )
         df_eos_points.append(df_crystal_V)
 

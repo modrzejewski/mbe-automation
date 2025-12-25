@@ -191,6 +191,7 @@ def crystal(
         dataset,
         root_key,
         system_label,
+        level_of_theory,
 ):
     """
     Physical properties derived from the harmonic model
@@ -245,7 +246,8 @@ def crystal(
         positions=unit_cell.get_positions(),
         atomic_numbers=unit_cell.get_atomic_numbers(),
         masses=unit_cell.get_masses(),
-        cell_vectors=unit_cell.get_cell()
+        cell_vectors=unit_cell.get_cell(),
+        level_of_theory=level_of_theory,
     )
     interp_mesh = phonons.mesh.mesh_numbers
     

@@ -46,14 +46,16 @@ baseline_calc = MACE(
     model_path="~/models/mace/mace-mh-1.model",
     head="omol"
 )
+baseline_calc.level_of_theory = "delta/baseline"
 
-# Target: DFTB3-D4 (using chemical symbols from reference)
-target_calc = DFTB3_D4(ref.to_ase_atoms().get_chemical_symbols())
+# Target: DFTB3-D4
+target_calc = DFTB3_D4()
+target_calc.level_of_theory = "delta/target"
 
 # Compute reference energies
-# This stores E_baseline and E_target in the structure's delta attribute
-ref.run_model(calculator=baseline_calc, level_of_theory="delta/baseline")
-ref.run_model(calculator=target_calc, level_of_theory="delta/target")
+# This stores E_baseline and E_target in the structure's ground_truth attribute
+ref.run_model(calculator=baseline_calc)
+ref.run_model(calculator=target_calc)
 ```
 
 ## Dataset of Periodic Structures
@@ -79,21 +81,26 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
     test_pbc.append(c)
 
 # Export Periodic Datasets
+# Note: This assumes the structures in the dataset have been labeled with
+# both "delta/baseline" and "delta/target" levels of theory.
+level_of_theory = {
+    "baseline": "delta/baseline",
+    "target": "delta/target"
+}
+
 train_pbc.to_mace_dataset(
     save_path=f"{output_dir}/delta_train_pbc.xyz",
-    learning_strategy="delta",
-    reference_energy_type="reference_molecule",
-    reference_molecule=ref,
+    level_of_theory=level_of_theory,
 )
 
 validate_pbc.to_mace_dataset(
     save_path=f"{output_dir}/delta_validate_pbc.xyz",
-    learning_strategy="delta",
+    level_of_theory=level_of_theory,
 )
 
 test_pbc.to_mace_dataset(
     save_path=f"{output_dir}/delta_test_pbc.xyz",
-    learning_strategy="delta",
+    level_of_theory=level_of_theory,
 )
 ```
 
@@ -119,21 +126,26 @@ for T, p in itertools.product(temperatures_K, pressures_GPa):
         test_clusters.append(c)
 
 # Export Cluster Datasets
+# Note: This assumes the clusters in the dataset have been labeled with
+# both "delta/baseline" and "delta/target" levels of theory.
+level_of_theory = {
+    "baseline": "delta/baseline",
+    "target": "delta/target"
+}
+
 train_clusters.to_mace_dataset(
     save_path=f"{output_dir}/delta_train_clusters.xyz",
-    learning_strategy="delta",
-    reference_energy_type="reference_molecule",
-    reference_molecule=ref,
+    level_of_theory=level_of_theory,
 )
 
 validate_clusters.to_mace_dataset(
     save_path=f"{output_dir}/delta_validate_clusters.xyz",
-    learning_strategy="delta",
+    level_of_theory=level_of_theory,
 )
 
 test_clusters.to_mace_dataset(
     save_path=f"{output_dir}/delta_test_clusters.xyz",
-    learning_strategy="delta",
+    level_of_theory=level_of_theory,
 )
 ```
 

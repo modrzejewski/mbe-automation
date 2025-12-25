@@ -34,7 +34,7 @@ from mbe_automation.structure.clusters import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter
 from mbe_automation.configs.training import MDSampling, PhononSampling
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
-from mbe_automation.storage import from_xyz_file
+from mbe_automation import Structure
 
 xyz_solid = "path/to/your/solid.xyz"
 mlip_parameter_file = "path/to/your/mace.model"
@@ -50,7 +50,7 @@ The first stage generates configurations by running a short molecular dynamics s
 
 ```python
 md_sampling_config = MDSampling(
-    crystal=from_xyz_file(xyz_solid),
+    crystal=Structure.from_xyz_file(xyz_solid),
     calculator=mace_calc,
     temperatures_K=np.array([temperature_K]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
@@ -78,7 +78,7 @@ A quasi-harmonic calculation is performed to obtain the force constants required
 ```python
 free_energy_config = FreeEnergy.recommended(
     model_name="mace",
-    crystal=from_xyz_file(xyz_solid),
+    crystal=Structure.from_xyz_file(xyz_solid),
     calculator=mace_calc,
     thermal_expansion=False,
     supercell_radius=20.0,
@@ -385,7 +385,7 @@ from mbe_automation.structure.clusters import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter
 from mbe_automation.configs.training import MDSampling, PhononSampling
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
-from mbe_automation.storage import from_xyz_file
+from mbe_automation import Structure
 
 xyz_solid = "path/to/your/solid.xyz"
 mlip_parameter_file = "path/to/your/mace.model"
@@ -395,7 +395,7 @@ dataset = "training_set.hdf5"
 mace_calc = MACE(model_path=mlip_parameter_file)
 
 md_sampling_config = MDSampling(
-    crystal=from_xyz_file(xyz_solid),
+    crystal=Structure.from_xyz_file(xyz_solid),
     calculator=mace_calc,
     features_calculator=mace_calc,
     temperatures_K=np.array([temperature_K]),
@@ -418,7 +418,7 @@ mbe_automation.run(md_sampling_config)
 
 free_energy_config = FreeEnergy.recommended(
     model_name="mace",
-    crystal=from_xyz_file(xyz_solid),
+    crystal=Structure.from_xyz_file(xyz_solid),
     calculator=mace_calc,
     thermal_expansion=False,
     supercell_radius=20.0,
