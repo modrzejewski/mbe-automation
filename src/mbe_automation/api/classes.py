@@ -765,8 +765,10 @@ def _run_model(
         structure.feature_vectors = d
         structure.feature_vectors_type = feature_vectors_type
 
-    if energies: structure.ground_truth.energies[level_of_theory] = E_pot
-    if forces: structure.ground_truth.forces[level_of_theory] = F
+    if energies:
+        structure.ground_truth.energies[level_of_theory] = E_pot
+    if forces:
+        structure.ground_truth.forces[level_of_theory] = F
 
     return
 
