@@ -127,13 +127,13 @@ def run_model(
             if compute_feature_vectors and chunk_features is not None:
                 # Need to init feature_vectors array if first time
                 if feature_vectors is None:
-                     # Determine shape from first chunk result
-                     n_features = chunk_features.shape[-1]
-                     if average_over_atoms:
-                        feature_vectors = np.zeros((structure.n_frames, n_features))
-                     else:
-                        feature_vectors = np.zeros((structure.n_frames, structure.n_atoms, n_features))
-                     if not return_arrays: structure.feature_vectors = feature_vectors
+                    # Determine shape from first chunk result
+                    n_features = chunk_features.shape[-1]
+                    if average_over_atoms:
+                       feature_vectors = np.zeros((structure.n_frames, n_features))
+                    else:
+                       feature_vectors = np.zeros((structure.n_frames, structure.n_atoms, n_features))
+                    if not return_arrays: structure.feature_vectors = feature_vectors
 
                 feature_vectors[chunk_frames] = chunk_features
 
