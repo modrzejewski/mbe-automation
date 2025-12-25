@@ -97,9 +97,9 @@ def run_model(
     use_ray = False
     if torch.cuda.is_available() and torch.cuda.device_count() > 1:
         if isinstance(calculator, (MACE, PySCFCalculator)):
-             use_ray = True
-             if not ray.is_initialized():
-                 ray.init()
+            use_ray = True
+            if not ray.is_initialized():
+                ray.init()
     
     if use_ray:
         calc_cls, calc_kwargs = calculator.serialize()
