@@ -8,7 +8,7 @@ import numpy.typing as npt
 
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
 import mbe_automation.storage
-import mbe_automation.calculators.CALCULATORS
+from mbe_automation.calculators import CALCULATORS
 from .structure import Minimum
 
 @dataclass(kw_only=True)
