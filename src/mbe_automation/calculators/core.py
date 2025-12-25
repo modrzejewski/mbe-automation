@@ -42,10 +42,10 @@ class CalculatorWorker:
                 else:
                     feature_vectors.append(features)
 
-        if compute_feature_vectors and len(feature_vectors) > 0:
-             feature_vectors = np.array(feature_vectors)
-        elif compute_feature_vectors:
-             feature_vectors = None
+        if compute_feature_vectors and feature_vectors:
+            feature_vectors = np.array(feature_vectors)
+        else:
+            feature_vectors = None
 
         return frames, E_pot, forces, feature_vectors
 
