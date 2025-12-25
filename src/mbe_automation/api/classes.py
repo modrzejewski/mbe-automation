@@ -731,7 +731,7 @@ def _run_model(
     ):
         raise ValueError(
             f"Structure already contains forces computed with {level_of_theory}. "
-            f"Use a different caclulator or set overwrite=True."
+            f"Use a different calculator or set overwrite=True."
         )
 
     if (
