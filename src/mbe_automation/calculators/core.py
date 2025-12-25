@@ -36,11 +36,11 @@ class CalculatorWorker:
             if compute_energies: E_pot[idx] = atoms.get_potential_energy() / structure.n_atoms # eV/atom
 
             if compute_feature_vectors:
-                 features = self.calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
-                 if average_over_atoms:
-                     feature_vectors.append(np.average(features, axis=0))
-                 else:
-                     feature_vectors.append(features)
+                features = self.calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
+                if average_over_atoms:
+                    feature_vectors.append(np.average(features, axis=0))
+                else:
+                    feature_vectors.append(features)
 
         if compute_feature_vectors and len(feature_vectors) > 0:
              feature_vectors = np.array(feature_vectors)
