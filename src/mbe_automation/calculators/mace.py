@@ -27,7 +27,7 @@ class MACE(MACECalculator):
         )
 
         if head != "default":
-            self.level_of_theory = f"mace_{self.architecture}_{head}"
+            self.level_of_theory = f"mace_{self.architecture}_{head}_head"
         else:
             self.level_of_theory = f"mace_{self.architecture}"
 
