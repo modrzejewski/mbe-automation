@@ -32,10 +32,15 @@ structure = mbe_automation.Structure.from_xyz_file("structure.xyz")
 
 # Run calculation
 # This updates the structure in-place with energies and forces
+# The results are stored in the ground_truth attribute
 structure.run_model(calc)
 
-print(f"Potential Energy: {structure.E_pot} eV/atom")
-print(f"Forces:\n{structure.forces}")
+# Retrieve results using the calculator's level of theory
+energy = structure.ground_truth.energies[calc.level_of_theory]
+forces = structure.ground_truth.forces[calc.level_of_theory]
+
+print(f"Potential Energy: {energy} eV/atom")
+print(f"Forces:\n{forces}")
 ```
 
 ## PySCF (DFT & HF)
@@ -94,11 +99,13 @@ structure = mbe_automation.Structure.from_xyz_file("molecule.xyz")
 
 # Run DFT
 structure.run_model(dft_calc)
-print(f"DFT Energy: {structure.E_pot} eV/atom")
+energy_dft = structure.ground_truth.energies[dft_calc.level_of_theory]
+print(f"DFT Energy: {energy_dft} eV/atom")
 
 # Run HF
 structure.run_model(hf_calc)
-print(f"HF Energy: {structure.E_pot} eV/atom")
+energy_hf = structure.ground_truth.energies[hf_calc.level_of_theory]
+print(f"HF Energy: {energy_hf} eV/atom")
 ```
 
 ## DFTB+ (Semi-empirical)
@@ -147,5 +154,6 @@ structure = mbe_automation.Structure.from_xyz_file("crystal.xyz")
 
 # Run Calculation
 structure.run_model(calc_xtb)
-print(f"GFN2-xTB Energy: {structure.E_pot} eV/atom")
+energy_xtb = structure.ground_truth.energies[calc_xtb.level_of_theory]
+print(f"GFN2-xTB Energy: {energy_xtb} eV/atom")
 ```
