@@ -49,9 +49,7 @@ class Resources:
         n_cpu_cores, memory_cpu_gb = mbe_automation.common.resources.get_cpu_resources()
         gpus = mbe_automation.common.resources.get_gpu_resources()
         n_gpus = len(gpus)
-        memory_gpu_gb = np.zeros(n_gpus)
-        for i in range(n_gpus):
-            _, _, memory_gpu_gb[i] = gpus[i]
+        memory_gpu_gb = np.array([mem for _, _, mem in gpus])
         
         params = {}        
         params["stack_size_main"] = resource.RLIM_INFINITY
