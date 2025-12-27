@@ -6,6 +6,8 @@ from pyscf.pbc.tools.pyscf_ase import ase_atoms_to_pyscf
 import torch
 import pyscf
 
+from mbe_automation.configs.execution import Resources
+
 if torch.cuda.is_available():
     try:
         from gpu4pyscf import scf        
@@ -74,13 +76,18 @@ def HF(
     verbose: int = 0,
     density_fit: bool = True, 
     auxbasis: Optional[str] = None,
-    max_memory_mb: Optional[int] = 64000,
+    max_memory_mb: int | None = None,
     multigrid: bool = False,
 ) -> Calculator:
     """
     Factory function for PySCF/GPU4PySCF Hartree-Fock calculators.
     """
-    assert basis in BASIS_SETS
+    basis = basis.lower()
+    
+    assert basis in BASIS_SETS, (
+        "Invalid basis set name. "
+        "Consult documentation for available basis sets."
+    )
 
     return PySCFCalculator(
         xc="hf",
@@ -102,15 +109,22 @@ def DFT(
     verbose: int = 0,
     density_fit: bool = True, 
     auxbasis: Optional[str] = None,
-    max_memory_mb: Optional[int] = 64000,
+    max_memory_mb: int | None = None,
     multigrid: bool = False,
 ) -> Calculator:
     """
     Factory function for PySCF/GPU4PySCF calculators.
     """
     name = model_name.lower().replace("_", "-")
-    assert name in DFT_METHODS
-    assert basis in BASIS_SETS
+    basis = basis.lower()
+    assert name in DFT_METHODS, (
+        "Invalid DFT method name. "
+        "Consult documentation for available exchange-correlation models."
+    )
+    assert basis in BASIS_SETS, (
+        "Invalid basis set name. "
+        "Consult documentation for available basis sets."
+    )
 
     config = XC_MAP[name]
     xc = config["xc"]
@@ -176,9 +190,34 @@ class PySCFCalculator(Calculator):
         
         self.system = None
         self.method = None
+
+        if self.max_memory_mb is None:
+            resources = Resources.auto_detect()
+            self.max_memory_mb = int(0.8 * resources.memory_cpu_gb * 1024)
         
         if atoms is not None:
             self._initialize_backend(atoms)
+
+    def serialize(self) -> tuple:
+        """
+        Returns the class and arguments required to reconstruct the calculator.
+        Used for passing the calculator to Ray workers.
+        """
+        return PySCFCalculator, {
+            "xc": self.xc,
+            "disp": self.disp,
+            "basis": self.basis,
+            "level_of_theory": self.level_of_theory,
+            "kpts": self.kpts,
+            "verbose": self.verbose,
+            "density_fit": self.density_fit,
+            "auxbasis": self.auxbasis,
+            "max_memory_mb": self.max_memory_mb,
+            "conv_tol": self.conv_tol,
+            "conv_tol_grad": self.conv_tol_grad,
+            "max_cycle": self.max_cycle,
+            "multigrid": self.multigrid,
+        }
 
     def calculate(self, atoms=None, properties=['energy', 'forces'], system_changes=all_changes):
         current_atoms = atoms if atoms is not None else self.atoms

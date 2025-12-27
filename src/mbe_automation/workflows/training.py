@@ -66,18 +66,20 @@ def phonon_sampling(
     
     all_structures = [molecular_crystal.supercell] + [s.cluster_of_molecules for s in finite_subsystems]
     for s in all_structures:
-        mbe_automation.calculators.run_model(
+        E_pot, forces, _ = mbe_automation.calculators.run_model(
             structure=s,
             calculator=config.calculator,
             compute_feature_vectors=False,
             compute_energies=True,
             compute_forces=True,
         )
+        s.E_pot = E_pot
+        s.forces = forces
         if (
                 config.features_calculator is not None and
                 config.feature_vectors_type != "none"
         ):
-            mbe_automation.calculators.run_model(
+            _, _, feature_vectors = mbe_automation.calculators.run_model(
                 structure=s,
                 calculator=config.features_calculator,
                 compute_feature_vectors=True,
@@ -85,6 +87,8 @@ def phonon_sampling(
                 compute_energies=False,
                 compute_forces=False,
             )
+            s.feature_vectors = feature_vectors
+            s.feature_vectors_type = config.feature_vectors_type
 
     mbe_automation.storage.save_molecular_crystal(
         dataset=config.dataset,
@@ -150,7 +154,7 @@ def _crystal_at_pT(
             config.features_calculator is not None and
             config.feature_vectors_type != "none"
     ):
-        mbe_automation.calculators.run_model(
+        _, _, feature_vectors = mbe_automation.calculators.run_model(
             structure=pbc_md_frames,
             calculator=config.features_calculator,
             compute_feature_vectors=True,
@@ -158,6 +162,8 @@ def _crystal_at_pT(
             compute_energies=False,
             compute_forces=False,
         )
+        pbc_md_frames.feature_vectors = feature_vectors
+        pbc_md_frames.feature_vectors_type = config.feature_vectors_type
         pbc_md_frames.save(
             dataset=config.dataset,
             key=pbc_trajectory_key,
@@ -190,19 +196,21 @@ def _finite_system_at_pT(
     for s in finite_subsystems:
         key = f"{config.root_key}/finite_subsystems/n={s.n_molecules}/{system_label}"
 
-        mbe_automation.calculators.run_model(
+        E_pot, forces, _ = mbe_automation.calculators.run_model(
             structure=s.cluster_of_molecules,
             calculator=config.calculator,
             compute_feature_vectors=False,
             compute_energies=True,
             compute_forces=True
         )
+        s.cluster_of_molecules.E_pot = E_pot
+        s.cluster_of_molecules.forces = forces
 
         if (
                 config.features_calculator is not None and
                 config.feature_vectors_type != "none"
         ):
-            mbe_automation.calculators.run_model(
+            _, _, feature_vectors = mbe_automation.calculators.run_model(
                 structure=s.cluster_of_molecules,
                 calculator=config.features_calculator,
                 compute_feature_vectors=True,
@@ -210,6 +218,8 @@ def _finite_system_at_pT(
                 compute_energies=False,
                 compute_forces=False
             )
+            s.cluster_of_molecules.feature_vectors = feature_vectors
+            s.cluster_of_molecules.feature_vectors_type = config.feature_vectors_type
 
         mbe_automation.storage.save_finite_subsystem(
             dataset=config.dataset,

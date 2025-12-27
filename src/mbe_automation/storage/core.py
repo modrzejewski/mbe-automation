@@ -166,6 +166,14 @@ class Structure:
     def unique_elements(self) -> npt.NDArray[np.int64]:
         return np.unique(np.atleast_2d(self.atomic_numbers)[0])
 
+    @property
+    def permuted_between_frames(self) -> bool:
+        return (self.atomic_numbers.ndim == 2)
+
+    @property
+    def variable_cell(self) -> bool:
+        return (self.periodic and self.cell_vectors.ndim == 3)
+
 @dataclass
 class ForceConstants:
     """Harmonic force constants model."""
