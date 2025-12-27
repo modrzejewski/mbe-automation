@@ -5,6 +5,7 @@ from pyscf.data.nist import BOHR, HARTREE2EV
 from pyscf.pbc.tools.pyscf_ase import ase_atoms_to_pyscf
 import torch
 import pyscf
+from mbe_automation.configs.execution import Resources
 
 if torch.cuda.is_available():
     try:
@@ -74,7 +75,7 @@ def HF(
     verbose: int = 0,
     density_fit: bool = True, 
     auxbasis: Optional[str] = None,
-    max_memory_mb: Optional[int] = 64000,
+    max_memory_mb: Optional[int] = None,
     multigrid: bool = False,
 ) -> Calculator:
     """
@@ -102,7 +103,7 @@ def DFT(
     verbose: int = 0,
     density_fit: bool = True, 
     auxbasis: Optional[str] = None,
-    max_memory_mb: Optional[int] = 64000,
+    max_memory_mb: Optional[int] = None,
     multigrid: bool = False,
 ) -> Calculator:
     """
@@ -169,6 +170,11 @@ class PySCFCalculator(Calculator):
         self.density_fit = density_fit
         self.auxbasis = auxbasis
         self.max_memory_mb = max_memory_mb
+
+        if self.max_memory_mb is None:
+            resources = Resources.auto_detect()
+            self.max_memory_mb = int(resources.memory_cpu_gb * 1024)
+
         self.conv_tol = conv_tol
         self.conv_tol_grad = conv_tol_grad
         self.max_cycle = max_cycle
