@@ -2,8 +2,11 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 import ase
-import ray
-import torch
+try:
+    import ray
+    RAY_AVAILABLE = True
+except ImportError:
+    RAY_AVAILABLE = False
 
 from mbe_automation.storage import Structure
 from mbe_automation.calculators.mace import MACE
@@ -298,8 +301,9 @@ def run_model(
     n_gpus_per_worker = 1
 
     use_ray = (
-        n_workers > 1
-        and isinstance(calculator, (MACE, PySCFCalculator))
+        RAY_AVAILABLE and
+        n_workers > 1 and
+        isinstance(calculator, (MACE, PySCFCalculator))
     )
 
     if use_ray:
