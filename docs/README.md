@@ -56,6 +56,7 @@ The program integrates several scientific codes into a unified workflow, includi
 ### Setup
 
 *   [Installation Guide](./00_installation.md)
+*   [Troubleshooting Ray](./11_troubleshooting_ray.md)
 
 ### Basics
 
