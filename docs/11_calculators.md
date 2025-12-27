@@ -13,10 +13,9 @@ Location: `mbe_automation.calculators.mace.MACE`
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `model_path` | `str` | - | Path to the MACE model file (`.model`). |
-| `device` | `str` \| `None` | `None` | Computation device (e.g., "cpu", "cuda"). Auto-detected if `None`. |
-| `head` | `str` | `"default"` | Name of the output head to use.† |
+| `head` | `str` | `"default"` | Name of the readout head to use.† |
 
-† *Some models, such as `mace-mh-1.model`, require specifying a head (e.g., `head="omol"`).*
+† *Some models, such as `mace-mh-1.model`, require specifying a readout head (e.g., `head="omol"`).*
 
 ### Code Example
 
@@ -53,10 +52,9 @@ Location: `mbe_automation.calculators.pyscf.DFT` and `mbe_automation.calculators
 | :--- | :--- | :--- | :--- |
 | `model_name` | `str` | `"r2scan-d4"` | (DFT only) The density functional method. Supported methods include `wb97m-v`, `wb97x-d3`, `b3lyp-d4`, `r2scan-d4`, etc. |
 | `basis` | `str` | `"def2-tzvp"` | Basis set (e.g., `def2-svp`, `def2-tzvpp`). |
-| `kpts` | `list[int]` \| `None` | `None` | k-point mesh for periodic calculations (e.g., `[2, 2, 2]`). If `None`, calculation is treated as isolated/molecule. |
+| `kpts` | `list[int]` \| `None` | `None` | k-point mesh for periodic calculations (e.g., `[2, 2, 2]`). If `None`, periodic calculations are performed at the Gamma point. Has no effect on finite systems. |
 | `density_fit` | `bool` | `True` | Whether to use density fitting (RI approximation). |
 | `auxbasis` | `str` \| `None` | `None` | Auxiliary basis set for density fitting. |
-| `multigrid` | `bool` | `False` | Whether to use multigrid algorithm for DFT on PBC (GPU4PySCF feature). |
 | `verbose` | `int` | `0` | Verbosity level for PySCF output. |
 | `max_memory_mb` | `int` \| `None` | `None` | Maximum memory usage in MB. Auto-detected if `None`. |
 
