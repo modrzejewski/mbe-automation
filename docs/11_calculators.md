@@ -2,6 +2,20 @@
 
 The `mbe_automation.calculators` module provides interfaces to various computational backends, including machine learning potentials (MACE), density functional theory (PySCF/GPU4PySCF), and semi-empirical methods (DFTB+).
 
+## Why use `mbe_automation.calculators`?
+
+While these calculators inherit from the standard ASE `Calculator` interface, they are enhanced with specific features required by the `mbe_automation` workflow:
+
+1.  **Extended Interface:** They implement additional methods and properties not found in standard ASE calculators.
+2.  **Level of Theory Tracking:** Each calculator instance has a `level_of_theory` property (string). This identifier is used to tag computed energies and forces when they are stored in the HDF5 dataset (under `ground_truth`), ensuring data provenance and enabling multi-fidelity workflows.
+3.  **Multi-GPU Parallelization:** The MACE and PySCF-based calculators implement specialized serialization methods that allow `run_model` to distribute calculations across multiple GPUs using Ray. This parallelization works as a "black box" for the user: you simply allocate the necessary resources (e.g., via SLURM) and execute `run_model` on your structures.
+
+## Table of Contents
+
+*   [MACE](#mace)
+*   [PySCF (DFT & HF)](#pyscf-dft--hf)
+*   [DFTB+ (Semi-empirical)](#dftb-semi-empirical)
+
 ## MACE
 
 The `MACE` class wraps the `mace-torch` calculator, providing automatic device selection (CPU/CUDA) and serialization support for Ray actors.
