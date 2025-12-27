@@ -21,7 +21,7 @@ This chapter provides an overview of the physical content each class represents 
 | :--- | :--- |
 | **`ForceConstants`** | Represents 2nd order force constants used to compute phonon properties like frequencies and dynamical matrix eigenvectors. |
 | **`Structure`** | Represents an atomistic structure (positions, atomic numbers, unit cell). Can hold a single frame or a sequence of frames of equal size (e.g., from a short trajectory or a collection of configurations). |
-| **`Trajectory`** | Represents the time-evolution of an atomistic system, typically resulting from a Molecular Dynamics simulation. It includes time-dependent properties like positions, velocities, kinetic energies, and thermodynamic variables. |
+| **`Trajectory`** | Represents the time evolution of an atomistic system generated with molecular dynamics. Includes time-dependent properties, e.g., positions, velocities, kinetic energies, temperature, pressure, and cell volumes. |
 | **`MolecularCrystal`** | Represents a periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). Serves as an intermediate necessary for finite cluster extraction. |
 | **`FiniteSubsystem`** | Represents a finite cluster of molecules extracted from a periodic structure or trajectory. Used to generate training data for fragment-based methods. |
 | **`Dataset`** | A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets. |
