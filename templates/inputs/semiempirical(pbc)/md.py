@@ -4,7 +4,7 @@ import os.path
 import mbe_automation
 import mbe_automation.configs
 import mbe_automation.workflows
-from mbe_automation.configs.execution import ParallelCPU
+from mbe_automation.configs.execution import Resources
 from mbe_automation.storage import from_xyz_file
 
 xyz_solid = "{xyz_solid}"
@@ -12,7 +12,7 @@ xyz_molecule = "{xyz_molecule}"
 work_dir = os.path.abspath(os.path.dirname(__file__))
 dataset = os.path.join(work_dir, "properties.hdf5")
 
-env_config = ParallelCPU.recommended(model_name="dftb3-d4")
+env_config = Resources.auto_detect(model_name="dftb3-d4")
 env_config.set()
 
 molecule = from_xyz_file(xyz_molecule)
