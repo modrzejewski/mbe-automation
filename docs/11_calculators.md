@@ -8,8 +8,6 @@ The `MACE` class wraps the `mace-torch` calculator, providing automatic device s
 
 ### Adjustable parameters
 
-Location: `mbe_automation.calculators.mace.MACE`
-
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `model_path` | `str` | - | Path to the MACE model file (`.model`). |
@@ -50,8 +48,6 @@ The `PySCFCalculator` provides an interface to PySCF (CPU) and GPU4PySCF (GPU) f
 The module provides factory functions `DFT` and `HF` to simplify initialization.
 
 ### Adjustable parameters
-
-Location: `mbe_automation.calculators.pyscf.DFT` and `mbe_automation.calculators.pyscf.HF`
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
@@ -118,14 +114,12 @@ Convenience factory functions are provided for common methods.
 
 | Function | Description |
 | :--- | :--- |
-| `mbe_automation.calculators.dftb.GFN1_xTB` | GFN1-xTB method. |
-| `mbe_automation.calculators.dftb.GFN2_xTB` | GFN2-xTB method. |
-| `mbe_automation.calculators.dftb.DFTB_Plus_MBD` | DFTB+ with MBD dispersion (3ob-3-1 parameters). |
-| `mbe_automation.calculators.dftb.DFTB3_D4` | DFTB3 with D4 dispersion (3ob-3-1 parameters). |
+| `GFN2_xTB` | GFN2-xTB method. |
+| `DFTB3_D4` | DFTB3 with D4 dispersion (3ob-3-1 parameters). |
+
+The factory functions can be imported from `mbe_automation.calculators` (e.g. `from mbe_automation.calculators import GFN2_xTB`).
 
 ### Adjustable parameters
-
-Location: `mbe_automation.calculators.dftb.DFTBCalculator`
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
