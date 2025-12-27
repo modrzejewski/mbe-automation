@@ -244,36 +244,40 @@ def _parallel_loop(
     return E_pot, forces, feature_vectors
 
 
-@ray.remote
-class CalculatorWorker:
-    def __init__(self, calculator_cls, silent, calculator_kwargs):
-        self.silent = silent
-        self.calculator = calculator_cls(**calculator_kwargs)
+if RAY_AVAILABLE:
+    @ray.remote
+    class CalculatorWorker:
+        def __init__(self, calculator_cls, silent, calculator_kwargs):
+            self.silent = silent
+            self.calculator = calculator_cls(**calculator_kwargs)
 
-    def run(
-        self,
-        positions: npt.NDArray[np.float64],
-        atomic_numbers: npt.NDArray[np.float64],
-        masses: npt.NDArray[np.float64],
-        cell_vectors: npt.NDArray[np.float64] | None,
-        compute_energies: bool,
-        compute_forces: bool,
-        compute_feature_vectors: bool,
-        average_over_atoms: bool,
-    ):
+        def run(
+            self,
+            positions: npt.NDArray[np.float64],
+            atomic_numbers: npt.NDArray[np.float64],
+            masses: npt.NDArray[np.float64],
+            cell_vectors: npt.NDArray[np.float64] | None,
+            compute_energies: bool,
+            compute_forces: bool,
+            compute_feature_vectors: bool,
+            average_over_atoms: bool,
+        ):
 
-        return _sequential_loop(
-            calculator=self.calculator,
-            positions=positions,
-            cell_vectors=cell_vectors,
-            atomic_numbers=atomic_numbers,
-            masses=masses,
-            silent=self.silent,
-            compute_energies=compute_energies,
-            compute_forces=compute_forces,
-            compute_feature_vectors=compute_feature_vectors,
-            average_over_atoms=average_over_atoms,
-        )
+            return _sequential_loop(
+                calculator=self.calculator,
+                positions=positions,
+                cell_vectors=cell_vectors,
+                atomic_numbers=atomic_numbers,
+                masses=masses,
+                silent=self.silent,
+                compute_energies=compute_energies,
+                compute_forces=compute_forces,
+                compute_feature_vectors=compute_feature_vectors,
+                average_over_atoms=average_over_atoms,
+            )
+else:
+    class CalculatorWorker:
+        pass
 
 
 def run_model(
