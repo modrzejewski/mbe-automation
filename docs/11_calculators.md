@@ -69,19 +69,13 @@ Location: `mbe_automation.calculators.pyscf.DFT` and `mbe_automation.calculators
 
 ### Supported Basis Sets
 
-| Basis Set |
-| :--- |
-| `def2-svp` |
-| `def2-svpd` |
-| `def2-tzvp` |
-| `def2-tzvpp` |
-| `def2-mtzvpp` |
-| `def2-tzvpd` |
-| `def2-tzvppd` |
-| `def2-qzvp` |
-| `def2-qzvpp` |
-| `def2-qzvpd` |
-| `def2-qzvppd` |
+| Double Zeta | Triple Zeta | Quadruple Zeta |
+| :--- | :--- | :--- |
+| `def2-svp` | `def2-tzvp` | `def2-qzvp` |
+| `def2-svpd` | `def2-tzvpp` | `def2-qzvpp` |
+| | `def2-mtzvpp` | `def2-qzvpd` |
+| | `def2-tzvpd` | `def2-qzvppd` |
+| | `def2-tzvppd` | |
 
 ### Code Example
 
