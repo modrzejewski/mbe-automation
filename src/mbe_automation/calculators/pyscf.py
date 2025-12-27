@@ -82,7 +82,12 @@ def HF(
     """
     Factory function for PySCF/GPU4PySCF Hartree-Fock calculators.
     """
-    assert basis in BASIS_SETS
+    basis = basis.lower()
+    
+    assert basis in BASIS_SETS, (
+        "Invalid basis set name. "
+        "Consult documentation for available basis sets."
+    )
 
     return PySCFCalculator(
         xc="hf",
@@ -111,8 +116,15 @@ def DFT(
     Factory function for PySCF/GPU4PySCF calculators.
     """
     name = model_name.lower().replace("_", "-")
-    assert name in DFT_METHODS
-    assert basis in BASIS_SETS
+    basis = basis.lower()
+    assert name in DFT_METHODS, (
+        "Invalid DFT method name. "
+        "Consult documentation for available exchange-correlation models."
+    )
+    assert basis in BASIS_SETS, (
+        "Invalid basis set name. "
+        "Consult documentation for available basis sets."
+    )
 
     config = XC_MAP[name]
     xc = config["xc"]
