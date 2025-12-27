@@ -275,7 +275,7 @@ def run_model(
     The coordinates are not modified.
 
     """
-    if resources == None:
+    if resources is None:
         resources = Resources.auto_detect()
 
     compute_feature_vectors = compute_feature_vectors and isinstance(calculator, MACE)
