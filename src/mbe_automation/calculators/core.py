@@ -11,6 +11,7 @@ from mbe_automation.calculators.pyscf import PySCFCalculator
 from mbe_automation.calculators.dftb import DFTBCalculator
 from mbe_automation.storage import Structure
 import mbe_automation.common.display
+import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
 
