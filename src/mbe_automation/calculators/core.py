@@ -11,6 +11,7 @@ from mbe_automation.calculators.pyscf import PySCFCalculator
 from mbe_automation.calculators.dftb import DFTBCalculator
 from mbe_automation.storage import Structure, to_ase
 import mbe_automation.common.display
+import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
 
@@ -275,12 +276,12 @@ def run_model(
     The coordinates are not modified.
 
     """
-    if resources == None:
+    if resources is None:
         resources = Resources.auto_detect()
 
     compute_feature_vectors = compute_feature_vectors and isinstance(calculator, MACE)
 
-    n_workers = resources.n_gpus
+    n_workers = min(resources.n_gpus, structure.n_frames)
     n_gpus_per_worker = 1
 
     use_ray = (
@@ -290,8 +291,7 @@ def run_model(
     )
 
     if use_ray:
-        n_cpus_per_worker = resources.n_cpu_cores // n_workers
-        assert n_cpus_per_worker >= 1
+        n_cpus_per_worker = max(1, resources.n_cpu_cores // n_workers)
 
         if not ray.is_initialized():
             ray.init()
