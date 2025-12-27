@@ -290,7 +290,7 @@ def run_model(
     )
 
     if use_ray:
-        n_cpus_per_worker = resources.n_cpu_cores // n_workers
+        n_cpus_per_worker = max(1, resources.n_cpu_cores // n_workers)
         assert n_cpus_per_worker >= 1
 
         if not ray.is_initialized():
