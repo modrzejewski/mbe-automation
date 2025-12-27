@@ -3,14 +3,14 @@ import os.path
 
 import mbe_automation
 from mbe_automation.storage import from_xyz_file
-from mbe_automation.configs.execution import ParallelCPU
+from mbe_automation.configs.execution import Resources
 from mbe_automation.configs.structure import Minimum
 
 xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
 work_dir = os.path.abspath(os.path.dirname(__file__))
 
-env_config = ParallelCPU.recommended(model_name="dftb3-d4")
+env_config = Resources.auto_detect(model_name="dftb3-d4")
 env_config.set()
 
 crystal = from_xyz_file(xyz_solid)
