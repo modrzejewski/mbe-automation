@@ -178,49 +178,60 @@ def _parallel_loop(
         structure, n_workers
     )
 
-    calc_cls, calc_kwargs = calculator.serialize()
-    workers = [
-        CalculatorWorker.options(
-            n_gpus=n_gpus_per_worker,
-            n_cpus=n_cpus_per_worker,
-        ).remote(
-            calculator_cls=calc_cls,
-            silent=(silent or i > 0),
-            calculator_kwargs=calc_kwargs,
-        )
-        for i in range(n_workers)
-    ]
+    if not ray.is_initialized():
+        ray.init()
+        shutdown_ray = True
+    else:
+        shutdown_ray = False
 
-    futures = []
-    for i, worker in enumerate(workers):
-        n_frames = len(chunk_frames[i])
-        if n_frames > 0:
-            futures.append(
-                worker.run.remote(
-                    positions=positions[i],
-                    atomic_numbers=atomic_numbers[i],
-                    masses=masses[i],
-                    cell_vectors=cell_vectors[i],
-                    compute_energies=compute_energies,
-                    compute_forces=compute_forces,
-                    compute_feature_vectors=compute_feature_vectors,
-                    average_over_atoms=average_over_atoms,
-                )
+    try:
+        calc_cls, calc_kwargs = calculator.serialize()
+        workers = [
+            CalculatorWorker.options(
+                n_gpus=n_gpus_per_worker,
+                n_cpus=n_cpus_per_worker,
+            ).remote(
+                calculator_cls=calc_cls,
+                silent=(silent or i > 0),
+                calculator_kwargs=calc_kwargs,
             )
+            for i in range(n_workers)
+        ]
 
-    results = ray.get(futures)
+        futures = []
+        for i, worker in enumerate(workers):
+            n_frames = len(chunk_frames[i])
+            if n_frames > 0:
+                futures.append(
+                    worker.run.remote(
+                        positions=positions[i],
+                        atomic_numbers=atomic_numbers[i],
+                        masses=masses[i],
+                        cell_vectors=cell_vectors[i],
+                        compute_energies=compute_energies,
+                        compute_forces=compute_forces,
+                        compute_feature_vectors=compute_feature_vectors,
+                        average_over_atoms=average_over_atoms,
+                    )
+                )
 
-    for i, result in enumerate(results):
-        chunk_E, chunk_forces, chunk_features = result
+        results = ray.get(futures)
 
-        if compute_energies:
-            E_pot[chunk_frames[i]] = chunk_E
+        for i, result in enumerate(results):
+            chunk_E, chunk_forces, chunk_features = result
 
-        if compute_forces:
-            forces[chunk_frames[i]] = chunk_forces
+            if compute_energies:
+                E_pot[chunk_frames[i]] = chunk_E
 
-        if compute_feature_vectors:
-            feature_vectors[chunk_frames[i]] = chunk_features
+            if compute_forces:
+                forces[chunk_frames[i]] = chunk_forces
+
+            if compute_feature_vectors:
+                feature_vectors[chunk_frames[i]] = chunk_features
+
+    finally:
+        if shutdown_ray:
+            ray.shutdown()
 
     return E_pot, forces, feature_vectors
 
@@ -284,18 +295,11 @@ def run_model(
 
     use_ray = (
         n_workers > 1
-        and structure.n_frames >= n_workers
         and isinstance(calculator, (MACE, PySCFCalculator))
     )
 
     if use_ray:
         n_cpus_per_worker = max(1, resources.n_cpu_cores // n_workers)
-
-        if not ray.is_initialized():
-            ray.init()
-            shutdown_ray = True
-        else:
-            shutdown_ray = False
 
     if not silent:
         mbe_automation.common.resources.print_computational_resources()
@@ -355,9 +359,6 @@ def run_model(
                 structure.feature_vectors_type = "atomic"
 
             structure.feature_vectors = feature_vectors
-
-    if use_ray and shutdown_ray:
-        ray.shutdown()
 
     if return_arrays:
         return E_pot, forces, feature_vectors
