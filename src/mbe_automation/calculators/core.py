@@ -2,6 +2,7 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 import ase
+import logging
 try:
     import ray
     RAY_AVAILABLE = True
@@ -182,7 +183,10 @@ def _parallel_loop(
     )
 
     if not ray.is_initialized():
-        ray.init(include_dashboard=False) # we get lots of warnings if dashboard is not disabled
+        ray.init(
+            include_dashboard=False,
+            logging_level=logging.ERROR,
+        ) # we get lots of warnings if dashboard is not disabled
         shutdown_ray = True
     else:
         shutdown_ray = False
