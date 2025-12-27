@@ -3,7 +3,10 @@ from typing import Literal
 import resource
 import psutil
 import os
+import numpy as np
+import numpy.typing as npt
 
+import mbe_automation.common.resources
 from .recommended import SEMIEMPIRICAL, KNOWN_MODELS
 
 @dataclass(kw_only=True)

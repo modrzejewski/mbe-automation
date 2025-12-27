@@ -6,6 +6,8 @@ from pyscf.pbc.tools.pyscf_ase import ase_atoms_to_pyscf
 import torch
 import pyscf
 
+from mbe_automation.configs.execution import Resources
+
 if torch.cuda.is_available():
     try:
         from gpu4pyscf import scf        
@@ -74,7 +76,7 @@ def HF(
     verbose: int = 0,
     density_fit: bool = True, 
     auxbasis: Optional[str] = None,
-    max_memory_mb: Optional[int] = 64000,
+    max_memory_mb: int | None = None,
     multigrid: bool = False,
 ) -> Calculator:
     """
@@ -102,7 +104,7 @@ def DFT(
     verbose: int = 0,
     density_fit: bool = True, 
     auxbasis: Optional[str] = None,
-    max_memory_mb: Optional[int] = 64000,
+    max_memory_mb: int | None = None,
     multigrid: bool = False,
 ) -> Calculator:
     """
@@ -176,6 +178,10 @@ class PySCFCalculator(Calculator):
         
         self.system = None
         self.method = None
+
+        if self.max_memory_mb is None:
+            resources = Resources.auto_detect()
+            self.max_memory_mb = int(0.8 * resources.memory_cpu_gb * 1024)
         
         if atoms is not None:
             self._initialize_backend(atoms)

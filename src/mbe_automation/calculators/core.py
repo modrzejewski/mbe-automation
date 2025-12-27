@@ -186,6 +186,11 @@ def _parallel_loop(
 
     try:
         calc_cls, calc_kwargs = calculator.serialize()
+
+        if isinstance(calculator, PySCFCalculator):
+            if calc_kwargs.get("max_memory_mb") is not None:
+                calc_kwargs["max_memory_mb"] = int(calc_kwargs["max_memory_mb"] / n_workers)
+        
         workers = [
             CalculatorWorker.options(
                 n_gpus=n_gpus_per_worker,
