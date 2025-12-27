@@ -60,18 +60,12 @@ Location: `mbe_automation.calculators.pyscf.DFT` and `mbe_automation.calculators
 
 ### Supported DFT Methods
 
-| Method |
-| :--- |
-| `wb97m-v` |
-| `wb97x-d3` |
-| `wb97x-d4` |
-| `b3lyp-d3` |
-| `b3lyp-d4` |
-| `pbe-d3` |
-| `pbe-d4` |
-| `pbe0-d3` |
-| `pbe0-d4` |
-| `r2scan-d4` |
+| Range-Separated Hybrids | Global Hybrid GGAs | Pure GGAs | Pure Meta-GGAs |
+| :--- | :--- | :--- | :--- |
+| `wb97m-v` | `b3lyp-d3` | `pbe-d3` | `r2scan-d4` |
+| `wb97x-d3` | `b3lyp-d4` | `pbe-d4` | |
+| `wb97x-d4` | `pbe0-d3` | | |
+| | `pbe0-d4` | | |
 
 ### Supported Basis Sets
 
