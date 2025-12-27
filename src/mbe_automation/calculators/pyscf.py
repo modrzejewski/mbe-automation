@@ -16,6 +16,9 @@ if torch.cuda.is_available():
         from gpu4pyscf.pbc import scf as pbc_scf
         from gpu4pyscf.dft.gen_grid import sg1_prune
         from gpu4pyscf.pbc.dft.multigrid import MultiGridNumInt
+        
+        scf.hf.remove_overlap_zero_eigenvalue = True
+        
         GPU_AVAILABLE = True
     except ImportError:
         GPU_AVAILABLE = False
