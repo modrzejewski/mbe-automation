@@ -7,14 +7,16 @@ import os
 from .recommended import SEMIEMPIRICAL, KNOWN_MODELS
 
 @dataclass(kw_only=True)
-class ParallelCPU:
+class Resources:
     """
-    Environment parameters for execution control of parallel
-    programs on CPUs.
+    Environment parameters for parallel code execution.
     """
-    n_cores: int            # number of CPU cores
-    stack_size_main: int    # stack size of the main program
-    stack_size_threads: int # stack size of threads spawned by OpenMP (in megabytes)
+    n_gpus: int                               # number of GPU cards
+    n_cpu_cores: int                          # number of CPU cores
+    memory_cpu_gb: float                      # shared memory accessible to CPUs
+    memory_gpu_gb: npt.NDArray[np.float64]    # memory accessible to a single GPU
+    stack_size_main: int                      # stack size of the main program
+    stack_size_threads: int                   # stack size of threads spawned by OpenMP (in megabytes)
 
     def set(self) -> None:
         """
@@ -39,16 +41,25 @@ class ParallelCPU:
         os.environ["MKL_NUM_THREADS"] = f"{self.n_cores}"
     
     @classmethod
-    def recommended(
+    def auto_detect(
             cls,
             model_name: Literal[*KNOWN_MODELS] | None = None,
             **kwargs
     ):
-        modified_params = {}
-
-        modified_params["stack_size_main"] = resource.RLIM_INFINITY
-        modified_params["stack_size_threads"] = 64
-        modified_params["n_cores"] = len(psutil.Process().cpu_affinity())
+        n_cpu_cores, memory_cpu_gb = mbe_automation.common.resources.get_cpu_resources()
+        gpus = mbe_automation.common.resources.get_gpu_resources()
+        n_gpus = len(gpus)
+        memory_gpu_gb = np.zeros(n_gpus)
+        for i in range(n_gpus):
+            _, _, memory_gpu_gb[i] = gpus[i]
+        
+        params = {}        
+        params["stack_size_main"] = resource.RLIM_INFINITY
+        params["stack_size_threads"] = 64
+        params["n_cpu_cores"] = n_cpu_cores
+        params["n_gpus"] = n_gpus
+        params["memory_cpu_gb"] = memory_cpu_gb
+        params["memory_gpu_gb"] = memory_gpu_gb
         #
         # Stack size for OpenMP threads
         #
@@ -64,11 +75,11 @@ class ParallelCPU:
         # is recommended in the documentation of tblite.
         #
         if model_name == "rpa":
-            modified_params["stack_size_threads"] = 64
+            params["stack_size_threads"] = 64
         
         elif model_name in SEMIEMPIRICAL:
-            modified_params["stack_size_threads"] = 1024
+            params["stack_size_threads"] = 1024
 
-        modified_params.update(kwargs)
+        params.update(kwargs)
 
-        return cls(**modified_params)
+        return cls(**params)

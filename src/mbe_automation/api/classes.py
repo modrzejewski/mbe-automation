@@ -10,7 +10,7 @@ from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 
 import mbe_automation.storage
 import mbe_automation.common
-from mbe_automation.configs.execution import ParallelCPU
+from mbe_automation.configs.execution import Resources
 from mbe_automation.configs.clusters import FiniteSubsystemFilter
 from mbe_automation.configs.structure import Minimum
 from mbe_automation.storage import ForceConstants as _ForceConstants
@@ -151,7 +151,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            exec_params: ParallelCPU | None = None,
+            exec_params: Resources | None = None,
             overwrite: bool = False
     ) -> None:
         _run_model(
@@ -278,7 +278,7 @@ class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            exec_params: ParallelCPU | None = None,
+            exec_params: Resources | None = None,
             overwrite: bool = False,
     ) -> None:
         _run_model(
@@ -391,7 +391,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             energies: bool = True,
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-            exec_params: ParallelCPU | None = None,
+            exec_params: Resources | None = None,
             overwrite: bool = False,
     ) -> None:
         _run_model(
@@ -675,7 +675,7 @@ def _run_model(
         energies: bool = True,
         forces: bool = True,
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
-        exec_params: ParallelCPU | None = None,
+        exec_params: Resources | None = None,
         overwrite: bool = False,
 ) -> None:
     """
@@ -747,7 +747,7 @@ def _run_model(
         structure.ground_truth = mbe_automation.storage.GroundTruth()
 
     if exec_params is None:
-        exec_params = ParallelCPU.recommended()
+        exec_params = Resources.auto_detect()
 
     exec_params.set()
 
@@ -759,6 +759,7 @@ def _run_model(
         compute_feature_vectors=(feature_vectors_type!="none"),
         average_over_atoms=(feature_vectors_type=="averaged_environments"),
         return_arrays=True,
+        resources=resources,
     )
 
     if feature_vectors_type != "none" and d is not None:

@@ -1,173 +1,365 @@
 from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
-from mace.calculators import MACECalculator
-from ase.calculators.calculator import Calculator as ASECalculator
 from ase import Atoms
 import ray
 import torch
+
+from mbe_automation.storage import Structure
 from mbe_automation.calculators.mace import MACE
 from mbe_automation.calculators.pyscf import PySCFCalculator
-
+from mbe_automation.calculators.dftb import DFTBCalculator
 from mbe_automation.storage import Structure, to_ase
 import mbe_automation.common.display
-import mbe_automation.common.resources
+from mbe_automation.configs.execution import Resources
 
-@ray.remote(num_gpus=1)
-class CalculatorWorker:
-    def __init__(self, calculator_cls, calculator_kwargs):
-        self.calculator = calculator_cls(**calculator_kwargs)
 
-    def run(self, structure: Structure, frames: list[int], compute_energies: bool, compute_forces: bool, compute_feature_vectors: bool, average_over_atoms: bool):
-        n_frames = len(frames)
-        E_pot = np.zeros(n_frames) if compute_energies else None
-        forces = np.zeros((n_frames, structure.n_atoms, 3)) if compute_forces else None
+def _split_work(structure: Structure, n_workers: int):
+    assert strucure.atomic_numbers.ndim == structure.masses.ndim
+    assert structure.n_frames > 1
+    assert n_workers >= structure.n_frames
 
-        feature_vectors = []
+    indices = np.arange(structure.n_frames)
+    chunks = np.array_split(indices, n_workers)
 
-        for idx, i in enumerate(frames):
-            atoms = to_ase(
-                structure=structure,
-                frame_index=i
-            )
-            atoms.calc = self.calculator
+    periodic = structure.periodic
+    permuted_between_frames = structure.permuted_between_frames
+    variable_cell = structure.variable_cell
 
-            if compute_forces: forces[idx] = atoms.get_forces()
-            if compute_energies: E_pot[idx] = atoms.get_potential_energy() / structure.n_atoms # eV/atom
+    positions = []
+    atomic_numbers = []
+    cell_vectors = []
+    masses = []
 
-            if compute_feature_vectors:
-                features = self.calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
-                if average_over_atoms:
-                    feature_vectors.append(np.average(features, axis=0))
-                else:
-                    feature_vectors.append(features)
+    for i in range(n_workers):
+        frames = chunks[i]
+        positions.append(structure.positions[frames])
 
-        if compute_feature_vectors and feature_vectors:
-            feature_vectors = np.array(feature_vectors)
+        if permuted_between_frames:
+            atomic_numbers.append(structure.atomic_numbers[frames])
+            masses.append(structure.masses[frames])
         else:
-            feature_vectors = None
+            atomic_numbers.append(structure.atomic_numbers)
+            masses.append(structure.masses)
 
-        return frames, E_pot, forces, feature_vectors
+        if variable_cell:
+            cell_vectors.append(structure.cell_vectors[frames])
+        else:
+            cell_vectors.append(structure.cell_vectors)
 
-def run_model(
-        structure: Structure,
-        calculator: ASECalculator | MACECalculator,
-        compute_energies: bool = True,
-        compute_forces: bool = True,
-        compute_feature_vectors: bool = True,
-        average_over_atoms: bool = False,
-        return_arrays: bool = False,
-        silent: bool = False,
-) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None] | None:
-    """
-    Run a calculator of energies/forces/feature vectors for all frames of a given
-    Structure. Stores computed quantities in-place or returns them as arrays.
-    The coordinates are not modified.
-    
-    """    
-    compute_feature_vectors = (compute_feature_vectors and isinstance(calculator, MACECalculator))
-    E_pot = forces = feature_vectors = None
+    return chunks, positions, atomic_numbers, masses, cell_vectors
+
+
+def _sequential_loop(
+    calculator: MACE | PySCFCalculator | DFTBCalculator,
+    positions: npt.NDArray[np.float64],
+    cell_vectors: npt.NDArray[np.float64] | None,
+    atomic_numbers: npt.NDArray[np.float64],
+    masses: npt.NDArray[np.float64],
+    silent: bool,
+    compute_energies: bool,
+    compute_forces: bool,
+    compute_feature_vectors: bool,
+    average_over_atoms: bool,
+) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None]:
+
+    n_frames, n_atoms, _ = positions.shape
+    is_periodic = cell_vectors is not None
+    permuted_between_frames = atomic_numbers.ndim == 2
+    variable_cell = is_periodic and cell_vectors.ndim == 3
+
+    assert masses.ndim == atomic_numbers.ndim
 
     if compute_energies:
+        E_pot = np.zeros(n_frames)
+    else:
+        E_pot = None
+
+    if compute_forces:
+        forces = np.zeros((n_frames, n_atoms, 3))
+    else:
+        forces = None
+
+    if compute_feature_vectors:
+        assert isinstance(calculator, MACE)
+        n_features = calculator.n_invariant_features()
+        if average_over_atoms:
+            feature_vectors = np.zeros((structure.n_frames, n_features))
+        else:
+            feature_vectors = np.zeros(
+                (structure.n_frames, structure.n_atoms, n_features)
+            )
+    else:
+        feature_vectors = None
+
+    for i in mbe_automation.common.display.Progress(
+        iterable=range(n_frames),
+        n_total_steps=n_frames,
+        label="frames",
+        percent_increment=10,
+        silent=silent,
+    ):
+        if permuted_between_frames:
+            atomic_numbers_i = atomic_numbers[i]
+            masses_i = masses[i]
+        else:
+            atomic_numbers_i = atomic_numbers
+            masses_i = masses
+
+        if variable_cell:
+            cell_vectors_i = cell_vectors[i]
+        else:
+            cell_vectors_i = cell_vectors
+
+        positions_i = positions[i]
+
+        atoms = ase.Atoms(
+            numbers=atomic_numbers_i,
+            positions=positions_i,
+            masses=masses_i,
+            pbc=is_periodic,
+            cell=cell_vectors_i,
+        )
+        atoms.calc = calculator
+
+        if compute_forces:
+            forces[i] = atoms.get_forces()
+
+        if compute_energies:
+            E_pot[i] = atoms.get_potential_energy() / structure.n_atoms  # eV/atom
+
+        if compute_feature_vectors:
+            feature_vectors_i = calculator.get_descriptors(atoms).reshape(
+                structure.n_atoms, -1
+            )
+
+            if average_over_atoms:
+                feature_vectors[i] = np.average(feature_vectors_i, axis=0)
+            else:
+                feature_vectors[i] = feature_vectors_i
+
+    return E_pot, forces, feature_vectors
+
+
+def _parallel_loop(
+    calculator: MACE | PySCFCalculator,
+    structure: Structure,
+    compute_energies: bool,
+    compute_forces: bool,
+    compute_feature_vectors: bool,
+    average_over_atoms: bool,
+    n_workers: int,
+    n_gpus_per_worker: int,
+    n_cpus_per_worker: int,
+    silent: bool,
+) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None]:
+
+    if compute_energy:
         E_pot = np.zeros(structure.n_frames)
-        if not return_arrays: structure.E_pot = E_pot
+    else:
+        E_pot = None
 
     if compute_forces:
         forces = np.zeros((structure.n_frames, structure.n_atoms, 3))
-        if not return_arrays: structure.forces = forces
+    else:
+        forces = None
 
     if compute_feature_vectors:
-        if average_over_atoms:
-            if not return_arrays: structure.feature_vectors_type = "averaged_environments"
+        n_features = calculator.n_invariant_features()
+        if average_over_stoms:
+            feature_vectors = np.zeros((structure.n_frames, n_features))
         else:
-            if not return_arrays: structure.feature_vectors_type = "atomic"
+            feature_vectors = np.zeros(
+                (structure.n_frames, structure.n_atoms, n_features)
+            )
+    else:
+        feature_vectors = None
+
+    chunk_frames, positions, atomic_numbers, masses, cell_vectors = _split_work(
+        structure, n_workers
+    )
+
+    calc_cls, calc_kwargs = calculator.serialize()
+    workers = [
+        CalculatorWorker.options(
+            n_gpus=n_gpus_per_worker,
+            n_cpus=n_cpus_per_workser,
+        ).remote(
+            calculator_cls=calc_cls,
+            silent=(silent or i > 0),
+            calculator_kwargs=calc_kwargs,
+        )
+        for i in range(n_workers)
+    ]
+
+    futures = []
+    for i, worker in enumerate(workers):
+        n_frames = len(chunks[i])
+        if n_frames > 0:
+            futures.append(
+                worker.run.remote(
+                    positions=positions[i],
+                    atomic_numbers=atomic_numbers[i],
+                    masses=masses[i],
+                    cell_vectors=cell_vectors[i],
+                    compute_energies=compute_energies,
+                    compute_forces=compute_forces,
+                    compute_feature_vectors=compute_feature_vectors,
+                    average_over_atoms=average_over_atoms,
+                )
+            )
+
+    results = ray.get(futures)
+
+    for i, result in enumerate(results):
+        chunk_E, chunk_forces, chunk_features = result
+
+        if compute_energies:
+            E_pot[chunk_frames[i]] = chunk_E
+
+        if compute_forces:
+            forces[chunk_frames[i]] = chunk_forces
+
+        if compute_feature_vectors:
+            feature_vectors[chunk_frames[i]] = chunk_features
+
+    return E_pot, forces, feature_vectors
+
+
+@ray.remote
+class CalculatorWorker:
+    def __init__(self, calculator_cls, silent, calculator_kwargs):
+        self.silent = silent
+        self.calculator = calculator_cls(**calculator_kwargs)
+
+    def run(
+        self,
+        positions: npt.NDArray[np.float64],
+        atomic_numbers: npt.NDArray[np.float64],
+        masses: npt.NDArray[np.float64],
+        cell_vectors: npt.NDArray[np.float64] | None,
+        compute_energies: bool,
+        compute_forces: bool,
+        compute_feature_vectors: bool,
+        average_over_atoms: bool,
+    ):
+
+        return _sequential_loop(
+            calculator=self.calculator,
+            positions=positions,
+            cell_vectors=cell_vectors,
+            atomic_numbers=atomic_numbers,
+            masses=masses,
+            silent=self.silent,
+            compute_energies=compute_energies,
+            compute_forces=compute_forces,
+            compute_feature_vectors=compute_feature_vectors,
+            average_over_atoms=average_over_atoms,
+        )
+
+
+def run_model(
+    structure: Structure,
+    calculator: ASECalculator | MACECalculator,
+    compute_energies: bool = True,
+    compute_forces: bool = True,
+    compute_feature_vectors: bool = True,
+    average_over_atoms: bool = False,
+    return_arrays: bool = False,
+    silent: bool = False,
+    resources: Resources | None = None,
+) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None] | None:
+    """
+    Run a calculator of energies/forces/feature vectors for all frames of a given
+    Structure. Store computed quantities in-place or return them as arrays.
+    The coordinates are not modified.
+
+    """
+    if resources == None:
+        resources = Resources.auto_detect()
+
+    compute_feature_vectors = compute_feature_vectors and isinstance(calculator, MACE)
+
+    n_workers = resources.n_gpus
+    n_gpus_per_worker = 1
+
+    use_ray = (
+        n_workers > 1
+        and structure.n_frames >= n_workers
+        and isinstance(calculator, (MACE, PySCFCalculator))
+    )
+
+    if use_ray:
+        n_cpus_per_worker = resources.n_cpu_cores // n_workers
+        assert n_cpus_per_worker >= 1
+
+        if not ray.is_initialized():
+            ray.init()
+            shutdown_ray = True
+        else:
+            shutdown_ray = False
 
     if not silent:
         mbe_automation.common.resources.print_computational_resources()
-        mbe_automation.common.display.framed([
-            "Properties for pre-computed structures"
-        ])
-        print(f"n_frames                    {structure.n_frames}")
-        print(f"compute_energies            {compute_energies}")
-        print(f"compute_forces              {compute_forces}")
-        print(f"compute_feature_vectors     {compute_feature_vectors}")
+        mbe_automation.common.display.framed(
+            ["Applying energies and forces model on fixed structures"]
+        )
+        print(f"{'n_frames':<30}{structure.n_frames}")
+        print(f"{'compute_energies':<30}{compute_energies}")
+        print(f"{'compute_forces':<30}{compute_forces}")
+        print(f"{'compute_feature_vectors':<30}{compute_feature_vectors}")
+        print(f"{'multi-GPU parallelization':<30}{use_ray}")
+        if use_ray:
+            print(f"{'n_gpus':<30}{resources.n_gpus}")
+            print(f"{'n_gpus_per_worker':<30}{n_gpus_per_worker}")
+            print(f"{'n_cpus_per_worker':<30}{n_cpus_per_worker}")
 
         print(f"Loop over frames...")
 
-    use_ray = False
-    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-        if isinstance(calculator, (MACE, PySCFCalculator)):
-            use_ray = True
-            if not ray.is_initialized():
-                ray.init()
-    
     if use_ray:
-        calc_cls, calc_kwargs = calculator.serialize()
-        n_gpus = torch.cuda.device_count()
-        workers = [CalculatorWorker.remote(calc_cls, calc_kwargs) for _ in range(n_gpus)]
-
-        # Split frames
-        indices = np.arange(structure.n_frames)
-        chunks = np.array_split(indices, n_gpus)
-
-        futures = []
-        for i, worker in enumerate(workers):
-            if len(chunks[i]) > 0:
-                futures.append(worker.run.remote(structure, chunks[i].tolist(), compute_energies, compute_forces, compute_feature_vectors, average_over_atoms))
-
-        results = ray.get(futures)
-
-        # Aggregate results
-        for res in results:
-            chunk_frames, chunk_E, chunk_forces, chunk_features = res
-            if compute_energies:
-                E_pot[chunk_frames] = chunk_E
-            if compute_forces:
-                forces[chunk_frames] = chunk_forces
-            if compute_feature_vectors and chunk_features is not None:
-                # Need to init feature_vectors array if first time
-                if feature_vectors is None:
-                    # Determine shape from first chunk result
-                    n_features = chunk_features.shape[-1]
-                    if average_over_atoms:
-                       feature_vectors = np.zeros((structure.n_frames, n_features))
-                    else:
-                       feature_vectors = np.zeros((structure.n_frames, structure.n_atoms, n_features))
-                    if not return_arrays: structure.feature_vectors = feature_vectors
-
-                feature_vectors[chunk_frames] = chunk_features
-
+        E_pot, forces, feature_vectors = _parallel_loop(
+            calculator=calculator,
+            structure=structure,
+            compute_energies=compute_energies,
+            compute_forces=compute_forces,
+            compute_feature_vectors=compute_feature_vectors,
+            average_over_atoms=average_over_atoms,
+            n_workers=n_workers,
+            n_gpus_per_worker=n_gpus_per_worker,
+            n_cpus_per_worke=n_cpus_per_worker,
+            silent=silent,
+        )
     else:
-        for i in mbe_automation.common.display.Progress(
-                iterable=range(structure.n_frames),
-                n_total_steps=structure.n_frames,
-                label="frames",
-                percent_increment=10,
-                silent=silent,
-        ):
-            atoms = to_ase(
-                structure=structure,
-                frame_index=i
-            )
-            atoms.calc = calculator
-            if compute_forces: forces[i] = atoms.get_forces()
-            if compute_energies: E_pot[i] = atoms.get_potential_energy() / structure.n_atoms # eV/atom
-            if compute_feature_vectors:
-                assert isinstance(calculator, MACECalculator)
-                features = calculator.get_descriptors(atoms).reshape(structure.n_atoms, -1)
-                if i == 0:
-                    n_features = features.shape[-1]
-                    if average_over_atoms:
-                        feature_vectors = np.zeros((structure.n_frames, n_features))
-                    else:
-                        feature_vectors = np.zeros((structure.n_frames, structure.n_atoms, n_features))
+        E_pot, forces, feature_vectors = _sequential_loop(
+            calculator=calculator,
+            positions=structure.positions,
+            cell_vectors=structure.cell_vectors,
+            atomic_numbers=structure.atomic_numbers,
+            masses=structure.masses,
+            silent=silent,
+            compute_energies=compute_energies,
+            compute_forces=compute_forces,
+            compute_feature_vectors=compute_feature_vectors,
+            average_over_atoms=average_over_atoms,
+        )
 
-                    if not return_arrays: structure.feature_vectors = feature_vectors
+    if not return_arrays:
+        if compute_energies:
+            structure.E_pot = E_pot
 
-                if average_over_atoms:
-                    feature_vectors[i] = np.average(features, axis=0)
-                else:
-                    feature_vectors[i] = features
+        if compute_forces:
+            structure.forces = forces
+
+        if compute_feature_vectors:
+            if average_over_atoms:
+                structure.feature_vectors_type = "averaged_environments"
+            else:
+                structure.feature_vectors_type = "atomic"
+
+            structure.feature_vectors = feature_vectors
+
+    if use_ray and shutdown_ray:
+        ray.shutdown()
 
     if return_arrays:
         return E_pot, forces, feature_vectors
