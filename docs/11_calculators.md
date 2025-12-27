@@ -14,7 +14,9 @@ Location: `mbe_automation.calculators.mace.MACE`
 | :--- | :--- | :--- | :--- |
 | `model_path` | `str` | - | Path to the MACE model file (`.model`). |
 | `device` | `str` \| `None` | `None` | Computation device (e.g., "cpu", "cuda"). Auto-detected if `None`. |
-| `head` | `str` | `"default"` | Name of the output head to use. |
+| `head` | `str` | `"default"` | Name of the output head to use.† |
+
+† *Some models, such as `mace-mh-1.model`, require specifying a head (e.g., `head="omol"`).*
 
 ### Code Example
 
@@ -23,16 +25,18 @@ import mbe_automation
 from mbe_automation.calculators import MACE
 
 # Load a MACE model
-calc = MACE(model_path="~/models/mace-mh-1.model")
+# Note: mace-mh-1 requires the "omol" head
+calc = MACE(model_path="~/models/mace-mh-1.model", head="omol")
 
 # Load a structure
 structure = mbe_automation.Structure.from_xyz_file("structure.xyz")
-atoms = structure.to_ase_atoms()
 
-# Attach calculator and calculate
-atoms.calc = calc
-print(f"Potential Energy: {atoms.get_potential_energy()} eV")
-print(f"Forces:\n{atoms.get_forces()}")
+# Run calculation
+# This updates the structure in-place with energies and forces
+structure.run_model(calc)
+
+print(f"Potential Energy: {structure.E_pot} eV/atom")
+print(f"Forces:\n{structure.forces}")
 ```
 
 ## PySCF (DFT & HF)
@@ -70,15 +74,14 @@ hf_calc = HF(basis="def2-tzvpp")
 
 # Load a structure
 structure = mbe_automation.Structure.from_xyz_file("molecule.xyz")
-atoms = structure.to_ase_atoms()
 
 # Run DFT
-atoms.calc = dft_calc
-print(f"DFT Energy: {atoms.get_potential_energy()} eV")
+structure.run_model(dft_calc)
+print(f"DFT Energy: {structure.E_pot} eV/atom")
 
 # Run HF
-atoms.calc = hf_calc
-print(f"HF Energy: {atoms.get_potential_energy()} eV")
+structure.run_model(hf_calc)
+print(f"HF Energy: {structure.E_pot} eV/atom")
 ```
 
 ## DFTB+ (Semi-empirical)
@@ -124,9 +127,8 @@ calc_dftb.model_independent_params["directory"] = str(Path("./dftb_work").resolv
 
 # Load a structure
 structure = mbe_automation.Structure.from_xyz_file("crystal.xyz")
-atoms = structure.to_ase_atoms()
 
 # Run Calculation
-atoms.calc = calc_xtb
-print(f"GFN2-xTB Energy: {atoms.get_potential_energy()} eV")
+structure.run_model(calc_xtb)
+print(f"GFN2-xTB Energy: {structure.E_pot} eV/atom")
 ```
