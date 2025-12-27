@@ -6,6 +6,13 @@ from . import configs
 from . import workflows
 from . import ml
 from . import calculators
+
+from .calculators import (
+    HF,
+    DFT,
+    MACE,
+)
+
 from .storage.core import (
     BrillouinZonePath,
     EOSCurves,
