@@ -182,7 +182,7 @@ def _parallel_loop(
     )
 
     if not ray.is_initialized():
-        ray.init()
+        ray.init(include_dashboard=False) # we get lots of warnings if dashboard is not disabled
         shutdown_ray = True
     else:
         shutdown_ray = False
