@@ -31,7 +31,7 @@ The `MACE` class wraps the `mace-torch` calculator, providing automatic device s
 ### Code Example
 
 ```python
-import mbe_automation
+from mbe_automation import Structure
 from mbe_automation.calculators import MACE
 
 # Load a MACE model
@@ -39,7 +39,7 @@ from mbe_automation.calculators import MACE
 calc = MACE(model_path="~/models/mace-mh-1.model", head="omol")
 
 # Load a structure
-structure = mbe_automation.Structure.from_xyz_file("structure.xyz")
+structure = Structure.from_xyz_file("structure.xyz")
 
 # Run calculation
 # This updates the structure in-place with energies and forces
@@ -94,7 +94,7 @@ The module provides factory functions `DFT` and `HF` to simplify initialization.
 ### Code Example
 
 ```python
-import mbe_automation
+from mbe_automation import Structure
 from mbe_automation.calculators import DFT, HF
 
 # Initialize a DFT calculator (e.g., r2scan-d4 / def2-tzvp)
@@ -104,7 +104,7 @@ dft_calc = DFT(model_name="r2scan-d4", basis="def2-tzvp")
 hf_calc = HF(basis="def2-tzvpp")
 
 # Load a structure
-structure = mbe_automation.Structure.from_xyz_file("molecule.xyz")
+structure = Structure.from_xyz_file("molecule.xyz")
 
 # Run DFT
 structure.run_model(dft_calc)
@@ -132,32 +132,20 @@ Convenience factory functions are provided for common methods.
 
 The factory functions can be imported from `mbe_automation.calculators` (e.g. `from mbe_automation.calculators import GFN2_xTB`).
 
-### Adjustable parameters
-
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `work_dir` | `Path` | `Path(".")` | Directory where DFTB+ input/output files are written. |
-
-*Note: Most physics parameters are hardcoded in the factory functions or determined by the chemical system.*
+Most physics parameters are hardcoded in the factory functions or determined by the chemical system.
 
 ### Code Example
 
 ```python
-import mbe_automation
+from mbe_automation import Structure
 from mbe_automation.calculators import GFN2_xTB, DFTB3_D4
 from pathlib import Path
 
-# Create a GFN2-xTB calculator
-# It writes files to the current directory by default
 calc_xtb = GFN2_xTB()
-
-# Create a DFTB3-D4 calculator
-# Specify a work directory to avoid file conflicts in parallel runs
 calc_dftb = DFTB3_D4()
-calc_dftb.model_independent_params["directory"] = str(Path("./dftb_work").resolve())
 
 # Load a structure
-structure = mbe_automation.Structure.from_xyz_file("crystal.xyz")
+structure = Structure.from_xyz_file("crystal.xyz")
 
 # Run Calculation
 structure.run_model(calc_xtb)
