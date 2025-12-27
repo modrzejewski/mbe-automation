@@ -3,6 +3,7 @@ import numpy as np
 import numpy.typing as npt
 import ase
 import logging
+import os
 try:
     import ray
     RAY_AVAILABLE = True
@@ -183,6 +184,7 @@ def _parallel_loop(
     )
 
     if not ray.is_initialized():
+        os.environ["RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO"] = "0"
         ray.init(
             include_dashboard=False,
             logging_level=logging.ERROR,
