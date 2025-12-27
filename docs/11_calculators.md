@@ -6,9 +6,8 @@ The `mbe_automation.calculators` module provides interfaces to various computati
 
 While these calculators inherit from the standard ASE `Calculator` interface, they are enhanced with specific features required by the `mbe_automation` workflow:
 
-1.  **Extended Interface:** They implement additional methods and properties not found in standard ASE calculators.
-2.  **Level of Theory Tracking:** Each calculator instance has a `level_of_theory` property (string). This identifier is used to tag computed energies and forces when they are stored in the HDF5 dataset (under `ground_truth`), ensuring data provenance and enabling multi-fidelity workflows.
-3.  **Multi-GPU Parallelization:** The MACE and PySCF-based calculators implement specialized serialization methods that allow `run_model` to distribute calculations across multiple GPUs using Ray. This parallelization works as a "black box" for the user: you simply allocate the necessary resources (e.g., via SLURM) and execute `run_model` on your structures.
+1.  **Level of Theory Tracking:** Each calculator instance has a `level_of_theory` property (string). This identifier is used to tag computed energies and forces when they are stored in the HDF5 dataset (under `ground_truth`), ensuring data provenance and enabling multi-fidelity workflows.
+2.  **Multi-GPU Parallelization:** The MACE and PySCF-based calculators implement specialized serialization methods that allow `run_model` to distribute calculations across multiple GPUs using Ray. This parallelization works as a black box for the user: you simply allocate the necessary resources (e.g., via SLURM) and execute `run_model` on your structures.
 
 ## Table of Contents
 
