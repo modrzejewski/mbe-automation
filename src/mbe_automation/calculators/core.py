@@ -1,7 +1,7 @@
 from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
-from ase import Atoms
+import ase
 import ray
 import torch
 
@@ -9,7 +9,6 @@ from mbe_automation.storage import Structure
 from mbe_automation.calculators.mace import MACE
 from mbe_automation.calculators.pyscf import PySCFCalculator
 from mbe_automation.calculators.dftb import DFTBCalculator
-from mbe_automation.storage import Structure
 import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
@@ -23,7 +22,6 @@ def _split_work(structure: Structure, n_workers: int):
     indices = np.arange(structure.n_frames)
     chunks = np.array_split(indices, n_workers)
 
-    periodic = structure.periodic
     permuted_between_frames = structure.permuted_between_frames
     variable_cell = structure.variable_cell
 
