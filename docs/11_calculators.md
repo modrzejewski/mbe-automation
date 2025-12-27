@@ -50,13 +50,44 @@ Location: `mbe_automation.calculators.pyscf.DFT` and `mbe_automation.calculators
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `model_name` | `str` | `"r2scan-d4"` | (DFT only) The density functional method. Supported methods include `wb97m-v`, `wb97x-d3`, `b3lyp-d4`, `r2scan-d4`, etc. |
-| `basis` | `str` | `"def2-tzvp"` | Basis set (e.g., `def2-svp`, `def2-tzvpp`). |
+| `model_name` | `str` | `"r2scan-d4"` | (DFT only) The density functional method. See "Supported DFT Methods" below. |
+| `basis` | `str` | `"def2-tzvp"` | Basis set. See "Supported Basis Sets" below. |
 | `kpts` | `list[int]` \| `None` | `None` | k-point mesh for periodic calculations (e.g., `[2, 2, 2]`). If `None`, periodic calculations are performed at the Gamma point. Has no effect on finite systems. |
 | `density_fit` | `bool` | `True` | Whether to use density fitting (RI approximation). |
 | `auxbasis` | `str` \| `None` | `None` | Auxiliary basis set for density fitting. |
 | `verbose` | `int` | `0` | Verbosity level for PySCF output. |
 | `max_memory_mb` | `int` \| `None` | `None` | Maximum memory usage in MB. Auto-detected if `None`. |
+
+### Supported DFT Methods
+
+| Method |
+| :--- |
+| `wb97m-v` |
+| `wb97x-d3` |
+| `wb97x-d4` |
+| `b3lyp-d3` |
+| `b3lyp-d4` |
+| `pbe-d3` |
+| `pbe-d4` |
+| `pbe0-d3` |
+| `pbe0-d4` |
+| `r2scan-d4` |
+
+### Supported Basis Sets
+
+| Basis Set |
+| :--- |
+| `def2-svp` |
+| `def2-svpd` |
+| `def2-tzvp` |
+| `def2-tzvpp` |
+| `def2-mtzvpp` |
+| `def2-tzvpd` |
+| `def2-tzvppd` |
+| `def2-qzvp` |
+| `def2-qzvpp` |
+| `def2-qzvpd` |
+| `def2-qzvppd` |
 
 ### Code Example
 
