@@ -280,10 +280,9 @@ def run_model(
     compute_forces: bool = True,
     compute_feature_vectors: bool = True,
     average_over_atoms: bool = False,
-    return_arrays: bool = False,
     silent: bool = False,
     resources: Resources | None = None,
-) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None] | None:
+) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None]:
     """
     Run a calculator of energies/forces/feature vectors for all frames of a given
     Structure. Store computed quantities in-place or return them as arrays.
@@ -350,20 +349,4 @@ def run_model(
             average_over_atoms=average_over_atoms,
         )
 
-    if not return_arrays:
-        if compute_energies:
-            structure.E_pot = E_pot
-
-        if compute_forces:
-            structure.forces = forces
-
-        if compute_feature_vectors:
-            if average_over_atoms:
-                structure.feature_vectors_type = "averaged_environments"
-            else:
-                structure.feature_vectors_type = "atomic"
-
-            structure.feature_vectors = feature_vectors
-
-    if return_arrays:
-        return E_pot, forces, feature_vectors
+    return E_pot, forces, feature_vectors

@@ -577,7 +577,7 @@ def extract_all_molecules(
 
     if calculator is not None:
         for molecule in molecules:
-            mbe_automation.calculators.core.run_model(
+            E_pot, _, _ = mbe_automation.calculators.core.run_model(
                 structure=molecule,
                 calculator=calculator,
                 compute_energies=True,
@@ -585,6 +585,7 @@ def extract_all_molecules(
                 compute_feature_vectors=False,
                 silent=True,
             )
+            molecule.E_pot = E_pot
 
     return molecules
 
@@ -665,7 +666,7 @@ def extract_relaxed_unique_molecules(
         relaxed_molecules.append(relaxed_molecule)
 
     for molecule in relaxed_molecules:
-        mbe_automation.calculators.core.run_model(
+        E_pot, _, _ = mbe_automation.calculators.core.run_model(
                 structure=molecule,
                 calculator=calculator,
                 compute_energies=True,
@@ -673,6 +674,7 @@ def extract_relaxed_unique_molecules(
                 compute_feature_vectors=False,
                 silent=True,
             )
+        molecule.E_pot = E_pot
 
     mbe_automation.storage.save_attribute(
         dataset=dataset,

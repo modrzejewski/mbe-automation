@@ -759,7 +759,6 @@ def _run_model(
         compute_forces=forces,
         compute_feature_vectors=(feature_vectors_type!="none"),
         average_over_atoms=(feature_vectors_type=="averaged_environments"),
-        return_arrays=True,
         resources=exec_params,
     )
 
@@ -769,6 +768,7 @@ def _run_model(
 
     if energies:
         structure.ground_truth.energies[level_of_theory] = E_pot
+        
     if forces:
         structure.ground_truth.forces[level_of_theory] = F
 
