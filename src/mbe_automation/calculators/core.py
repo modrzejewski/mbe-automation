@@ -15,9 +15,9 @@ from mbe_automation.configs.execution import Resources
 
 
 def _split_work(structure: Structure, n_workers: int):
-    assert strucure.atomic_numbers.ndim == structure.masses.ndim
+    assert structure.atomic_numbers.ndim == structure.masses.ndim
     assert structure.n_frames > 1
-    assert n_workers >= structure.n_frames
+    assert structure.n_frames >= n_workers
 
     indices = np.arange(structure.n_frames)
     chunks = np.array_split(indices, n_workers)
@@ -84,10 +84,10 @@ def _sequential_loop(
         assert isinstance(calculator, MACE)
         n_features = calculator.n_invariant_features()
         if average_over_atoms:
-            feature_vectors = np.zeros((structure.n_frames, n_features))
+            feature_vectors = np.zeros((n_frames, n_features))
         else:
             feature_vectors = np.zeros(
-                (structure.n_frames, structure.n_atoms, n_features)
+                (n_frames, n_atoms, n_features)
             )
     else:
         feature_vectors = None
@@ -126,11 +126,11 @@ def _sequential_loop(
             forces[i] = atoms.get_forces()
 
         if compute_energies:
-            E_pot[i] = atoms.get_potential_energy() / structure.n_atoms  # eV/atom
+            E_pot[i] = atoms.get_potential_energy() / n_atoms  # eV/atom
 
         if compute_feature_vectors:
             feature_vectors_i = calculator.get_descriptors(atoms).reshape(
-                structure.n_atoms, -1
+                n_atoms, -1
             )
 
             if average_over_atoms:
@@ -154,7 +154,7 @@ def _parallel_loop(
     silent: bool,
 ) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None]:
 
-    if compute_energy:
+    if compute_energies:
         E_pot = np.zeros(structure.n_frames)
     else:
         E_pot = None
@@ -166,7 +166,7 @@ def _parallel_loop(
 
     if compute_feature_vectors:
         n_features = calculator.n_invariant_features()
-        if average_over_stoms:
+        if average_over_atoms:
             feature_vectors = np.zeros((structure.n_frames, n_features))
         else:
             feature_vectors = np.zeros(
@@ -183,7 +183,7 @@ def _parallel_loop(
     workers = [
         CalculatorWorker.options(
             n_gpus=n_gpus_per_worker,
-            n_cpus=n_cpus_per_workser,
+            n_cpus=n_cpus_per_worker,
         ).remote(
             calculator_cls=calc_cls,
             silent=(silent or i > 0),
@@ -194,7 +194,7 @@ def _parallel_loop(
 
     futures = []
     for i, worker in enumerate(workers):
-        n_frames = len(chunks[i])
+        n_frames = len(chunk_frames[i])
         if n_frames > 0:
             futures.append(
                 worker.run.remote(
@@ -260,7 +260,7 @@ class CalculatorWorker:
 
 def run_model(
     structure: Structure,
-    calculator: ASECalculator | MACECalculator,
+    calculator: MACE | PySCFCalculator | DFTBCalculator,
     compute_energies: bool = True,
     compute_forces: bool = True,
     compute_feature_vectors: bool = True,
@@ -326,7 +326,7 @@ def run_model(
             average_over_atoms=average_over_atoms,
             n_workers=n_workers,
             n_gpus_per_worker=n_gpus_per_worker,
-            n_cpus_per_worke=n_cpus_per_worker,
+            n_cpus_per_worker=n_cpus_per_worker,
             silent=silent,
         )
     else:

@@ -759,7 +759,7 @@ def _run_model(
         compute_feature_vectors=(feature_vectors_type!="none"),
         average_over_atoms=(feature_vectors_type=="averaged_environments"),
         return_arrays=True,
-        resources=resources,
+        resources=exec_params,
     )
 
     if feature_vectors_type != "none" and d is not None:

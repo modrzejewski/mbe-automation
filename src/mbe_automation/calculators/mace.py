@@ -18,14 +18,6 @@ class MACE(MACECalculator):
                 device = "cpu"
         
         self.model_path = Path(model_path).expanduser()
-        
-        if head != "default":
-            self.level_of_theory = f"mace_{self.architecture}_{head}"
-        else:
-            self.level_of_theory = f"mace_{self.architecture}"
-
-        self.device = device
-        self.head = head
 
         super().__init__(
             model_paths=str(self.model_path),
@@ -33,6 +25,14 @@ class MACE(MACECalculator):
             head=head,
             default_dtype="float64",
         )
+
+        if head != "default":
+            self.level_of_theory = f"mace_{self.architecture}_{head}"
+        else:
+            self.level_of_theory = f"mace_{self.architecture}"
+
+        self.device = device
+        self.head = head
 
     @property
     def n_invariant_features(self) -> int:
