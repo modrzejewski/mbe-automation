@@ -9,7 +9,7 @@ from mbe_automation.storage import Structure
 from mbe_automation.calculators.mace import MACE
 from mbe_automation.calculators.pyscf import PySCFCalculator
 from mbe_automation.calculators.dftb import DFTBCalculator
-from mbe_automation.storage import Structure, to_ase
+from mbe_automation.storage import Structure
 import mbe_automation.common.display
 from mbe_automation.configs.execution import Resources
 
