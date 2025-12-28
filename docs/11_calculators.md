@@ -139,7 +139,6 @@ Most physics parameters are hardcoded in the factory functions or determined by 
 ```python
 from mbe_automation import Structure
 from mbe_automation.calculators import GFN2_xTB, DFTB3_D4
-from pathlib import Path
 
 calc_xtb = GFN2_xTB()
 calc_dftb = DFTB3_D4()
@@ -149,6 +148,9 @@ structure = Structure.from_xyz_file("crystal.xyz")
 
 # Run Calculation
 structure.run_model(calc_xtb)
+structure.run_model(calc_dftb)
 energy_xtb = structure.ground_truth.energies[calc_xtb.level_of_theory]
+energy_dftb = structure.ground_truth.energies[calc_dftb.level_of_theory]
 print(f"GFN2-xTB Energy: {energy_xtb} eV/atom")
+print(f"DFTB3-D4 Energy: {energy_dftb} eV/atom")
 ```
