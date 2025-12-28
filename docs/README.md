@@ -60,6 +60,7 @@ The program integrates several scientific codes into a unified workflow, includi
 ### Basics
 
 *   [API Data Classes](./10_api_classes.md)
+*   [Calculators](./11_calculators.md)
 *   [Working with HDF5 Datasets](./09_working_with_hdf5_datasets.md)
 *   [Computational Bottlenecks](./06_bottlenecks.md)
 
