@@ -35,7 +35,9 @@ from mbe_automation import Structure
 from mbe_automation.calculators import MACE
 
 # Load a MACE model
-# Note: mace-mh-1 requires the "omol" head
+# Note: mace-mh-1 requires specifying the readout head.
+# In our tests we have found that "omol" works well for molecular
+# crystals.
 calc = MACE(model_path="~/models/mace-mh-1.model", head="omol")
 
 # Load a structure
@@ -56,7 +58,7 @@ print(f"Forces:\n{forces}")
 
 ## PySCF (DFT & HF)
 
-The `PySCFCalculator` provides an interface to PySCF (CPU) and GPU4PySCF (GPU) for Hartree-Fock and DFT calculations. It is designed to be **stateless**, meaning the underlying backend and system are re-initialized for every `calculate` call. This allows a single calculator instance to be used across different atomic configurations (e.g., during delta learning training set generation).
+The `PySCFCalculator` provides an interface to PySCF (CPU) and GPU4PySCF (GPU) for Hartree-Fock and DFT calculations. It is designed to be stateless, meaning the underlying backend and system are re-initialized for every `calculate` call. This allows a single calculator instance to be used across different atomic configurations (e.g., during delta learning training set generation).
 
 The module provides factory functions `DFT` and `HF` to simplify initialization.
 
