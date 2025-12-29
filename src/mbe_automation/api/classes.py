@@ -11,6 +11,7 @@ from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 
 import mbe_automation.storage
 import mbe_automation.common
+import mbe_automation.dynamics.md.display
 from mbe_automation.configs.execution import Resources
 from mbe_automation.configs.clusters import FiniteSubsystemFilter
 from mbe_automation.configs.structure import Minimum
@@ -146,7 +147,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             Structure(**vars(x)) for x in _split_frames(self, fractions, rng)
         ]
 
-    def run_model(
+    def run(
             self,
             calculator: CALCULATORS,
             energies: bool = True,
@@ -164,6 +165,8 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             exec_params=exec_params,
             overwrite=overwrite,
         )
+
+    run_model = run
 
     def to_molecular_crystal(
             self,
@@ -273,7 +276,7 @@ class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
             _subsample_trajectory(self, n, algorithm, rng)
         ))
 
-    def run_model(
+    def run(
             self,
             calculator: CALCULATORS,
             energies: bool = True,
@@ -291,6 +294,16 @@ class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
             exec_params=exec_params,
             overwrite=overwrite,
         )
+
+    run_model = run
+
+    def display(
+            self,
+            quantity: Literal["energy_fluctuations"] = "energy_fluctuations",
+            save_path: str | None = None
+    ):
+        if quantity == "energy_fluctuations":
+            mbe_automation.dynamics.md.display.energy_fluctuations(self, save_path)
 
 @dataclass(kw_only=True)
 class MolecularCrystal(_MolecularCrystal, _AtomicEnergiesCalc):
@@ -386,7 +399,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             n_molecules=self.n_molecules
         )
 
-    def run_model(
+    def run(
             self,
             calculator: CALCULATORS,
             energies: bool = True,
@@ -404,6 +417,8 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             exec_params=exec_params,
             overwrite=overwrite,
         )
+
+    run_model = run
 
     def random_split(
             self,
