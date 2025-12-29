@@ -83,8 +83,8 @@ mbe_automation.run(md_config)
 | `dataset` | The main HDF5 file with all data computed for the physical system. | `"./properties.hdf5"` |
 | `root_key` | Specifies the root path in the HDF5 dataset where the workflow's output is stored. | `"md"` |
 | `verbose` | Verbosity of the program's output. `0` suppresses warnings. | `0` |
-| `save_plots` | If `True`, save plots of the simulation results. | `True` |
-| `save_csv` | If `True`, save CSV files of the simulation results. | `True` |
+| `save_plots` | If `True`, save plots of the simulation results. | `False` |
+| `save_csv` | If `True`, save CSV files of the simulation results. | `False` |
 
 ### `ClassicalMD` Class
 
