@@ -1,3 +1,4 @@
+from __future__ import annotations
 from functools import singledispatch
 import matplotlib.pyplot as plt
 import numpy as np
