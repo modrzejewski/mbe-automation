@@ -8,10 +8,20 @@ import pandas as pd
 import mbe_automation.storage
 import mbe_automation.dynamics.md.data
 
-def _energy_fluctuations(
+def energy_fluctuations(
         df: pd.DataFrame,
         save_path: str | None
 ):
+    """
+    Generate plots for total energy, temperature, and, for an NPT ensemble,
+    pressure and volume.
+    
+    Target values and trajectory averages are plotted as horizontal lines.
+    Averages are computed only for the production run and
+    are visualized with a shaded region. A vertical line marks the
+    start of the production run.
+    
+    """
     df["E_total (eV∕atom)"] = df["E_kin (eV∕atom)"] + df["E_pot (eV∕atom)"]
     time_ps = df["time (fs)"] / 1000.0
     
@@ -103,26 +113,7 @@ def _energy_fluctuations(
     else:
         return fig
 
-@singledispatch
-def energy_fluctuations(source, *args, **kwargs):
-    """
-    Plot properties from a molecular dynamics trajectory.
-
-    The function reads trajectory data and generates plots for total
-    energy, temperature, and, for an NPT ensemble, pressure and volume.
-    Target values and trajectory averages are plotted as horizontal lines.
-    Averages are computed only for the production run and
-    are visualized with a shaded region. A vertical line marks the
-    start of the production run.
-
-    This function is overloaded to accept either:
-    1. A dataset file path (str) and a key (str).
-    2. A Trajectory object.
-    """
-    raise NotImplementedError(f"Wrong type of argument passed to energy_fluctuations: {type(source)}")
-
-@energy_fluctuations.register
-def _(
+def energy_fluctuations_dataset(
         dataset: str,
         key: str,
         save_path: str | None = None
@@ -135,26 +126,7 @@ def _(
             "E_pot (eV∕atom)", "p (GPa)", "V (Å³∕atom)"
         ]
     )
-    _energy_fluctuations(df, save_path)        
-
-@energy_fluctuations.register
-def _(
-        traj: mbe_automation.storage.Trajectory,
-        save_path: str | None = None
-):
-    df = pd.DataFrame({
-        "time (fs)": traj.time,
-        "T (K)": traj.temperature,
-        "E_kin (eV∕atom)": traj.E_kin,
-        "E_pot (eV∕atom)": traj.E_pot,
-        "p (GPa)": traj.pressure,
-        "V (Å³∕atom)": traj.volume
-    })
-    df.attrs["time_equilibration (fs)"] = traj.time_equilibration
-    df.attrs["ensemble"] = traj.ensemble
-    df.attrs["target_temperature (K)"] = traj.target_temperature
-    df.attrs["target_pressure (GPa)"] = traj.target_pressure
-    _energy_fluctuations(df, save_path)
+    energy_fluctuations(df, save_path)        
 
 def reblocking(
     dataset: str,

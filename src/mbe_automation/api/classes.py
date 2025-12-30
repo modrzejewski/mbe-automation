@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 import typing
 from typing import Tuple, Literal, Sequence, List
 from pathlib import Path
+import pandas as pd
 import numpy as np
 import numpy.typing as npt
 import ase
@@ -303,7 +304,7 @@ class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
             save_path: str | None = None
     ):
         if quantity == "energy_fluctuations":
-            mbe_automation.dynamics.md.display.energy_fluctuations(self, save_path)
+            return _energy_fluctuations(self, save_path)
 
 @dataclass(kw_only=True)
 class MolecularCrystal(_MolecularCrystal, _AtomicEnergiesCalc):
@@ -854,3 +855,22 @@ def _statistics(
 
     print(f"Mean energy: {np.mean(data):.5f} eV/atom")
     print(f"Std energy:  {np.std(data):.5f} eV/atom")
+
+def _energy_fluctuations(
+        traj: Trajectory,
+        save_path: str | None = None
+):
+    df = pd.DataFrame({
+        "time (fs)": traj.time,
+        "T (K)": traj.temperature,
+        "E_kin (eV∕atom)": traj.E_kin,
+        "E_pot (eV∕atom)": traj.E_pot,
+        "p (GPa)": traj.pressure,
+        "V (Å³∕atom)": traj.volume
+    })
+    df.attrs["time_equilibration (fs)"] = traj.time_equilibration
+    df.attrs["ensemble"] = traj.ensemble
+    df.attrs["target_temperature (K)"] = traj.target_temperature
+    df.attrs["target_pressure (GPa)"] = traj.target_pressure
+    
+    return mbe_automation.dynamics.md.display.energy_fluctuations(df, save_path)

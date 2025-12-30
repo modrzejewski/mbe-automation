@@ -28,7 +28,7 @@ def _save_md_plots(
     key = f"{config.root_key}/trajectories/{label}"
     save_dir = os.path.join(config.work_dir, config.root_key, label)
     
-    mbe_automation.dynamics.md.display.energy_fluctuations(
+    mbe_automation.dynamics.md.display.energy_fluctuations_dataset(
         dataset=config.dataset,
         key=key,
         save_path=os.path.join(save_dir, "energy_fluctuations.png"),

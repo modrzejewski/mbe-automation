@@ -26,13 +26,8 @@ def get_velocities(
     remove_drift_rotation: bool = True,
 ) -> Tuple[float, float, np.ndarray]:
     """
-    Analyzes and optionally corrects particle velocities for COM translation
-    and global rotation, calculating the corresponding kinetic energies.
-
-    Parameters:
-    - system (ase.Atoms): The system of atoms.
-    - remove_drift_translation (bool): If True, removes the center-of-mass velocity.
-    - remove_drift_rotation (bool): If True, removes the global rotational velocity.
+    Evaluate and correct particle velocities for COM translation
+    and global rotation.
 
     Returns:
     - Tuple[float, float, np.ndarray]:
