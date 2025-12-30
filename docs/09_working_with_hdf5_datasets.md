@@ -1,7 +1,4 @@
 # Working with HDF5 Datasets
-
-The `mbe_automation.storage` module handles data persistence using hierarchical dataset files. It provides tools to inspect the file structure, query specific data groups using filters, and perform maintenance operations like copying or deleting data.
-
 *   [Inspecting Datasets](#inspecting-datasets)
 *   [Querying Data with DatasetKeys](#querying-data-with-datasetkeys)
     *   [Initialization](#initialization)

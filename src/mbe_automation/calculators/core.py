@@ -188,7 +188,7 @@ def _parallel_loop(
         ray.init(
             include_dashboard=False,
             logging_level=logging.ERROR,
-        ) # we get lots of warnings if dashboard is not disabled
+        ) # we get lots of warnings if dashboard and metrics are not disabled
         shutdown_ray = True
     else:
         shutdown_ray = False

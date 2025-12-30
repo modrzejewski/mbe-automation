@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 import typing
 from typing import Tuple, Literal, Sequence, List
 from pathlib import Path
+import pandas as pd
 import numpy as np
 import numpy.typing as npt
 import ase
@@ -11,6 +12,7 @@ from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 
 import mbe_automation.storage
 import mbe_automation.common
+import mbe_automation.dynamics.md.display
 from mbe_automation.configs.execution import Resources
 from mbe_automation.configs.clusters import FiniteSubsystemFilter
 from mbe_automation.configs.structure import Minimum
@@ -146,7 +148,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             Structure(**vars(x)) for x in _split_frames(self, fractions, rng)
         ]
 
-    def run_model(
+    def run(
             self,
             calculator: CALCULATORS,
             energies: bool = True,
@@ -164,6 +166,8 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             exec_params=exec_params,
             overwrite=overwrite,
         )
+
+    run_model = run
 
     def to_molecular_crystal(
             self,
@@ -273,7 +277,7 @@ class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
             _subsample_trajectory(self, n, algorithm, rng)
         ))
 
-    def run_model(
+    def run(
             self,
             calculator: CALCULATORS,
             energies: bool = True,
@@ -291,6 +295,16 @@ class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
             exec_params=exec_params,
             overwrite=overwrite,
         )
+
+    run_model = run
+
+    def display(
+            self,
+            quantity: Literal["energy_fluctuations"] = "energy_fluctuations",
+            save_path: str | None = None
+    ):
+        if quantity == "energy_fluctuations":
+            return _energy_fluctuations(self, save_path)
 
 @dataclass(kw_only=True)
 class MolecularCrystal(_MolecularCrystal, _AtomicEnergiesCalc):
@@ -386,7 +400,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             n_molecules=self.n_molecules
         )
 
-    def run_model(
+    def run(
             self,
             calculator: CALCULATORS,
             energies: bool = True,
@@ -404,6 +418,8 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             exec_params=exec_params,
             overwrite=overwrite,
         )
+
+    run_model = run
 
     def random_split(
             self,
@@ -839,3 +855,22 @@ def _statistics(
 
     print(f"Mean energy: {np.mean(data):.5f} eV/atom")
     print(f"Std energy:  {np.std(data):.5f} eV/atom")
+
+def _energy_fluctuations(
+        traj: Trajectory,
+        save_path: str | None = None
+):
+    df = pd.DataFrame({
+        "time (fs)": traj.time,
+        "T (K)": traj.temperature,
+        "E_kin (eV∕atom)": traj.E_kin,
+        "E_pot (eV∕atom)": traj.E_pot,
+        "p (GPa)": traj.pressure,
+        "V (Å³∕atom)": traj.volume
+    })
+    df.attrs["time_equilibration (fs)"] = traj.time_equilibration
+    df.attrs["ensemble"] = traj.ensemble
+    df.attrs["target_temperature (K)"] = traj.target_temperature
+    df.attrs["target_pressure (GPa)"] = traj.target_pressure
+    
+    return mbe_automation.dynamics.md.display.energy_fluctuations(df, save_path)

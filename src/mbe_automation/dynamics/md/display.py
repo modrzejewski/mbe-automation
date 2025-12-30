@@ -1,3 +1,4 @@
+from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -6,38 +7,20 @@ import pandas as pd
 import mbe_automation.storage
 import mbe_automation.dynamics.md.data
 
-
-def trajectory(
-        dataset: str,
-        key: str,
-        save_path: str = None
+def energy_fluctuations(
+        df: pd.DataFrame,
+        save_path: str | None
 ):
     """
-    Plot properties from a molecular dynamics trajectory.
-
-    The function reads trajectory data from a specified dataset file and
-    generates plots for total energy, temperature, and, for an NPT
-    ensemble, pressure and volume as a function of time. Target values
-    and trajectory averages are plotted as horizontal lines. Averages and
-    standard deviations are computed only for the production run and
+    Generate plots for total energy, temperature, and, for an NPT ensemble,
+    pressure and volume.
+    
+    Target values and trajectory averages are plotted as horizontal lines.
+    Averages are computed only for the production run and
     are visualized with a shaded region. A vertical line marks the
     start of the production run.
-
-    Parameters:
-    - dataset (str): Path to the dataset file.
-    - key (str): Path to the trajectory group within the HDF5 file.
-    - save_path (str, optional): If provided, the plot is saved to this
-      path instead of being returned. Defaults to None.
+    
     """
-
-    df = mbe_automation.storage.read_data_frame(
-        dataset=dataset,
-        key=key,
-        columns=[
-            "time (fs)", "T (K)", "E_kin (eV∕atom)",
-            "E_pot (eV∕atom)", "p (GPa)", "V (Å³∕atom)"
-        ]
-    )
     df["E_total (eV∕atom)"] = df["E_kin (eV∕atom)"] + df["E_pot (eV∕atom)"]
     time_ps = df["time (fs)"] / 1000.0
     
@@ -129,6 +112,20 @@ def trajectory(
     else:
         return fig
 
+def energy_fluctuations_dataset(
+        dataset: str,
+        key: str,
+        save_path: str | None = None
+):
+    df = mbe_automation.storage.read_data_frame(
+        dataset=dataset,
+        key=key,
+        columns=[
+            "time (fs)", "T (K)", "E_kin (eV∕atom)",
+            "E_pot (eV∕atom)", "p (GPa)", "V (Å³∕atom)"
+        ]
+    )
+    energy_fluctuations(df, save_path)        
 
 def reblocking(
     dataset: str,
