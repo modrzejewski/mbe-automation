@@ -21,6 +21,7 @@ from mbe_automation.storage import Structure as _Structure
 from mbe_automation.storage import Trajectory as _Trajectory
 from mbe_automation.storage import MolecularCrystal as _MolecularCrystal
 from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
+from mbe_automation.storage import AtomicReference as _AtomicReference
 import mbe_automation.dynamics.harmonic.modes
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
@@ -66,6 +67,23 @@ class _TrainingStructure:
             atomic_energies=atomic_energies,
         )
 
+@dataclass(kw_only=True)
+class AtomicReference(_AtomicReference):
+    @classmethod
+    def read(cls, dataset: str | Path, key: str) -> AtomicReference:
+        return cls(**vars(
+            mbe_automation.storage.core.read_atomic_reference(
+                dataset=dataset,
+                key=key
+        ))
+
+    def save(self, dataset: str | Path, key: str) -> None:
+        mbe_automation.storage.core.save_atomic_reference(
+            dataset=dataset,
+            key=key,
+            atomic_reference=self
+        )
+        
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
     @classmethod
