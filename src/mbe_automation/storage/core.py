@@ -64,7 +64,7 @@ class AtomicReference:
         self.energies[level_of_theory] = atom_energies
     
     @property
-    def levels_of_theory(self):
+    def levels_of_theory(self) -> list[str]:
         return list(self.energies.keys())
     
 @dataclass
