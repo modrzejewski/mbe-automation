@@ -57,7 +57,7 @@ class AtomicReference:
     
     @property
     def levels_of_theory(self):
-        return list[self.energies.keys()]
+        return list(self.energies.keys())
     
 @dataclass
 class GroundTruth:
