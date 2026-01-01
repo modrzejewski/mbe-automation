@@ -1455,7 +1455,7 @@ def save_atomic_reference(
             energies = np.array([d[z] for z in atomic_numbers], dtype=np.float64)
             sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
 
-            subgroup = f.require_group(f"{key}/{sanitized_method_name}")
+            subgroup = group.require_group(sanitized_method_name)
             subgroup.create_dataset(key_Z, data=atomic_numbers)
             subgroup.create_dataset(key_E, data=energies)
         
