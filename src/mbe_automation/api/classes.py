@@ -102,7 +102,7 @@ class ForceConstants(_ForceConstants):
         )
 
 @dataclass(kw_only=True)
-class Structure(_Structure, _TrainingStructure, _AtomicEnergiesCalc):
+class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
     @classmethod
     def read(
             cls,
