@@ -85,9 +85,7 @@ class _AtomicEnergiesCalc:
             calculator=calculator,
             z_numbers=self.unique_elements,
         )
-        ref = AtomicReference()
-        ref[calculator.level_of_theory] = energies
-        return ref
+        return AtomicReference(energies={calculator.level_of_theory: energies})
         
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
