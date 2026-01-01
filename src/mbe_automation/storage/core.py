@@ -62,6 +62,20 @@ class AtomicReference:
 
     def __setitem__(self, level_of_theory: str, atom_energies: dict[np.int64, np.float64]) -> None:
         self.energies[level_of_theory] = atom_energies
+
+    def __add__(self, other: AtomicReference) -> AtomicReference:
+        if not isinstance(other, AtomicReference):
+            return NotImplemented
+
+        merged_energies = {k: v.copy() for k, v in self.energies.items()}
+        
+        for level_of_theory, atom_energies in other.energies.items():
+            if level_of_theory in merged_energies:
+                merged_energies[level_of_theory].update(atom_energies)
+            else:
+                merged_energies[level_of_theory] = atom_energies.copy()
+
+        return AtomicReference(energies=merged_energies)
     
     @property
     def levels_of_theory(self) -> list[str]:
