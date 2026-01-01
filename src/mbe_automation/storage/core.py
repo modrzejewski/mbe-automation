@@ -52,7 +52,7 @@ class AtomicReference:
     """
     energies: dict[str, dict[np.int64, npt.NDArray[np.float64]]] = field(default_factory=dict)
     
-    def __getitem__(self, level_of_theory):
+    def __getitem__(self, level_of_theory: str) -> dict[np.int64, npt.NDArray[np.float64]]:
         return self.energies[level_of_theory]
     
     @property
