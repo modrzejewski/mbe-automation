@@ -54,6 +54,9 @@ class AtomicReference:
     
     def __getitem__(self, level_of_theory: str) -> dict[np.int64, npt.NDArray[np.float64]]:
         return self.energies[level_of_theory]
+
+    def __setitem__(self, level_of_theory: str, atom_energies: dict[np.int64, npt.NDArray[np.float64]]) -> None:
+        self.energies[level_of_theory] = atom_energies
     
     @property
     def levels_of_theory(self):
