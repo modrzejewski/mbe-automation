@@ -44,18 +44,23 @@ class EOSCurves:
 class AtomicReference:
     """
     Isolated atom energies required to generate reference energy
-    for machine-learning interatomic potentials. In MLIPs like MACE
-    the energy predicted by the neural net is computed w.r.t. the
-    trivial part defined as the sum of isolated ground-state
-    atom energies.
+    for machine-learning interatomic potentials.
+
+
+    In MLIPs like MACE, the energy predicted by the neural
+    net is computed w.r.t. the trivial reference defined
+    as the sum of isolated ground-state atom energies.
+    Thanks to this, the training process focuses on learning
+    interactions, not the absolute energies which include
+    the inert core.
     
     """
-    energies: dict[str, dict[np.int64, npt.NDArray[np.float64]]] = field(default_factory=dict)
+    energies: dict[str, dict[np.int64, np.float64]] = field(default_factory=dict)
     
-    def __getitem__(self, level_of_theory: str) -> dict[np.int64, npt.NDArray[np.float64]]:
+    def __getitem__(self, level_of_theory: str) -> dict[np.int64, np.float64]:
         return self.energies[level_of_theory]
 
-    def __setitem__(self, level_of_theory: str, atom_energies: dict[np.int64, npt.NDArray[np.float64]]) -> None:
+    def __setitem__(self, level_of_theory: str, atom_energies: dict[np.int64, np.float64]) -> None:
         self.energies[level_of_theory] = atom_energies
     
     @property
@@ -1417,9 +1422,13 @@ def save_atomic_reference(
 
     key_E = "E (eV∕atom)"
     key_Z = "atomic_numbers"
-    levels_of_theory = set()
     
     with h5py.File(dataset, "a") as f:
+
+        levels_of_theory = []
+        if key in f:
+            del f[key]            
+        group = f.create_group(key)
         
         for method_name in atomic_reference.levels_of_theory:
             d = atomic_reference.energies[method_name]
@@ -1427,14 +1436,11 @@ def save_atomic_reference(
             energies = np.array([d[z] for z in atomic_numbers], dtype=np.float64)
             sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
 
-            group = f.require_group(f"key/{sanitized_method_name}")
-            if key_E in group: del group[key_E]
-            if key_Z in group: del group[key_Z]
-
-            group.create_dataset(key_Z, data=atomic_numbers)
-            group.create_dataset(key_E, data=energies)
+            subgroup = f.require_group(f"{key}/{sanitized_method_name}")
+            subgroup.create_dataset(key_Z, data=atomic_numbers)
+            subgroup.create_dataset(key_E, data=energies)
         
-            levels_of_theory.add(method_name)
+            levels_of_theory.append(method_name)
 
         group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
         group.attrs["dataclass"] = "AtomicReference"
