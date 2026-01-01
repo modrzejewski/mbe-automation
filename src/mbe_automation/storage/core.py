@@ -1415,6 +1415,7 @@ def save_atomic_reference(
         dataset: str | Path,
         key: str,
         atomic_reference: AtomicReference,
+        overwrite: bool = False,
 ) -> None:
 
     dataset = Path(dataset)
@@ -1425,7 +1426,13 @@ def save_atomic_reference(
     
     with h5py.File(dataset, "a") as f:
         if key in f:
-            del f[key]            
+            if overwrite:
+                del f[key]
+            else:
+                raise RuntimeError(
+                    f"Data with key '{key}' already exists in {dataset}. "
+                    f"Set overwrite=True to replace it."
+                )
         group = f.create_group(key)
         
         for method_name in atomic_reference.levels_of_theory:

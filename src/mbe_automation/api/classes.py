@@ -56,11 +56,17 @@ class AtomicReference(_AtomicReference):
                 key=key
         )))
 
-    def save(self, dataset: str | Path, key: str) -> None:
+    def save(
+            self,
+            dataset: str | Path,
+            key: str,
+            overwrite: bool = False,
+    ) -> None:
         mbe_automation.storage.core.save_atomic_reference(
             dataset=dataset,
             key=key,
             atomic_reference=self,
+            overwrite=overwrite,
         )
 
     def run(
