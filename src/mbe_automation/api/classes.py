@@ -32,27 +32,6 @@ from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
-class _AtomicEnergiesCalc:
-    def atomic_energies(self, calculator: CALCULATORS) -> dict[np.int64, np.float64]:
-        """
-        Calculate ground-state energies for all unique isolated atoms
-        represented in the structure. Spin is selected automatically
-        based on the ground-state configurations of isolated atoms
-        according to pyscf.data.elements.CONFIGURATION.
-
-        This is the function that you need to generate isolated
-        atomic baseline data for machine learning interatomic
-        potentials.
-
-        Remember to define the calculator with exactly the same
-        settings (basis set, integral approximations)
-        as for the main dataset calculation.
-        """
-        return mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=self.unique_elements,
-        )
-
 class _TrainingStructure:
     def to_mace_dataset(
             self,
@@ -75,14 +54,34 @@ class AtomicReference(_AtomicReference):
             mbe_automation.storage.core.read_atomic_reference(
                 dataset=dataset,
                 key=key
-        ))
+        )))
 
     def save(self, dataset: str | Path, key: str) -> None:
         mbe_automation.storage.core.save_atomic_reference(
             dataset=dataset,
             key=key,
-            atomic_reference=self
+            atomic_reference=self,
         )
+
+    def run(
+            self,
+            atomic_numbers: npt.NDArray[np.int64],
+            calculator: CALCULATORS
+    ) -> None:
+        self.energies[calculator.level_of_theory] = mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=atomic_numbers,
+        )
+
+class _AtomicEnergiesCalc:
+    def atomic_reference(self, calculator: CALCULATORS) -> AtomicReference:
+        energies = mbe_automation.calculators.atomic_energies(
+            calculator=calculator,
+            z_numbers=self.unique_elements,
+        )
+        ref = AtomicReference()
+        ref[calculator.level_of_theory] = energies
+        return ref
         
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
@@ -103,7 +102,7 @@ class ForceConstants(_ForceConstants):
         )
 
 @dataclass(kw_only=True)
-class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
+class Structure(_Structure, _TrainingStructure, _AtomicEnergiesCalc):
     @classmethod
     def read(
             cls,
@@ -274,7 +273,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
         )
 
 @dataclass(kw_only=True)
-class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
+class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
     @classmethod
     def read(
             cls,

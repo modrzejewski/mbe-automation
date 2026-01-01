@@ -1424,8 +1424,6 @@ def save_atomic_reference(
     key_Z = "atomic_numbers"
     
     with h5py.File(dataset, "a") as f:
-
-        levels_of_theory = []
         if key in f:
             del f[key]            
         group = f.create_group(key)
@@ -1440,9 +1438,7 @@ def save_atomic_reference(
             subgroup.create_dataset(key_Z, data=atomic_numbers)
             subgroup.create_dataset(key_E, data=energies)
         
-            levels_of_theory.append(method_name)
-
-        group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
+        group.attrs["levels_of_theory"] = sorted(atomic_reference.levels_of_theory)
         group.attrs["dataclass"] = "AtomicReference"
 
 def read_atomic_reference(dataset: str | Path, key: str) -> AtomicReference:

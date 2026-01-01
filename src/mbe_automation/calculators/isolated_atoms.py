@@ -56,7 +56,21 @@ def atomic_energies(
         calculator: SUPPORTED_CALCULATORS,
         z_numbers: npt.NDArray[np.integer],
 ) -> dict[np.int64, np.float64]:
+    """
+    Calculate ground-state energies for all unique isolated atoms
+    represented in the structure. Spin is selected automatically
+    based on the ground-state configurations of isolated atoms
+    according to pyscf.data.elements.CONFIGURATION.
 
+    This is the function that you need to generate isolated
+    atomic baseline data for machine learning interatomic
+    potentials.
+
+    Remember to define the calculator with exactly the same
+    settings (basis set, integral approximations)
+    as for the main dataset calculation.
+    """
+    
     if not isinstance(calculator, SUPPORTED_CALCULATORS):
         valid_names = [x.__name__ for x in typing.get_args(SUPPORTED_CALCULATORS)]
         raise TypeError(
