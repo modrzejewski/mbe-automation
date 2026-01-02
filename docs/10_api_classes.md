@@ -4,6 +4,7 @@ The core data structures of `mbe_automation` are available as Python classes. Th
 
 ```python
 from mbe_automation import (
+    AtomicReference,
     ForceConstants,
     Structure,
     Trajectory,
@@ -19,6 +20,7 @@ This chapter provides an overview of the physical content each class represents 
 
 | Class | Description |
 | :--- | :--- |
+| **`AtomicReference`** | Represents isolated atom energies required to generate reference energy for machine-learning interatomic potentials. |
 | **`ForceConstants`** | Represents 2nd order force constants used to compute phonon properties like frequencies and dynamical matrix eigenvectors. |
 | **`Structure`** | Represents an atomistic structure (positions, atomic numbers, unit cell). Can hold a single frame or a sequence of frames of equal size (e.g., from a short trajectory or a collection of configurations). |
 | **`Trajectory`** | Represents the time-evolution of an atomistic system, typically resulting from a Molecular Dynamics simulation. It includes time-dependent properties like positions, velocities, kinetic energies, and thermodynamic variables. |
@@ -32,10 +34,10 @@ The following table summarizes the key methods available across these classes.
 
 | Method | Description | Available In |
 | :--- | :--- | :--- |
-| **`read`** | Method to load the object from an HDF5 dataset. | `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
-| **`save`** | Saves the object to an HDF5 dataset. | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
+| **`read`** | Method to load the object from an HDF5 dataset. | `AtomicReference`, `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
+| **`save`** | Saves the object to an HDF5 dataset. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`subsample`** | Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
-| **`run_model`** | Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. | `Structure`, `Trajectory`, `FiniteSubsystem` |
+| **`run_model`** | Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. | `AtomicReference`, `Structure`, `Trajectory`, `FiniteSubsystem` |
 | **`to_mace_dataset`** | Exports the data (structures, energies, forces) to MACE-compatible XYZ files for model training. | `Structure`, `FiniteSubsystem`, `Dataset` |
 | **`random_split`** | Randomly splits the frames into multiple objects (e.g., for creating training and validation sets). | `Structure`, `FiniteSubsystem` |
 | **`to_ase_atoms`** | Converts a specific frame into an `ase.Atoms` object. | `Structure` |
