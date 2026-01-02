@@ -78,7 +78,7 @@ mace_calc = MACE(model_path="/path/to/mace.model")
 # Average feature vectors are sufficient to perform subsampling of the most dissimilar
 # MD frames. However, one can also compute 'atomic' feature vectors where each atom in the
 # system gets a full feature vector.
-trajectory.run_model(
+trajectory.run(
     calculator=mace_calc,
     energies=False,
     forces=False,
