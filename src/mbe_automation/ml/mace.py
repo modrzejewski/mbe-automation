@@ -5,8 +5,8 @@ import numpy.typing as npt
 import ase.io
 import ase.data
 
-import mbe_automation.storage
-from mbe_automation.storage import Structure, AtomicReference
+import mbe_automation.storage.views
+from mbe_automation.storage.core import Structure, AtomicReference
 
 def _to_xyz_training_set(
         structure: Structure,
@@ -28,7 +28,7 @@ def _to_xyz_training_set(
     
     ase_atoms_list = []
     for i in range(structure.n_frames):
-        ase_atoms = mbe_automation.storage.to_ase(
+        ase_atoms = mbe_automation.storage.views.to_ase(
             structure=structure,
             frame_index=i
         )

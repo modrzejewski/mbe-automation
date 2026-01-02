@@ -1,14 +1,18 @@
 # Code Review: AtomicReference Implementation
 
-I have analyzed the recent changes related to the `AtomicReference` class. The following issues were identified, ranging from critical crashes to structural issues.
+I have re-analyzed the `AtomicReference` code path on the updated `machine-learning` branch (commit `d55632e`).
 
-| File Path | Line Number | Description of the Issue | Severity Level |
-| :--- | :--- | :--- | :--- |
-| `src/mbe_automation/ml/mace.py` | 9 | **Circular Import**: `mbe_automation.ml.mace` imports `Structure` and `AtomicReference` from `mbe_automation.storage`. Since `mbe_automation.storage` initialization eventually imports `mace` (via `xyz_formats` -> `structure` -> ... -> `mace`), this creates a circular dependency loop, causing `ImportError`. It should import from `mbe_automation.storage.core`. | Critical |
-| `src/mbe_automation/storage/__init__.py` | - | **Missing Export**: `AtomicReference`, `read_atomic_reference`, and `save_atomic_reference` are defined in `storage/core.py` but are not imported/exported in `storage/__init__.py`. This causes `from mbe_automation.storage import AtomicReference` to fail. | Critical |
-| `src/mbe_automation/api/classes.py` | 510 | **Undefined Variable**: In `_to_mace_dataset`, the variable `atomic_energies` is passed as a keyword argument to `to_xyz_training_set`. However, `atomic_energies` is not defined in the function scope; the argument is named `atomic_reference`. | Critical |
-| `src/mbe_automation/api/classes.py` | 510 | **Invalid Keyword Argument**: `_to_mace_dataset` calls `mbe_automation.ml.mace.to_xyz_training_set` with `atomic_energies=...`. `to_xyz_training_set` expects the keyword argument `atomic_reference`. This causes a `TypeError` at runtime. | Critical |
-| `src/mbe_automation/api/classes.py` | 33 | **Typo in Type Hint**: In `_TrainingStructure.to_mace_dataset`, the type hint for the `atomic_reference` argument is `AtomicRerefence` (misspelled). This will cause a `NameError`. | Major |
+### Resolved Issues
+The following critical issues identified in the previous review have been successfully resolved:
+1.  **Circular Import**: The import in `src/mbe_automation/ml/mace.py` was corrected to `from mbe_automation.storage.core import ...`, breaking the dependency cycle.
+2.  **Undefined Variable**: The variable `atomic_energies` in `src/mbe_automation/api/classes.py` was correctly renamed to `atomic_reference`.
+3.  **Invalid Keyword Argument**: The call to `to_xyz_training_set` in `src/mbe_automation/api/classes.py` now uses the correct keyword argument `atomic_reference`.
+4.  **Typos**: The typo `AtomicRerefence` in `src/mbe_automation/api/classes.py` has been fixed.
+
+### Remaining Issues
+| File Path | Description of the Issue | Severity Level |
+| :--- | :--- | :--- |
+| `src/mbe_automation/storage/__init__.py` | **Missing Export**: While `AtomicReference` is now exported, the helper functions `read_atomic_reference` and `save_atomic_reference` are not exported from `mbe_automation.storage`. This means users must access them via `mbe_automation.storage.core` or use the `AtomicReference` class methods. This is inconsistent with other storage functions like `read_structure` which are exported at the `storage` level. | Minor |
 
 ### Summary
-The code path is currently broken due to a combination of import cycles, missing exports, variable name mismatches, and typos. While some variable naming issues in `mace.py` were addressed in the latest commit, critical errors remain in `api/classes.py` and the import structure.
+The code is now functional and the critical crash-causing bugs have been fixed. The imports work correctly, and the API signatures match. The remaining issue regarding missing function exports is minor and does not prevent the code from working.
