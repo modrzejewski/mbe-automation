@@ -47,7 +47,7 @@ from mbe_automation.calculators import DFT
 # Define the calculator used for the ground truth
 # Ensure the settings match your dataset's level of theory
 calculator = DFT(
-    xc="r2scan",
+    model_name="r2scan-d4",
     basis="def2-tzvpd"
 )
 
