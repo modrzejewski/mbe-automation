@@ -17,24 +17,23 @@ We assume you already have a HDF5 file containing structures with ground truth d
 First, we identify the keys for the structures we want to export and read them into a `Dataset` object.
 
 ```python
-import mbe_automation
-from mbe_automation.calculators import DFT
+from mbe_automation import Dataset, DatasetKeys, Structure
 
 # Path to your HDF5 file
 dataset_path = "structures.hdf5"
 
 # Initialize a Dataset to hold the structures
-dataset = mbe_automation.Dataset()
+dataset = Dataset()
 
 # Filter and read structure keys
 # In this example, we select all periodic structures
-keys = mbe_automation.DatasetKeys(dataset_path).structures().periodic()
+keys = DatasetKeys(dataset_path).structures().periodic()
 
 print(f"Found {len(keys)} structures.")
 
 for key in keys:
     # Read the structure
-    structure = mbe_automation.Structure.read(dataset_path, key)
+    structure = Structure.read(dataset_path, key)
     dataset.append(structure)
 ```
 
@@ -43,6 +42,9 @@ for key in keys:
 MACE requires the energies of isolated atoms to serve as a baseline for the total energy. We calculate these using the same level of theory as the dataset.
 
 ```python
+from mbe_automation import AtomicReference
+from mbe_automation.calculators import DFT
+
 # Define the calculator used for the ground truth
 # Ensure the settings match your dataset's level of theory
 calculator = DFT(
@@ -51,7 +53,7 @@ calculator = DFT(
 )
 
 # Initialize an AtomicReference object
-atomic_reference = mbe_automation.AtomicReference()
+atomic_reference = AtomicReference()
 
 # Calculate energies for all unique elements in the dataset
 # This runs the calculator for each isolated atom type
