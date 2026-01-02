@@ -54,8 +54,8 @@ target_calc.level_of_theory = "delta/target"
 
 # Compute reference energies
 # This stores E_baseline and E_target in the structure's ground_truth attribute
-ref.run_model(calculator=baseline_calc)
-ref.run_model(calculator=target_calc)
+ref.run(calculator=baseline_calc)
+ref.run(calculator=target_calc)
 ```
 
 ## Dataset of Periodic Structures

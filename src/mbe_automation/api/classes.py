@@ -21,6 +21,7 @@ from mbe_automation.storage import Structure as _Structure
 from mbe_automation.storage import Trajectory as _Trajectory
 from mbe_automation.storage import MolecularCrystal as _MolecularCrystal
 from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
+from mbe_automation.storage import AtomicReference as _AtomicReference
 import mbe_automation.dynamics.harmonic.modes
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
@@ -31,41 +32,67 @@ from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 from mbe_automation.storage.core import DATA_FOR_TRAINING
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
-class _AtomicEnergiesCalc:
-    def atomic_energies(self, calculator: CALCULATORS) -> dict[np.int64, np.float64]:
-        """
-        Calculate ground-state energies for all unique isolated atoms
-        represented in the structure. Spin is selected automatically
-        based on the ground-state configurations of isolated atoms
-        according to pyscf.data.elements.CONFIGURATION.
-
-        This is the function that you need to generate isolated
-        atomic baseline data for machine learning interatomic
-        potentials.
-
-        Remember to define the calculator with exactly the same
-        settings (basis set, integral approximations)
-        as for the main dataset calculation.
-        """
-        return mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=self.unique_elements,
-        )
-
 class _TrainingStructure:
     def to_mace_dataset(
             self,
             save_path: str,
             level_of_theory: str | dict[Literal["target", "baseline"], str],
-            atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
+            atomic_reference: AtomicReference | None = None,
     ) -> None:
         _to_mace_dataset(
             dataset=[self],
             save_path=save_path,
             level_of_theory=level_of_theory,
-            atomic_energies=atomic_energies,
+            atomic_reference=atomic_reference,
         )
 
+@dataclass(kw_only=True)
+class AtomicReference(_AtomicReference):
+    @classmethod
+    def read(cls, dataset: str | Path, key: str) -> AtomicReference:
+        return cls(**vars(
+            mbe_automation.storage.core.read_atomic_reference(
+                dataset=dataset,
+                key=key
+        )))
+
+    def save(
+            self,
+            dataset: str | Path,
+            key: str,
+            overwrite: bool = False,
+    ) -> None:
+        mbe_automation.storage.core.save_atomic_reference(
+            dataset=dataset,
+            key=key,
+            atomic_reference=self,
+            overwrite=overwrite,
+        )
+
+    @classmethod
+    def from_atomic_numbers(
+            cls,
+            atomic_numbers: npt.NDArray[np.int64],
+            calculator: CALCULATORS
+    ) -> AtomicReference:
+        """
+        Create a new AtomicReference object for a given set of atomic numbers
+        and a calculator associated with a given level of theory.
+        """
+        return cls(
+            energies={
+                calculator.level_of_theory: mbe_automation.calculators.atomic_energies(
+                    calculator=calculator,
+                    z_numbers=atomic_numbers,
+                )})
+
+class _AtomicEnergiesCalc:
+    def atomic_reference(self, calculator: CALCULATORS) -> AtomicReference:
+        return AtomicReference.from_atomic_numbers(
+            atomic_numbers=self.unique_elements,
+            calculator=calculator
+        )
+        
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
     @classmethod
@@ -167,7 +194,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             overwrite=overwrite,
         )
 
-    run_model = run
+    run_model = run # synonym
 
     def to_molecular_crystal(
             self,
@@ -256,7 +283,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
         )
 
 @dataclass(kw_only=True)
-class Trajectory(_Trajectory, _AtomicEnergiesCalc, _TrainingStructure):
+class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
     @classmethod
     def read(
             cls,
@@ -460,13 +487,13 @@ class Dataset(_AtomicEnergiesCalc):
             self,
             save_path: str,
             level_of_theory: str | dict[Literal["target", "baseline"], str],
-            atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
+            atomic_reference: AtomicReference | None = None,
     ) -> None:
         _to_mace_dataset(
             dataset=self.structures,
             save_path=save_path,
             level_of_theory=level_of_theory,
-            atomic_energies=atomic_energies,
+            atomic_reference=atomic_reference,
         )
 
     @property
@@ -794,7 +821,7 @@ def _to_mace_dataset(
         dataset: List[Structure|FiniteSubsystem],
         save_path: str,
         level_of_theory: str | dict[Literal["target", "baseline"], str],
-        atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
+        atomic_reference: AtomicReference | None = None,
 ) -> None:
     """
     Export dataset to training files readable by MACE.
@@ -804,8 +831,8 @@ def _to_mace_dataset(
         level_of_theory: The level of theory to use for energies and forces.
             Can be a string for direct learning, or a dict with "target" and
             "baseline" keys for delta learning.
-        atomic_energies: A dictionary of ground-state energies for isolated
-            atoms, used to generate a baseline superposition of atomic shifts
+        atomic_reference: Ground-state energies for isolated
+            atoms, used to generate baseline atomic shifts
             in MACE.
     """
     
@@ -822,7 +849,7 @@ def _to_mace_dataset(
         structures=structures,
         level_of_theory=level_of_theory,
         save_path=save_path,
-        atomic_energies=atomic_energies,
+        atomic_reference=atomic_reference,
     )
     
 def _statistics(

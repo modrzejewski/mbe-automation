@@ -40,10 +40,55 @@ class EOSCurves:
     V_min: npt.NDArray[np.floating]
     G_min: npt.NDArray[np.floating]
 
+@dataclass(kw_only=True)
+class AtomicReference:
+    """
+    Isolated atom energies required to generate reference energy
+    for machine-learning interatomic potentials.
+
+
+    In MLIPs like MACE, the energy predicted by the neural
+    net is computed w.r.t. the trivial reference defined
+    as the sum of isolated ground-state atom energies.
+    Thanks to this, the training process focuses on learning
+    interactions, not the absolute energies which include
+    the inert core.
+    
+    """
+    energies: dict[str, dict[np.int64, np.float64]] = field(default_factory=dict)
+    
+    def __getitem__(self, level_of_theory: str) -> dict[np.int64, np.float64]:
+        return self.energies[level_of_theory]
+
+    def __setitem__(self, level_of_theory: str, atom_energies: dict[np.int64, np.float64]) -> None:
+        self.energies[level_of_theory] = atom_energies
+
+    def __contains__(self, level_of_theory: str) -> bool:
+        """Check availability of a specific level of theory."""
+        return level_of_theory in self.energies
+
+    def __add__(self, other: AtomicReference) -> AtomicReference:
+        if not isinstance(other, AtomicReference):
+            return NotImplemented
+
+        merged_energies = {k: v.copy() for k, v in self.energies.items()}
+        
+        for level_of_theory, atom_energies in other.energies.items():
+            if level_of_theory in merged_energies:
+                merged_energies[level_of_theory].update(atom_energies)
+            else:
+                merged_energies[level_of_theory] = atom_energies.copy()
+
+        return AtomicReference(energies=merged_energies)
+    
+    @property
+    def levels_of_theory(self) -> list[str]:
+        return list(self.energies.keys())
+    
 @dataclass
 class GroundTruth:
-    energies: Dict[str, npt.NDArray[np.floating]] = field(default_factory=dict)
-    forces: Dict[str, npt.NDArray[np.floating]] = field(default_factory=dict)
+    energies: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
+    forces: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
 
     def copy(self) -> GroundTruth:
         return GroundTruth(
@@ -60,7 +105,7 @@ class GroundTruth:
 @dataclass
 class Structure:
     """
-    Main data storage class for geometric data and the corresponding
+    Main data storage class for geometric data and corresponding
     energies and forces.
 
     Data generated with the theoretical model applied
@@ -71,7 +116,7 @@ class Structure:
     Structure.forces
 
     Data generated for fixed, precomputed structures
-    via a call to run_model
+    via a call to Structure.run:
 
     Structure.ground_truth
 
@@ -1383,3 +1428,62 @@ def _forces_at_level_of_theory(
         forces = None
     
     return forces
+
+def save_atomic_reference(
+        dataset: str | Path,
+        key: str,
+        atomic_reference: AtomicReference,
+        overwrite: bool = False,
+) -> None:
+
+    dataset = Path(dataset)
+    dataset.parent.mkdir(parents=True, exist_ok=True)
+
+    key_E = "E (eV∕atom)"
+    key_Z = "atomic_numbers"
+    
+    with h5py.File(dataset, "a") as f:
+        if key in f:
+            if overwrite:
+                del f[key]
+            else:
+                raise RuntimeError(
+                    f"Data with key '{key}' already exists in {dataset}. "
+                    f"Set overwrite=True to replace it."
+                )
+        group = f.create_group(key)
+        
+        for method_name in atomic_reference.levels_of_theory:
+            d = atomic_reference.energies[method_name]
+            atomic_numbers = np.sort(np.fromiter(d.keys(), dtype=np.int64))
+            energies = np.array([d[z] for z in atomic_numbers], dtype=np.float64)
+            sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
+
+            subgroup = group.require_group(sanitized_method_name)
+            subgroup.create_dataset(key_Z, data=atomic_numbers)
+            subgroup.create_dataset(key_E, data=energies)
+        
+        group.attrs["levels_of_theory"] = sorted(atomic_reference.levels_of_theory)
+        group.attrs["dataclass"] = "AtomicReference"
+
+def read_atomic_reference(dataset: str | Path, key: str) -> AtomicReference:
+
+    key_E = "E (eV∕atom)"
+    key_Z = "atomic_numbers"
+    energies = {}
+    
+    with h5py.File(dataset, "r") as f:
+        atomic_reference_group = f[key]
+        levels_of_theory = atomic_reference_group.attrs.get("levels_of_theory", [])
+        
+        for method_name in levels_of_theory:
+            sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)            
+            subgroup = atomic_reference_group[sanitized_method_name]
+            energies[method_name] = dict(zip(
+                subgroup[key_Z][...],  # atomic numbers
+                subgroup[key_E][...]   # corresponding isolated atom energies for each Z (eV/atom)
+            ))
+            
+    return AtomicReference(
+        energies=energies
+    )

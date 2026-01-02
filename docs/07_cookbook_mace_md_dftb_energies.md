@@ -122,7 +122,7 @@ for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_fr
         key=key
     )
 
-    frames.run_model(
+    frames.run(
         calculator=mace_calc,
         energies=False,
         forces=False,
@@ -162,7 +162,7 @@ for key in DatasetKeys(dataset).trajectories().periodic().with_feature_vectors()
         key=key
     ).subsample(n=500)
 
-    subsampled_frames.run_model(
+    subsampled_frames.run(
         calculator=calculator,
         energies=True,
         forces=True,
@@ -277,7 +277,7 @@ for key in keys:
         key=key
     )
 
-    cluster.run_model(
+    cluster.run(
         calculator=mace_calc,
         energies=False,
         forces=False,
@@ -316,7 +316,7 @@ for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().start
         key=key
     ).subsample(n=100)
 
-    cluster.run_model(
+    cluster.run(
         calculator=calculator,
         energies=True,
         forces=True

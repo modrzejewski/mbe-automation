@@ -5,8 +5,8 @@ import numpy.typing as npt
 import ase.io
 import ase.data
 
-import mbe_automation.storage
-from mbe_automation.storage import Structure
+import mbe_automation.storage.views
+from mbe_automation.storage.core import Structure, AtomicReference
 
 def _to_xyz_training_set(
         structure: Structure,
@@ -28,7 +28,7 @@ def _to_xyz_training_set(
     
     ase_atoms_list = []
     for i in range(structure.n_frames):
-        ase_atoms = mbe_automation.storage.to_ase(
+        ase_atoms = mbe_automation.storage.views.to_ase(
             structure=structure,
             frame_index=i
         )
@@ -76,18 +76,22 @@ def _save_atomic_energies(
     return
 
 def _process_atomic_energies(
-        E_atomic: dict[np.int64, np.float64]
+        structures: list[Structure],
+        level_of_theory: str,
+        atomic_reference: AtomicReference,
 ) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.float64]]:
-    
-    atomic_numbers = np.sort(np.fromiter(E_atomic.keys(), dtype=np.int64))
-    energies = np.array([E_atomic[z] for z in atomic_numbers], dtype=np.float64)
+
+    atomic_numbers = [s.unique_elements for s in structures]
+    atomic_numbers = np.sort(np.unique(np.concatenate(atomic_numbers)))
+    data = atomic_reference[level_of_theory]
+    energies = np.array([data[z] for z in atomic_numbers])
     return atomic_numbers, energies
 
 def to_xyz_training_set(
         structures: List[Structure],
         level_of_theory: str | dict[Literal["target", "baseline"], str],
         save_path: str,
-        atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
+        atomic_reference: AtomicReference | None = None,
 ) -> None:
     """
     Export a list of Structure objects to a dataset
@@ -103,23 +107,22 @@ def to_xyz_training_set(
     else:
         target = level_of_theory
     
-    if atomic_energies is not None:
-        assert len(atomic_energies) > 0
+    if atomic_reference is not None:
+        assert isinstance(atomic_reference, AtomicReference)
         atomic_energies_available = True
         
         if delta_learning:
             assert (
-                isinstance(atomic_energies, dict) and
-                target in atomic_energies and
-                baseline in atomic_energies
-            ), ("atomic_energies must a dictionary which contains data "
+                target in atomic_reference and
+                baseline in atomic_reference
+            ), ("atomic_reference must contain data "
                 "for target and baseline levels of theory.")
             
             atomic_numbers_target, E_atomic_target = _process_atomic_energies(
-                atomic_energies[target]
+                structures, target, atomic_reference
             )
             atomic_numbers_baseline, E_atomic_baseline = _process_atomic_energies(
-                atomic_energies[baseline]
+                structures, baseline, atomic_reference
             )
             
             if not np.array_equal(atomic_numbers_target, atomic_numbers_baseline):
@@ -129,10 +132,13 @@ def to_xyz_training_set(
             E_atomic = E_atomic_target - E_atomic_baseline
             
         else:
-
+            assert level_of_theory in atomic_reference, (
+                f"atomic_reference must contain data for level of theory '{level_of_theory}'"
+            )
+            
             atomic_numbers, E_atomic = _process_atomic_energies(
-                atomic_energies
-            )  
+                structures, level_of_theory, atomic_reference
+            )
     else:
         atomic_energies_available = False
 

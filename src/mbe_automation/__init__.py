@@ -29,5 +29,6 @@ from .api import (
     MolecularCrystal,
     FiniteSubsystem,
     Dataset,
+    AtomicReference,
     run,
 )
