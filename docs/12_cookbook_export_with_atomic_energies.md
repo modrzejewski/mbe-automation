@@ -18,6 +18,17 @@ First, we identify the keys for the structures we want to export and read them i
 
 ```python
 from mbe_automation import Dataset, DatasetKeys, FiniteSubsystem
+from mbe_automation.calculators import DFT
+
+# Define the calculator used for the ground truth
+# Ensure the settings match your dataset's level of theory
+calculator = DFT(
+    model_name="r2scan-d4",
+    basis="def2-tzvpd"
+)
+
+# Print the level of theory string
+print(f"Level of theory: {calculator.level_of_theory}")
 
 # Path to your HDF5 file
 dataset_path = "structures.hdf5"
@@ -26,8 +37,8 @@ dataset_path = "structures.hdf5"
 dataset = Dataset()
 
 # Filter and read structure keys
-# In this example, we select finite subsystems with r2scan data
-keys = DatasetKeys(dataset_path).finite_subsystems().with_ground_truth("r2scan-d4_def2-tzvpd")
+# In this example, we select finite subsystems with data at the specified level of theory
+keys = DatasetKeys(dataset_path).finite_subsystems().with_ground_truth(calculator.level_of_theory)
 
 print(f"Found {len(keys)} structures.")
 
@@ -42,15 +53,6 @@ for key in keys:
 MACE requires the energies of isolated atoms to serve as a baseline for the total energy. We calculate these using the same level of theory as the dataset.
 
 ```python
-from mbe_automation.calculators import DFT
-
-# Define the calculator used for the ground truth
-# Ensure the settings match your dataset's level of theory
-calculator = DFT(
-    model_name="r2scan-d4",
-    basis="def2-tzvpd"
-)
-
 # Calculate energies for all unique elements in the dataset
 # This runs the calculator for each isolated atom type
 print("Calculating atomic reference energies...")
