@@ -108,11 +108,11 @@ def to_xyz_training_set(
         target = level_of_theory
     
     if atomic_reference is not None:
+        assert isinstance(atomic_reference, AtomicReference)
         atomic_energies_available = True
         
         if delta_learning:
             assert (
-                isinstance(atomic_reference, AtomicReference) and
                 target in atomic_reference and
                 baseline in atomic_reference
             ), ("atomic_reference must contain data "
@@ -132,7 +132,10 @@ def to_xyz_training_set(
             E_atomic = E_atomic_target - E_atomic_baseline
             
         else:
-
+            assert level_of_theory in atomic_reference, (
+                f"atomic_reference must contain data for level of theory '{level_of_thery}'"
+            )
+            
             atomic_numbers, E_atomic = _process_atomic_energies(
                 structures, level_of_theory, atomic_reference
             )
