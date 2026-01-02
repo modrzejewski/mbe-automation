@@ -69,25 +69,29 @@ class AtomicReference(_AtomicReference):
             overwrite=overwrite,
         )
 
-    def run(
-            self,
+    @classmethod
+    def from_atomic_numbers(
+            cls,
             atomic_numbers: npt.NDArray[np.int64],
             calculator: CALCULATORS
-    ) -> None:
-        self.energies[calculator.level_of_theory] = mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=atomic_numbers,
-        )
-
-    run_model = run # synonym
+    ) -> AtomicReference:
+        """
+        Create a new AtomicNumbers object for a given set of atomic numbers
+        and a calculator associated with a given level of theory.
+        """
+        return cls(
+            energies={
+                calculator.level_of_theory: mbe_automation.calculators.atomic_energies(
+                    calculator=calculator,
+                    z_numbers=atomic_numbers,
+                )})
 
 class _AtomicEnergiesCalc:
     def atomic_reference(self, calculator: CALCULATORS) -> AtomicReference:
-        energies = mbe_automation.calculators.atomic_energies(
-            calculator=calculator,
-            z_numbers=self.unique_elements,
+        return AtomicReference.from_atomic_numbers(
+            atomic_numbers=self.unique_elements,
+            calculator=calculator
         )
-        return AtomicReference(energies={calculator.level_of_theory: energies})
         
 @dataclass(kw_only=True)
 class ForceConstants(_ForceConstants):
