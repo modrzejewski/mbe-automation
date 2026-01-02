@@ -106,7 +106,7 @@ phonon_sampling_config = PhononSampling(
         freq_max_THz=8.0
     ),
     force_constants_dataset=dataset,
-    force_constants_key="training/quasi_harmonic/phonons/crystal[opt:atoms,shape]/force_constants",
+    force_constants_key="training/quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]",
     amplitude_scan="random",
     time_step_fs=100.0,
     n_frames=20,
@@ -152,7 +152,7 @@ mbe_automation.run(phonon_sampling_config)
 | `temperature_K`           | Temperature (in Kelvin) for the phonon sampling.                                 | `298.15`          |
 | `phonon_filter`           | An instance of `PhononFilter` that specifies which phonon modes to sample from. This method is particularly effective at generating distorted geometries that may be energetically unfavorable but are important for teaching the MLIP about repulsive interactions.       | `PhononFilter()`  |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter` that defines how finite molecular clusters are extracted.        | `FiniteSubsystemFilter()`          |
-| `amplitude_scan`          | Method for sampling normal-mode coordinates. `"random"` multiplies eigenvectors by a random number on (-1, 1). `"time_propagation"` uses a time-dependent phase factor. | `"random"`                         |
+| `amplitude_scan`          | Method for sampling normal-mode coordinates. `"random"` multiplies eigenvectors by a random number on (-1, 1). `"equidistant"` multiplies eigenvectors by a series of equidistant points on (-1, 1). `"time_propagation"` uses a time-dependent phase factor. | `"random"`                         |
 | `time_step_fs`            | Time step for trajectory generation (used only if `amplitude_scan` is `"time_propagation"`).            | `100.0`           |
 | `rng`                     | Random number generator for randomized amplitude sampling (used only if `amplitude_scan` is `"random"`). | `None` (random seed)               |
 | `n_frames`                | Number of frames to generate for each selected phonon mode.                        | `20`              |
@@ -189,11 +189,35 @@ mbe_automation.run(phonon_sampling_config)
 
 | Parameter                       | Description                                                                                                                                                                                            | Default Value                                   |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| `crystal`                       | Initial, non-relaxed crystal structure.                                                                                                                                                            | -                                               |
+| `crystal`                       | Initial, non-relaxed crystal structure. The geometry of the crystal unit cell is relaxed prior to the calculation of the harmonic properties.                                                                                                                                                            | -                                               |
 | `calculator`                    | MLIP calculator for energies and forces.                                                                                                                                                           | -                                               |
-| `thermal_expansion`             | If `True`, performs volumetric thermal expansion calculations. If `False`, uses the harmonic approximation.                                                                                            | `True`                                          |
-| `supercell_radius`              | Minimum point-periodic image distance in the supercell for phonon calculations (Å).                                                                                                               | `25.0`                                          |
+| `molecule`                      | Initial, non-relaxed structure of the isolated molecule. If set to `None`, sublimation free energy is not computed.                                                                           | `None`                                          |
 | `relaxation`                    | An instance of `Minimum` that configures the geometry relaxation parameters.                                                                                                                       | `Minimum()`                                     |
+| `temperatures_K`                | Array of temperatures (in Kelvin) for the calculation.                                                                                                                                              | `np.array([298.15])`                            |
+| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell.                                                                         | `1.0E-3`                                        |
+| `supercell_radius`              | Minimum point-periodic image distance in the supercell for phonon calculations (Å).                                                                                                               | `25.0`                                          |
+| `supercell_matrix`              | Supercell transformation matrix. If specified, `supercell_radius` is ignored.                                                                                                                      | `None`                                          |
+| `supercell_diagonal`            | If `True`, create a diagonal supercell. Ignored if `supercell_matrix` is provided.                                                                                                                 | `False`                                         |
+| `supercell_displacement`        | Displacement length (in Å) used for numerical differentiation in phonon calculations.                                                                                                             | `0.01`                                          |
+| `fourier_interpolation_mesh`    | Mesh for Brillouin zone integration, specified as a 3-component array or a distance in Å.                                                                                                          | `150.0`                                         |
+| `thermal_expansion`             | If `True`, performs volumetric thermal expansion calculations by sampling a range of volumes and fitting an equation of state to the F(V) curve. If `False`, uses the harmonic approximation at a fixed reference volume.                                                                                            | `True`                                          |
+| `eos_sampling`                  | Algorithm for generating points on the equilibrium curve: "pressure", "volume", or "uniform_scaling".                                                                                                                  | `"volume"`                                      |
+| `volume_range`                  | Scaling factors applied to the reference volume (V0) to sample the F(V) curve.                                                                                                                         | `np.array([0.96, ..., 1.08])`                   |
+| `pressure_GPa`                  | External pressure (GPa). Applied as the isotropic pressure during input cell relaxation if `relaxation.cell_relaxation="full"` If `thermal_expansion=True`, affects the equilibrium volume determined by minimizing Gibbs Free Energy: G(V) = F(V) + pV. | `1.0E-4`                                           |
+| `thermal_pressures_GPa`         | Range of thermal, effective isotropic pressures (in GPa) applied during cell relaxation to sample cell volumes. Added as an extra term in addition to `pressure_GPa`. Referenced only if `thermal_expansion=True`.                                      | `np.array([0.2, ..., -0.6])`                    |
+| `equation_of_state`             | Equation of state used to fit the energy/free energy vs. volume curve: "birch_murnaghan", "vinet", "polynomial", or "spline".                                                                                   | `"polynomial"`                                  |
+| `imaginary_mode_threshold`      | Threshold (in THz) for detecting imaginary phonon frequencies.                                                                                                                                     | `-0.1`                                          |
+| `filter_out_imaginary_acoustic` | If `True`, filters out data points with imaginary acoustic modes before the EOS fit.                                                                                                               | `False`                                         |
+| `filter_out_imaginary_optical`  | If `True`, filters out data points with imaginary optical modes before the EOS fit.                                                                                                                | `True`                                          |
+| `filter_out_broken_symmetry`    | If `True`, filters out data points where the space group differs from the reference.                                                                                                               | `True`                                          |
+| `filter_out_extrapolated_minimum` | If `True`, filters out EOS fits where the free energy minimum is outside the volume sampling interval.                                                                                           | `True`                                          |
+| `work_dir`                      | Directory where files are stored at runtime.                                                                                                                                                     | `"./"`                                          |
+| `dataset`                       | The main HDF5 file with all data computed for the physical system.                                                                                                                               | `"./properties.hdf5"`                           |
+| `root_key`                      | Specifies the root path in the HDF5 dataset where the workflow's output is stored.                                                                                                                       | `"quasi_harmonic"`                              |
+| `verbose`                       | Verbosity of the program's output. `0` suppresses warnings.                                                                                                                                      | `0`                                             |
+| `save_plots`                    | If `True`, save plots of the simulation results.                                                                                                                                                 | `True`                                          |
+| `save_csv`                      | If `True`, save CSV files of the simulation results.                                                                                                                                             | `True`                                          |
+| `save_xyz`                      | If `True`, save XYZ files of the simulation results.                                                                                                                                             | `True`                                          |
 
 ### `Minimum` Class
 
@@ -225,7 +249,7 @@ mbe_automation.run(phonon_sampling_config)
 | Parameter          | Description                                                                                                                                                                                                                                                          | Default Value |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
 | `k_point_mesh`     | The k-points for sampling the Brillouin zone. Can be `"gamma"` (for the Γ point only), a float (for a Monkhorst-Pack grid defined by a radius), or a 3-element array (for an explicit Monkhorst-Pack mesh).                                                               | `"gamma"`     |
-| `selected_modes`   | An array of 1-based indices for selecting specific phonon modes at each k-point. If this is specified, `freq_min_THz` and `freq_max_THz` are ignored.                                                                                                                   | `None`        |
+| `selected_modes`   | An array of 1-based indices to include. This will select the Nth lowest frequency mode at each k-point. If specified, `freq_min_THz` and `freq_max_THz` are ignored.                                                                                                                   | `None`        |
 | `freq_min_THz`     | The minimum phonon frequency (in THz) to be included in the sampling.                                                                                                                                                                                              | `0.1`         |
 | `freq_max_THz`     | The maximum phonon frequency (in THz) to be included in the sampling. If `None`, all frequencies above `freq_min_THz` are included.                                                                                                                                   | `8.0`         |
 
@@ -252,7 +276,7 @@ from mbe_automation import Trajectory
 # Read the full trajectory from the dataset
 full_trajectory = Trajectory.read(
     dataset="training_set.hdf5",
-    key="training/md_sampling/trajectory"
+    key="training/md_sampling/trajectories/crystal[dyn:T=298.15,p=0.00010]"
 )
 
 # Subsample the trajectory to select 100 frames
@@ -261,9 +285,11 @@ subsampled_trajectory = full_trajectory.subsample(n=100)
 # Save the subsampled trajectory to a new key in the dataset
 subsampled_trajectory.save(
     dataset="training_set.hdf5",
-    key="training/md_sampling/trajectory_subsampled"
+    key="training/md_sampling/trajectories/crystal[dyn:T=298.15,p=0.00010]_subsampled"
 )
 ```
+
+*Note: In the example above, the key has been updated to reflect the actual output structure of the MD sampling workflow.*
 
 ## Updates to an Existing Dataset
 
@@ -278,21 +304,21 @@ from mbe_automation.storage import Trajectory
 # Load structure
 traj = Trajectory.read(
     dataset="training_set.hdf5",
-    key="training/md_sampling/trajectory"
+    key="training/md_sampling/trajectories/crystal[dyn:T=298.15,p=0.00010]"
 )
 
 # Compute new properties (e.g., feature vectors)
-traj.run_neural_network(
+traj.run(
     calculator=mace_calc,
     feature_vectors_type="averaged_environments",
-    potential_energies=False,
+    energies=False,
     forces=False
 )
 
 # Save only the new feature vectors
 traj.save(
     dataset="training_set.hdf5",
-    key="training/md_sampling/trajectory",
+    key="training/md_sampling/trajectories/crystal[dyn:T=298.15,p=0.00010]",
     only=["feature_vectors"]
 )
 ```
