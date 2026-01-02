@@ -7,7 +7,7 @@ The `mbe_automation.calculators` module provides interfaces to various computati
 While these calculators inherit from the standard ASE `Calculator` interface, they are enhanced with specific features required by the `mbe_automation` workflow:
 
 1.  **Level of Theory Tracking:** Each calculator instance has a `level_of_theory` property (string). This identifier is used to tag computed energies and forces when they are stored in the HDF5 dataset (under `ground_truth`), ensuring data provenance and enabling multi-fidelity workflows.
-2.  **Multi-GPU Parallelization:** The MACE and PySCF-based calculators implement specialized serialization methods that allow `run_model` to distribute calculations across multiple GPUs using Ray. This parallelization works as a black box for the user: you simply allocate the necessary resources (e.g., via SLURM) and execute `run_model` on your structures.
+2.  **Multi-GPU Parallelization:** The MACE and PySCF-based calculators implement specialized serialization methods that allow `run` to distribute calculations across multiple GPUs using Ray. This parallelization works as a black box for the user: you simply allocate the necessary resources (e.g., via SLURM) and execute `run` on your structures.
 
 ## Table of Contents
 
@@ -44,7 +44,7 @@ structure = Structure.from_xyz_file("structure.xyz")
 # Run calculation
 # This updates the structure in-place with energies and forces
 # The results are stored in the ground_truth attribute
-structure.run_model(calc)
+structure.run(calc)
 
 # Retrieve results using the calculator's level of theory
 energy = structure.ground_truth.energies[calc.level_of_theory]
@@ -107,12 +107,12 @@ hf_calc = HF(basis="def2-tzvpp")
 structure = Structure.from_xyz_file("molecule.xyz")
 
 # Run DFT
-structure.run_model(dft_calc)
+structure.run(dft_calc)
 energy_dft = structure.ground_truth.energies[dft_calc.level_of_theory]
 print(f"DFT Energy: {energy_dft} eV/atom")
 
 # Run HF
-structure.run_model(hf_calc)
+structure.run(hf_calc)
 energy_hf = structure.ground_truth.energies[hf_calc.level_of_theory]
 print(f"HF Energy: {energy_hf} eV/atom")
 ```
@@ -147,8 +147,8 @@ calc_dftb = DFTB3_D4()
 structure = Structure.from_xyz_file("crystal.xyz")
 
 # Run Calculation
-structure.run_model(calc_xtb)
-structure.run_model(calc_dftb)
+structure.run(calc_xtb)
+structure.run(calc_dftb)
 energy_xtb = structure.ground_truth.energies[calc_xtb.level_of_theory]
 energy_dftb = structure.ground_truth.energies[calc_dftb.level_of_theory]
 print(f"GFN2-xTB Energy: {energy_xtb} eV/atom")
