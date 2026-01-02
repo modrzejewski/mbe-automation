@@ -63,6 +63,10 @@ class AtomicReference:
     def __setitem__(self, level_of_theory: str, atom_energies: dict[np.int64, np.float64]) -> None:
         self.energies[level_of_theory] = atom_energies
 
+    def __contains__(self, level_of_theory: str) -> bool:
+        """Check availability of a specific level of theory."""
+        return level_of_theory in self.energies
+
     def __add__(self, other: AtomicReference) -> AtomicReference:
         if not isinstance(other, AtomicReference):
             return NotImplemented
@@ -101,7 +105,7 @@ class GroundTruth:
 @dataclass
 class Structure:
     """
-    Main data storage class for geometric data and the corresponding
+    Main data storage class for geometric data and corresponding
     energies and forces.
 
     Data generated with the theoretical model applied
@@ -112,7 +116,7 @@ class Structure:
     Structure.forces
 
     Data generated for fixed, precomputed structures
-    via a call to run_model
+    via a call to Structure.run:
 
     Structure.ground_truth
 

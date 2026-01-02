@@ -79,6 +79,8 @@ class AtomicReference(_AtomicReference):
             z_numbers=atomic_numbers,
         )
 
+    run_model = run # synonym
+
 class _AtomicEnergiesCalc:
     def atomic_reference(self, calculator: CALCULATORS) -> AtomicReference:
         energies = mbe_automation.calculators.atomic_energies(
@@ -188,7 +190,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             overwrite=overwrite,
         )
 
-    run_model = run
+    run_model = run # synonym
 
     def to_molecular_crystal(
             self,
