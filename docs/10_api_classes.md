@@ -37,7 +37,7 @@ The following table summarizes the key methods available across these classes.
 | **`read`** | Method to load the object from an HDF5 dataset. | `AtomicReference`, `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`save`** | Saves the object to an HDF5 dataset. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`subsample`** | Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
-| **`run_model`** | Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. | `AtomicReference`, `Structure`, `Trajectory`, `FiniteSubsystem` |
+| **`run`** | Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. | `AtomicReference`, `Structure`, `Trajectory`, `FiniteSubsystem` |
 | **`to_mace_dataset`** | Exports the data (structures, energies, forces) to MACE-compatible XYZ files for model training. | `Structure`, `FiniteSubsystem`, `Dataset` |
 | **`random_split`** | Randomly splits the frames into multiple objects (e.g., for creating training and validation sets). | `Structure`, `FiniteSubsystem` |
 | **`to_ase_atoms`** | Converts a specific frame into an `ase.Atoms` object. | `Structure` |
@@ -49,5 +49,5 @@ The following table summarizes the key methods available across these classes.
 | **`atomic_reference`** | Calculates ground-state energies for all unique isolated atoms (used for generating MLIP baselines). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem`, `Dataset` |
 
 ### Usage Notes
-*   **`subsample`**: Requires feature vectors to be present (computed via `run_model` or during an MD simulation) to calculate distances in chemical space.
-*   **`run_model`**: Can be used to evaluate ground truth (energies and forces) or to generate descriptors (feature vectors) for subsampling.
+*   **`subsample`**: Requires feature vectors to be present (computed via `run` or during an MD simulation) to calculate distances in chemical space.
+*   **`run`**: Can be used to evaluate ground truth (energies and forces) or to generate descriptors (feature vectors) for subsampling.
