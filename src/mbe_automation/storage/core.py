@@ -1455,7 +1455,7 @@ def save_atomic_reference(
         
         for method_name in atomic_reference.levels_of_theory:
             d = atomic_reference.energies[method_name]
-            atomic_numbers = np.sort(np.array([z for z in d], dtype=np.int64))
+            atomic_numbers = np.sort(np.fromiter(d.keys(), dtype=np.int64))
             energies = np.array([d[z] for z in atomic_numbers], dtype=np.float64)
             sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
 
