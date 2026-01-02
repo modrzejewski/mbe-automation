@@ -1,4 +1,4 @@
-# Cookbook: Export to MACE with Atomic Reference Energies
+# Cookbook: Adding Atomic Reference Energies to existing MACE Training Data
 
 This cookbook demonstrates how to export a dataset of structures to a MACE-compatible training file, including the calculation and inclusion of atomic reference energies (isolated atom energies).
 
