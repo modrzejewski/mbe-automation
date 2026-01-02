@@ -83,7 +83,7 @@ print(f"Dataset exported to {output_path}")
 
 ## Output Explanation
 
-The resulting `training_data.xyz` file will start with `IsolatedAtom` configurations for each element (H, C, O, etc.), followed by your structure configurations.
+The resulting `training_data.xyz` file will start with `IsolatedAtom` configurations for each element (H, C, O, etc.), followed by your training configurations.
 
 Example structure of the output file:
 
