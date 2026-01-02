@@ -845,7 +845,7 @@ def _to_mace_dataset(
         structures=structures,
         level_of_theory=level_of_theory,
         save_path=save_path,
-        atomic_reference=atomic_reference,
+        atomic_energies=atomic_energies,
     )
     
 def _statistics(
