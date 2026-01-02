@@ -18,7 +18,7 @@ First, we identify the keys for the structures we want to export and read them i
 
 ```python
 import mbe_automation
-from mbe_automation.calculators.pyscf import PySCFCalculator
+from mbe_automation.calculators import DFT
 
 # Path to your HDF5 file
 dataset_path = "structures.hdf5"
@@ -45,7 +45,7 @@ MACE requires the energies of isolated atoms to serve as a baseline for the tota
 ```python
 # Define the calculator used for the ground truth
 # Ensure the settings match your dataset's level of theory
-calculator = PySCFCalculator(
+calculator = DFT(
     xc="r2scan",
     basis="def2-tzvpd"
 )
