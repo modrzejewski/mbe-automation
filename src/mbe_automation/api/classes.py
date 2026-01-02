@@ -76,7 +76,7 @@ class AtomicReference(_AtomicReference):
             calculator: CALCULATORS
     ) -> AtomicReference:
         """
-        Create a new AtomicNumbers object for a given set of atomic numbers
+        Create a new AtomicReference object for a given set of atomic numbers
         and a calculator associated with a given level of theory.
         """
         return cls(
