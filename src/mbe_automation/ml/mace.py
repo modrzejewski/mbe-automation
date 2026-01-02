@@ -112,9 +112,9 @@ def to_xyz_training_set(
         
         if delta_learning:
             assert (
-                isinstance(atomic_energies, AtomicReference) and
-                target in atomic_energies and
-                baseline in atomic_energies
+                isinstance(atomic_reference, AtomicReference) and
+                target in atomic_reference and
+                baseline in atomic_reference
             ), ("atomic_reference must contain data "
                 "for target and baseline levels of theory.")
             
