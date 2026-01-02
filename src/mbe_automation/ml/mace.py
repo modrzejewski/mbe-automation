@@ -133,7 +133,7 @@ def to_xyz_training_set(
             
         else:
             assert level_of_theory in atomic_reference, (
-                f"atomic_reference must contain data for level of theory '{level_of_thery}'"
+                f"atomic_reference must contain data for level of theory '{level_of_theory}'"
             )
             
             atomic_numbers, E_atomic = _process_atomic_energies(
