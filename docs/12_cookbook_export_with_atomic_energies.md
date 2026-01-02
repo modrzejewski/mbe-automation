@@ -4,15 +4,19 @@ This cookbook demonstrates how to export a dataset of structures to a MACE-compa
 
 We assume you already have a HDF5 file containing structures with ground truth data (energies and forces) at a specific level of theory (e.g., r2SCAN DFT with def2-tzvpd basis set).
 
+- [Prerequisites](#prerequisites)
+- [1. Read structures](#1-read-structures)
+- [2. Generate atomic reference energies](#2-generate-atomic-reference-energies)
+- [3. Export data](#3-export-data)
+- [Output Explanation](#output-explanation)
+
 ## Prerequisites
 
 *   A HDF5 file (e.g., `structures.hdf5`) containing your structures.
 *   Ground truth data stored in the structures at the desired level of theory.
 *   The `pyscf` package installed for running DFT calculations.
 
-## Step-by-step Guide
-
-### 1. Read structures
+## 1. Read structures
 
 First, we identify the keys for the structures we want to export and read them into a `Dataset` object.
 
@@ -48,7 +52,7 @@ for key in keys:
     dataset.append(structure)
 ```
 
-### 2. Generate atomic reference energies
+## 2. Generate atomic reference energies
 
 MACE requires the energies of isolated atoms to serve as a baseline for the total energy. We calculate these using the same level of theory as the dataset.
 
@@ -62,7 +66,7 @@ print("Atomic energies calculated:")
 print(atomic_reference.energies[calculator.level_of_theory])
 ```
 
-### 3. Export data
+## 3. Export data
 
 Finally, we export the structures and the atomic reference energies to a single XYZ file suitable for training MACE models.
 
