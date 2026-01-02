@@ -42,7 +42,6 @@ for key in keys:
 MACE requires the energies of isolated atoms to serve as a baseline for the total energy. We calculate these using the same level of theory as the dataset.
 
 ```python
-from mbe_automation import AtomicReference
 from mbe_automation.calculators import DFT
 
 # Define the calculator used for the ground truth
@@ -52,16 +51,10 @@ calculator = DFT(
     basis="def2-tzvpd"
 )
 
-# Initialize an AtomicReference object
-atomic_reference = AtomicReference()
-
 # Calculate energies for all unique elements in the dataset
 # This runs the calculator for each isolated atom type
 print("Calculating atomic reference energies...")
-atomic_reference.run(
-    atomic_numbers=dataset.unique_elements,
-    calculator=calculator
-)
+atomic_reference = dataset.atomic_reference(calculator)
 
 print("Atomic energies calculated:")
 print(atomic_reference.energies[calculator.level_of_theory])
