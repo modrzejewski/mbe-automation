@@ -9,6 +9,7 @@ from mbe_automation.storage.core import (
     MolecularCrystal,
     UniqueClusters,
     FiniteSubsystem,
+    AtomicReference,
     save_data_frame,
     read_data_frame,
     save_brillouin_zone_path,
