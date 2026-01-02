@@ -37,7 +37,7 @@ class _TrainingStructure:
             self,
             save_path: str,
             level_of_theory: str | dict[Literal["target", "baseline"], str],
-            atomic_reference: AtomicRerefence | None = None,
+            atomic_reference: AtomicReference | None = None,
     ) -> None:
         _to_mace_dataset(
             dataset=[self],
@@ -845,7 +845,7 @@ def _to_mace_dataset(
         structures=structures,
         level_of_theory=level_of_theory,
         save_path=save_path,
-        atomic_energies=atomic_energies,
+        atomic_reference=atomic_reference,
     )
     
 def _statistics(
