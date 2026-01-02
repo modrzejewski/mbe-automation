@@ -37,13 +37,13 @@ class _TrainingStructure:
             self,
             save_path: str,
             level_of_theory: str | dict[Literal["target", "baseline"], str],
-            atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
+            atomic_reference: AtomicRerefence | None = None,
     ) -> None:
         _to_mace_dataset(
             dataset=[self],
             save_path=save_path,
             level_of_theory=level_of_theory,
-            atomic_energies=atomic_energies,
+            atomic_reference=atomic_reference,
         )
 
 @dataclass(kw_only=True)
@@ -483,13 +483,13 @@ class Dataset(_AtomicEnergiesCalc):
             self,
             save_path: str,
             level_of_theory: str | dict[Literal["target", "baseline"], str],
-            atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
+            atomic_reference: AtomicReference | None = None,
     ) -> None:
         _to_mace_dataset(
             dataset=self.structures,
             save_path=save_path,
             level_of_theory=level_of_theory,
-            atomic_energies=atomic_energies,
+            atomic_reference=atomic_reference,
         )
 
     @property
@@ -817,7 +817,7 @@ def _to_mace_dataset(
         dataset: List[Structure|FiniteSubsystem],
         save_path: str,
         level_of_theory: str | dict[Literal["target", "baseline"], str],
-        atomic_energies: dict[np.int64, np.float64] | dict[str, dict[np.int64, np.float64]] | None = None,
+        atomic_reference: AtomicReference | None = None,
 ) -> None:
     """
     Export dataset to training files readable by MACE.
@@ -827,8 +827,8 @@ def _to_mace_dataset(
         level_of_theory: The level of theory to use for energies and forces.
             Can be a string for direct learning, or a dict with "target" and
             "baseline" keys for delta learning.
-        atomic_energies: A dictionary of ground-state energies for isolated
-            atoms, used to generate a baseline superposition of atomic shifts
+        atomic_reference: Ground-state energies for isolated
+            atoms, used to generate baseline atomic shifts
             in MACE.
     """
     
