@@ -17,7 +17,7 @@ We assume you already have a HDF5 file containing structures with ground truth d
 First, we identify the keys for the structures we want to export and read them into a `Dataset` object.
 
 ```python
-from mbe_automation import Dataset, DatasetKeys, Structure
+from mbe_automation import Dataset, DatasetKeys, FiniteSubsystem
 
 # Path to your HDF5 file
 dataset_path = "structures.hdf5"
@@ -26,14 +26,14 @@ dataset_path = "structures.hdf5"
 dataset = Dataset()
 
 # Filter and read structure keys
-# In this example, we select all periodic structures
-keys = DatasetKeys(dataset_path).structures().periodic()
+# In this example, we select finite subsystems with r2scan data
+keys = DatasetKeys(dataset_path).finite_subsystems().with_ground_truth("r2scan-d4_def2-tzvpd")
 
 print(f"Found {len(keys)} structures.")
 
 for key in keys:
     # Read the structure
-    structure = Structure.read(dataset_path, key)
+    structure = FiniteSubsystem.read(dataset_path, key)
     dataset.append(structure)
 ```
 
