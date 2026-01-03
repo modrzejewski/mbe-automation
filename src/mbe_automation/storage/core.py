@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Tuple, Literal, overload, Dict
+import pymatgen
 import pandas as pd
 import phonopy
 from phonopy import Phonopy
@@ -9,6 +10,8 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 import os
+
+from .views import to_pymatgen, to_ase
 
 DATA_FOR_TRAINING = [
     "feature_vectors",
@@ -206,6 +209,16 @@ class Structure:
             restrict_to: list[Literal["ground_truth", "structure_generation"]] | None = None
     ) -> list[str]:
         return _available_forces(self, restrict_to)
+
+    def to_ase_atoms(self, frame_index: int = 0) -> ase.Atoms:        
+        return to_ase(self, frame_index)
+
+    def to_pymatgen(self, frame_index: int = 0) -> pymatgen.core.Structure | pymatgen.core.Molecule:
+        return to_pymatgen(self, frame_index)
+    
+    def lattice(self, frame_index: int = 0) -> pymatgen.core.Lattice:
+        assert self.periodic, "Structure must be periodic."
+        return self.to_pymatgen(frame_index).lattice
 
     @property
     def unique_elements(self) -> npt.NDArray[np.int64]:
