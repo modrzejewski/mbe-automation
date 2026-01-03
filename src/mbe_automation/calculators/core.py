@@ -18,6 +18,7 @@ import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
+CALCULATORS = PySCFCalculator | DFTBCalculator | MACE
 
 def _split_work(structure: Structure, n_workers: int):
     assert structure.atomic_numbers.ndim == structure.masses.ndim

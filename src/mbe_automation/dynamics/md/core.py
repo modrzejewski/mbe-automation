@@ -19,6 +19,8 @@ import mbe_automation.storage
 import mbe_automation.structure.molecule
 import mbe_automation.dynamics.md.csvr
 import mbe_automation.calculators
+from mbe_automation.calculators import CALCULATORS
+from mbe_automation.calculators import MACE
 
 def get_velocities(
     system: ase.Atoms,
@@ -86,7 +88,7 @@ def get_velocities(
 def run(
         system: ase.Atoms,
         supercell_matrix: npt.NDArray[np.integer] | None,
-        calculator: mbe_automation.calculators.CALCULATORS,
+        calculator: CALCULATORS,
         target_temperature_K: float,
         target_pressure_GPa: float | None,
         md: ClassicalMD,
@@ -304,6 +306,25 @@ def run(
     t0 = time.time()
     print("Time propagation...", flush=True)
     dyn.run(steps=n_total_steps)
+
+    if isinstance(calculator, MACE):
+        #
+        # Automatically compute feature vectors if the calculator
+        # is MACE. This simplifies the workflow because in most
+        # cases structure generation with MACE is followed by
+        # subsampling in the chemical space. The storage cost is
+        # negligible because the computed feature vectors
+        # are averaged over atoms.
+        #
+        mbe_automation.calculators.run_model(
+            structure=traj,
+            calculator=calculator,
+            compute_energies=False,
+            compute_forces=False,
+            compute_feature_vectors=True,
+            average_over_atoms=True,
+            silent=False,
+        )
 
     mbe_automation.storage.save_trajectory(
         dataset=dataset,
