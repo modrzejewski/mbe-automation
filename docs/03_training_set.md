@@ -126,8 +126,8 @@ mbe_automation.run(phonon_sampling_config)
 | ------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | `crystal`                 | Initial crystal structure. From this periodic trajectory, the workflow extracts finite, non-periodic clusters. | - |
 | `calculator`              | MLIP calculator.                                                                                    | -                                  |
-| `features_calculator`     | Calculator used to compute feature vectors.                                                         | `None`                             |
-| `feature_vectors_type`    | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Ignored unless `features_calculator` is present. | `"averaged_environments"`          |
+| `features_calculator`     | Calculator used to compute feature vectors. Not required if `calculator` is a MACE model.               | `None`                             |
+| `feature_vectors_type`    | Type of feature vectors to save. Options are "none", "atomic_environments", or "averaged_environments". Enables subsampling based on distances in the feature space. Ignored unless `features_calculator` is present or `calculator` is a MACE model. If `calculator` is a MACE model, averaged environment feature vectors are computed automatically. | `"averaged_environments"`          |
 | `md_crystal`              | An instance of `ClassicalMD` that configures the MD simulation parameters. Defaults used in `MDSampling` differ from standard `ClassicalMD` defaults: `time_total_fs=100000.0`, `supercell_radius=15.0`, `time_step_fs=1.0`, `sampling_interval_fs=1000.0`, `time_equilibration_fs=1000.0`. | -                                  |
 | `temperatures_K`          | Target temperatures (in Kelvin) for the MD simulation. Can be a single float or an array of floats. | `298.15` |
 | `pressures_GPa`           | Target pressures (in GPa) for the MD simulation. Can be a single float or an array of floats. | `1.0E-4` |
@@ -295,6 +295,8 @@ subsampled_trajectory.save(
 
 The `Structure` and `Trajectory` classes allow updating an existing dataset with new properties, such as feature vectors, potential energies, or forces. This is useful for machine learning workflows where new data needs to be computed for existing geometries.
 
+If the MD simulation was performed with a calculator other than MACE (e.g., DFTB+), or if you want to add feature vectors to a legacy dataset, you can compute them in a separate step.
+
 To update a dataset, first load the structure, run the calculator, and then save the specific properties using the `only` argument in the `save` method.
 
 ```python
@@ -423,7 +425,6 @@ mace_calc = MACE(model_path=mlip_parameter_file)
 md_sampling_config = MDSampling(
     crystal=Structure.from_xyz_file(xyz_solid),
     calculator=mace_calc,
-    features_calculator=mace_calc,
     temperatures_K=np.array([temperature_K]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
     finite_subsystem_filter=FiniteSubsystemFilter(

@@ -316,7 +316,7 @@ def run(
         # negligible because the computed feature vectors
         # are averaged over atoms.
         #
-        mbe_automation.calculators.run_model(
+        _, _, feature_vectors = mbe_automation.calculators.run_model(
             structure=traj,
             calculator=calculator,
             compute_energies=False,
@@ -325,6 +325,9 @@ def run(
             average_over_atoms=True,
             silent=False,
         )
+        if feature_vectors is not None:
+            traj.feature_vectors = feature_vectors
+            traj.feature_vectors_type = "averaged_environments"
 
     mbe_automation.storage.save_trajectory(
         dataset=dataset,
