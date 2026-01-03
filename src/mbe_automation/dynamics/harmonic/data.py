@@ -213,7 +213,7 @@ def crystal(
     # internal transformation of the cell.
     #
     assert n_atoms_unit_cell == structure.n_atoms
-    assert n_atoms_primitive_cell = structure.n_atoms
+    assert n_atoms_primitive_cell == structure.n_atoms
     
     phonons.run_thermal_properties(temperatures=temperatures)
     #
