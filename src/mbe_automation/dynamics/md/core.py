@@ -19,8 +19,7 @@ import mbe_automation.storage
 import mbe_automation.structure.molecule
 import mbe_automation.dynamics.md.csvr
 import mbe_automation.calculators
-from mbe_automation.calculators import CALCULATORS
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import CALCULATORS, MACE
 
 def get_velocities(
     system: ase.Atoms,
