@@ -218,7 +218,11 @@ class Structure:
     
     def lattice(self, frame_index: int = 0) -> pymatgen.core.Lattice:
         assert self.periodic, "Structure must be periodic."
-        return self.to_pymatgen(frame_index).lattice
+        if self.variable_cell:
+            cell = self.cell_vectors[frame_index]
+        else:
+            cell = self.cell_vectors
+        return pymatgen.core.Lattice(cell)
 
     @property
     def unique_elements(self) -> npt.NDArray[np.int64]:
