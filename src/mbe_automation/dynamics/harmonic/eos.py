@@ -222,10 +222,13 @@ def fit(V, G, equation_of_state):
 
     poly_fit = polynomial_fit(V, G)
         
-    if equation_of_state in linear_fit:
+    if (
+            equation_of_state in linear_fit or
+            (equation_of_state in nonlinear_fit and poly_fit.min_found)
+    ):        
         return poly_fit
 
-    if equation_of_state in nonlinear_fit:
+    if equation_of_state in nonlinear_fit:    
         G_initial = poly_fit.G_min
         V_initial = poly_fit.V_min
         B_initial = poly_fit.B * ase.units.GPa/(ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)

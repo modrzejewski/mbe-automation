@@ -213,7 +213,7 @@ class FreeEnergy:
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.
                                    #                                   
-    equation_of_state: Literal[*EQUATIONS_OF_STATE] = "polynomial"
+    equation_of_state: Literal[*EQUATIONS_OF_STATE] = "spline"
                                    #
                                    # Algorithm used to generate points on
                                    # the equilibrium curve:
