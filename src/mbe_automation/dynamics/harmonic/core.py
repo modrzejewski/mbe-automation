@@ -254,7 +254,7 @@ def equilibrium_curve(
         filter_out_broken_symmetry,
         dataset,
         root_key,
-        save_plots,
+        save_plots=True,
 ):
 
     geom_opt_dir = Path(work_dir) / "relaxation"

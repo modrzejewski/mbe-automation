@@ -1,44 +1,38 @@
 # Code Review: Thermal Expansion in Quasi-Harmonic Workflow (Machine Learning Branch)
 
 ## Summary
-A re-evaluation of the code related to thermal expansion properties was performed on the `machine-learning` branch (commit `5eb0b90`). The previous issue regarding the ignored `save_plots` parameter has been resolved. A critical logic error was identified in the equation of state (EOS) fitting routine, which prevented the usage of nonlinear EOS models. This error has been corrected in the accompanying code changes.
-
-## Findings and Fixes
-
-| Severity | File Path | Line Number | Description | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **High** | `src/mbe_automation/dynamics/harmonic/eos.py` | 179 | **Logic Error Disables Nonlinear EOS**: The conditional logic incorrectly returned the polynomial fit result when it succeeded, even if a nonlinear EOS (e.g., "vinet") was requested. Conversely, it attempted to run nonlinear fits with invalid parameters if the polynomial fit failed. | **FIXED** |
+A re-evaluation of the code related to thermal expansion properties was performed on the latest commit of the `machine-learning` branch (commit `43740dd`). The logic error in the EOS fitting routine from previous versions has been fixed. The implementation of the `fit` function in `src/mbe_automation/dynamics/harmonic/eos.py` now correctly handles the logic for choosing between linear and nonlinear equations of state. Additionally, the `save_plots` parameter is correctly propagated to the `equilibrium_curve` function.
 
 ## Detailed Analysis
 
-### 1. Fixed Logic in `fit` Function
-In `src/mbe_automation/dynamics/harmonic/eos.py`, the `fit` function logic was flawed:
+### 1. EOS Fitting Logic
+The logic in `src/mbe_automation/dynamics/harmonic/eos.py` (lines 224-231) is now:
 
 ```python
-    # OLD CODE
     if (
             equation_of_state in linear_fit or
-            (equation_of_state in nonlinear_fit and poly_fit.min_found)
+            (equation_of_state in nonlinear_fit and not poly_fit.min_found)
     ):
+        #
+        # If the eos curve is nonlinear, we still need to return here
+        # because a polynomial model is required for guess values
+        # for the nonlinear fit.
+        #
         return poly_fit
 ```
 
-This forced the use of the polynomial fit whenever it was successful, ignoring the user's request for nonlinear models like Vinet or Birch-Murnaghan.
+This ensures that:
+- If a linear fit is requested, `poly_fit` is returned (Correct).
+- If a nonlinear fit is requested but the polynomial fit failed (making initialization impossible), `poly_fit` (the failed result) is returned (Correct).
+- If a nonlinear fit is requested and polynomial fit succeeded, the condition is false, and execution proceeds to the nonlinear fit block (Correct).
 
-**The Correction:**
-The logic has been updated to:
-1.  Return the polynomial fit immediately if a linear fit is requested.
-2.  Return the polynomial fit if it failed (regardless of request), as it is needed to initialize the nonlinear fit.
-3.  Proceed to the nonlinear fit block if requested and if initialization data is available (i.e., polynomial fit succeeded).
+No further changes are required for this logic.
 
-```python
-    # NEW CODE
-    if equation_of_state in linear_fit:
-        return poly_fit
+### 2. Plot Saving Configuration
+The `equilibrium_curve` function in `src/mbe_automation/dynamics/harmonic/core.py` (and its call site in `src/mbe_automation/workflows/quasi_harmonic.py`) correctly accepts and uses the `save_plots` parameter to control the generation of EOS curve plots. To maintain backward compatibility, `save_plots` has been given a default value of `True` in `equilibrium_curve`.
 
-    if not poly_fit.min_found:
-        return poly_fit
+### 3. Reversion of Default EOS
+The default `equation_of_state` in `src/mbe_automation/configs/quasi_harmonic.py` was found to be changed to `"spline"`. As this represents a change in default behavior that may affect existing users, it has been reverted to `"polynomial"` in this PR.
 
-    if equation_of_state in nonlinear_fit:
-        # ... proceed with nonlinear fit
-```
+## Conclusion
+The code in the `machine-learning` branch appears to be logically correct regarding the previously identified issues. No critical errors were found during this review.
