@@ -290,12 +290,18 @@ train_set = Dataset()
 val_set = Dataset()
 test_set = Dataset()
 
-# Molecules
-keys_mol = DatasetKeys(dataset).structures().finite().with_ground_truth().starts_with("subsampled_md_frames/molecule")
-# Clusters
-keys_clust = DatasetKeys(dataset).finite_subsystems().with_ground_truth().starts_with("subsampled_md_frames/finite_subsystems")
+keys = []
 
-keys = list(keys_mol) + list(keys_clust)
+# Molecules
+keys.extend(list(
+    DatasetKeys(dataset).structures().finite().with_ground_truth().starts_with("subsampled_md_frames/molecule")
+))
+
+# Clusters
+# We explicitly loop over cluster sizes to ensure all sizes are included
+for n in range(2, 9):
+    keys_n = DatasetKeys(dataset).finite_subsystems(n).with_ground_truth().starts_with("subsampled_md_frames/finite_subsystems")
+    keys.extend(list(keys_n))
 
 for key in keys:
     print(f"Processing {key}")
