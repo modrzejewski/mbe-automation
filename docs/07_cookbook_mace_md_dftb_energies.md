@@ -458,7 +458,7 @@ Use this script to run the CPU-intensive export steps.
 #SBATCH --time=4:00:00
 #SBATCH --mem=32gb
 
-module load oneAPI python/3.11.9-gcc-11.5.0-5l7rvgy
+module load python/3.11.9-gcc-11.5.0-5l7rvgy
 source ~/.virtualenvs/compute-env/bin/activate
 
 # Dataset Export
