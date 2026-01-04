@@ -8,15 +8,13 @@ This cookbook outlines a multi-step workflow for generating a machine learning t
 
 2. [**Molecule Subsampling & Labeling**](#step-2-molecule-subsampling-and-labeling): Select diverse isolated molecule configurations and compute reference energies/forces.
 
-3. [**Cluster Extraction**](#step-3-finite-cluster-extraction): Cleave finite molecular clusters (n ≥ 2) from the periodic trajectory.
+3. [**Cluster Extraction & Features**](#step-3-finite-cluster-extraction-and-features): Cleave finite molecular clusters (n ≥ 2) from the periodic trajectory and compute their feature vectors.
 
-4. [**Cluster Feature Computation**](#step-4-feature-vector-computation-clusters): Compute feature vectors for the finite clusters.
+4. [**Cluster Subsampling & Labeling**](#step-4-subsampling-and-labeling-clusters): Select diverse cluster configurations and compute reference energies/forces.
 
-5. [**Cluster Subsampling & Labeling**](#step-5-subsampling-and-labeling-clusters): Select diverse cluster configurations and compute reference energies/forces.
+5. [**Dataset Export**](#step-5-dataset-splitting-and-export): Split the labeled samples into training/validation/test sets and export to XYZ files.
 
-6. [**Dataset Export**](#step-6-dataset-splitting-and-export): Split the labeled samples into training/validation/test sets and export to XYZ files.
-
-7. [**Model Training**](#step-7-model-training): Train a new MACE model using the combined data.
+6. [**Model Training**](#step-6-model-training): Train a new MACE model using the combined data.
 
 ## Input Data
 
@@ -146,9 +144,9 @@ for key in DatasetKeys(dataset).trajectories().finite().starts_with("all_md_fram
 print("All calculations completed")
 ```
 
-## Step 3: Finite Cluster Extraction
+## Step 3: Finite Cluster Extraction & Features
 
-Read the periodic MD trajectory, detect molecules, and extract finite clusters of varying sizes (n ≥ 2).
+Read the periodic MD trajectory, extract finite clusters (n ≥ 2), and compute their feature vectors.
 
 **Input:** `step_3.py`
 
@@ -157,8 +155,14 @@ import mbe_automation
 import numpy as np
 from mbe_automation import Structure, DatasetKeys
 from mbe_automation.configs.clusters import FiniteSubsystemFilter
+from mbe_automation.calculators import MACE
 
 dataset = "md_structures.hdf5"
+
+mace_calc = MACE(
+    model_path="~/models/mace/mace-mh-1.model",
+    head="omol",
+)
 
 for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_frames"):
     print(f"Generating finite clusters for {key}")
@@ -183,6 +187,13 @@ for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_fr
     )
     
     for cluster in clusters:
+        cluster.run(
+            calculator=mace_calc,
+            energies=False,
+            forces=False,
+            feature_vectors_type="averaged_environments"
+        )
+
         n_molecules = cluster.n_molecules
         cluster.save(
             dataset=dataset,
@@ -192,54 +203,11 @@ for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_fr
 print("All calculations completed")
 ```
 
-## Step 4: Feature Vector Computation (Clusters)
-
-Compute feature vectors for the finite clusters to enable diverse subsampling.
-
-**Input:** `step_4.py`
-
-```python
-from mbe_automation.calculators import MACE
-from mbe_automation import Structure, FiniteSubsystem, DatasetKeys
-
-dataset = "md_structures.hdf5"
-
-mace_calc = MACE(
-    model_path="~/models/mace/mace-mh-1.model",
-    head="omol",
-)
-
-keys = DatasetKeys(dataset).finite_subsystems().starts_with("all_md_frames")
-
-for key in keys:
-    print(f"Processing {key}")
-
-    cluster = FiniteSubsystem.read(
-        dataset=dataset,
-        key=key
-    )
-
-    cluster.run(
-        calculator=mace_calc,
-        energies=False,
-        forces=False,
-        feature_vectors_type="averaged_environments"
-    )
-
-    cluster.save(
-        dataset=dataset,
-        key=key,
-        only=["feature_vectors"]
-    )
-    
-print("All calculations completed")
-```
-
-## Step 5: Subsampling and Labeling (Clusters)
+## Step 4: Subsampling and Labeling (Clusters)
 
 Subsample the finite cluster trajectories and calculate reference energies and forces using r2SCAN-D4.
 
-**Input:** `step_5.py`
+**Input:** `step_4.py`
 
 ```python
 import mbe_automation
@@ -278,11 +246,11 @@ for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().start
 print("All calculations completed")
 ```
 
-## Step 6: Dataset Splitting and Export
+## Step 5: Dataset Splitting and Export
 
 Split the labeled samples (molecules and clusters) into training (90%), validation (5%), and test (5%) sets, and export them to XYZ format.
 
-**Input:** `step_6.py`
+**Input:** `step_5.py`
 
 ```python
 import mbe_automation
@@ -349,7 +317,7 @@ test_set.to_mace_dataset(
 print("All calculations completed")
 ```
 
-## Step 7: Model Training
+## Step 6: Model Training
 
 Train the MACE model using all generated data files.
 
@@ -405,7 +373,7 @@ python -m mace.cli.run_train \
 
 ## Computational Resources
 
-### GPU Tasks (Steps 1, 2, 3, 4, 5)
+### GPU Tasks (Steps 1, 2, 3, 4)
 
 Use this script to run the GPU-intensive steps.
 
@@ -438,10 +406,9 @@ python step_2.py > step_2.log 2>&1
 # Cluster Extraction, Features, and Labeling
 python step_3.py > step_3.log 2>&1
 python step_4.py > step_4.log 2>&1
-python step_5.py > step_5.log 2>&1
 ```
 
-### CPU Tasks (Step 6)
+### CPU Tasks (Step 5)
 
 Use this script to run the CPU-intensive export steps.
 
@@ -462,5 +429,5 @@ module load python/3.11.9-gcc-11.5.0-5l7rvgy
 source ~/.virtualenvs/compute-env/bin/activate
 
 # Dataset Export
-python step_6.py > step_6.log 2>&1
+python step_5.py > step_5.log 2>&1
 ```
