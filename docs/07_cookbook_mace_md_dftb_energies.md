@@ -78,6 +78,7 @@ md_config = ClassicalMD(
     time_total_fs=10000.0,
     time_step_fs=1.0,
     sampling_interval_fs=10.0,
+    time_equilibration_fs=0.0,
     supercell_radius=12.0
 )
 
@@ -85,7 +86,8 @@ md_config_mol = ClassicalMD(
     ensemble="NVT",
     time_total_fs=10000.0,
     time_step_fs=1.0,
-    sampling_interval_fs=10.0
+    sampling_interval_fs=10.0,
+    time_equilibration_fs=0.0
 )
 
 config = Enthalpy(
