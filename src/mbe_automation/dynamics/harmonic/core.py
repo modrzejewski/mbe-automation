@@ -253,7 +253,8 @@ def equilibrium_curve(
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
         dataset,
-        root_key
+        root_key,
+        save_plots,
 ):
 
     geom_opt_dir = Path(work_dir) / "relaxation"
@@ -485,12 +486,13 @@ def equilibrium_curve(
         dataset=dataset,
         key=f"{root_key}/eos_interpolated"
     )
-    
-    mbe_automation.dynamics.harmonic.display.eos_curves(
-        dataset=dataset,
-        key=f"{root_key}/eos_interpolated",
-        save_path=os.path.join(work_dir, "eos_curves.png")
-    )
+
+    if save_plots:
+        mbe_automation.dynamics.harmonic.display.eos_curves(
+            dataset=dataset,
+            key=f"{root_key}/eos_interpolated",
+            save_path=os.path.join(work_dir, "eos_curves.png")
+        )
         
     df = pd.DataFrame({
         "T (K)": temperatures,

@@ -225,6 +225,9 @@ def fit(V, G, equation_of_state):
     if equation_of_state in linear_fit:
         return poly_fit
 
+    if not poly_fit.min_found:
+        return poly_fit
+
     if equation_of_state in nonlinear_fit:
         G_initial = poly_fit.G_min
         V_initial = poly_fit.V_min

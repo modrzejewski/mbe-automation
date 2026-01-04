@@ -321,9 +321,8 @@ def run_model(
     if not silent:
         mbe_automation.common.resources.print_computational_resources()
         mbe_automation.common.display.framed(
-            ["Applying energies and forces model on fixed structures"]
+            [f"Running {calculator.level_of_theory} on {structure.n_frames} fixed frames"]
         )
-        print(f"{'n_frames':<30}{structure.n_frames}")
         print(f"{'compute_energies':<30}{compute_energies}")
         print(f"{'compute_forces':<30}{compute_forces}")
         print(f"{'compute_feature_vectors':<30}{compute_feature_vectors}")

@@ -233,7 +233,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.filter_out_imaginary_optical,
         config.filter_out_broken_symmetry,
         config.dataset,
-        config.root_key
+        config.root_key,
+        config.save_plots,
     )
     #
     # Harmonic properties for unit cells with temperature-dependent
