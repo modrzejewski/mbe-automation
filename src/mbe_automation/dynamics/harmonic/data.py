@@ -212,6 +212,10 @@ def crystal(
     # to the standardized primitive cell. Phonopy performs no
     # internal transformation of the cell.
     #
+    # Phonopy computes thermodynamic properties per primitive
+    # cell, but in our case unit cell and primitive cell are
+    # identical.
+    #
     assert n_atoms_unit_cell == structure.n_atoms
     assert n_atoms_primitive_cell == structure.n_atoms
     
@@ -243,6 +247,8 @@ def crystal(
 
     GPa_Angs3_to_kJ_mol = (ase.units.GPa*ase.units.Angstrom**3)/(ase.units.kJ/ase.units.mol)
     pV_crystal = external_pressure_GPa * V * GPa_Angs3_to_kJ_mol # kJ/mol/unit cell
+
+    E_tot_crystal = E_el_crystal + E_vib_crystal # kJ/mol/unit cell
     G_tot_crystal = F_tot_crystal + pV_crystal # kJ/mol/unit cell
     H_tot_crystal = E_el_crystal + E_vib_crystal + pV_crystal # kJ/mol/unit cell
 
@@ -281,6 +287,7 @@ def crystal(
         "ZPE_crystal (kJ∕mol∕unit cell)": ZPE_crystal,
         "C_V_vib_crystal (J∕K∕mol∕unit cell)": C_V_vib_crystal,
         "E_el_crystal (kJ∕mol∕unit cell)": E_el_crystal,
+        "E_tot_crystal (kJ∕mol∕unit cell)": E_tot_crystal,
         "F_tot_crystal (kJ∕mol∕unit cell)": F_tot_crystal,
         "G_tot_crystal (kJ∕mol∕unit cell)": G_tot_crystal,
         "H_tot_crystal (kJ∕mol∕unit cell)": H_tot_crystal,
@@ -304,7 +311,7 @@ def crystal(
         "Fourier_interp_mesh": f"{interp_mesh[0]}×{interp_mesh[1]}×{interp_mesh[2]}"
     })
     return df
-
+    
 
 def sublimation(df_crystal, df_molecule):
     """    

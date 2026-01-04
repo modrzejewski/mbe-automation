@@ -331,6 +331,16 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # temeprature points
     #
     df_crystal_qha = pd.concat(data_frames_at_T)
+    #
+    # Thermal expansion properties computed using numerical
+    # differentiations:
+    # (1) differentiation of cubic splines if n_temperatures >= 4
+    # (2) finite differences if 2 <= n_temperatures < 4
+    # (3) empty columns if n_temperatures < 2
+    #
+    df_thermal_expansion = mbe_automation.dynamics.haronic.eos.fit_thermal_expansion_properties(
+        df_crystal_equilibrium=df_crystal_qha
+    )
     if config.molecule is not None:
         df_sublimation_qha = mbe_automation.dynamics.harmonic.data.sublimation(
             df_crystal_qha,

@@ -6,6 +6,7 @@ import scipy.optimize
 from scipy.interpolate import CubicSpline
 import functools
 import numpy as np
+import pandas as pd
 import ase.units
 
 @dataclass
@@ -20,6 +21,17 @@ class EOSFitResults:
     V_sampled: npt.NDArray[np.floating]
     G_sampled: npt.NDArray[np.floating]
 
+@dataclass
+class ThermalExpansionProperties:
+    """
+    Properties related to thermal expansion of a crystal,
+    computed using numerical differentiation.
+    """
+    C_P_tot: npt.NDArray[np.float64]
+    alpha_V: npt.NDArray[np.float64]
+    alpha_L_a: npt.NDArray[np.float64]
+    alpha_L_b: npt.NDArray[np.float64]
+    alpha_L_c: npt.NDArray[np.float64]
 
 def birch_murnaghan(volume, e0, v0, b0, b1):
         """Birch-Murnaghan equation from PRB 70, 224107."""
@@ -253,4 +265,125 @@ def fit(V, G, equation_of_state):
             
         except RuntimeError as e:
             return poly_fit
+
+def _fit_thermal_expansion_properties_finite_diff(T, V, H, a, b, c):
+    """
+    Compute thermal expansion properties using finite differences.
+    This procedure requires at least two data points for forward/backward
+    difference and three points for a central difference.
+
+    lowest temperature endpoint: forward difference
+    midpoints: central differences
+    highest temperature endpoint: backward difference
     
+    """
+
+    dHdT = np.gradient(H, T)
+    dVdT = np.gradient(V, T)
+    dadT = np.gradient(a, T)
+    dbdT = np.gradient(b, T)
+    dcdT = np.gradient(c, T)
+    
+    return ThermalExpansionProperties(
+        C_P_tot = dHdT * 1000, # heat capacity at constant pressure J/K/mol/unit cell
+        alpha_V = dVdT / V,    # volumetric thermal expansion coefficient 1/K
+        alpha_L_a = dadT / a,  # linear thermal expansion coefficient 1/K
+        alpha_L_b = dbdT / b,  # 1/K
+        alpha_L_c = dcdT / c,  # 1/K
+    )
+
+def _hybrid_derivative(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    """
+    Compute derivative: cubic spline for midpoints, finite difference for endpoints.
+    """
+    d_dx = CubicSpline(x, y, bc_type="not-a-knot").derivative(1)(x)
+    d_dx[0] = (y[1] - y[0]) / (x[1] - x[0])
+    d_dx[-1] = (y[-1] - y[-2]) / (x[-1] - x[-2])
+    return d_dx
+    
+def _fit_thermal_expansion_properties_cspline(T, V, H, a, b, c):
+    """
+    Compute thermal expansion properties using numerical differentiation
+    of a cubic spline. This procedure requires at least four data points.
+    """
+
+    dHdT = _hybrid_derivative(T, H)
+    dVdT = _hybrid_derivative(T, V)
+    dadT = _hybrid_derivative(T, a)
+    dbdT = _hybrid_derivative(T, b)
+    dcdT = _hybrid_derivative(T, c)
+    
+    return ThermalExpansionProperties(
+        C_P_tot = dHdT * 1000, # heat capacity at constant pressure J/K/mol/unit cell
+        alpha_V = dVdT / V,    # volumetric thermal expansion coefficient 1/K
+        alpha_L_a = dadT / a,  # linear thermal expansion coefficient 1/K
+        alpha_L_b = dbdT / b,  # 1/K
+        alpha_L_c = dcdT / c,  # 1/K
+    )
+
+def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
+    """
+    Compute physical quantities by numerical differentiation
+
+    heat capacity at constant pressure C_P
+    volumetric thermal expansion cofficient alpha_V
+    linear thermal expansion coefficient alpha_L_x, x = a, b, c
+
+    C_P(T) = dH_tot(T,P)/dT
+    alpha_V = 1/V(T,P) dV(T,P)/dT
+    alpha_L_a = 1/a(T,P) da(T,P)/dT
+    alpha_L_b = 1/b(T,P) db(T,P)/dT
+    alpha_L_c = 1/c(T,P) dc(T,P)/dT
+    
+    """
+    T = df_crystal_equilibrium["T (K)"].to_numpy()
+    V = df_crystal_equilibrium["V_crystal (Å³∕unit cell)"].to_numpy()
+    H = df_crystal_equilibrium["H_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
+    a = df_crystal_equilibrium["cell_length_a (Å)"].to_numpy()
+    b = df_crystal_equilibrium["cell_length_b (Å)"].to_numpy()
+    c = df_crystal_equilibrium["cell_length_c (Å)"].to_numpy()
+
+    n_temperatures = len(T)
+
+    assert np.all(np.diff(T) > 0.0), "Temperatures must be strictly increasing."
+    assert n_temperatures > 0
+
+    if n_temperatures >= 4:
+        properties = _fit_thermal_expansion_properties_cspline(
+            T, V, H, a, b, c
+        )
+        derivative_methods = (
+            ["forward_difference"] + 
+            ["cubic_spline"] * (n_temperatures - 2) + 
+            ["backward_difference"]
+        )
+    
+    elif n_temperatures >= 2:
+        properties = _fit_thermal_expansion_properties_finite_diff(
+            T, V, H, a, b, c
+        )
+        derivative_methods = (
+                ["forward_difference"] + 
+                ["central_difference"] * (n_temperatures - 2) + 
+                ["backward_difference"]
+        )
+
+    else:
+        properties = ThermalExpansionProperties(
+            C_P_tot = np.full(n_temperatures, np.nan),
+            alpha_V = np.full(n_temperatures, np.nan),
+            alpha_L_a = np.full(n_temperatures, np.nan),
+            alpha_L_b = np.full(n_temperatures, np.nan),
+            alpha_L_c = np.full(n_temperatures, np.nan),
+        )
+        derivative_methods = ["none"] * n_temperatures
+
+    return pd.DataFrame({
+            "T (K)": T,
+            "C_P_tot (J∕K∕mol∕unit cell)": properties.C_P_tot,
+            "α_V (1∕K)": properties.alpha_V,
+            "α_L_a (1∕K)": properties.alpha_L_a,
+            "α_L_b (1∕K)": properties.alpha_L_b,
+            "α_L_c (1∕K)": properties.alpha_L_c,
+            "numerical_derivative": derivative_methods,
+    })
