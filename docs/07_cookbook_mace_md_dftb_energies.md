@@ -70,7 +70,6 @@ molecule = crystal.extract_all_molecules()[0]
 calculator = MACE(
    model_path="~/models/mace/mace-mh-1.model",
    head="omol",
-   device="cuda"
 )
 
 dataset = "md_structures.hdf5"
@@ -124,7 +123,6 @@ calculator = PySCFCalculator(
     xc="r2scan",
     disp="d4",
     basis="def2-svp",
-    device="cuda"
 )
 
 for key in DatasetKeys(dataset).trajectories().finite().starts_with("all_md_frames"):
@@ -244,7 +242,6 @@ dataset = "md_structures.hdf5"
 mace_calc = MACE(
     model_path="~/models/mace/mace-mh-1.model",
     head="omol",
-    device="cuda"
 )
 
 keys = DatasetKeys(dataset).finite_subsystems().starts_with("all_md_frames")
@@ -290,7 +287,6 @@ calculator = PySCFCalculator(
     xc="r2scan",
     disp="d4",
     basis="def2-svp",
-    device="cuda"
 )
 
 for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().starts_with("all_md_frames"):
