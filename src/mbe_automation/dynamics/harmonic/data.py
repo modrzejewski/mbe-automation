@@ -203,6 +203,8 @@ def crystal(
         masses=unit_cell.get_masses(),
         cell_vectors=unit_cell.get_cell(),
         level_of_theory=level_of_theory,
+        n_atoms=len(unit_cell),
+        n_frames=1,
     )
     n_atoms_unit_cell = len(phonons.unitcell)    
     n_atoms_primitive_cell = len(phonons.primitive)
