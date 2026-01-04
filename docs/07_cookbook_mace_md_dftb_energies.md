@@ -1,4 +1,4 @@
-# Cookbook: Training Set from MACE MD + PySCF Energies & Forces
+# Cookbook: Training Set from MACE MD + r2SCAN Energies & Forces
 
 This cookbook outlines a multi-step workflow for generating a machine learning training set. The procedure consists of generating candidate structures via molecular dynamics (MD) with a baseline model, extracting finite molecular clusters, identifying diverse configurations via feature-based subsampling, and labeling them with a reference calculator (r2SCAN-D4).
 
