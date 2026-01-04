@@ -113,13 +113,12 @@ Select a diverse subset of isolated molecule configurations and compute the refe
 ```python
 import mbe_automation
 from mbe_automation import Structure, DatasetKeys
-from mbe_automation.calculators.pyscf import PySCFCalculator
+from mbe_automation.calculators.pyscf import DFT
 
 dataset = "md_structures.hdf5"
 
-calculator = PySCFCalculator(
-    xc="r2scan",
-    disp="d4",
+calculator = DFT(
+    model_name="r2scan-d4",
     basis="def2-svp",
 )
 
@@ -241,13 +240,12 @@ Subsample the finite cluster trajectories and calculate reference energies and f
 ```python
 import mbe_automation
 from mbe_automation import Structure, FiniteSubsystem, DatasetKeys
-from mbe_automation.calculators.pyscf import PySCFCalculator
+from mbe_automation.calculators.pyscf import DFT
 
 dataset = "md_structures.hdf5"
 
-calculator = PySCFCalculator(
-    xc="r2scan",
-    disp="d4",
+calculator = DFT(
+    model_name="r2scan-d4",
     basis="def2-svp",
 )
 
