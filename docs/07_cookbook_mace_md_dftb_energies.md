@@ -154,7 +154,9 @@ Read the periodic MD trajectory, detect molecules, and extract finite clusters o
 
 ```python
 import mbe_automation
+import numpy as np
 from mbe_automation import Structure, DatasetKeys
+from mbe_automation.configs.clusters import FiniteSubsystemFilter
 
 dataset = "md_structures.hdf5"
 
@@ -166,7 +168,12 @@ for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_fr
         key=key
     )
     molecular_crystal = pbc_frames.detect_molecules()
-    clusters = molecular_crystal.extract_finite_subsystems()
+
+    # Select clusters with 2 to 8 molecules
+    cluster_filter = FiniteSubsystemFilter(
+        n_molecules=np.arange(2, 9)
+    )
+    clusters = molecular_crystal.extract_finite_subsystems(filter=cluster_filter)
 
     system_label = key.split(sep="/")[-1]
 
@@ -177,9 +184,6 @@ for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_fr
     
     for cluster in clusters:
         n_molecules = cluster.n_molecules
-        if n_molecules < 2:
-            continue
-
         cluster.save(
             dataset=dataset,
             key=f"all_md_frames/finite_subsystems/n={n_molecules}/{system_label}"
