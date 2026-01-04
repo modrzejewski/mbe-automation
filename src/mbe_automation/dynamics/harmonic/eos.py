@@ -377,7 +377,13 @@ def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
             alpha_L_c = np.full(n_temperatures, np.nan),
         )
         derivative_methods = ["none"] * n_temperatures
-
+    #
+    # Note that in the output data frame, we are preserving the
+    # original, possibly non-contiguous, data index of df_crystal_equilibrium.
+    # This is needed because in some cases, the preceding computation of
+    # equilibrium volumes may fail at some temperatures. Those empty rows
+    # are represented as gaps in the range of dataframe indices.
+    #
     return pd.DataFrame({
             "T (K)": T,
             "C_P_tot (J∕K∕mol∕unit cell)": properties.C_P_tot,
@@ -386,4 +392,4 @@ def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
             "α_L_b (1∕K)": properties.alpha_L_b,
             "α_L_c (1∕K)": properties.alpha_L_c,
             "numerical_derivative": derivative_methods,
-    })
+    }, index=df_crystal_equilibrium.index)
