@@ -213,8 +213,22 @@ def phonons(
         fc_calculator_log_level=1
     )
     print(f"Force constants completed", flush=True)
-
-    phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
+    #
+    # Computation of thermodynamic properties with phonopy requires
+    # an auxiliary k-points grid which we refer to Fourier interpolation
+    # mesh. For converged properties, this should be an extremely dense
+    # grid with a number of points far beyond the base k-point grid.
+    #
+    # Note that Phonopy accepts the mesh parameter in two forms:
+    # (1) A float is translated into the supercell radius. The supercell is
+    #     then folded in to the corresponding k-point grid.
+    # (2) A triple of integers which defines the number of k-points in
+    #     each direction.
+    #
+    phonons.run_mesh(
+        mesh=interp_mesh,
+        is_gamma_center=True
+    )
     print(f"Fourier interpolation mesh completed", flush=True)
     return phonons
 
