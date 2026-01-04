@@ -327,9 +327,24 @@ for key in keys:
     val_set.append(validate)
     test_set.append(test)
 
-train_set.to_mace_dataset("train.xyz", level_of_theory=calculator.level_of_theory)
-val_set.to_mace_dataset("validate.xyz", level_of_theory=calculator.level_of_theory)
-test_set.to_mace_dataset("test.xyz", level_of_theory=calculator.level_of_theory)
+# Compute atomic reference energies
+atomic_energies = train_set.atomic_reference(calculator)
+
+train_set.to_mace_dataset(
+    "train.xyz",
+    level_of_theory=calculator.level_of_theory,
+    atomic_reference=atomic_energies
+)
+val_set.to_mace_dataset(
+    "validate.xyz",
+    level_of_theory=calculator.level_of_theory,
+    atomic_reference=atomic_energies
+)
+test_set.to_mace_dataset(
+    "test.xyz",
+    level_of_theory=calculator.level_of_theory,
+    atomic_reference=atomic_energies
+)
 
 print("All calculations completed")
 ```
