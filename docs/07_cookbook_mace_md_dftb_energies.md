@@ -295,6 +295,8 @@ for n in range(2, 9):
 
 # Compute atomic reference energies. We will store the atomic data in
 # the training set. The atomic baseline is not needed for validation and test.
+# The ground-state electronic configurations of atoms are selected automatically.
+# This step is super fast, so can be done even in an interactive mode.
 atomic_energies = train_set.atomic_reference(calculator)
 
 train_set.to_mace_dataset(
