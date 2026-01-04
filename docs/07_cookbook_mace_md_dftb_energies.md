@@ -307,13 +307,11 @@ train_set.to_mace_dataset(
 )
 val_set.to_mace_dataset(
     "validate.xyz",
-    level_of_theory=calculator.level_of_theory,
-    atomic_reference=atomic_energies
+    level_of_theory=calculator.level_of_theory
 )
 test_set.to_mace_dataset(
     "test.xyz",
-    level_of_theory=calculator.level_of_theory,
-    atomic_reference=atomic_energies
+    level_of_theory=calculator.level_of_theory
 )
 
 print("All calculations completed")
