@@ -387,7 +387,11 @@ def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
     c = df_crystal_equilibrium["cell_length_c (Å)"].to_numpy()
 
     n_temperatures = len(T)
-
+    #
+    # Check if the temperatures are strictly increasing. This should never
+    # happen because the user-provided temperatures are sorted by __post_init__
+    # of the configuration class.
+    #
     assert np.all(np.diff(T) > 0.0), "Temperatures must be strictly increasing."
     assert n_temperatures > 0
 
