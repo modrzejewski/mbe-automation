@@ -73,7 +73,6 @@ The module provides factory functions `DFT` and `HF` to simplify initialization.
 | `auxbasis` | `str` \| `None` | `None` | Auxiliary basis set for density fitting. |
 | `verbose` | `int` | `0` | Verbosity level for PySCF output. |
 | `max_memory_mb` | `int` \| `None` | `None` | Maximum memory usage in MB. Auto-detected if `None`. |
-| `multigrid` | `bool` | `False` | If `True`, use the multigrid algorithm for numerical integration in periodic DFT calculations. |
 
 ### Supported DFT Methods
 
