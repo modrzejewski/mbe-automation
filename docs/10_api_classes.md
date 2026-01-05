@@ -50,7 +50,7 @@ The following table summarizes the key methods available across these classes.
 | **`extract_all_molecules`** | Extracts all molecules from a periodic structure. | `Structure` |
 | **`extract_unique_molecules`** | Extracts symmetry-unique molecules from a periodic structure. | `Structure` |
 | **`extract_relaxed_unique_molecules`** | Extracts and relaxes symmetry-unique molecules from a periodic structure. | `Structure` |
-| **`extract_finite_subsystems`** | Extracts finite clusters of molecules (e.g., dimers, trimers) based on distance or number criteria. | `MolecularCrystal` |
+| **`extract_finite_subsystems`** | Extracts finite clusters of molecules (e.g., dimers, trimers) based on distance or number of molecules. | `MolecularCrystal` |
 | **`positions`** | Returns positions of specific molecules in the crystal. | `MolecularCrystal` |
 | **`atomic_numbers`** | Returns atomic numbers of specific molecules in the crystal. | `MolecularCrystal` |
 | **`frequencies_and_eigenvectors`** | Calculates phonon frequencies and eigenvectors at a given k-point. | `ForceConstants` |
