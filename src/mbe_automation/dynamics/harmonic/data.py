@@ -197,16 +197,9 @@ def crystal(
     Physical properties derived from the harmonic model
     of crystal vibrations.
     """
-    structure = mbe_automation.storage.Structure(
-        positions=unit_cell.get_positions(),
-        atomic_numbers=unit_cell.get_atomic_numbers(),
-        masses=unit_cell.get_masses(),
-        cell_vectors=unit_cell.get_cell(),
-        level_of_theory=level_of_theory,
-        n_atoms=len(unit_cell),
-        n_frames=1,
-    )
-    n_atoms_unit_cell = len(phonons.unitcell)    
+    structure = mbe_automation.storage.from_ase_atoms(unit_cell)
+    structure.level_of_theory = level_of_theory
+    n_atoms_unit_cell = len(phonons.unitcell)  
     n_atoms_primitive_cell = len(phonons.primitive)
     #
     # Before building the force constants model in phonopy,
