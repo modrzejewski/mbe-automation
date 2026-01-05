@@ -68,12 +68,10 @@ def _sequential_loop(
     average_over_atoms: bool,
 ) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None]:
 
-    if positions.ndim == 3:
-        n_frames, n_atoms, _ = positions.shape
-    else:
-        n_frames = 1
-        n_atoms, _ = positions.shape
+    if positions.ndim == 2:
+        positions = positions[np.newaxis, :, :]
         
+    n_frames, n_atoms, _ = positions.shape
     is_periodic = cell_vectors is not None
     permuted_between_frames = atomic_numbers.ndim == 2
     variable_cell = is_periodic and cell_vectors.ndim == 3
