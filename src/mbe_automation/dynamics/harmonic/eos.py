@@ -310,7 +310,7 @@ def _hybrid_derivative(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -
     d_dx_finite_diff = np.gradient(y, x, edge_order=2)
     
     if np.any(np.sign(d_dx_cspline[1:-1]) != np.sign(d_dx_finite_diff[1:-1])):
-        print(
+        warnings.warn(
             "Cubic spline derivative and second-order finite differences disagree. "
             "Falling back to finite differences. Consider adjusting temperature points "
             "to enable accurate numerical derivatives."
