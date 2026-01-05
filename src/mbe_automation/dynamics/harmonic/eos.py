@@ -320,7 +320,7 @@ def _hybrid_derivative(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -
     else:
         d_dx = np.zeros_like(x)
         d_dx[0] = d_dx_finite_diff[0]
-        d_dx[-1] = d_dx_finie_diff[-1]
+        d_dx[-1] = d_dx_finite_diff[-1]
         d_dx[1:-1] = d_dx_cspline[1:-1]        
 
     return d_dx
