@@ -38,7 +38,6 @@ The following table summarizes the key methods available across these classes.
 | **`save`** | Saves the object to an HDF5 dataset. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`from_xyz_file`** | Creates a structure object from an XYZ file. | `Structure` |
 | **`from_atomic_numbers`** | Creates an `AtomicReference` from a list of atomic numbers and a calculator. | `AtomicReference` |
-| **`empty`** | Creates an empty trajectory. | `Trajectory` |
 | **`subsample`** | Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`select`** | Returns a new object containing only the specified frames (by index). | `Structure` |
 | **`run`** | Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. | `Structure`, `Trajectory`, `FiniteSubsystem` |
