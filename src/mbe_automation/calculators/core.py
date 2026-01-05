@@ -18,6 +18,7 @@ import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
+CALCULATORS = PySCFCalculator | DFTBCalculator | MACE
 
 def _split_work(structure: Structure, n_workers: int):
     assert structure.atomic_numbers.ndim == structure.masses.ndim
@@ -67,7 +68,12 @@ def _sequential_loop(
     average_over_atoms: bool,
 ) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None]:
 
-    n_frames, n_atoms, _ = positions.shape
+    if positions.ndim == 3:
+        n_frames, n_atoms, _ = positions.shape
+    else:
+        n_frames = 1
+        n_atoms, _ = positions.shape
+        
     is_periodic = cell_vectors is not None
     permuted_between_frames = atomic_numbers.ndim == 2
     variable_cell = is_periodic and cell_vectors.ndim == 3
@@ -320,9 +326,8 @@ def run_model(
     if not silent:
         mbe_automation.common.resources.print_computational_resources()
         mbe_automation.common.display.framed(
-            ["Applying energies and forces model on fixed structures"]
+            [f"Running {calculator.level_of_theory} on {structure.n_frames} fixed frames"]
         )
-        print(f"{'n_frames':<30}{structure.n_frames}")
         print(f"{'compute_energies':<30}{compute_energies}")
         print(f"{'compute_forces':<30}{compute_forces}")
         print(f"{'compute_feature_vectors':<30}{compute_feature_vectors}")

@@ -123,16 +123,6 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             mbe_automation.storage.read_structure(dataset, key)
         ))
 
-    def to_ase_atoms(
-            self,
-            frame_index: int = 0,
-    ) -> ase.Atoms:
-        
-        return mbe_automation.storage.to_ase(
-            structure=self,
-            frame_index=frame_index
-        )
-
     @classmethod
     def from_xyz_file(
             cls,

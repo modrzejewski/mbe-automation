@@ -213,8 +213,22 @@ def phonons(
         fc_calculator_log_level=1
     )
     print(f"Force constants completed", flush=True)
-
-    phonons.run_mesh(mesh=interp_mesh, is_gamma_center=True)
+    #
+    # Computation of thermodynamic properties with phonopy requires
+    # an auxiliary k-points grid which we refer to Fourier interpolation
+    # mesh. For converged properties, this should be an extremely dense
+    # grid with a number of points far beyond the base k-point grid.
+    #
+    # Note that Phonopy accepts the mesh parameter in two forms:
+    # (1) A float is translated into the supercell radius. The supercell is
+    #     then folded in to the corresponding k-point grid.
+    # (2) A triple of integers which defines the number of k-points in
+    #     each direction.
+    #
+    phonons.run_mesh(
+        mesh=interp_mesh,
+        is_gamma_center=True
+    )
     print(f"Fourier interpolation mesh completed", flush=True)
     return phonons
 
@@ -239,7 +253,8 @@ def equilibrium_curve(
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
         dataset,
-        root_key
+        root_key,
+        save_plots,
 ):
 
     geom_opt_dir = Path(work_dir) / "relaxation"
@@ -471,12 +486,13 @@ def equilibrium_curve(
         dataset=dataset,
         key=f"{root_key}/eos_interpolated"
     )
-    
-    mbe_automation.dynamics.harmonic.display.eos_curves(
-        dataset=dataset,
-        key=f"{root_key}/eos_interpolated",
-        save_path=os.path.join(work_dir, "eos_curves.png")
-    )
+
+    if save_plots:
+        mbe_automation.dynamics.harmonic.display.eos_curves(
+            dataset=dataset,
+            key=f"{root_key}/eos_interpolated",
+            save_path=os.path.join(work_dir, "eos_curves.png")
+        )
         
     df = pd.DataFrame({
         "T (K)": temperatures,

@@ -64,48 +64,10 @@ mbe_automation.run(md_config)
 
 ## Adjustable parameters
 
-### `Enthalpy` Class
+Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./13_configuration_classes.md) chapter.
 
-**Location:** `mbe_automation.configs.md.Enthalpy`
-
-| Parameter | Description | Default Value |
-| --- | --- | --- |
-| `molecule` | Initial, non-relaxed structure of the isolated molecule. An MD simulation is performed in the NVT ensemble to compute the average potential and kinetic energies. | - |
-| `crystal` | Initial, non-relaxed crystal structure. An MD simulation is performed in the NPT ensemble to compute the average potential and kinetic energies, and the average volume. | - |
-| `calculator` | MLIP calculator for energies and forces. | - |
-| `md_molecule` | An instance of `ClassicalMD` that configures the MD simulation for the isolated molecule. | - |
-| `md_crystal` | An instance of `ClassicalMD` that configures the MD simulation for the crystal. | - |
-| `temperatures_K` | Target temperatures (in Kelvin) for the MD simulation. Can be a single float or an array of floats. | `298.15` |
-| `pressures_GPa` | Target pressures (in GPa) for the MD simulation. Can be a single float or an array of floats. | `1.0E-4` |
-| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell. | `1.0E-3`    |
-| `relaxation`                     | An instance of `Minimum` that configures the geometry relaxation parameters.                | `Minimum()` |
-| `work_dir` | Directory where files are stored at runtime. | `"./"` |
-| `dataset` | The main HDF5 file with all data computed for the physical system. | `"./properties.hdf5"` |
-| `root_key` | Specifies the root path in the HDF5 dataset where the workflow's output is stored. | `"md"` |
-| `verbose` | Verbosity of the program's output. `0` suppresses warnings. | `0` |
-| `save_plots` | If `True`, save plots of the simulation results. | `False` |
-| `save_csv` | If `True`, save CSV files of the simulation results. | `False` |
-
-### `ClassicalMD` Class
-
-**Location:** `mbe_automation.configs.md.ClassicalMD`
-
-| Parameter               | Description                                                                                                                              | Default Value     |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| `time_total_fs`         | Total simulation time in femtoseconds.                                                                                               | `50000.0`             |
-| `time_step_fs`          | Time step for the integration algorithm.                                                                                             | `0.5`                 |
-| `sampling_interval_fs`  | Interval for trajectory sampling.                                                                                                   | `50.0`                |
-| `time_equilibration_fs` | Initial period of the simulation discarded to allow the system to reach equilibrium.                                         | `5000.0`              |
-| `ensemble`              | Thermodynamic ensemble for the simulation ("NVT" or "NPT").                                                                          | "NVT"                 |
-| `nvt_algo`              | Thermostat algorithm for NVT simulations. "csvr" (Canonical Sampling Through Velocity Rescaling) is robust for isolated molecules. | "csvr"                |
-| `npt_algo`              | Barostat/thermostat algorithm for NPT simulations.                                                                                   | "mtk_full"            |
-| `thermostat_time_fs`    | Thermostat relaxation time.                                                                                                          | `100.0`               |
-| `barostat_time_fs`      | Barostat relaxation time.                                                                                                            | `1000.0`              |
-| `tchain`                | Number of thermostats in the Nosé-Hoover chain.                                                                                      | `3`                   |
-| `pchain`                | Number of barostats in the Martyna-Tuckerman-Klein chain.                                                                            | `3`                   |
-| `supercell_radius`      | Minimum point-periodic image distance in the supercell (Å).                                                                        | `25.0`                |
-| `supercell_matrix`      | Supercell transformation matrix. If specified, `supercell_radius` is ignored.                                                        | `None`                |
-| `supercell_diagonal`    | If `True`, create a diagonal supercell. Ignored if `supercell_matrix` is provided.                                                   | `False`               |
+*   **[`Enthalpy`](./13_configuration_classes.md#enthalpy-class)**: Main configuration for the molecular dynamics workflow.
+*   **[`ClassicalMD`](./13_configuration_classes.md#classicalmd-class)**: Configuration for the MD simulation parameters.
 
 ## Function Call Overview
 

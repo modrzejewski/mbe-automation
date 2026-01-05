@@ -61,6 +61,7 @@ The program integrates several scientific codes into a unified workflow, includi
 
 *   [API Data Classes](./10_api_classes.md)
 *   [Calculators](./11_calculators.md)
+*   [Configuration Classes](./13_configuration_classes.md)
 *   [Working with HDF5 Datasets](./09_working_with_hdf5_datasets.md)
 *   [Computational Bottlenecks](./06_bottlenecks.md)
 
@@ -74,6 +75,6 @@ The program integrates several scientific codes into a unified workflow, includi
 
 *   [Semi-empirical MD + MACE Features](./04_cookbook_dftb_mace.md)
 *   [Extracting frequencies and eigenvectors of the dynamical matrix](./05_frequencies_eigenvectors.md)
-*   [Training Set from MACE MD + DFTB Energies](./07_cookbook_mace_md_dftb_energies.md)
+*   [Training Set from MACE MD + r2SCAN Energies & Forces](./07_cookbook_mace_md_dftb_energies.md)
 *   [Delta Learning Dataset Creation](./08_cookbook_delta_learning_dataset.md)
 *   [Adding Atomic Reference Energies to Existing MACE Training Data](./12_cookbook_export_with_atomic_energies.md)

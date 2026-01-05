@@ -1,26 +1,20 @@
-# Cookbook: Training Set from MACE MD + DFTB Energies & Forces
+# Cookbook: Training Set from MACE MD + r2SCAN Energies & Forces
 
-This cookbook outlines a multi-step workflow for generating a machine learning training set. The procedure consists of generating candidate structures via molecular dynamics (MD) with a baseline model, extracting finite molecular clusters, identifying diverse configurations via feature-based subsampling, and labeling them with a reference calculator.
+This cookbook outlines a multi-step workflow for generating a machine learning training set. The procedure consists of generating candidate structures via molecular dynamics (MD) with a baseline model, extracting finite molecular clusters, identifying diverse configurations via feature-based subsampling, and labeling them with a reference calculator (r2SCAN-D4).
 
 ## Workflow Overview
 
-1. [**MD Propagation**](#step-1-molecular-dynamics-sampling-pbc): Generate a dense set of periodic configurations using a fast baseline model (e.g., MACE).
+1. [**MD Propagation**](#step-1-molecular-dynamics-sampling): Generate a dense set of periodic configurations and an isolated molecule trajectory using a fast baseline model (MACE). Feature vectors are computed automatically.
 
-2. [**PBC Feature Computation**](#step-2-feature-vector-computation-pbc): Compute feature vectors for the periodic trajectory.
+2. [**Molecule Subsampling & Labeling**](#step-2-molecule-subsampling-and-labeling): Select diverse isolated molecule configurations and compute reference energies/forces.
 
-3. [**PBC Subsampling & Labeling**](#step-3-subsampling-and-labeling-pbc): Select diverse periodic frames and compute reference energies/forces.
+3. [**Cluster Extraction & Features**](#step-3-finite-cluster-extraction-and-features): Cleave finite molecular clusters (n ≥ 2) from the periodic trajectory and compute their feature vectors.
 
-4. [**PBC Export**](#step-4-dataset-splitting-and-export-pbc): Export the labeled periodic structures to XYZ files.
+4. [**Cluster Subsampling & Labeling**](#step-4-subsampling-and-labeling-clusters): Select diverse cluster configurations and compute reference energies/forces.
 
-5. [**Cluster Extraction**](#step-5-finite-cluster-extraction): Cleave finite molecular clusters from the periodic trajectory.
+5. [**Dataset Export**](#step-5-dataset-splitting-and-export): Split the labeled samples into training/validation/test sets and export to XYZ files.
 
-6. [**Cluster Feature Computation**](#step-6-feature-vector-computation-clusters): Compute feature vectors for the finite clusters.
-
-7. [**Cluster Subsampling & Labeling**](#step-7-subsampling-and-labeling-clusters): Select diverse cluster configurations and compute reference energies/forces.
-
-8. [**Cluster Export**](#step-8-dataset-splitting-and-export-clusters): Export the labeled clusters to XYZ files.
-
-9. [**Model Training**](#step-9-model-training): Train a new MACE model using the combined data.
+6. [**Model Training**](#step-6-model-training): Train a new MACE model using the combined data.
 
 ## Input Data
 
@@ -52,9 +46,9 @@ H 1.97137967 0.40556043 0.19082477
 
 </details>
 
-## Step 1: Molecular Dynamics Sampling (PBC)
+## Step 1: Molecular Dynamics Sampling
 
-Run a molecular dynamics simulation to generate structures of a molecular crystal for a series of positive and negative external pressures.
+Run a molecular dynamics simulation to generate structures of a molecular crystal and an isolated molecule.
 
 **Input:** `step_1.py`
 
@@ -67,6 +61,7 @@ from mbe_automation.configs.md import Enthalpy, ClassicalMD
 from mbe_automation import Structure
 
 crystal = Structure.from_xyz_file("urea_x23_geometry.xyz")
+molecule = crystal.extract_all_molecules()[0]
 
 calculator = MACE(
    model_path="~/models/mace/mace-mh-1.model",
@@ -83,13 +78,24 @@ md_config = ClassicalMD(
     time_total_fs=10000.0,
     time_step_fs=1.0,
     sampling_interval_fs=10.0,
+    time_equilibration_fs=0.0,
     supercell_radius=12.0
+)
+
+md_config_mol = ClassicalMD(
+    ensemble="NVT",
+    time_total_fs=10000.0,
+    time_step_fs=1.0,
+    sampling_interval_fs=10.0,
+    time_equilibration_fs=0.0
 )
 
 config = Enthalpy(
     calculator=calculator,
     crystal=crystal,
+    molecule=molecule,
     md_crystal=md_config,
+    md_molecule=md_config_mol,
     temperatures_K=temperatures_K,
     pressures_GPa=pressures_GPa,
     dataset=dataset,
@@ -98,64 +104,29 @@ config = Enthalpy(
 mbe_automation.run(config)
 ```
 
-## Step 2: Feature Vector Computation (PBC)
+## Step 2: Molecule Subsampling and Labeling
 
-Calculate feature vectors for every frame in the generated trajectories to enable farthest point sampling.
+Select a diverse subset of isolated molecule configurations and compute the reference energies and forces using the target calculator (r2SCAN-D4).
 
 **Input:** `step_2.py`
 
 ```python
-from mbe_automation.calculators import MACE
 import mbe_automation
 from mbe_automation import Structure, DatasetKeys
+from mbe_automation.calculators import DFT
 
 dataset = "md_structures.hdf5"
 
-mace_calc = MACE(
-    model_path="~/models/mace/mace-mh-1.model",
-    head="omol",
+calculator = DFT(
+    model_name="r2scan-d4",
+    basis="def2-svp",
 )
 
-for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_frames"):
-    frames = Structure.read(
-        dataset=dataset,
-        key=key
-    )
-
-    frames.run(
-        calculator=mace_calc,
-        energies=False,
-        forces=False,
-        feature_vectors_type="averaged_environments"
-    )
-
-    frames.save(
-        dataset=dataset,
-        key=key,
-        only=["feature_vectors"]
-    )
-```
-
-## Step 3: Subsampling and Labeling (PBC)
-
-Select a diverse subset of configurations and compute the reference energies and forces using the target calculator (DFTB3-D4).
-
-**Input:** `step_3.py`
-
-```python
-import mbe_automation
-from mbe_automation import Structure, DatasetKeys
-from mbe_automation.calculators.dftb import DFTB3_D4
-
-dataset = "md_structures.hdf5"
-crystal = Structure.from_xyz_file("urea_x23_geometry.xyz")
-calculator = DFTB3_D4()
-
-for key in DatasetKeys(dataset).trajectories().periodic().with_feature_vectors().starts_with("all_md_frames"):
+for key in DatasetKeys(dataset).trajectories().finite().starts_with("all_md_frames"):
     print(f"Processing {key}")
 
     system_label = key.split(sep="/")[-1]
-    write_key = f"subsampled_md_frames/structures/{system_label}"
+    write_key = f"subsampled_md_frames/molecule/{system_label}"
 
     subsampled_frames = Structure.read(
         dataset=dataset,
@@ -175,53 +146,25 @@ for key in DatasetKeys(dataset).trajectories().periodic().with_feature_vectors()
 print("All calculations completed")
 ```
 
-## Step 4: Dataset Splitting and Export (PBC)
+## Step 3: Finite Cluster Extraction & Features
 
-Split the labeled periodic samples into training (90%), validation (5%), and test (5%) sets, and export them to XYZ format.
+Read the periodic MD trajectory, extract finite clusters (n ≥ 2), and compute their feature vectors.
 
-**Input:** `step_4.py`
-
-```python
-import mbe_automation
-from mbe_automation import Structure, Dataset, DatasetKeys
-
-dataset = "md_structures.hdf5"
-
-train_set = Dataset()
-val_set = Dataset()
-test_set = Dataset()
- 
-for key in DatasetKeys(dataset).structures().periodic().with_ground_truth().starts_with("subsampled_md_frames"):
-    print(f"Processing {key}")
-
-    subsampled_frames = Structure.read(
-        dataset=dataset,
-        key=key
-    )
-    train, validate, test = subsampled_frames.random_split([0.90, 0.05, 0.05])
-
-    train_set.append(train)
-    val_set.append(validate)
-    test_set.append(test)
-
-train_set.to_mace_dataset("train_pbc.xyz", level_of_theory="dftb3-d4")
-val_set.to_mace_dataset("validate_pbc.xyz", level_of_theory="dftb3-d4")
-test_set.to_mace_dataset("test_pbc.xyz", level_of_theory="dftb3-d4")
-
-print("All calculations completed")
-```
-
-## Step 5: Finite Cluster Extraction
-
-Read the periodic MD trajectory, detect molecules, and extract finite clusters of varying sizes (1 to 8 molecules).
-
-**Input:** `step_5.py`
+**Input:** `step_3.py`
 
 ```python
 import mbe_automation
+import numpy as np
 from mbe_automation import Structure, DatasetKeys
+from mbe_automation.configs.clusters import FiniteSubsystemFilter
+from mbe_automation.calculators import MACE
 
 dataset = "md_structures.hdf5"
+
+mace_calc = MACE(
+    model_path="~/models/mace/mace-mh-1.model",
+    head="omol",
+)
 
 for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_frames"):
     print(f"Generating finite clusters for {key}")
@@ -231,7 +174,12 @@ for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_fr
         key=key
     )
     molecular_crystal = pbc_frames.detect_molecules()
-    clusters = molecular_crystal.extract_finite_subsystems()
+
+    # Select clusters with 2 to 8 molecules
+    cluster_filter = FiniteSubsystemFilter(
+        n_molecules=np.arange(2, 9)
+    )
+    clusters = molecular_crystal.extract_finite_subsystems(filter=cluster_filter)
 
     system_label = key.split(sep="/")[-1]
 
@@ -241,6 +189,13 @@ for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_fr
     )
     
     for cluster in clusters:
+        cluster.run(
+            calculator=mace_calc,
+            energies=False,
+            forces=False,
+            feature_vectors_type="averaged_environments"
+        )
+
         n_molecules = cluster.n_molecules
         cluster.save(
             dataset=dataset,
@@ -250,63 +205,23 @@ for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_fr
 print("All calculations completed")
 ```
 
-## Step 6: Feature Vector Computation (Clusters)
+## Step 4: Subsampling and Labeling (Clusters)
 
-Compute feature vectors for the finite clusters to enable diverse subsampling.
+Subsample the finite cluster trajectories and calculate reference energies and forces using r2SCAN-D4.
 
-**Input:** `step_6.py`
-
-```python
-from mbe_automation.calculators import MACE
-from mbe_automation import Structure, FiniteSubsystem, DatasetKeys
-
-dataset = "md_structures.hdf5"
-
-mace_calc = MACE(
-    model_path="~/models/mace/mace-mh-1.model",
-    head="omol"
-)
-
-keys = DatasetKeys(dataset).finite_subsystems().starts_with("all_md_frames")
-
-for key in keys:
-    print(f"Processing {key}")
-
-    cluster = FiniteSubsystem.read(
-        dataset=dataset,
-        key=key
-    )
-
-    cluster.run(
-        calculator=mace_calc,
-        energies=False,
-        forces=False,
-        feature_vectors_type="averaged_environments"
-    )
-
-    cluster.save(
-        dataset=dataset,
-        key=key,
-        only=["feature_vectors"]
-    )
-    
-print("All calculations completed")
-```
-
-## Step 7: Subsampling and Labeling (Clusters)
-
-Subsample the finite cluster trajectories and calculate reference energies and forces using DFTB3-D4.
-
-**Input:** `step_7.py`
+**Input:** `step_4.py`
 
 ```python
 import mbe_automation
 from mbe_automation import Structure, FiniteSubsystem, DatasetKeys
-from mbe_automation.calculators.dftb import DFTB3_D4
+from mbe_automation.calculators import DFT
 
 dataset = "md_structures.hdf5"
-crystal = Structure.from_xyz_file("urea_x23_geometry.xyz")
-calculator = DFTB3_D4()
+
+calculator = DFT(
+    model_name="r2scan-d4",
+    basis="def2-svp",
+)
 
 for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().starts_with("all_md_frames"):
     print(f"Processing {key}")
@@ -333,48 +248,77 @@ for key in DatasetKeys(dataset).finite_subsystems().with_feature_vectors().start
 print("All calculations completed")
 ```
 
-## Step 8: Dataset Splitting and Export (Clusters)
+## Step 5: Dataset Splitting and Export
 
-Split the labeled cluster samples into training (90%), validation (5%), and test (5%) sets, and export them to XYZ format.
+Split the labeled samples (molecules and clusters) into training (90%), validation (5%), and test (5%) sets, and export them to XYZ format.
 
-**Input:** `step_8.py`
+**Input:** `step_5.py`
 
 ```python
 import mbe_automation
 from mbe_automation import Structure, FiniteSubsystem, Dataset, DatasetKeys
+from mbe_automation.calculators import DFT
 
 dataset = "md_structures.hdf5"
+
+calculator = DFT(
+    model_name="r2scan-d4",
+    basis="def2-svp",
+)
 
 train_set = Dataset()
 val_set = Dataset()
 test_set = Dataset()
 
-keys = DatasetKeys(dataset).finite_subsystems().with_ground_truth().starts_with("subsampled_md_frames")
-
-for key in keys:
-    print(f"Processing {key}")
-
-    clusters = FiniteSubsystem.read(
-        dataset=dataset,
-        key=key
-    )
-
-    train, validate, test = clusters.random_split([0.90, 0.05, 0.05])
-
+# Isolated molecule in vacuum
+for key in DatasetKeys(dataset).structures().finite().with_ground_truth():
+    #
+    # Note that only the systems with DFT data will be selected
+    # by filter `with_ground_truth`. This is because ground_truth
+    # is only populated when you execute the `run` method.
+    #
+    molecule = Structure.read(dataset, key)
+    train, validate, test = molecule.random_split([0.90, 0.05, 0.05])
     train_set.append(train)
     val_set.append(validate)
     test_set.append(test)
 
-train_set.to_mace_dataset("train_finite_clusters.xyz", level_of_theory="dftb3-d4")
-val_set.to_mace_dataset("validate_finite_clusters.xyz", level_of_theory="dftb3-d4")
-test_set.to_mace_dataset("test_finite_clusters.xyz", level_of_theory="dftb3-d4")
+# Clusters
+# We explicitly loop over cluster sizes to ensure all sizes are included
+for n in range(2, 9):
+    for key in DatasetKeys(dataset).finite_subsystems(n).with_ground_truth():
+        cluster = FiniteSubsystem.read(dataset, key)
+        train, validate, test = cluster.random_split([0.90, 0.05, 0.05])
+        train_set.append(train)
+        val_set.append(validate)
+        test_set.append(test)
+
+# Compute atomic reference energies. We will store the atomic data in
+# the training set. The atomic baseline is not needed for validation and test.
+# The ground-state electronic configurations of atoms are selected automatically.
+# This step is super fast, so can be done even in an interactive mode.
+atomic_energies = train_set.atomic_reference(calculator)
+
+train_set.to_mace_dataset(
+    "train.xyz",
+    level_of_theory=calculator.level_of_theory,
+    atomic_reference=atomic_energies
+)
+val_set.to_mace_dataset(
+    "validate.xyz",
+    level_of_theory=calculator.level_of_theory
+)
+test_set.to_mace_dataset(
+    "test.xyz",
+    level_of_theory=calculator.level_of_theory
+)
 
 print("All calculations completed")
 ```
 
-## Step 9: Model Training
+## Step 6: Model Training
 
-Train the MACE model using all generated data files (both PBC and finite clusters).
+Train the MACE model using all generated data files.
 
 **Bash Script:** `train_mace.sh`
 
@@ -394,11 +338,10 @@ module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
 python -m mace.cli.run_train \
-    --name="urea_dftb3_d4" \
-    --train_file="train_pbc.xyz train_finite_clusters.xyz" \
-    --valid_file="validate_pbc.xyz validate_finite_clusters.xyz" \
-    --test_file="test_pbc.xyz test_finite_clusters.xyz" \
-    --E0s="average" \
+    --name="urea_r2scan_d4" \
+    --train_file="train.xyz" \
+    --valid_file="validate.xyz" \
+    --test_file="test.xyz" \
     --model="MACE" \
     --num_interactions=2 \
     --hidden_irreps='32x0e + 32x1o' \
@@ -428,7 +371,7 @@ python -m mace.cli.run_train \
 
 ## Computational Resources
 
-### GPU Tasks (Steps 1, 2, 5, 6)
+### GPU Tasks (Steps 1, 2, 3, 4)
 
 Use this script to run the GPU-intensive steps.
 
@@ -443,7 +386,7 @@ Use this script to run the GPU-intensive steps.
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH --mem=180gb
 
 export OMP_NUM_THREADS=8
@@ -452,40 +395,39 @@ export MKL_NUM_THREADS=8
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
-# PBC MD and Features
+# MD
 python step_1.py > step_1.log 2>&1
+
+# Molecule Labeling
 python step_2.py > step_2.log 2>&1
 
-# Cluster Extraction and Features
-python step_5.py > step_5.log 2>&1
-python step_6.py > step_6.log 2>&1
+# Cluster Extraction & Features
+python step_3.py > step_3.log 2>&1
+
+# Cluster Subsampling & Labeling
+python step_4.py > step_4.log 2>&1
 ```
 
-### CPU Tasks (Steps 3, 4, 7, 8)
+### CPU Tasks (Step 5)
 
-Use this script to run the CPU-intensive labeling and export steps.
+Use this script to run data export.
 
 **Bash Script:** `run_cpu_tasks.sh`
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="ref_energies_forces"
+#SBATCH --job-name="export"
 #SBATCH -A pl0415-02
 #SBATCH --partition=altair
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=48
-#SBATCH --time=48:00:00
-#SBATCH --mem=180gb
+#SBATCH --cpus-per-task=8
+#SBATCH --time=4:00:00
+#SBATCH --mem=32gb
 
-module load oneAPI python/3.11.9-gcc-11.5.0-5l7rvgy
+module load python/3.11.9-gcc-11.5.0-5l7rvgy
 source ~/.virtualenvs/compute-env/bin/activate
 
-# PBC Labeling and Export
-python step_3.py > step_3.log 2>&1
-python step_4.py > step_4.log 2>&1
-
-# Cluster Labeling and Export
-python step_7.py > step_7.log 2>&1
-python step_8.py > step_8.log 2>&1
+# Dataset Export
+python step_5.py > step_5.log 2>&1
 ```

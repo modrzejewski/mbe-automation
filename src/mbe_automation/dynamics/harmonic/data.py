@@ -197,27 +197,55 @@ def crystal(
     Physical properties derived from the harmonic model
     of crystal vibrations.
     """
-    n_atoms_unit_cell = len(phonons.unitcell)
+    structure = mbe_automation.storage.from_ase_atoms(unit_cell)
+    structure.level_of_theory = level_of_theory
+    n_atoms_unit_cell = len(phonons.unitcell)  
     n_atoms_primitive_cell = len(phonons.primitive)
-    alpha = n_atoms_unit_cell/n_atoms_primitive_cell
+    #
+    # Before building the force constants model in phonopy,
+    # we ensure that the computatinal unit cell is identical
+    # to the standardized primitive cell. Phonopy performs no
+    # internal transformation of the cell.
+    #
+    # Phonopy computes thermodynamic properties per primitive
+    # cell, but in our case unit cell and primitive cell are
+    # identical.
+    #
+    assert n_atoms_unit_cell == structure.n_atoms
+    assert n_atoms_primitive_cell == structure.n_atoms
     
     phonons.run_thermal_properties(temperatures=temperatures)
-    _, F_vib_crystal, S_vib_crystal, C_V_vib_crystal = phonons.thermal_properties.thermal_properties
-    
-    ZPE_crystal = phonons.thermal_properties.zero_point_energy * alpha # kJ/mol/unit cell
-    F_vib_crystal *= alpha # kJ/mol/unit cell
-    S_vib_crystal *= alpha # J/K/mol/unit cell
-    C_V_vib_crystal *= alpha # J/K/mol/unit cell
+    #
+    # Phonopy units:
+    # F_vib_crystal     kJ/mol/unit cell
+    # S_vib_crystal     J/K/mol/unit cell
+    # C_V_vib_crystal   J/K/mol/unit cell
+    #
+    _, F_vib_crystal, S_vib_crystal, C_V_vib_crystal = phonons.thermal_properties.thermal_properties    
+    ZPE_crystal = phonons.thermal_properties.zero_point_energy # kJ/mol/unit cell
+
     E_vib_crystal = F_vib_crystal + temperatures * S_vib_crystal / 1000 # kJ/mol/unit cell
     E_el_crystal = unit_cell.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
     F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
 
-    V = unit_cell.get_volume() # Å³/unit cell
+    lattice = structure.lattice()
+    cell_length_a, cell_length_b, cell_length_c = lattice.lengths # Å
+    cell_angle_alpha, cell_angle_beta, cell_angle_gamma = lattice.angles # deg
+    
+    V = lattice.volume # Å³/unit cell
     rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
+    #
+    # Additional check to make sure that
+    # the interface to ASE works as intended
+    #
+    assert np.isclose(V, unit_cell.get_volume())
 
     GPa_Angs3_to_kJ_mol = (ase.units.GPa*ase.units.Angstrom**3)/(ase.units.kJ/ase.units.mol)
     pV_crystal = external_pressure_GPa * V * GPa_Angs3_to_kJ_mol # kJ/mol/unit cell
-    G_tot_crystal = F_tot_crystal + pV_crystal
+
+    E_tot_crystal = E_el_crystal + E_vib_crystal # kJ/mol/unit cell
+    G_tot_crystal = F_tot_crystal + pV_crystal # kJ/mol/unit cell
+    H_tot_crystal = E_el_crystal + E_vib_crystal + pV_crystal # kJ/mol/unit cell
 
     generate_fbz_path(phonons)
     fbz_analysis = detect_imaginary_modes(
@@ -240,14 +268,9 @@ def crystal(
         save_path=os.path.join(work_dir, "phonons", system_label, "brillouin_zone_path.png"),
         freq_max_THz=10.0 # THz
     )
-    mbe_automation.storage.save_structure(
+    structure.save(
         dataset=dataset,
-        key=f"{root_key}/structures/{system_label}",
-        positions=unit_cell.get_positions(),
-        atomic_numbers=unit_cell.get_atomic_numbers(),
-        masses=unit_cell.get_masses(),
-        cell_vectors=unit_cell.get_cell(),
-        level_of_theory=level_of_theory,
+        key=f"{root_key}/structures/{system_label}"
     )
     interp_mesh = phonons.mesh.mesh_numbers
     
@@ -259,12 +282,20 @@ def crystal(
         "ZPE_crystal (kJ∕mol∕unit cell)": ZPE_crystal,
         "C_V_vib_crystal (J∕K∕mol∕unit cell)": C_V_vib_crystal,
         "E_el_crystal (kJ∕mol∕unit cell)": E_el_crystal,
+        "E_tot_crystal (kJ∕mol∕unit cell)": E_tot_crystal,
         "F_tot_crystal (kJ∕mol∕unit cell)": F_tot_crystal,
         "G_tot_crystal (kJ∕mol∕unit cell)": G_tot_crystal,
+        "H_tot_crystal (kJ∕mol∕unit cell)": H_tot_crystal,
         "V_crystal (Å³∕unit cell)": V,
         "p_external_crystal (GPa)": external_pressure_GPa,
         "pV_crystal (kJ∕mol∕unit cell)": pV_crystal,
         "ρ_crystal (g∕cm³)": rho,
+        "cell_length_a (Å)": cell_length_a,
+        "cell_length_b (Å)": cell_length_b,
+        "cell_length_c (Å)": cell_length_c,
+        "cell_angle_α (deg)": cell_angle_alpha,
+        "cell_angle_β (deg)": cell_angle_beta,
+        "cell_angle_γ (deg)": cell_angle_gamma,
         "n_atoms_unit_cell": n_atoms_unit_cell,
         "space_group": space_group,
         "acoustic_freqs_real_crystal": fbz_analysis.acoustic_freqs_real,
@@ -275,7 +306,7 @@ def crystal(
         "Fourier_interp_mesh": f"{interp_mesh[0]}×{interp_mesh[1]}×{interp_mesh[2]}"
     })
     return df
-
+    
 
 def sublimation(df_crystal, df_molecule):
     """    

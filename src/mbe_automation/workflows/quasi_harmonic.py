@@ -233,7 +233,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.filter_out_imaginary_optical,
         config.filter_out_broken_symmetry,
         config.dataset,
-        config.root_key
+        config.root_key,
+        config.save_plots,
     )
     #
     # Harmonic properties for unit cells with temperature-dependent
@@ -331,6 +332,17 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # temeprature points
     #
     df_crystal_qha = pd.concat(data_frames_at_T)
+    #
+    # Compute heat capacity at constant pressure (C_P_tot) and thermal expansion
+    # coefficients (alpha_V, alpha_L_a, alpha_L_b, alpha_L_c) using numerical
+    # derivatives. The derivatives will be computed only if there is a sufficient
+    # number of temperature points with equilibrium values of thermodynamic functions.
+    # The numerical algorithm chosen for dX/dT depends on the number of available
+    # temperature points.
+    #
+    df_thermal_expansion = mbe_automation.dynamics.harmonic.eos.fit_thermal_expansion_properties(
+        df_crystal_equilibrium=df_crystal_qha
+    )
     if config.molecule is not None:
         df_sublimation_qha = mbe_automation.dynamics.harmonic.data.sublimation(
             df_crystal_qha,
@@ -339,6 +351,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         df_quasi_harmonic = pd.concat([
             df_sublimation_qha,
             df_crystal_qha.drop(columns=["T (K)"]),
+            df_thermal_expansion.drop(columns=["T (K)"]),
             df_crystal_eos.drop(columns=["T (K)"]),
             df_molecule.drop(columns=["T (K)"]),
         ], axis=1)
@@ -346,6 +359,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     else:
         df_quasi_harmonic = pd.concat([
             df_crystal_qha,
+            df_thermal_expansion.drop(columns=["T (K)"]),
             df_crystal_eos.drop(columns=["T (K)"]),
         ], axis=1)
         

@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Tuple, Literal, overload, Dict
+import pymatgen
 import pandas as pd
 import phonopy
 from phonopy import Phonopy
@@ -206,6 +207,22 @@ class Structure:
             restrict_to: list[Literal["ground_truth", "structure_generation"]] | None = None
     ) -> list[str]:
         return _available_forces(self, restrict_to)
+
+    def to_ase_atoms(self, frame_index: int = 0) -> ase.Atoms:
+        from .views import to_ase
+        return to_ase(self, frame_index)
+
+    def to_pymatgen(self, frame_index: int = 0) -> pymatgen.core.Structure | pymatgen.core.Molecule:
+        from .views import to_pymatgen
+        return to_pymatgen(self, frame_index)
+    
+    def lattice(self, frame_index: int = 0) -> pymatgen.core.Lattice:
+        assert self.periodic, "Structure must be periodic."
+        if self.variable_cell:
+            cell = self.cell_vectors[frame_index]
+        else:
+            cell = self.cell_vectors
+        return pymatgen.core.Lattice(cell)
 
     @property
     def unique_elements(self) -> npt.NDArray[np.int64]:
@@ -1223,6 +1240,13 @@ def _save_only(
 
     with h5py.File(dataset, "r+") as f:
         group = f[key]
+
+        if group.attrs["n_frames"] != structure.n_frames:
+             raise ValueError(
+                f"Cannot save partial data: frame count mismatch. "
+                f"Existing dataset has {group.attrs['n_frames']} frames, "
+                f"but the object being saved has {structure.n_frames} frames."
+            )
         
         if "feature_vectors" in quantities:
             

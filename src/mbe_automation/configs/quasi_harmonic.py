@@ -60,7 +60,7 @@ class FreeEnergy:
                                    # Range of temperatures (K) at which phonons
                                    # and thermodynamic properties are computed
                                    #
-    temperatures_K: npt.NDArray[np.floating] = field(default_factory=lambda: np.array([298.15]))
+    temperatures_K: float | npt.NDArray[np.float64] = field(default_factory=lambda: np.array([298.15]))
                                    #
                                    # Energy threshold (eV/atom) used to detect
                                    # nonequivalent molecules in the input unit
@@ -213,7 +213,7 @@ class FreeEnergy:
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.
                                    #                                   
-    equation_of_state: Literal[*EQUATIONS_OF_STATE] = "polynomial"
+    equation_of_state: Literal[*EQUATIONS_OF_STATE] = "spline"
                                    #
                                    # Algorithm used to generate points on
                                    # the equilibrium curve:
@@ -269,6 +269,12 @@ class FreeEnergy:
             self.crystal = mbe_automation.storage.to_ase(self.crystal)
         if isinstance(self.molecule, mbe_automation.storage.Structure):
             self.molecule = mbe_automation.storage.to_ase(self.molecule)
+
+        self.temperatures_K = np.sort(np.atleast_1d(self.temperatures_K))
+        if len(self.temperatures_K) > 1:
+            diffs = np.diff(self.temperatures_K)
+            if np.any(diffs < 1.0E-5):
+                 raise ValueError("Numerically close temperatures detected in temperatures_K.")
         
         if (
                 self.thermal_expansion and
