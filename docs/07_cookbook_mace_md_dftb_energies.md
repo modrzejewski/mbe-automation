@@ -408,7 +408,7 @@ python step_4.py > step_4.log 2>&1
 
 ### CPU Tasks (Step 5)
 
-Use this script to run the CPU-intensive export steps.
+Use this script to run data export.
 
 **Bash Script:** `run_cpu_tasks.sh`
 
