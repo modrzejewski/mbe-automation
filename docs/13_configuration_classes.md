@@ -1,6 +1,6 @@
 # Configuration Classes
 
-This chapter documents the configuration classes used to control the various workflows in `mbe-automation`. These classes are typically instantiated in the input script and passed to the `mbe_automation.run()` function.
+This chapter documents the configuration classes used to control the various workflows in `mbe-automation`. These classes are typically instantiated in the input script and passed, individually or as a part of a top-level class, to the `mbe_automation.run()` function.
 
 - [Thermodynamics](#thermodynamics)
     - [`FreeEnergy`](#freeenergy-class)
