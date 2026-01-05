@@ -401,8 +401,10 @@ python step_1.py > step_1.log 2>&1
 # Molecule Labeling
 python step_2.py > step_2.log 2>&1
 
-# Cluster Extraction, Features, and Labeling
+# Cluster Extraction & Features
 python step_3.py > step_3.log 2>&1
+
+# Cluster Subsampling & Labeling
 python step_4.py > step_4.log 2>&1
 ```
 
