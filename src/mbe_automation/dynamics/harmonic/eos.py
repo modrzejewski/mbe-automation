@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Callable
+import warnings
 import numpy.typing as npt
 from numpy.polynomial.polynomial import Polynomial
 import scipy.optimize
@@ -303,10 +304,25 @@ def _fit_thermal_expansion_properties_finite_diff(T, V, H, a, b, c):
 def _hybrid_derivative(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """
     Compute derivative: cubic spline for midpoints, finite difference for endpoints.
+    Fall back to finite differences everywhere if finite differences and spline disagree.
     """
-    d_dx = CubicSpline(x, y, bc_type="not-a-knot").derivative(1)(x)
-    d_dx[0] = (y[1] - y[0]) / (x[1] - x[0])
-    d_dx[-1] = (y[-1] - y[-2]) / (x[-1] - x[-2])
+    d_dx_cspline = CubicSpline(x, y, bc_type="not-a-knot").derivative(1)(x)
+    d_dx_finite_diff = np.gradient(y, x, edge_order=2)
+    
+    if np.any(np.sign(d_dx_cspline[1:-1]) != np.sign(d_dx_finite_diff[1:-1])):
+        print(
+            "Cubic spline derivative and second-order finite differences disagree. "
+            "Falling back to finite differences. Consider adjusting temperature points "
+            "to enable accurate numerical derivatives."
+        )
+        d_dx = d_dx_finite_diff
+        
+    else:
+        d_dx = np.zeros_like(x)
+        d_dx[0] = d_dx_finite_diff[0]
+        d_dx[-1] = d_dx_finie_diff[-1]
+        d_dx[1:-1] = d_dx_cspline[1:-1]        
+
     return d_dx
     
 def _fit_thermal_expansion_properties_cspline(T, V, H, a, b, c):
@@ -342,6 +358,25 @@ def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
     alpha_L_a = 1/a(T,P) da(T,P)/dT
     alpha_L_b = 1/b(T,P) db(T,P)/dT
     alpha_L_c = 1/c(T,P) dc(T,P)/dT
+
+    The algorithm selected for the numerical differentiation
+    depends on the available number of temperature points (n_temperatures).
+
+    n_temperatures        algorithm
+    -------------------------------------------------------------------
+    1                     return empty arrays
+    
+    2                     forward/backward differences
+    
+    3                     forward/backward differences at end points,
+                          central difference in the middle
+    
+    4, 5, 6, ...          second-order forward/backward differences
+                          at end points, derivative of a cubic spline
+                          for knots in the middle. Fallback to
+                          second-order differences everywhere if cubic
+                          spline differentiation and finite differences
+                          disagree
     
     """
     T = df_crystal_equilibrium["T (K)"].to_numpy()
@@ -360,20 +395,10 @@ def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
         properties = _fit_thermal_expansion_properties_cspline(
             T, V, H, a, b, c
         )
-        derivative_methods = (
-            ["forward_difference"] + 
-            ["cubic_spline"] * (n_temperatures - 2) + 
-            ["backward_difference"]
-        )
     
     elif n_temperatures >= 2:
         properties = _fit_thermal_expansion_properties_finite_diff(
             T, V, H, a, b, c
-        )
-        derivative_methods = (
-                ["forward_difference"] + 
-                ["central_difference"] * (n_temperatures - 2) + 
-                ["backward_difference"]
         )
 
     else:
@@ -384,7 +409,6 @@ def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
             alpha_L_b = np.full(n_temperatures, np.nan),
             alpha_L_c = np.full(n_temperatures, np.nan),
         )
-        derivative_methods = ["none"] * n_temperatures
     #
     # Note that in the output data frame, we are preserving the
     # original, possibly non-contiguous, data index of df_crystal_equilibrium.
@@ -399,5 +423,4 @@ def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
             "α_L_a (1∕K)": properties.alpha_L_a,
             "α_L_b (1∕K)": properties.alpha_L_b,
             "α_L_c (1∕K)": properties.alpha_L_c,
-            "numerical_derivative": derivative_methods,
     }, index=df_crystal_equilibrium.index)
