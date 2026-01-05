@@ -265,6 +265,19 @@ class FreeEnergy:
     save_xyz: bool = True
 
     def __post_init__(self):
+        #
+        # Ensure temperatures are a numpy array and strictly increasing
+        #
+        if not isinstance(self.temperatures_K, np.ndarray):
+            self.temperatures_K = np.array(self.temperatures_K)
+
+        self.temperatures_K = np.sort(self.temperatures_K)
+
+        if len(self.temperatures_K) > 1:
+            diffs = np.diff(self.temperatures_K)
+            if np.any(diffs < 1.0E-4):
+                 raise ValueError("Temperatures must be strictly increasing and not numerically close.")
+
         if isinstance(self.crystal, mbe_automation.storage.Structure):
             self.crystal = mbe_automation.storage.to_ase(self.crystal)
         if isinstance(self.molecule, mbe_automation.storage.Structure):

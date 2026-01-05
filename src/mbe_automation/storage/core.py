@@ -11,8 +11,6 @@ import numpy as np
 import numpy.typing as npt
 import os
 
-from .views import to_pymatgen, to_ase
-
 DATA_FOR_TRAINING = [
     "feature_vectors",
     "ground_truth",
@@ -210,10 +208,12 @@ class Structure:
     ) -> list[str]:
         return _available_forces(self, restrict_to)
 
-    def to_ase_atoms(self, frame_index: int = 0) -> ase.Atoms:        
+    def to_ase_atoms(self, frame_index: int = 0) -> ase.Atoms:
+        from .views import to_ase
         return to_ase(self, frame_index)
 
     def to_pymatgen(self, frame_index: int = 0) -> pymatgen.core.Structure | pymatgen.core.Molecule:
+        from .views import to_pymatgen
         return to_pymatgen(self, frame_index)
     
     def lattice(self, frame_index: int = 0) -> pymatgen.core.Lattice:
