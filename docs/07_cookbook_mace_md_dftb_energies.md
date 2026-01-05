@@ -4,7 +4,7 @@ This cookbook outlines a multi-step workflow for generating a machine learning t
 
 ## Workflow Overview
 
-1. [**MD Propagation**](#step-1-molecular-dynamics-sampling): Generate a dense set of periodic configurations and an isolated molecule trajectory using a fast baseline model (e.g., MACE). Feature vectors are computed automatically.
+1. [**MD Propagation**](#step-1-molecular-dynamics-sampling): Generate a dense set of periodic configurations and an isolated molecule trajectory using a fast baseline model (MACE). Feature vectors are computed automatically.
 
 2. [**Molecule Subsampling & Labeling**](#step-2-molecule-subsampling-and-labeling): Select diverse isolated molecule configurations and compute reference energies/forces.
 
