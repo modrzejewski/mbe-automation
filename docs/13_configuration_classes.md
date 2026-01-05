@@ -2,10 +2,10 @@
 
 This chapter documents the configuration classes used to control the various workflows in `mbe-automation`. These classes are typically instantiated in the input script and passed to the `mbe_automation.run()` function.
 
-- [Quasi-Harmonic & Thermodynamics](#quasi-harmonic--thermodynamics)
+- [Thermodynamics](#thermodynamics)
     - [`FreeEnergy`](#freeenergy-class)
     - [`Enthalpy`](#enthalpy-class)
-- [Molecular Dynamics](#molecular-dynamics)
+- [Molecular Dynamics Propagation](#molecular-dynamics-propagation)
     - [`ClassicalMD`](#classicalmd-class)
 - [Training Set Generation](#training-set-generation)
     - [`MDSampling`](#mdsampling-class)
@@ -15,7 +15,7 @@ This chapter documents the configuration classes used to control the various wor
 - [Structure Relaxation](#structure-relaxation)
     - [`Minimum`](#minimum-class)
 
-## Quasi-Harmonic & Thermodynamics
+## Thermodynamics
 
 ### `FreeEnergy` Class
 
@@ -75,7 +75,7 @@ This chapter documents the configuration classes used to control the various wor
 | `save_plots` | If `True`, save plots of the simulation results. | `False` |
 | `save_csv` | If `True`, save CSV files of the simulation results. | `False` |
 
-## Molecular Dynamics
+## Molecular Dynamics Propagation
 
 ### `ClassicalMD` Class
 
