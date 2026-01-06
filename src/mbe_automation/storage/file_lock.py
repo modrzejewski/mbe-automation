@@ -1,8 +1,13 @@
 import contextlib
-import fcntl
 import random
 import time
 from typing import Generator, Any
+
+import os
+if os.name != "posix":
+    raise OSError("Unix-based platform is required")
+
+import fcntl
 
 import h5py
 

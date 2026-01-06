@@ -54,8 +54,7 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
     Present a trajectory as an ASE-compatible object.
 
     The object can be initialized from a stored trajectory on disk or from an
-    in-memory Structure object. It supports indexing to retrieve ase.Atoms
-    objects for each frame on-demand.
+    in-memory Structure object.
     """
     @overload
     def __init__(self, structure: core.Structure): ...
@@ -82,7 +81,13 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
             self.n_frames = structure.n_frames
             self.cell_vectors = structure.cell_vectors
         elif dataset is not None and key is not None:
-            # File-based mode: Load entirely into memory
+            #
+            # Entire trajectory is loaded into memory
+            # at once. The trajecories should fit into memory
+            # on typical clusters that we use. The benefit of
+            # loading the entire trajectory is that we don't
+            # lock the file for other independent processes.
+            #
             with dataset_file(dataset, "r") as f:
                 group = f[key]
                 self.positions = group["positions (Å)"][...]
