@@ -69,9 +69,6 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
         dataset: str | None = None,
         key: str | None = None
     ):
-        self._is_file_based = False
-        self.storage = None
-
         if structure is not None:
             # In-memory mode
             self.positions = structure.positions
