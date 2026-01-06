@@ -34,28 +34,58 @@ import mbe_automation.dynamics.harmonic.display
 from mbe_automation.configs.structure import Minimum
 from mbe_automation.configs.quasi_harmonic import EOS_SAMPLING_ALGOS, EQUATIONS_OF_STATE
 
+def _assert_equivalent_cells(
+        phonopy_cell: PhonopyAtoms,
+        ase_cell: ase.Atoms,
+):
+    """
+    Check if ASE and Phonopy cells are equivalent up to a translation by whole lattice
+    vectors. Cells which differ by a permutation of atoms will be considered nonequivalent.
+    
+    """
+    assert len(ase_cell) == len(phonopy_cell), \
+        "Different numbers of atoms in ASE and Phonopy structures."
+    
+    assert (ase_cell.numbers == phonopy_cell.numbers).all(), \
+        "Different arrays of atomic numbers in ASE and Phonopy structures."
+    
+    assert np.max(np.abs(ase_cell.get_masses() - phonopy_cell.masses)) < 1.0E-8, \
+        "Different arrays of masses in ASE and Phonopy structures."
+
+    assert np.allclose(ase_cell.cell.array, phonopy_cell.cell), \
+        "Different cell vectors in ASE and Phonopy structures."
+
+    ase_pos = ase_cell.get_scaled_positions()
+    phonopy_pos = phonopy_cell.scaled_positions
+
+    diff_frac = ase_pos - phonopy_pos
+    diff_frac -= np.rint(diff_frac)
+
+    diff_cart = diff_frac @ ase_cell.cell.array
+    max_abs_diff = np.max(np.linalg.norm(diff_cart, axis=1))
+    
+    assert max_abs_diff < 1.0E-8, \
+        f"Inconsistent arrays of atomic positions (max_abs_diff={max_abs_diff:.6e})."
+
 def _assert_primitive_consistency(
         ph: phonopy.Phonopy,
         unit_cell: ase.Atoms
 ):
     """
     Assert that the primitive cell used to compute phonons
-    is exactly equal to the input cell without any
-    permutations of atoms.
-    """
-    assert (unit_cell.numbers == ph.primitive.numbers).all(), \
-        "Inconsistent arrays of atomic numbers."
-    assert np.max(np.abs(unit_cell.get_masses() - ph.primitive.masses)) < 1.0E-8, \
-        "Inconsistent arrays of atomic masses."
-    max_abs_diff = np.max(np.abs(unit_cell.positions - ph.primitive.positions))
-    assert max_abs_diff < 1.0E-8, \
-        f"Inconsistent arrays of atomic positions (max_abs_diff={max_abs_diff:.2e})."
-
+    is equivalent to the input cell without any permutations
+    of atoms. 
     
+    """
+    _assert_equivalent_cells(
+        ase_cell=unit_cell,
+        phonopy_cell=ph.primitive,
+    )
+
 def _assert_supercell_consistency(
     phonopy_instance: phonopy.Phonopy,
     unit_cell: Atoms,
-    supercell_matrix: npt.NDArray[np.integer]
+    supercell_matrix: npt.NDArray[np.int64]
 ):
     """
     Assert that ASE and Phonopy supercells are identical.
@@ -80,7 +110,6 @@ def _assert_supercell_consistency(
 
     if len(supercell_ase) != len(supercell_phonopy):
         raise RuntimeError("ASE and Phonopy supercell atom counts are inconsistent.")
-
 
 def molecular_vibrations(
         molecule,

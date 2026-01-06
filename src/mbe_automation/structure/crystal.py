@@ -61,7 +61,7 @@ def display(unit_cell: ase.Atoms, key: str | None=None) -> None:
 def to_symmetrized_primitive(
         unit_cell: ase.Atoms,
         symprec: float = SYMMETRY_TOLERANCE_STRICT
-):
+) -> ase.Atoms:
     """
     Convert unit cell to pymatgen's standard primitive cell.
     Involves symmetry refinement with spglib. Search for
