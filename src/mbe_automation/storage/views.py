@@ -1,5 +1,6 @@
 from __future__ import annotations
 import io
+import contextlib
 from typing import overload
 from functools import singledispatch
 import numpy as np
@@ -12,6 +13,7 @@ import pymatgen
 from phonopy.structure.atoms import PhonopyAtoms
 
 from . import core
+from .file_lock import dataset_file
 
 def from_ase_atoms(
         system: ase.Atoms,
@@ -69,6 +71,8 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
         key: str | None = None
     ):
         self._is_file_based = False
+        self._stack = None
+
         if structure is not None:
             # In-memory mode
             self.positions = structure.positions
@@ -81,7 +85,9 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
         elif dataset is not None and key is not None:
             # File-based mode
             self._is_file_based = True
-            self.storage = h5py.File(dataset, "r")
+            self._stack = contextlib.ExitStack()
+            self.storage = self._stack.enter_context(dataset_file(dataset, "r"))
+
             group = self.storage[key]
             self.positions = group["positions (Å)"]
             self.atomic_numbers = group["atomic_numbers"][:]
@@ -138,8 +144,10 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
 
     def close(self):
         """Close the dataset file if it was opened."""
-        if self._is_file_based and self.storage:
-            self.storage.close()
+        if self._is_file_based and self._stack:
+            self._stack.close()
+            self._stack = None
+            self.storage = None
 
 
 @singledispatch

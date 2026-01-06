@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import os
 import h5py
 from typing import Set, List, Literal, Iterator
+from .file_lock import dataset_file
 
 @dataclass(kw_only=True)
 class DatasetKey:
@@ -113,7 +114,7 @@ class DatasetKeys:
                 level_of_theory=level_of_theory,
             ))
 
-        with h5py.File(filename, "r") as f:
+        with dataset_file(filename, "r") as f:
             f.visititems(visit_func)
 
         return
@@ -245,7 +246,7 @@ def tree(dataset: str):
                 print_recursive(key, item, child_indent, is_last_item)
 
     try:
-        with h5py.File(dataset, "r") as f:
+        with dataset_file(dataset, "r") as f:
             print(Path(dataset).name)
             items = list(f.items())
             for i, (name, obj) in enumerate(items):

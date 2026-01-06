@@ -6,6 +6,7 @@ from collections import Counter
 from ase import Atoms
 import h5py
 import mbe_automation.ml.descriptors.generic
+from mbe_automation.storage.file_lock import dataset_file
 
 def atomic(systems, calc):
     """
@@ -86,7 +87,7 @@ def atomic_hdf5(hdf5_dataset, calc, system_types):
     system_types : list of str
         System types to process: "crystals", "molecules", "dimers", "trimers", "tetramers"
     """
-    with h5py.File(hdf5_dataset, 'r+') as f:
+    with dataset_file(hdf5_dataset, 'r+') as f:
         print(f"Processing {len(system_types)} system type(s)")
         
         for system_type in system_types:
