@@ -1,5 +1,6 @@
 from __future__ import annotations
 import io
+import contextlib
 from typing import overload
 from functools import singledispatch
 import numpy as np
@@ -12,6 +13,7 @@ import pymatgen
 from phonopy.structure.atoms import PhonopyAtoms
 
 from . import core
+from .file_lock import dataset_file
 
 def from_ase_atoms(
         system: ase.Atoms,
@@ -52,8 +54,7 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
     Present a trajectory as an ASE-compatible object.
 
     The object can be initialized from a stored trajectory on disk or from an
-    in-memory Structure object. It supports indexing to retrieve ase.Atoms
-    objects for each frame on-demand.
+    in-memory Structure object.
     """
     @overload
     def __init__(self, structure: core.Structure): ...
@@ -68,7 +69,6 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
         dataset: str | None = None,
         key: str | None = None
     ):
-        self._is_file_based = False
         if structure is not None:
             # In-memory mode
             self.positions = structure.positions
@@ -77,20 +77,24 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
             self.periodic = structure.periodic
             self.n_frames = structure.n_frames
             self.cell_vectors = structure.cell_vectors
-            self.storage = None
         elif dataset is not None and key is not None:
-            # File-based mode
-            self._is_file_based = True
-            self.storage = h5py.File(dataset, "r")
-            group = self.storage[key]
-            self.positions = group["positions (Å)"]
-            self.atomic_numbers = group["atomic_numbers"][:]
-            self.masses = group["masses (u)"][:]
-            self.periodic = group.attrs["periodic"]
-            self.n_frames = group.attrs["n_frames"]
-            self.cell_vectors = None
-            if self.periodic:
-                self.cell_vectors = group["cell_vectors (Å)"]
+            #
+            # Entire trajectory is loaded into memory
+            # at once. The trajecories should fit into memory
+            # on typical clusters that we use. The benefit of
+            # loading the entire trajectory is that we don't
+            # lock the file for other independent processes.
+            #
+            with dataset_file(dataset, "r") as f:
+                group = f[key]
+                self.positions = group["positions (Å)"][...]
+                self.atomic_numbers = group["atomic_numbers"][...]
+                self.masses = group["masses (u)"][...]
+                self.periodic = group.attrs["periodic"]
+                self.n_frames = group.attrs["n_frames"]
+                self.cell_vectors = None
+                if self.periodic:
+                    self.cell_vectors = group["cell_vectors (Å)"][...]
         else:
             raise ValueError(
                 "Provide either a 'structure' object or both 'dataset' and 'key'."
@@ -138,8 +142,7 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
 
     def close(self):
         """Close the dataset file if it was opened."""
-        if self._is_file_based and self.storage:
-            self.storage.close()
+        pass
 
 
 @singledispatch
