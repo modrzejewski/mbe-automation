@@ -41,10 +41,10 @@ class PhononFilter:
             phonon branch across the Brillouin zone. If specified,
             freq_min_THz and freq_max_THz are ignored.
     freq_min_THz: The minimum phonon frequency (in THz) to be included
-            in the calculations. Defaults to 0.0.
+            in the calculations. Defaults to 0.1.
     freq_max_THz: The maximum phonon frequency (in THz) to be included.
             If None, all frequencies above `freq_min_THz` are included.
-            Defaults to None.
+            Defaults to 8.0.
     """
     selected_modes: npt.NDArray[np.integer] | None = None
     freq_min_THz: float = 0.1
