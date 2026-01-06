@@ -71,7 +71,7 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
         key: str | None = None
     ):
         self._is_file_based = False
-        self._stack = None
+        self.storage = None
 
         if structure is not None:
             # In-memory mode
@@ -81,22 +81,18 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
             self.periodic = structure.periodic
             self.n_frames = structure.n_frames
             self.cell_vectors = structure.cell_vectors
-            self.storage = None
         elif dataset is not None and key is not None:
-            # File-based mode
-            self._is_file_based = True
-            self._stack = contextlib.ExitStack()
-            self.storage = self._stack.enter_context(dataset_file(dataset, "r"))
-
-            group = self.storage[key]
-            self.positions = group["positions (Å)"]
-            self.atomic_numbers = group["atomic_numbers"][:]
-            self.masses = group["masses (u)"][:]
-            self.periodic = group.attrs["periodic"]
-            self.n_frames = group.attrs["n_frames"]
-            self.cell_vectors = None
-            if self.periodic:
-                self.cell_vectors = group["cell_vectors (Å)"]
+            # File-based mode: Load entirely into memory
+            with dataset_file(dataset, "r") as f:
+                group = f[key]
+                self.positions = group["positions (Å)"][...]
+                self.atomic_numbers = group["atomic_numbers"][...]
+                self.masses = group["masses (u)"][...]
+                self.periodic = group.attrs["periodic"]
+                self.n_frames = group.attrs["n_frames"]
+                self.cell_vectors = None
+                if self.periodic:
+                    self.cell_vectors = group["cell_vectors (Å)"][...]
         else:
             raise ValueError(
                 "Provide either a 'structure' object or both 'dataset' and 'key'."
@@ -144,10 +140,7 @@ class ASETrajectory(ase.io.trajectory.TrajectoryReader):
 
     def close(self):
         """Close the dataset file if it was opened."""
-        if self._is_file_based and self._stack:
-            self._stack.close()
-            self._stack = None
-            self.storage = None
+        pass
 
 
 @singledispatch
