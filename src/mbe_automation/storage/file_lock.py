@@ -21,7 +21,7 @@ def acquire_storage_lock(file_path: str, timeout: int = DEFAULT_LOCK_TIMEOUT) ->
     lock_path = f"{file_path}.lock"
     start_time = time.monotonic()
 
-    with open(lock_path, "w") as lock_handle:
+    with open(lock_path, "a") as lock_handle:
         while True:
             try:
                 fcntl.flock(lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
