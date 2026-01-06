@@ -1,6 +1,7 @@
 from pathlib import Path
 import h5py
 
+from .file_lock import dataset_file
 from .inspect import DatasetKeys
 
 def save_level_of_theory(
@@ -10,7 +11,7 @@ def save_level_of_theory(
 ) -> None:
     keys = DatasetKeys(dataset).structures().starts_with(root_key)
     
-    with h5py.File(Path(dataset).resolve(), "a") as f:
+    with dataset_file(Path(dataset).resolve(), "a") as f:
         for key in keys:
             group = f[key]
             group.attrs["level_of_theory"] = level_of_theory
@@ -29,13 +30,13 @@ def copy(
     path_target = Path(dataset_target).resolve()
     is_same_file = path_source == path_target
 
-    with h5py.File(path_source, "a" if is_same_file else "r") as source:
+    with dataset_file(path_source, "a" if is_same_file else "r") as source:
         if is_same_file:
             if overwrite and key_target in source:
                 del source[key_target]
             source.copy(key_source, key_target)
         else:
-            with h5py.File(path_target, "a") as target:
+            with dataset_file(path_target, "a") as target:
                 if overwrite and key_target in target:
                     del target[key_target]
                 source.copy(key_source, target, name=key_target)
@@ -48,7 +49,7 @@ def rename(
 ) -> None:
     """Rename a data group in a dataset storage file."""
     path = Path(dataset).resolve()
-    with h5py.File(path, "a") as f:
+    with dataset_file(path, "a") as f:
         if overwrite and key_new in f:
             del f[key_new]
         f.move(key_old, key_new)
@@ -59,5 +60,5 @@ def delete(
 ) -> None:
     """Delete a data group from storage."""
     path = Path(dataset).resolve()
-    with h5py.File(path, "a") as f:
+    with dataset_file(path, "a") as f:
         del f[key]

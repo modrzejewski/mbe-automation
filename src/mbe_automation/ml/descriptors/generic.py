@@ -1,6 +1,7 @@
 import numpy as np
 import sys
 import h5py
+from mbe_automation.storage.file_lock import dataset_file
 
 def normalized(feature_vectors, atomic_numbers, feature_vector_mean, feature_vector_sigma):
     """
@@ -45,7 +46,7 @@ def normalized_hdf5(hdf5_dataset, system_types, reference_system_type="crystals"
     reference_system_type : str, default="crystals"
         System type providing normalization statistics. 
     """
-    with h5py.File(hdf5_dataset, 'r+') as f:
+    with dataset_file(hdf5_dataset, 'r+') as f:
         ref_group = f[reference_system_type]
         feature_vector_mean = ref_group['feature_vector_mean'][:]
         feature_vector_sigma = ref_group['feature_vector_sigma'][:]
@@ -115,7 +116,7 @@ def molecular_hdf5(hdf5_dataset, system_types=["molecules", "crystals"]):
     system_types : list
         System types for which to compute molecular descriptors
     """
-    with h5py.File(hdf5_dataset, 'r+') as f:
+    with dataset_file(hdf5_dataset, 'r+') as f:
         for system_type in system_types:
             group = f[system_type]
             normalized_feature_vectors = group['normalized_feature_vectors'][:]

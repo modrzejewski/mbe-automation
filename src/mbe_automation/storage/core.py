@@ -10,6 +10,7 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 import os
+from .file_lock import dataset_file
 
 DATA_FOR_TRAINING = [
     "feature_vectors",
@@ -399,7 +400,7 @@ def save_data_frame(
         df: pd.DataFrame
 ):
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(dataset, "a") as f:
+    with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
         
@@ -431,7 +432,7 @@ def read_data_frame(
         columns: List[str] | Literal["all"] = "all"
 ) -> pd.DataFrame:
     
-    with h5py.File(dataset, "r") as f:
+    with dataset_file(dataset, "r") as f:
         group = f[key]
         
         if columns == "all":
@@ -464,7 +465,7 @@ def save_brillouin_zone_path(
     _, n_bands = band_structure.frequencies[0].shape
     
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(dataset, "a") as f:
+    with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
             
@@ -502,7 +503,7 @@ def read_brillouin_zone_path(
         key: str
 ) -> BrillouinZonePath:
 
-    with h5py.File(dataset, "r") as f:
+    with dataset_file(dataset, "r") as f:
         group = f[key]
         n_segments = group.attrs["n_segments"]
         
@@ -560,7 +561,7 @@ def save_eos_curves(
             G_interp[i, :] = fit.G_interp(V_interp)
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(dataset, "a") as f:
+    with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
             
@@ -605,7 +606,7 @@ def read_eos_curves(
         key
 ) -> EOSCurves:
 
-    with h5py.File(dataset, "r") as f:
+    with dataset_file(dataset, "r") as f:
         group = f[key]
         eos_curves = EOSCurves(
             temperatures=group["T (K)"][...],
@@ -646,7 +647,7 @@ def _save_structure(
         )
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)    
-    with h5py.File(dataset, "a") as f:
+    with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
         group = f.require_group(key)
@@ -773,7 +774,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
         
 
 def read_structure(dataset, key):
-    with h5py.File(dataset, "r") as f:
+    with dataset_file(dataset, "r") as f:
         group = f[key]
         is_periodic = group.attrs["periodic"]
         feature_vectors_type = group.attrs["feature_vectors_type"]
@@ -815,7 +816,7 @@ def save_trajectory(
 ):
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(dataset, "a") as f:
+    with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
 
@@ -907,7 +908,7 @@ def save_trajectory(
 
 def read_trajectory(dataset: str, key: str) -> Trajectory:
     
-    with h5py.File(dataset, "r") as f:
+    with dataset_file(dataset, "r") as f:
         group = f[key]
         is_periodic = group.attrs["periodic"]
         feature_vectors_type = group.attrs["feature_vectors_type"]
@@ -964,7 +965,7 @@ def save_force_constants(
     assert isinstance(phonons.primitive, phonopy.structure.atoms.PhonopyAtoms)
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(dataset, "a") as f:
+    with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
         group = f.create_group(key)
@@ -1002,7 +1003,7 @@ def save_force_constants(
 def read_force_constants(dataset: str, key: str) -> ForceConstants:
     """Read force constants and their associated structures."""
 
-    with h5py.File(dataset, "r") as data:
+    with dataset_file(dataset, "r") as data:
         group = data[key]
         fc = group["force_constants (eV∕Å²)"][...]
         supercell_matrix = group["supercell_matrix"][...]
@@ -1029,7 +1030,7 @@ def save_molecular_crystal(
     """
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(dataset, "a") as f:
+    with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
         
@@ -1079,7 +1080,7 @@ def read_molecular_crystal(dataset: str, key: str) -> MolecularCrystal:
     Read a MolecularCrystal object from a dataset.
     
     """
-    with h5py.File(dataset, "r") as f:
+    with dataset_file(dataset, "r") as f:
         group = f[key]
         
         n_molecules = group.attrs["n_molecules"]
@@ -1118,7 +1119,7 @@ def save_finite_subsystem(
 
     if only is None:
         Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-        with h5py.File(dataset, "a") as f:
+        with dataset_file(dataset, "a") as f:
             if key in f:
                 del f[key]  
             group = f.create_group(key)
@@ -1149,7 +1150,7 @@ def read_finite_subsystem(dataset: str, key: str) -> FiniteSubsystem:
         dataset,
         key=f"{key}/cluster_of_molecules"
     )
-    with h5py.File(dataset, "r") as f:
+    with dataset_file(dataset, "r") as f:
         group = f[key]
         n_molecules = group.attrs["n_molecules"]
         molecule_indices = group["molecule_indices"][...]
@@ -1168,7 +1169,7 @@ def save_attribute(
         attribute_value
 ):
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(dataset, "a") as f:
+    with dataset_file(dataset, "a") as f:
         group = f.require_group(key)
         group.attrs[attribute_name] = attribute_value
 
@@ -1180,7 +1181,7 @@ def read_attribute(
         key: str,
         attribute_name: str,
 ):
-    with h5py.File(dataset, "r") as f:
+    with dataset_file(dataset, "r") as f:
         group = f[key]
         attribute_value = group.attrs[attribute_name]
 
@@ -1195,7 +1196,7 @@ def save_unique_clusters(
     """Save a UniqueClusters object to a dataset."""
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(dataset, "a") as f:
+    with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
         group = f.create_group(key)
@@ -1209,7 +1210,7 @@ def save_unique_clusters(
 
 def read_unique_clusters(dataset: str, key: str) -> UniqueClusters:
     """Read a UniqueClusters object from a dataset."""
-    with h5py.File(dataset, "r") as f:
+    with dataset_file(dataset, "r") as f:
         group = f[key]
         return UniqueClusters(
             n_clusters=group.attrs["n_clusters"],
@@ -1238,7 +1239,7 @@ def _save_only(
     Keeps the rest of the saved Structure object unaltered.
     """
 
-    with h5py.File(dataset, "r+") as f:
+    with dataset_file(dataset, "r+") as f:
         group = f[key]
 
         if group.attrs["n_frames"] != structure.n_frames:
@@ -1466,7 +1467,7 @@ def save_atomic_reference(
     key_E = "E (eV∕atom)"
     key_Z = "atomic_numbers"
     
-    with h5py.File(dataset, "a") as f:
+    with dataset_file(dataset, "a") as f:
         if key in f:
             if overwrite:
                 del f[key]
@@ -1496,7 +1497,7 @@ def read_atomic_reference(dataset: str | Path, key: str) -> AtomicReference:
     key_Z = "atomic_numbers"
     energies = {}
     
-    with h5py.File(dataset, "r") as f:
+    with dataset_file(dataset, "r") as f:
         atomic_reference_group = f[key]
         levels_of_theory = atomic_reference_group.attrs.get("levels_of_theory", [])
         
