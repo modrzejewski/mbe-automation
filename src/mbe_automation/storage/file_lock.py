@@ -1,11 +1,14 @@
 import contextlib
 import fcntl
-import signal
+import random
+import time
 from typing import Generator, Any
 
 import h5py
 
 DEFAULT_LOCK_TIMEOUT = 300
+POLL_INTERVAL_MIN = 2.0
+POLL_INTERVAL_MAX = 5.0
 
 class LockTimeoutError(TimeoutError):
     pass
@@ -13,31 +16,29 @@ class LockTimeoutError(TimeoutError):
 @contextlib.contextmanager
 def acquire_storage_lock(file_path: str, timeout: int = DEFAULT_LOCK_TIMEOUT) -> Generator[None, None, None]:
     """
-    Acquire a blocking filesystem lock for the file.
+    Acquire a blocking filesystem lock for the file using flock.
     """
     lock_path = f"{file_path}.lock"
-
-    def _timeout_handler(signum, frame):
-        raise LockTimeoutError(f"Lock acquisition timed out after {timeout}s")
+    start_time = time.monotonic()
 
     with open(lock_path, "w") as lock_handle:
-        original_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(timeout)
-        
+        while True:
+            try:
+                fcntl.flock(lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() - start_time >= timeout:
+                    raise LockTimeoutError(f"Lock acquisition timed out after {timeout}s")
+                
+                time.sleep(random.uniform(POLL_INTERVAL_MIN, POLL_INTERVAL_MAX))
+
         try:
-            fcntl.flock(lock_handle, fcntl.LOCK_EX)
-            signal.alarm(0)
             yield
-        except LockTimeoutError:
-            raise
         finally:
-            signal.alarm(0)
-            if "original_handler" in locals():
-                signal.signal(signal.SIGALRM, original_handler)
             fcntl.flock(lock_handle, fcntl.LOCK_UN)
 
 @contextlib.contextmanager
-def disk_storage(
+def dataset_file(
     file_path: str, 
     mode: str = "r", 
     timeout: int = DEFAULT_LOCK_TIMEOUT, 
@@ -49,3 +50,4 @@ def disk_storage(
     with acquire_storage_lock(file_path, timeout):
         with h5py.File(file_path, mode, **kwargs) as handle:
             yield handle
+            
