@@ -167,9 +167,12 @@ class Structure:
             self,
             dataset: str,
             key: str,
-            only: List[Literal[*DATA_FOR_TRAINING]] | None = None,
+            only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
     ) -> None:
         """Save the structure to a dataset."""
+
+        if isinstance(only, str):
+            only = [only]
 
         if only is None:
             save_structure(
@@ -310,9 +313,12 @@ class Trajectory(Structure):
             self,
             dataset: str,
             key: str,
-            only: List[Literal[*DATA_FOR_TRAINING]] | None = None,
+            only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
     ) -> None:
         """Save the trajectory to a dataset."""
+
+        if isinstance(only, str):
+            only = [only]
 
         if only is None:
             save_trajectory(
@@ -1113,9 +1119,12 @@ def save_finite_subsystem(
         dataset: str,
         key: str,
         subsystem: FiniteSubsystem,
-        only: List[Literal[*DATA_FOR_TRAINING]] | None = None,
+        only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
 ) -> None:
     """Save a FiniteSubsystem object to a dataset."""
+
+    if isinstance(only, str):
+        only = [only]
 
     if only is None:
         Path(dataset).parent.mkdir(parents=True, exist_ok=True)
