@@ -159,6 +159,26 @@ class DeltaLearningMACE(MACE):
             # Mark results as combined
             self.results["delta_learning_baseline_added"] = True
 
+    def get_descriptors(self, atoms=None):
+        """
+        Return descriptors from the baseline model.
+        """
+        return self.baseline_calc.get_descriptors(atoms)
+
+    @property
+    def n_invariant_features(self) -> int:
+        """
+        Return number of invariant features of the baseline model.
+        """
+        return self.baseline_calc.n_invariant_features
+
+    @property
+    def architecture(self) -> str:
+        """
+        Return architecture of the baseline model.
+        """
+        return self.baseline_calc.architecture
+
     def serialize(self) -> tuple:
         return DeltaLearningMACE, {
             "model_path_baseline": str(self.model_path_baseline),
