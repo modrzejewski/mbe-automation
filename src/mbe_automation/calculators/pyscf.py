@@ -322,6 +322,9 @@ class PySCFCalculator(Calculator):
             if self.xc == "wb97m-v":
                 mf.nlcgrids.atom_grid = (50, 194)  # sg-1 grid for the nonlocal correlation functional
 
+        if not pbc:
+            mf = mf.newton()
+
         if self.density_fit:
             if self.auxbasis:
                 mf = mf.density_fit(auxbasis=self.auxbasis)
