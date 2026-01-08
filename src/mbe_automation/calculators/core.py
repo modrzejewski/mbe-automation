@@ -11,14 +11,14 @@ except ImportError:
     RAY_AVAILABLE = False
 
 from mbe_automation.storage import Structure
-from mbe_automation.calculators.mace import MACE
+from mbe_automation.calculators.mace import MACE, DeltaLearningMACE
 from mbe_automation.calculators.pyscf import PySCFCalculator
 from mbe_automation.calculators.dftb import DFTBCalculator
 import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
-CALCULATORS = PySCFCalculator | DFTBCalculator | MACE
+CALCULATORS = PySCFCalculator | DFTBCalculator | MACE | DeltaLearningMACE
 
 def _split_work(structure: Structure, n_workers: int):
     assert structure.atomic_numbers.ndim == structure.masses.ndim
@@ -56,7 +56,7 @@ def _split_work(structure: Structure, n_workers: int):
 
 
 def _sequential_loop(
-    calculator: MACE | PySCFCalculator | DFTBCalculator,
+    calculator: MACE | DeltaLearningMACE | PySCFCalculator | DFTBCalculator,
     positions: npt.NDArray[np.float64],
     cell_vectors: npt.NDArray[np.float64] | None,
     atomic_numbers: npt.NDArray[np.float64],
@@ -150,7 +150,7 @@ def _sequential_loop(
 
 
 def _parallel_loop(
-    calculator: MACE | PySCFCalculator,
+    calculator: MACE | DeltaLearningMACE | PySCFCalculator,
     structure: Structure,
     compute_energies: bool,
     compute_forces: bool,
@@ -290,7 +290,7 @@ else:
 
 def run_model(
     structure: Structure,
-    calculator: MACE | PySCFCalculator | DFTBCalculator,
+    calculator: MACE | DeltaLearningMACE | PySCFCalculator | DFTBCalculator,
     compute_energies: bool = True,
     compute_forces: bool = True,
     compute_feature_vectors: bool = True,
