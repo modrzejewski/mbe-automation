@@ -60,10 +60,10 @@ mbe_automation.run(properties_config)
 
 ## Adjustable parameters
 
-Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./13_configuration_classes.md) chapter.
+Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./03_configuration_classes.md) chapter.
 
-*   **[`FreeEnergy`](./13_configuration_classes.md#freeenergy-class)**: Main configuration for the quasi-harmonic workflow.
-*   **[`Minimum`](./13_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
+*   **[`FreeEnergy`](./03_configuration_classes.md#freeenergy-class)**: Main configuration for the quasi-harmonic workflow.
+*   **[`Minimum`](./03_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
 
 ## Function Call Overview
 
@@ -125,7 +125,7 @@ Detailed descriptions of the configuration classes can be found in the [Configur
 
 ## Computational Bottlenecks
 
-For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
+For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./05_bottlenecks.md) section.
 
 ## How to read the results
 

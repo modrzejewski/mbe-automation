@@ -64,10 +64,10 @@ mbe_automation.run(md_config)
 
 ## Adjustable parameters
 
-Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./13_configuration_classes.md) chapter.
+Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./03_configuration_classes.md) chapter.
 
-*   **[`Enthalpy`](./13_configuration_classes.md#enthalpy-class)**: Main configuration for the molecular dynamics workflow.
-*   **[`ClassicalMD`](./13_configuration_classes.md#classicalmd-class)**: Configuration for the MD simulation parameters.
+*   **[`Enthalpy`](./03_configuration_classes.md#enthalpy-class)**: Main configuration for the molecular dynamics workflow.
+*   **[`ClassicalMD`](./03_configuration_classes.md#classicalmd-class)**: Configuration for the MD simulation parameters.
 
 ## Function Call Overview
 
@@ -123,7 +123,7 @@ Detailed descriptions of the configuration classes can be found in the [Configur
 
 ## Computational Bottlenecks
 
-For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
+For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./05_bottlenecks.md) section.
 
 ## How to read the results
 
