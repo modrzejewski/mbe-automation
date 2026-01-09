@@ -185,24 +185,30 @@ python -m mace.cli.run_train \
     --train_file="delta_learning/train.xyz" \
     --valid_file="delta_learning/validate.xyz" \
     --test_file="delta_learning/test.xyz" \
-    --energy_key="Delta_energy" \
     --model="MACE" \
-    --multiheads_finetuning=False \
-    --r_max=4 \
-    --num_channels=16 \
-    --max_L=0 \
-    --batch_size=10 \
-    --max_num_epochs=300 \
-    --forces_weight=0 \
-    --energy_weight=1000 \
+    --plot_frequency 10 \
+    --num_interactions=2 \
+    --hidden_irreps='32x0e + 32x1o' \
+    --correlation=2 \
+    --r_max=6.0 \
+    --forces_weight=1000 \
+    --energy_weight=10 \
     --stress_weight=0 \
-    --scaling="no_scaling" \
+    --energy_key="REF_energy" \
+    --forces_key="REF_forces" \
+    --batch_size=8 \
+    --valid_batch_size=8 \
+    --max_num_epochs=300 \
+    --start_swa=200 \
+    --scheduler_patience=15 \
+    --patience=100 \
+    --eval_interval=1 \
     --ema \
-    --ema_decay=0.99 \
-    --amsgrad \
+    --swa \
+    --error_table="PerAtomRMSE" \
     --default_dtype="float64" \
     --device=cuda \
-    --seed=3 \
     --save_cpu \
+    --seed=3 \
     --restart_latest > "train.log" 2>&1
 ```
