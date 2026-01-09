@@ -12,8 +12,8 @@ class DeltaMACE(MACE):
 
     def __init__(
         self,
-        model_path_baseline,
-        model_path_delta,
+        model_path_baseline: str | Path,
+        model_path_delta: str | Path,
         device: str | None = None,
         head: str = "Default"
     ):
