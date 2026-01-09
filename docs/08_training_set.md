@@ -41,7 +41,7 @@ mlip_parameter_file = "path/to/your/mace.model"
 temperature_K = 298.15
 dataset = "training_set.hdf5"
 
-mace_calc = MACE(model_path=mlip_parameter_file)
+mace_calc = MACE(model_paths=mlip_parameter_file)
 ```
 
 ## Step 1: MD Sampling
@@ -293,7 +293,7 @@ mlip_parameter_file = "path/to/your/mace.model"
 temperature_K = 298.15
 dataset = "training_set.hdf5"
 
-mace_calc = MACE(model_path=mlip_parameter_file)
+mace_calc = MACE(model_paths=mlip_parameter_file)
 
 md_sampling_config = MDSampling(
     crystal=Structure.from_xyz_file(xyz_solid),

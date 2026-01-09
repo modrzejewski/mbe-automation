@@ -64,7 +64,7 @@ crystal = Structure.from_xyz_file("urea_x23_geometry.xyz")
 molecule = crystal.extract_all_molecules()[0]
 
 calculator = MACE(
-   model_path="~/models/mace/mace-mh-1.model",
+   model_paths="~/models/mace/mace-mh-1.model",
    head="omol",
 )
 
@@ -162,7 +162,7 @@ from mbe_automation.calculators import MACE
 dataset = "md_structures.hdf5"
 
 mace_calc = MACE(
-    model_path="~/models/mace/mace-mh-1.model",
+    model_paths="~/models/mace/mace-mh-1.model",
     head="omol",
 )
 
