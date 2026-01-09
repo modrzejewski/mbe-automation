@@ -221,9 +221,6 @@ mbe_automation.run(md_config)
 #SBATCH --time=24:00:00
 #SBATCH --mem=180gb
 
-export OMP_NUM_THREADS=8
-export MKL_NUM_THREADS=8
-
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
