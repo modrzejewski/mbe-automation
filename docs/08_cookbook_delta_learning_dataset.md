@@ -44,8 +44,8 @@ The example below processes an input HDF5 file (`md_trajectories.hdf5`) containi
 input_dataset = "md_trajectories.hdf5"
 output_dataset = "ground_truth.hdf5"
 
-# 1. Process Periodic Trajectories
-# We iterate over all periodic trajectories in the input dataset
+# 1. Process Trajectories
+# We iterate over all finite-system trajectories in the input dataset
 for key in DatasetKeys(input_dataset).trajectories().finite():
     print(f"Processing trajectory: {key}")
 
