@@ -93,7 +93,7 @@ val_set = Dataset()
 test_set = Dataset()
 
 # Isolated molecule in vacuum
-for key in DatasetKeys(dataset).structures().finite().with_ground_truth():
+for key in DatasetKeys(dataset).trajectories().finite().with_ground_truth():
     print(f"Adding molecule to dataset: {key}")
     molecule = Structure.read(dataset, key)
 
