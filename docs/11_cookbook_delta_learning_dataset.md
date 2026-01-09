@@ -23,7 +23,7 @@ from mbe_automation.calculators import DFT, MACE
 # Initialize Calculators
 # Baseline: Pre-trained MACE model
 calc_baseline = MACE(
-    model_path="~/models/mace/mace-mh-1.model",
+    model_paths="~/models/mace/mace-mh-1.model",
     head="omol",
 )
 
