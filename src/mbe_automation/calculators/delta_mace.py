@@ -116,6 +116,5 @@ class DeltaMACE(MACE):
             "model_path_baseline": self.model_path_baseline,
             "model_path_delta": self.model_path_delta,
             "device": self.device,
-            "head_delta": self.head_delta,
-            "head_baseline": self.head_baseline,
+            "head": self.head,
         }
