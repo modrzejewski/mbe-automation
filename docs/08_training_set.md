@@ -118,15 +118,15 @@ mbe_automation.run(phonon_sampling_config)
 
 ## Adjustable parameters
 
-Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./13_configuration_classes.md) chapter.
+Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./03_configuration_classes.md) chapter.
 
-*   **[`MDSampling`](./13_configuration_classes.md#mdsampling-class)**: Configuration for the MD sampling stage.
-*   **[`PhononSampling`](./13_configuration_classes.md#phononsampling-class)**: Configuration for the phonon sampling stage.
-*   **[`ClassicalMD`](./13_configuration_classes.md#classicalmd-class)**: Configuration for the MD simulation parameters within `MDSampling`.
-*   **[`FreeEnergy`](./13_configuration_classes.md#freeenergy-class)**: Configuration for the force constants calculation.
-*   **[`Minimum`](./13_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
-*   **[`FiniteSubsystemFilter`](./13_configuration_classes.md#finitesubsystemfilter-class)**: Configuration for extracting molecular clusters.
-*   **[`PhononFilter`](./13_configuration_classes.md#phononfilter-class)**: Configuration for selecting phonon modes.
+*   **[`MDSampling`](./03_configuration_classes.md#mdsampling-class)**: Configuration for the MD sampling stage.
+*   **[`PhononSampling`](./03_configuration_classes.md#phononsampling-class)**: Configuration for the phonon sampling stage.
+*   **[`ClassicalMD`](./03_configuration_classes.md#classicalmd-class)**: Configuration for the MD simulation parameters within `MDSampling`.
+*   **[`FreeEnergy`](./03_configuration_classes.md#freeenergy-class)**: Configuration for the force constants calculation.
+*   **[`Minimum`](./03_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
+*   **[`FiniteSubsystemFilter`](./03_configuration_classes.md#finitesubsystemfilter-class)**: Configuration for extracting molecular clusters.
+*   **[`PhononFilter`](./03_configuration_classes.md#phononfilter-class)**: Configuration for selecting phonon modes.
 
 ## Subsampling
 
@@ -270,7 +270,7 @@ traj.save(
 
 ## Computational Bottlenecks
 
-For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
+For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./05_bottlenecks.md) section.
 
 ## Complete Input Files
 
