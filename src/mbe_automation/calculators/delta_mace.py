@@ -52,7 +52,7 @@ class DeltaMACE(MACE):
 
     def calculate(self, atoms=None, properties=None, system_changes=all_changes):
         # We need to call Calculator.calculate to set atoms and handle changes
-        Calculator.calculate(self, atoms)
+        Calculator.calculate(self, atoms, properties, system_changes)
         
         batch_base = self._atoms_to_batch(self.atoms)
 
