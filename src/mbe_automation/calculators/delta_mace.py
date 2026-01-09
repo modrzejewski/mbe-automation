@@ -1,10 +1,11 @@
 import torch
 import numpy as np
+from pathlib import Path
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
-from mace.calculators import MACECalculator
+from mbe_automation.calculators.mace import MACE
 
-class DeltaMACECalculator(MACECalculator):
+class DeltaMACE(MACE):
     """
     Calculator for Baseline + Delta MACE models with identical r_cut.
     """
@@ -13,32 +14,31 @@ class DeltaMACECalculator(MACECalculator):
         self,
         model_path_baseline,
         model_path_delta,
-        device="cpu",
-        energy_units_to_eV=1.0,
-        length_units_to_A=1.0,
-        default_dtype="",
-        charges_key="Qs",
-        **kwargs
+        device: str | None = None,
+        head: str = "Default",
+        baseline_head: str = "Default",
     ):
+        # Initialize the baseline model using the MACE class
+        # This sets self.models[0] to the baseline model
         super().__init__(
-            model_paths=model_path_baseline,
+            model_path=model_path_baseline,
             device=device,
-            energy_units_to_eV=energy_units_to_eV,
-            length_units_to_A=length_units_to_A,
-            default_dtype=default_dtype,
-            charges_key=charges_key,
-            model_type="MACE",
-            **kwargs
+            head=baseline_head,
         )
 
+        # Overwrite attributes specific to DeltaMACE
+        self.model_path_baseline = self.model_path # set by super from model_path_baseline
+        self.model_path_delta = Path(model_path_delta).expanduser()
+        self.baseline_head = baseline_head
+        # MACE.__init__ sets self.head to baseline_head. We overwrite it.
+        self.head = head
+
         self.baseline_model = self.models[0]
-        self.delta_model = torch.load(f=model_path_delta, map_location=self.device)
+        self.delta_model = torch.load(f=self.model_path_delta, map_location=self.device)
         self.delta_model.to(self.device)
 
-        if default_dtype == "float64":
-            self.delta_model = self.delta_model.double()
-        elif default_dtype == "float32":
-            self.delta_model = self.delta_model.float()
+        # Ensure double precision (MACE default)
+        self.delta_model = self.delta_model.double()
 
         for param in self.delta_model.parameters():
             param.requires_grad = False
@@ -51,26 +51,36 @@ class DeltaMACECalculator(MACECalculator):
                 f"Got {r_cut_base} and {r_cut_delta}"
             )
 
+        # Update level of theory
+        self.level_of_theory = f"delta_mace_{self.architecture}"
+        if head != "Default":
+             self.level_of_theory += f"_{head}_head"
+
     def calculate(self, atoms=None, properties=None, system_changes=all_changes):
+        # We need to call Calculator.calculate to set atoms and handle changes
         Calculator.calculate(self, atoms)
         
         batch_base = self._atoms_to_batch(atoms)
-        compute_stress = not self.use_compile
+
+        # Attributes from MACECalculator
+        compute_stress = not getattr(self, "use_compile", False)
+        compute_atomic_stresses = getattr(self, "compute_atomic_stresses", False)
+        training = getattr(self, "use_compile", False)
 
         out_base = self.baseline_model(
             self._clone_batch(batch_base).to_dict(),
             compute_stress=compute_stress,
-            training=self.use_compile,
-            compute_edge_forces=self.compute_atomic_stresses,
-            compute_atomic_stresses=self.compute_atomic_stresses,
+            training=training,
+            compute_edge_forces=compute_atomic_stresses,
+            compute_atomic_stresses=compute_atomic_stresses,
         )
 
         out_delta = self.delta_model(
             self._clone_batch(batch_base).to_dict(),
             compute_stress=compute_stress,
-            training=self.use_compile,
-            compute_edge_forces=self.compute_atomic_stresses,
-            compute_atomic_stresses=self.compute_atomic_stresses,
+            training=training,
+            compute_edge_forces=compute_atomic_stresses,
+            compute_atomic_stresses=compute_atomic_stresses,
         )
 
         self.results = {}
@@ -101,3 +111,16 @@ class DeltaMACECalculator(MACECalculator):
         node_e_tensor = get_summed("node_energy")
         if node_e_tensor is not None:
             self.results["energies"] = node_e_tensor.detach().cpu().numpy() * self.energy_units_to_eV
+
+    def serialize(self) -> tuple:
+        """
+        Returns the class and arguments required to reconstruct the calculator.
+        Used for passing the calculator to Ray workers.
+        """
+        return DeltaMACE, {
+            "model_path_baseline": self.model_path_baseline,
+            "model_path_delta": self.model_path_delta,
+            "device": self.device,
+            "head": self.head,
+            "baseline_head": self.baseline_head,
+        }
