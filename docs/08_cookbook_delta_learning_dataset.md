@@ -1,6 +1,6 @@
 # Cookbook: Delta Learning Dataset Creation
 
-This cookbook demonstrates how to create a dataset for **Delta Learning** using the MACE framework. Delta learning aims to learn the difference between a high-level target method (e.g., DFT or CCSD(T)) and a lower-level baseline method (e.g., a semi-empirical method or a simpler ML potential).
+This document describes the creation of a dataset for **Delta Learning** using the MACE framework. Delta learning trains a model on the difference between a high-level target method (e.g., DFT or CCSD(T)) and a lower-level baseline method (e.g., a semi-empirical method or a simpler ML potential).
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ This cookbook demonstrates how to create a dataset for **Delta Learning** using 
 
 ## Setup
 
-First, we set up the necessary imports and initialize the calculators. We use a pre-trained MACE model as the baseline and a DFT method (r2SCAN-D4/def2-SVP) as the target.
+The following script initializes the necessary calculators. A pre-trained MACE model serves as the baseline, and a DFT method (r2SCAN-D4/def2-SVP) serves as the target.
 
 ```python
 import mbe_automation
@@ -37,9 +37,9 @@ calc_target = DFT(
 
 ## Generating Ground Truth Data
 
-Before creating the training set, we need to generate the "ground truth" data. This involves calculating the energies and forces for both the baseline and target methods on our structures.
+Generating the "ground truth" data involves calculating the energies and forces for both the baseline and target methods on the structures.
 
-In this example, we assume we have an input HDF5 file (`md_trajectories.hdf5`) containing raw MD trajectories and finite structures (extracted clusters). We will process these, subsample frames, run the calculations, and save the results to a new file (`ground_truth.hdf5`).
+The example below processes an input HDF5 file (`md_trajectories.hdf5`) containing raw MD trajectories and finite structures. It subsamples frames, executes the calculations, and saves the results to `ground_truth.hdf5`.
 
 ```python
 input_dataset = "md_trajectories.hdf5"
@@ -85,7 +85,7 @@ print("Ground truth generation completed.")
 
 ## Dataset Generation
 
-Now that we have a dataset populated with ground truth data (`ground_truth.hdf5`), we can organize it into training, validation, and test sets. We use `DatasetKeys` with the `.with_ground_truth()` filter to ensure we only include systems where the calculations were successful.
+With the ground truth data generated, the dataset is organized into training, validation, and test sets. The `DatasetKeys` class allows filtering with `.with_ground_truth()` to select only systems with completed calculations.
 
 ```python
 dataset = "ground_truth.hdf5"
@@ -120,7 +120,7 @@ for n in range(2, 11):
 
 ## Atomic Reference
 
-For delta learning, we need to calculate the atomic reference energies for both the baseline and target methods. The `Dataset` class provides a convenient `atomic_reference` method that automatically selects ground-state electronic configurations for atoms in the dataset and computes their energies.
+Delta learning requires atomic reference energies for both the baseline and target methods. The `Dataset.atomic_reference` method automatically selects ground-state electronic configurations for atoms in the dataset and computes their energies.
 
 ```python
 # Compute atomic reference energies for both levels of theory
@@ -136,7 +136,7 @@ atomic_energies = atomic_energies_baseline + atomic_energies_target
 
 ## Export
 
-Finally, we export the datasets to MACE-compatible XYZ files. We define the levels of theory for delta learning and pass the combined atomic reference energies to the training set export.
+The final step exports the datasets to MACE-compatible XYZ files. The levels of theory for delta learning are defined, and the combined atomic reference energies are passed to the training set export.
 
 ```python
 delta_learning = {
@@ -163,7 +163,7 @@ print("Export completed.")
 
 ## Model Training
 
-Once the datasets are generated, you can train a Delta Learning MACE model. Below is an example Bash script that runs the training using the generated files.
+The following Bash script trains a Delta Learning MACE model using the generated files.
 
 **Bash Script:** `train.sh`
 
