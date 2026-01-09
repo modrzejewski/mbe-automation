@@ -51,7 +51,7 @@ for key in DatasetKeys(input_dataset).trajectories().finite():
     # Read the full trajectory
     traj = Trajectory.read(input_dataset, key)
 
-    # Select a diverse subset of frames (e.g., 20 frames using fartherst point sampling)
+    # Select a diverse subset of frames (e.g., 20 frames using farthest point sampling)
     subset = traj.subsample(20)
 
     # Calculate Baseline (MACE) and Target (DFT) properties
