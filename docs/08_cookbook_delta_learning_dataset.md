@@ -186,7 +186,7 @@ python -m mace.cli.run_train \
     --valid_file="delta_learning/validate.xyz" \
     --test_file="delta_learning/test.xyz" \
     --model="MACE" \
-    --plot_frequency 10 \
+    --plot_frequency=10 \
     --num_interactions=2 \
     --hidden_irreps='32x0e + 32x1o' \
     --correlation=2 \
