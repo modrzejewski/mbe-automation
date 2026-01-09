@@ -54,7 +54,7 @@ class DeltaMACE(MACE):
         # We need to call Calculator.calculate to set atoms and handle changes
         Calculator.calculate(self, atoms)
         
-        batch_base = self._atoms_to_batch(atoms)
+        batch_base = self._atoms_to_batch(self.atoms)
 
         # Attributes from MACECalculator
         compute_stress = not getattr(self, "use_compile", False)
