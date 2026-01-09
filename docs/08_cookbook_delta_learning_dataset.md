@@ -5,10 +5,11 @@ This cookbook demonstrates how to create a dataset for **Delta Learning** using 
 ## Table of Contents
 
 1. [Setup](#setup)
-2. [Dataset Generation](#dataset-generation)
-3. [Atomic Reference](#atomic-reference)
-4. [Export](#export)
-5. [Model Training](#model-training)
+2. [Generating Ground Truth Data](#generating-ground-truth-data)
+3. [Dataset Generation](#dataset-generation)
+4. [Atomic Reference](#atomic-reference)
+5. [Export](#export)
+6. [Model Training](#model-training)
 
 ## Setup
 
@@ -16,10 +17,8 @@ First, we set up the necessary imports and initialize the calculators. We use a 
 
 ```python
 import mbe_automation
-from mbe_automation import Structure, FiniteSubsystem, Dataset, DatasetKeys
+from mbe_automation import Structure, Trajectory, FiniteSubsystem, Dataset, DatasetKeys
 from mbe_automation.calculators import DFT, MACE
-
-dataset = "ground_truth.hdf5"
 
 # Initialize Calculators
 # Baseline: Pre-trained MACE model
@@ -36,26 +35,68 @@ calc_target = DFT(
 )
 ```
 
-## Dataset Generation
+## Generating Ground Truth Data
 
-We initialize empty `Dataset` containers for training, validation, and testing. We then iterate through the dataset keys using `DatasetKeys` to find relevant structures (molecules and clusters) that have ground truth data available.
+Before creating the training set, we need to generate the "ground truth" data. This involves calculating the energies and forces for both the baseline and target methods on our structures.
 
-The `DatasetKeys` class allows us to filter keys efficiently. We use `.with_ground_truth()` to ensure we only select systems for which the ground truth calculations have been completed.
+In this example, we assume we have an input HDF5 file (`md_trajectories.hdf5`) containing raw MD trajectories and finite structures (extracted clusters). We will process these, subsample frames, run the calculations, and save the results to a new file (`ground_truth.hdf5`).
 
 ```python
+input_dataset = "md_trajectories.hdf5"
+output_dataset = "ground_truth.hdf5"
+
+# 1. Process Periodic Trajectories
+# We iterate over all periodic trajectories in the input dataset
+for key in DatasetKeys(input_dataset).trajectories().periodic():
+    print(f"Processing trajectory: {key}")
+
+    # Read the full trajectory
+    traj = Trajectory.read(input_dataset, key)
+
+    # Select a diverse subset of frames (e.g., 20 frames using Farthest Point Sampling)
+    subset = traj.subsample(20, method="farthest_point_sampling")
+
+    # Calculate Baseline (MACE) and Target (DFT) properties
+    # The results are stored in the structure's 'ground_truth' attribute
+    subset.run_model(calc_baseline)
+    subset.run_model(calc_target)
+
+    # Save the processed subset to the output dataset
+    subset.save(output_dataset, key)
+
+# 2. Process Finite Structures (Clusters)
+# We iterate over finite subsystems (clusters) of various sizes
+for n in range(2, 11):
+    for key in DatasetKeys(input_dataset).finite_subsystems(n):
+        print(f"Processing cluster: {key}")
+
+        # Read the cluster structure
+        cluster = FiniteSubsystem.read(input_dataset, key)
+
+        # Calculate Baseline and Target properties
+        cluster.run_model(calc_baseline)
+        cluster.run_model(calc_target)
+
+        # Save to the output dataset
+        cluster.save(output_dataset, key)
+
+print("Ground truth generation completed.")
+```
+
+## Dataset Generation
+
+Now that we have a dataset populated with ground truth data (`ground_truth.hdf5`), we can organize it into training, validation, and test sets. We use `DatasetKeys` with the `.with_ground_truth()` filter to ensure we only include systems where the calculations were successful.
+
+```python
+dataset = "ground_truth.hdf5"
+
 train_set = Dataset()
 val_set = Dataset()
 test_set = Dataset()
 
-# Isolated molecule in vacuum
-# We select finite structures (molecules) from the dataset
+# Isolated molecule in vacuum (Finite Structures)
 for key in DatasetKeys(dataset).structures().finite().with_ground_truth():
-    #
-    # Note that only the systems with DFT data will be selected
-    # by filter `with_ground_truth`. This is because ground_truth
-    # is only populated when you execute the `run` method.
-    #
-    print(f"Processing {key}...")
+    print(f"Adding molecule to dataset: {key}")
     molecule = Structure.read(dataset, key)
 
     # Split into Train/Val/Test (90%/5%/5%)
@@ -65,10 +106,9 @@ for key in DatasetKeys(dataset).structures().finite().with_ground_truth():
     test_set.append(test)
 
 # Clusters
-# We explicitly loop over cluster sizes to ensure all sizes are included
 for n in range(2, 11):
     for key in DatasetKeys(dataset).finite_subsystems(n).with_ground_truth():
-        print(f"Processing {key}...")
+        print(f"Adding cluster to dataset: {key}")
         cluster = FiniteSubsystem.read(dataset, key)
 
         # Split into Train/Val/Test (90%/5%/5%)
@@ -80,28 +120,23 @@ for n in range(2, 11):
 
 ## Atomic Reference
 
-For delta learning, we need to calculate the atomic reference energies for both the baseline and target methods. The `Dataset` class provides a convenient `atomic_reference` method that automatically selects ground-state electronic configurations for atoms in the dataset and computes their energies using the provided calculator.
-
-We combine the atomic references for the baseline and target levels of theory using the `+` operator.
+For delta learning, we need to calculate the atomic reference energies for both the baseline and target methods. The `Dataset` class provides a convenient `atomic_reference` method that automatically selects ground-state electronic configurations for atoms in the dataset and computes their energies.
 
 ```python
-# Compute atomic reference energies. We will store the atomic data in
-# the training set. The atomic baseline is not needed for validation and test.
-# The ground-state electronic configurations of atoms are selected automatically.
-# This step is super fast, so can be done even in an interactive mode.
+# Compute atomic reference energies for both levels of theory
+# This step is very fast.
 atomic_energies_baseline = train_set.atomic_reference(calc_baseline)
 atomic_energies_target = train_set.atomic_reference(calc_target)
 
-#
 # Combine atomic references for the baseline and target levels of theory.
-# The plus operator creates a combined dataset with separate data.
-#
+# Note: The "+" operator isn't an arithmetic addition, but creation of
+# the combined reference data containing both sets of energies.
 atomic_energies = atomic_energies_baseline + atomic_energies_target
 ```
 
 ## Export
 
-Finally, we export the datasets to MACE-compatible XYZ files. We define the levels of theory for delta learning (specifying which calculator corresponds to "baseline" and "target") and pass the combined atomic reference energies to the training set export.
+Finally, we export the datasets to MACE-compatible XYZ files. We define the levels of theory for delta learning and pass the combined atomic reference energies to the training set export.
 
 ```python
 delta_learning = {
@@ -123,7 +158,7 @@ test_set.to_mace_dataset(
     level_of_theory=delta_learning
 )
 
-print("All calculations completed")
+print("Export completed.")
 ```
 
 ## Model Training
@@ -153,7 +188,7 @@ python -m mace.cli.run_train \
     --valid_file="delta_learning/validate.xyz" \
     --test_file="delta_learning/test.xyz" \
     --energy_key="Delta_energy" \
-    --model="MACELES" \
+    --model="MACE" \
     --multiheads_finetuning=False \
     --r_max=4 \
     --num_channels=16 \
