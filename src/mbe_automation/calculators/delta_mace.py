@@ -4,6 +4,9 @@ from pathlib import Path
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
 from mbe_automation.calculators.mace import MACE
+from mace.tools import AtomicNumberTable
+from mace.data import config_from_atoms, config_to_atomic_data
+from mace.tools.torch_geometric import Batch
 
 class DeltaMACE(MACE):
     """
@@ -39,6 +42,8 @@ class DeltaMACE(MACE):
         for param in self.delta_model.parameters():
             param.requires_grad = False
 
+        self.z_table_delta = AtomicNumberTable([int(z) for z in self.delta_model.atomic_numbers.cpu()])
+
         r_cut_base = float(self.baseline_model.r_max)
         r_cut_delta = float(self.delta_model.r_max)
         if not np.isclose(r_cut_base, r_cut_delta):
@@ -50,11 +55,20 @@ class DeltaMACE(MACE):
         # Update level of theory
         self.level_of_theory += "+Δ"
 
+    def _atoms_to_batch_with_z_table(self, atoms, z_table, r_cut):
+        config = config_from_atoms(atoms)
+        data = config_to_atomic_data(config, z_table, cutoff=r_cut)
+        batch = Batch.from_data_list([data])
+        return batch.to(self.device)
+
     def calculate(self, atoms=None, properties=None, system_changes=all_changes):
         # We need to call Calculator.calculate to set atoms and handle changes
         Calculator.calculate(self, atoms, properties, system_changes)
         
         batch_base = self._atoms_to_batch(self.atoms)
+        batch_delta = self._atoms_to_batch_with_z_table(
+            self.atoms, self.z_table_delta, float(self.delta_model.r_max)
+        )
 
         # Attributes from MACECalculator
         compute_stress = not getattr(self, "use_compile", False)
@@ -70,7 +84,7 @@ class DeltaMACE(MACE):
         )
 
         out_delta = self.delta_model(
-            self._clone_batch(batch_base).to_dict(),
+            batch_delta.to_dict(),
             compute_stress=compute_stress,
             training=training,
             compute_edge_forces=compute_atomic_stresses,
