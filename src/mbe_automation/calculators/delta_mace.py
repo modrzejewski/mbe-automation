@@ -30,7 +30,7 @@ class DeltaMACE(MACE):
         self.model_path_delta = Path(model_path_delta).expanduser()
 
         self.baseline_model = self.models[0]
-        self.delta_model = torch.load(f=self.model_path_delta, map_location=self.device)
+        self.delta_model = torch.load(self.model_path_delta, map_location=self.device)
         self.delta_model.to(self.device)
 
         # Ensure double precision (MACE default)
