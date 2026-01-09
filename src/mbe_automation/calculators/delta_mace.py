@@ -118,3 +118,80 @@ class DeltaMACE(MACE):
             "device": self.device,
             "head": self.head,
         }
+
+
+class DeltaMACESimple(Calculator):
+    """
+    A simple container for two MACE calculators (baseline and delta) that sums their outputs.
+    Intended for debugging purposes to ensure correctness with 100% probability.
+    """
+    implemented_properties = ['energy', 'forces', 'stress']
+
+    def __init__(
+        self,
+        model_path_baseline: str | Path,
+        model_path_delta: str | Path,
+        device: str | None = None,
+        head: str = "Default"
+    ):
+        super().__init__()
+
+        # Initialize two separate MACE calculators
+        self.calc_baseline = MACE(
+            model_path=model_path_baseline,
+            device=device,
+            head=head
+        )
+        self.calc_delta = MACE(
+            model_path=model_path_delta,
+            device=device,
+            head=head
+        )
+
+        self.model_path_baseline = model_path_baseline
+        self.model_path_delta = model_path_delta
+        self.device = device
+        self.head = head
+
+        # Set level of theory based on baseline
+        self.level_of_theory = self.calc_baseline.level_of_theory + "+Δ"
+
+    def calculate(self, atoms=None, properties=None, system_changes=all_changes):
+        super().calculate(atoms, properties, system_changes)
+
+        # Run calculations on both sub-calculators
+        self.calc_baseline.calculate(atoms, properties=properties, system_changes=system_changes)
+        self.calc_delta.calculate(atoms, properties=properties, system_changes=system_changes)
+
+        self.results = {}
+
+        # Helper to sum results safely
+        def sum_results(key):
+            val_base = self.calc_baseline.results.get(key)
+            val_delta = self.calc_delta.results.get(key)
+
+            if val_base is not None and val_delta is not None:
+                return val_base + val_delta
+            return None
+
+        # Sum supported properties
+        for prop in self.implemented_properties:
+            res = sum_results(prop)
+            if res is not None:
+                self.results[prop] = res
+
+        # Handle free_energy specifically (usually aliases to energy)
+        if 'energy' in self.results:
+            self.results['free_energy'] = self.results['energy']
+
+    def serialize(self) -> tuple:
+        """
+        Returns the class and arguments required to reconstruct the calculator.
+        Used for passing the calculator to Ray workers.
+        """
+        return DeltaMACESimple, {
+            "model_path_baseline": self.model_path_baseline,
+            "model_path_delta": self.model_path_delta,
+            "device": self.device,
+            "head": self.head,
+        }
