@@ -3,6 +3,7 @@ from pathlib import Path
 from e3nn import o3
 from mace.calculators import MACECalculator
 from ase.calculators.calculator import all_changes
+import numpy as np
 
 
 class MACE(MACECalculator):
