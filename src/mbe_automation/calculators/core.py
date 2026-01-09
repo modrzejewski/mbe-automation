@@ -12,13 +12,14 @@ except ImportError:
 
 from mbe_automation.storage import Structure
 from mbe_automation.calculators.mace import MACE
+from mbe_automation.calculators.delta_mace import DeltaMACECalculator
 from mbe_automation.calculators.pyscf import PySCFCalculator
 from mbe_automation.calculators.dftb import DFTBCalculator
 import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
-CALCULATORS = PySCFCalculator | DFTBCalculator | MACE
+CALCULATORS = PySCFCalculator | DFTBCalculator | MACE | DeltaMACECalculator
 
 def _split_work(structure: Structure, n_workers: int):
     assert structure.atomic_numbers.ndim == structure.masses.ndim
@@ -56,7 +57,7 @@ def _split_work(structure: Structure, n_workers: int):
 
 
 def _sequential_loop(
-    calculator: MACE | PySCFCalculator | DFTBCalculator,
+    calculator: MACE | PySCFCalculator | DFTBCalculator | DeltaMACECalculator,
     positions: npt.NDArray[np.float64],
     cell_vectors: npt.NDArray[np.float64] | None,
     atomic_numbers: npt.NDArray[np.float64],
@@ -90,7 +91,7 @@ def _sequential_loop(
 
     if compute_feature_vectors:
         assert isinstance(calculator, MACE)
-        n_features = calculator.n_invariant_features()
+        n_features = calculator.n_invariant_features
         if average_over_atoms:
             feature_vectors = np.zeros((n_frames, n_features))
         else:
@@ -150,7 +151,7 @@ def _sequential_loop(
 
 
 def _parallel_loop(
-    calculator: MACE | PySCFCalculator,
+    calculator: MACE | DeltaMACECalculator | PySCFCalculator,
     structure: Structure,
     compute_energies: bool,
     compute_forces: bool,
@@ -173,7 +174,7 @@ def _parallel_loop(
         forces = None
 
     if compute_feature_vectors:
-        n_features = calculator.n_invariant_features()
+        n_features = calculator.n_invariant_features
         if average_over_atoms:
             feature_vectors = np.zeros((structure.n_frames, n_features))
         else:
@@ -290,7 +291,7 @@ else:
 
 def run_model(
     structure: Structure,
-    calculator: MACE | PySCFCalculator | DFTBCalculator,
+    calculator: MACE | PySCFCalculator | DFTBCalculator | DeltaMACECalculator,
     compute_energies: bool = True,
     compute_forces: bool = True,
     compute_feature_vectors: bool = True,
@@ -315,7 +316,7 @@ def run_model(
     use_ray = (
         RAY_AVAILABLE and
         n_workers > 1 and
-        isinstance(calculator, (MACE, PySCFCalculator))
+        isinstance(calculator, (MACE, DeltaMACECalculator, PySCFCalculator))
     )
 
     if use_ray:
