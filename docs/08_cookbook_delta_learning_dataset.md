@@ -1,157 +1,134 @@
 # Cookbook: Delta Learning Dataset Creation
 
-This cookbook demonstrates how to create a dataset for **Delta Learning** using the MACE framework. Delta learning aims to learn the difference between a high-level target method (e.g., DFTB, DFT, or CCSD(T)) and a lower-level baseline method (e.g., a semi-empirical method or a simpler ML potential).
+This cookbook demonstrates how to create a dataset for **Delta Learning** using the MACE framework. Delta learning aims to learn the difference between a high-level target method (e.g., DFT or CCSD(T)) and a lower-level baseline method (e.g., a semi-empirical method or a simpler ML potential).
 
 ## Table of Contents
 
 1. [Setup](#setup)
-2. [Reference Molecule Energy](#reference-molecule-energy)
-3. [Dataset of Periodic Structures](#dataset-of-periodic-structures)
-4. [Dataset of Finite Clusters](#dataset-of-finite-clusters)
+2. [Dataset Generation](#dataset-generation)
+3. [Atomic Reference](#atomic-reference)
+4. [Export](#export)
 5. [Model Training](#model-training)
 
 ## Setup
 
-First, we set up the necessary imports and configuration variables. We specify the HDF5 dataset containing our structures and define the thermodynamic conditions (temperature and pressure) and cluster sizes we wish to process.
+First, we set up the necessary imports and initialize the calculators. We use a pre-trained MACE model as the baseline and a DFT method (r2SCAN-D4/def2-SVP) as the target.
 
 ```python
-import itertools
-import numpy as np
-from mbe_automation.calculators import MACE
-
 import mbe_automation
-from mbe_automation import Structure, Dataset, FiniteSubsystem
-from mbe_automation.calculators.dftb import DFTB3_D4
+from mbe_automation import Structure, FiniteSubsystem, Dataset, DatasetKeys
+from mbe_automation.calculators import DFT, MACE
 
-# Configuration
-dataset_path = "md_structures.hdf5"
-pressures_GPa = np.array([-0.5, 1.0E-4, 0.5, 1.0, 4.0, 8.0])
-temperatures_K = np.array([300.0])
-cluster_sizes = [1, 2, 3, 4, 5, 6, 7, 8]
-output_dir = "./datasets_11.12.2025"
-```
-
-## Reference Molecule Energy
-
-We need to calculate the energy of an isolated molecule using both the baseline (MACE) and target (DFTB+) calculators. This provides the atomic reference energies (`E_atomic_baseline` and `E_atomic_target`) needed for the delta learning scheme. We load a relaxed molecule from the dataset to serve as this reference.
-
-```python
-# Load reference molecule (extracted from the dataset)
-# Ensure this key points to a single, relaxed molecule
-ref = Structure.read(dataset=dataset_path, key="training/dftb3_d4/structures/molecule[extracted,0,opt:atoms]")
+dataset = "ground_truth.hdf5"
 
 # Initialize Calculators
-# Baseline: MACE model
-baseline_calc = MACE(
+# Baseline: Pre-trained MACE model
+calc_baseline = MACE(
     model_path="~/models/mace/mace-mh-1.model",
-    head="omol"
+    head="omol",
 )
-baseline_calc.level_of_theory = "delta/baseline"
 
-# Target: DFTB3-D4
-target_calc = DFTB3_D4()
-target_calc.level_of_theory = "delta/target"
-
-# Compute reference energies
-# This stores E_baseline and E_target in the structure's ground_truth attribute
-ref.run(calculator=baseline_calc)
-ref.run(calculator=target_calc)
+# Target: DFT (r2SCAN-D4/def2-SVP)
+calc_target = DFT(
+    model_name="r2scan-d4",
+    basis="def2-svp",
+    verbose=5,
+)
 ```
 
-## Dataset of Periodic Structures
+## Dataset Generation
 
-We iterate through the specified thermodynamic conditions (T, p) to load periodic crystal structures from the HDF5 file. We then split these structures into training (90%), validation (5%), and test (5%) sets and accumulate them into `Dataset` objects.
+We initialize empty `Dataset` containers for training, validation, and testing. We then iterate through the dataset keys using `DatasetKeys` to find relevant structures (molecules and clusters) that have ground truth data available.
+
+The `DatasetKeys` class allows us to filter keys efficiently. We use `.with_ground_truth()` to ensure we only select systems for which the ground truth calculations have been completed.
 
 ```python
-# Initialize Dataset containers for periodic structures
-train_pbc = Dataset()
-validate_pbc = Dataset()
-test_pbc = Dataset()
+train_set = Dataset()
+val_set = Dataset()
+test_set = Dataset()
 
-# Loop over Periodic Crystals
-for T, p in itertools.product(temperatures_K, pressures_GPa):
-    # Read subsampled frames for this condition
-    key = f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/subsampled_frames"
-    struct = Structure.read(dataset=dataset_path, key=key)
+# Isolated molecule in vacuum
+# We select finite structures (molecules) from the dataset
+for key in DatasetKeys(dataset).structures().finite().with_ground_truth():
+    #
+    # Note that only the systems with DFT data will be selected
+    # by filter `with_ground_truth`. This is because ground_truth
+    # is only populated when you execute the `run` method.
+    #
+    print(f"Processing {key}...")
+    molecule = Structure.read(dataset, key)
 
     # Split into Train/Val/Test (90%/5%/5%)
-    a, b, c = struct.random_split([0.90, 0.05, 0.05])
-    train_pbc.append(a)
-    validate_pbc.append(b)
-    test_pbc.append(c)
+    train, validate, test = molecule.random_split([0.90, 0.05, 0.05])
+    train_set.append(train)
+    val_set.append(validate)
+    test_set.append(test)
 
-# Export Periodic Datasets
-# Note: This assumes the structures in the dataset have been labeled with
-# both "delta/baseline" and "delta/target" levels of theory.
-level_of_theory = {
-    "baseline": "delta/baseline",
-    "target": "delta/target"
-}
+# Clusters
+# We explicitly loop over cluster sizes to ensure all sizes are included
+for n in range(2, 11):
+    for key in DatasetKeys(dataset).finite_subsystems(n).with_ground_truth():
+        print(f"Processing {key}...")
+        cluster = FiniteSubsystem.read(dataset, key)
 
-train_pbc.to_mace_dataset(
-    save_path=f"{output_dir}/delta_train_pbc.xyz",
-    level_of_theory=level_of_theory,
-)
-
-validate_pbc.to_mace_dataset(
-    save_path=f"{output_dir}/delta_validate_pbc.xyz",
-    level_of_theory=level_of_theory,
-)
-
-test_pbc.to_mace_dataset(
-    save_path=f"{output_dir}/delta_test_pbc.xyz",
-    level_of_theory=level_of_theory,
-)
+        # Split into Train/Val/Test (90%/5%/5%)
+        train, validate, test = cluster.random_split([0.90, 0.05, 0.05])
+        train_set.append(train)
+        val_set.append(validate)
+        test_set.append(test)
 ```
 
-## Dataset of Finite Clusters
+## Atomic Reference
 
-Similarly, we iterate through the cluster sizes and thermodynamic conditions to load finite molecular clusters. These are also split and accumulated into separate `Dataset` objects.
+For delta learning, we need to calculate the atomic reference energies for both the baseline and target methods. The `Dataset` class provides a convenient `atomic_reference` method that automatically selects ground-state electronic configurations for atoms in the dataset and computes their energies using the provided calculator.
+
+We combine the atomic references for the baseline and target levels of theory using the `+` operator.
 
 ```python
-# Initialize Dataset containers for clusters
-train_clusters = Dataset()
-validate_clusters = Dataset()
-test_clusters = Dataset()
+# Compute atomic reference energies. We will store the atomic data in
+# the training set. The atomic baseline is not needed for validation and test.
+# The ground-state electronic configurations of atoms are selected automatically.
+# This step is super fast, so can be done even in an interactive mode.
+atomic_energies_baseline = train_set.atomic_reference(calc_baseline)
+atomic_energies_target = train_set.atomic_reference(calc_target)
 
-for T, p in itertools.product(temperatures_K, pressures_GPa):
-    for n_molecules in cluster_sizes:
-        key_cluster = f"training/dftb3_d4/structures/crystal[dyn:T={T:.2f},p={p:.5f}]/finite/n={n_molecules}"
-        cluster = FiniteSubsystem.read(dataset=dataset_path, key=key_cluster)
+#
+# Combine atomic references for the baseline and target levels of theory.
+# The plus operator creates a combined dataset with separate data.
+#
+atomic_energies = atomic_energies_baseline + atomic_energies_target
+```
 
-        # Split clusters
-        a, b, c = cluster.random_split([0.90, 0.05, 0.05])
-        train_clusters.append(a)
-        validate_clusters.append(b)
-        test_clusters.append(c)
+## Export
 
-# Export Cluster Datasets
-# Note: This assumes the clusters in the dataset have been labeled with
-# both "delta/baseline" and "delta/target" levels of theory.
-level_of_theory = {
-    "baseline": "delta/baseline",
-    "target": "delta/target"
+Finally, we export the datasets to MACE-compatible XYZ files. We define the levels of theory for delta learning (specifying which calculator corresponds to "baseline" and "target") and pass the combined atomic reference energies to the training set export.
+
+```python
+delta_learning = {
+    "target": calc_target.level_of_theory,
+    "baseline": calc_baseline.level_of_theory,
 }
 
-train_clusters.to_mace_dataset(
-    save_path=f"{output_dir}/delta_train_clusters.xyz",
-    level_of_theory=level_of_theory,
+train_set.to_mace_dataset(
+    "./delta_learning/train.xyz",
+    level_of_theory=delta_learning,
+    atomic_reference=atomic_energies
+)
+val_set.to_mace_dataset(
+    "./delta_learning/validate.xyz",
+    level_of_theory=delta_learning
+)
+test_set.to_mace_dataset(
+    "./delta_learning/test.xyz",
+    level_of_theory=delta_learning
 )
 
-validate_clusters.to_mace_dataset(
-    save_path=f"{output_dir}/delta_validate_clusters.xyz",
-    level_of_theory=level_of_theory,
-)
-
-test_clusters.to_mace_dataset(
-    save_path=f"{output_dir}/delta_test_clusters.xyz",
-    level_of_theory=level_of_theory,
-)
+print("All calculations completed")
 ```
 
 ## Model Training
 
-Finally, once the datasets are generated, you can train a Delta Learning MACE model. Below is an example Bash script that runs the training.
+Once the datasets are generated, you can train a Delta Learning MACE model. Below is an example Bash script that runs the training using the generated files.
 
 **Bash Script:** `train.sh`
 
@@ -171,10 +148,10 @@ module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
 python -m mace.cli.run_train \
-    --name="urea_dftb3_d4_delta" \
-    --train_file="datasets_11.12.2025/delta_train_clusters.xyz" \
-    --valid_file="datasets_11.12.2025/delta_validate_pbc.xyz" \
-    --test_file="datasets_11.12.2025/delta_test_pbc.xyz" \
+    --name="urea_r2scan_d4_delta" \
+    --train_file="delta_learning/train.xyz" \
+    --valid_file="delta_learning/validate.xyz" \
+    --test_file="delta_learning/test.xyz" \
     --energy_key="Delta_energy" \
     --model="MACELES" \
     --multiheads_finetuning=False \
