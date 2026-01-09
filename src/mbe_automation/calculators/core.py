@@ -12,14 +12,13 @@ except ImportError:
 
 from mbe_automation.storage import Structure
 from mbe_automation.calculators.mace import MACE
-from mbe_automation.calculators.delta_mace import DeltaMACE
 from mbe_automation.calculators.pyscf import PySCFCalculator
 from mbe_automation.calculators.dftb import DFTBCalculator
 import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
-CALCULATORS = PySCFCalculator | DFTBCalculator | MACE | DeltaMACE
+CALCULATORS = PySCFCalculator | DFTBCalculator | MACE
 
 def _split_work(structure: Structure, n_workers: int):
     assert structure.atomic_numbers.ndim == structure.masses.ndim

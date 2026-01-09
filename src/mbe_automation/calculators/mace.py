@@ -2,12 +2,30 @@ import torch
 from pathlib import Path
 from e3nn import o3
 from mace.calculators import MACECalculator
+from ase.calculators.calculator import all_changes
+
 
 class MACE(MACECalculator):
+    """
+    Modified ASE MACE calculator:
+    (1) level of theory string id
+    (2) serialize method required for parallelization via Ray
+    (3) delta learning
 
+    If multiple entries in model_paths are provided,
+    code path for delta learning is activated.
+    
+    (1) first path in model_paths is interpreted as the baseline,
+    (2) the remaining paths are interperted as models which
+        provide corrections.
+
+    In this case, the total energy, forces, and stress will be
+    assembled as baseline + delta corrections.
+    
+    """
     def __init__(
             self,
-            model_path,
+            model_paths: str | Path | list[str|Path],
             device: str | None = None,
             head: str = "Default",
     ):
@@ -16,11 +34,12 @@ class MACE(MACECalculator):
                 device = "cuda"
             else:
                 device = "cpu"
-        
-        self.model_path = Path(model_path).expanduser()
+
+        self.model_paths = [Path(x).expanduser() for x in list(model_paths)]
+        self.n_models = len(model_paths)
 
         super().__init__(
-            model_paths=str(self.model_path),
+            model_paths=[str(x) for x in self.model_paths],
             device=device,
             head=head,
             default_dtype="float64",
@@ -31,9 +50,43 @@ class MACE(MACECalculator):
         else:
             self.level_of_theory = f"mace_{self.architecture}"
 
+        if self.n_models > 1:
+            self.level_of_theory += "+Δ"
+
         self.device = device
         self.head = head
 
+    def calculate(self, atoms=None, properties=("energy",), system_changes=all_changes):
+        super().calculate(atoms, properties, system_changes)
+
+        if self.n_models > 1:
+            #
+            # baseline+delta is implemented as a committee of models,
+            # where model[0] is the baseline and the remaining ones
+            # are delta corrections.
+            # MACE saves properties calculated by individual models
+            # with postfix "_comm".
+            #
+            additive_keys = ["energy", "free_energy", "forces", "stress"]
+            for key in additive_keys:
+                comm_key = f"{key}_comm" 
+                if comm_key in self.results:
+                    self.results[key] = np.sum(self.results[comm_key], axis=0)
+            
+            keys_to_remove = [k for k in self.results if k.endswith("_var")]
+            for k in keys_to_remove:
+                del self.results[k]
+
+    def get_descriptors(self, atoms=None, invariants_only=True, num_layers=-1):
+        """
+        For delta learning, return only the descriptors of the baseline model.
+        """
+        d = super().get_descriptors(self, atoms, invariants_only, num_layers)
+        if self.n_models > 1:
+            return d[0]
+        else:
+            return d
+                
     @property
     def n_invariant_features(self) -> int:
         """
@@ -72,8 +125,7 @@ class MACE(MACECalculator):
         Used for passing the calculator to Ray workers.
         """
         return MACE, {
-            "model_path": self.model_path,
+            "model_paths": self.model_paths,
             "device": self.device,
             "head": self.head,
         }
-        
