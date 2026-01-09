@@ -35,7 +35,9 @@ class MACE(MACECalculator):
             else:
                 device = "cpu"
 
-        self.model_paths = [Path(x).expanduser() for x in list(model_paths)]
+        if isinstance(model_paths, (str, Path)):
+            model_paths = [model_paths]
+        self.model_paths = [Path(x).expanduser() for x in model_paths]
         self.n_models = len(model_paths)
 
         super().__init__(
