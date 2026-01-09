@@ -46,7 +46,7 @@ output_dataset = "ground_truth.hdf5"
 
 # 1. Process Periodic Trajectories
 # We iterate over all periodic trajectories in the input dataset
-for key in DatasetKeys(input_dataset).trajectories().periodic():
+for key in DatasetKeys(input_dataset).trajectories().finite():
     print(f"Processing trajectory: {key}")
 
     # Read the full trajectory
