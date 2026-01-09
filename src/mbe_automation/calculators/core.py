@@ -56,7 +56,7 @@ def _split_work(structure: Structure, n_workers: int):
 
 
 def _sequential_loop(
-    calculator: MACE | DeltaMACE | PySCFCalculator | DFTBCalculator,
+    calculator: MACE | PySCFCalculator | DFTBCalculator,
     positions: npt.NDArray[np.float64],
     cell_vectors: npt.NDArray[np.float64] | None,
     atomic_numbers: npt.NDArray[np.float64],
