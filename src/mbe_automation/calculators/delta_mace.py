@@ -15,23 +15,25 @@ class DeltaMACE(MACE):
         model_path_baseline,
         model_path_delta,
         device: str | None = None,
-        head: str = "Default",
-        baseline_head: str = "Default",
+        head_baseline: str = "Default",
+        head_delta: str = "Default",
     ):
         # Initialize the baseline model using the MACE class
         # This sets self.models[0] to the baseline model
         super().__init__(
             model_path=model_path_baseline,
             device=device,
-            head=baseline_head,
+            head=head_baseline,
         )
 
         # Overwrite attributes specific to DeltaMACE
         self.model_path_baseline = self.model_path # set by super from model_path_baseline
         self.model_path_delta = Path(model_path_delta).expanduser()
-        self.baseline_head = baseline_head
-        # MACE.__init__ sets self.head to baseline_head. We overwrite it.
-        self.head = head
+        self.head_baseline = head_baseline
+        self.head_delta = head_delta
+
+        # MACE.__init__ sets self.head to head_baseline. We overwrite it to head_delta.
+        self.head = head_delta
 
         self.baseline_model = self.models[0]
         self.delta_model = torch.load(f=self.model_path_delta, map_location=self.device)
@@ -53,8 +55,8 @@ class DeltaMACE(MACE):
 
         # Update level of theory
         self.level_of_theory = f"delta_mace_{self.architecture}"
-        if head != "Default":
-             self.level_of_theory += f"_{head}_head"
+        if head_delta != "Default":
+             self.level_of_theory += f"_{head_delta}_head"
 
     def calculate(self, atoms=None, properties=None, system_changes=all_changes):
         # We need to call Calculator.calculate to set atoms and handle changes
@@ -121,6 +123,6 @@ class DeltaMACE(MACE):
             "model_path_baseline": self.model_path_baseline,
             "model_path_delta": self.model_path_delta,
             "device": self.device,
-            "head": self.head,
-            "baseline_head": self.baseline_head,
+            "head_delta": self.head_delta,
+            "head_baseline": self.head_baseline,
         }
