@@ -214,11 +214,11 @@ class Structure:
 
     def to_ase_atoms(self, frame_index: int = 0) -> ase.Atoms:
         from .views import to_ase
-        return to_ase(self, frame_index)
+        return to_ase(structure=self, frame_index=frame_index)
 
     def to_pymatgen(self, frame_index: int = 0) -> pymatgen.core.Structure | pymatgen.core.Molecule:
         from .views import to_pymatgen
-        return to_pymatgen(self, frame_index)
+        return to_pymatgen(structure=self, frame_index=frame_index)
     
     def lattice(self, frame_index: int = 0) -> pymatgen.core.Lattice:
         assert self.periodic, "Structure must be periodic."
