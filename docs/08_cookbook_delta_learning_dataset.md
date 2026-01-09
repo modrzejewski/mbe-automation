@@ -30,8 +30,7 @@ calc_baseline = MACE(
 # Target: DFT (r2SCAN-D4/def2-SVP)
 calc_target = DFT(
     model_name="r2scan-d4",
-    basis="def2-svp",
-    verbose=5,
+    basis="def2-svp"
 )
 ```
 
