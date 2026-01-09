@@ -208,6 +208,12 @@ def _parallel_loop(
             CalculatorWorker.options(
                 num_gpus=n_gpus_per_worker,
                 num_cpus=n_cpus_per_worker,
+                runtime_env={
+                    "env_vars": {
+                        "OMP_NUM_THREADS": str(n_cpus_per_worker),
+                        "MKL_NUM_THREADS": str(n_cpus_per_worker),
+                    }
+                },
             ).remote(
                 calculator_cls=calc_cls,
                 silent=(silent or i > 0),
