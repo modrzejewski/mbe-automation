@@ -81,7 +81,7 @@ class MACE(MACECalculator):
         """
         For delta learning, return only the descriptors of the baseline model.
         """
-        d = super().get_descriptors(self, atoms, invariants_only, num_layers)
+        d = super().get_descriptors(atoms, invariants_only, num_layers)
         if self.n_models > 1:
             return d[0]
         else:
