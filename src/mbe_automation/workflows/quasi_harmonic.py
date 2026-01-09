@@ -15,6 +15,7 @@ import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.structure.clusters
+from mbe_automation.configs.execution import Resources
 
 try:
     from mace.calculators import MACECalculator
@@ -26,6 +27,7 @@ except ImportError:
 
 def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
+    Resources.auto_detect().set()
     datetime_start = mbe_automation.common.display.timestamp_start()
     
     if config.verbose == 0:

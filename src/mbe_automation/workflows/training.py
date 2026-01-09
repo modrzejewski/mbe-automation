@@ -11,6 +11,7 @@ import mbe_automation.configs
 import mbe_automation.dynamics
 import mbe_automation.structure
 import mbe_automation.calculators
+from mbe_automation.configs.execution import Resources
 
 try:
     from mace.calculators import MACECalculator
@@ -24,6 +25,7 @@ def phonon_sampling(
         config: mbe_automation.configs.training.PhononSampling
 ):
 
+    Resources.auto_detect().set()
     datetime_start = mbe_automation.common.display.timestamp_start()
     
     if config.verbose == 0:
@@ -233,6 +235,7 @@ def md_sampling(
         config: mbe_automation.configs.training.MDSampling
 ):
 
+    Resources.auto_detect().set()
     datetime_start = mbe_automation.common.display.timestamp_start()
     
     if config.verbose == 0:

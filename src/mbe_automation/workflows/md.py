@@ -12,6 +12,7 @@ import mbe_automation.storage
 import mbe_automation.configs
 import mbe_automation.dynamics
 import mbe_automation.structure
+from mbe_automation.configs.execution import Resources
 
 try:
     from mace.calculators import MACECalculator
@@ -104,6 +105,7 @@ def _md_crystal(
 
 def run(config: mbe_automation.configs.md.Enthalpy):
 
+    Resources.auto_detect().set()
     datetime_start = mbe_automation.common.display.timestamp_start()
     
     if config.verbose == 0:
