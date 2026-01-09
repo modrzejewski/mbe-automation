@@ -36,7 +36,7 @@ calc_target = DFT(
 
 ## Generating Ground Truth Data
 
-Generating the "ground truth" data involves calculating the energies and forces for both the baseline and target methods on the structures.
+Generating the ground truth data involves calculating the energies and forces for both the baseline and target methods on the structures.
 
 The example below processes an input HDF5 file (`md_trajectories.hdf5`) containing raw MD trajectories and finite structures. It subsamples frames, executes the calculations, and saves the results to `ground_truth.hdf5`.
 
