@@ -15,25 +15,19 @@ class DeltaMACE(MACE):
         model_path_baseline,
         model_path_delta,
         device: str | None = None,
-        head_baseline: str = "Default",
-        head_delta: str = "Default",
+        head: str = "Default"
     ):
         # Initialize the baseline model using the MACE class
         # This sets self.models[0] to the baseline model
         super().__init__(
             model_path=model_path_baseline,
             device=device,
-            head=head_baseline,
+            head=head,
         )
 
         # Overwrite attributes specific to DeltaMACE
         self.model_path_baseline = self.model_path # set by super from model_path_baseline
         self.model_path_delta = Path(model_path_delta).expanduser()
-        self.head_baseline = head_baseline
-        self.head_delta = head_delta
-
-        # MACE.__init__ sets self.head to head_baseline. We overwrite it to head_delta.
-        self.head = head_delta
 
         self.baseline_model = self.models[0]
         self.delta_model = torch.load(f=self.model_path_delta, map_location=self.device)
@@ -54,9 +48,7 @@ class DeltaMACE(MACE):
             )
 
         # Update level of theory
-        self.level_of_theory = f"delta_mace_{self.architecture}"
-        if head_delta != "Default":
-             self.level_of_theory += f"_{head_delta}_head"
+        self.level_of_theory += "+Δ"
 
     def calculate(self, atoms=None, properties=None, system_changes=all_changes):
         # We need to call Calculator.calculate to set atoms and handle changes
@@ -87,30 +79,31 @@ class DeltaMACE(MACE):
 
         self.results = {}
 
-        def get_summed(key):
+        def _baseline_plus_delta(key):
             v1 = out_base.get(key)
             v2 = out_delta.get(key)
             if v1 is not None and v2 is not None:
                 return v1 + v2
-            return v1 if v1 is not None else v2
+            else:
+                return None
 
-        energy_tensor = get_summed("energy")
+        energy_tensor = _baseline_plus_delta("energy")
         if energy_tensor is not None:
             self.results["energy"] = energy_tensor.item() * self.energy_units_to_eV
             self.results["free_energy"] = self.results["energy"]
 
-        forces_tensor = get_summed("forces")
+        forces_tensor = _baseline_plus_delta("forces")
         if forces_tensor is not None:
             f_conv = self.energy_units_to_eV / self.length_units_to_A
             self.results["forces"] = forces_tensor.detach().cpu().numpy() * f_conv
 
-        stress_tensor = get_summed("stress")
+        stress_tensor = _baseline_plus_delta("stress")
         if stress_tensor is not None:
             s_conv = self.energy_units_to_eV / self.length_units_to_A**3
             stress_numpy = stress_tensor.detach().cpu().numpy()
             self.results["stress"] = full_3x3_to_voigt_6_stress(stress_numpy) * s_conv
 
-        node_e_tensor = get_summed("node_energy")
+        node_e_tensor = _baseline_plus_delta("node_energy")
         if node_e_tensor is not None:
             self.results["energies"] = node_e_tensor.detach().cpu().numpy() * self.energy_units_to_eV
 
