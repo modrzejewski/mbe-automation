@@ -12,7 +12,6 @@ class MACE(MACECalculator):
     Modified ASE MACE calculator:
     (1) level of theory string id
     (2) serialize method required for parallelization via Ray
-    (3) delta learning
     """
     def __init__(
             self,
