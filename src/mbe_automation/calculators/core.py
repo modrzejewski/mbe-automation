@@ -100,11 +100,21 @@ def _sequential_loop(
     else:
         feature_vectors = None
 
+    if isinstance(calculator, PySCFCalculator):
+        #
+        # Electronic structure calculations are slow,
+        # so we are showing progress after smaller
+        # increments
+        #
+        displayed_percent_increment = 5
+    else:
+        displayed_percent_increment = 10
+
     for i in mbe_automation.common.display.Progress(
         iterable=range(n_frames),
         n_total_steps=n_frames,
         label="frames",
-        percent_increment=10,
+        percent_increment=displayed_percent_increment,
         silent=silent,
     ):
         if permuted_between_frames:
