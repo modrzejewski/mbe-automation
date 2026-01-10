@@ -36,7 +36,7 @@ from mbe_automation import Structure
 from mbe_automation.calculators import MACE
 
 # Load a MACE model
-# Note: mbe-mh-1 requires specifying the readout head.
+# Note: mace-mh-1 requires specifying the readout head.
 # In our tests we have found that "omol" works well for molecular
 # crystals.
 calc = MACE(model_path="~/models/mace-mh-1.model", head="omol")
