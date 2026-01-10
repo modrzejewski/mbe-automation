@@ -15,7 +15,7 @@ from mbe_automation import Structure
 
 xyz_solid = "solid.xyz"
 
-mace_calc = MACE(model_paths="mace.model")
+mace_calc = MACE(model_path="mace.model")
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
