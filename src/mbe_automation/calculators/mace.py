@@ -5,6 +5,7 @@ from mace.calculators import MACECalculator
 from ase.calculators.calculator import all_changes
 import numpy as np
 
+DEFAULT_HEAD = "Default"
 
 class MACE(MACECalculator):
     """
@@ -28,7 +29,7 @@ class MACE(MACECalculator):
             self,
             model_paths: str | Path | list[str|Path],
             device: str | None = None,
-            head: str = "Default",
+            head: str = DEFAULT_HEAD,
     ):
         if device is None:
             if torch.cuda.is_available():
@@ -48,7 +49,7 @@ class MACE(MACECalculator):
             default_dtype="float64",
         )
 
-        if head != "default":
+        if head != DEFAULT_HEAD:
             self.level_of_theory = f"mace_{self.architecture}_{head}_head"
         else:
             self.level_of_theory = f"mace_{self.architecture}"
