@@ -123,9 +123,9 @@ The module provides factory functions `DFT` and `HF` to simplify initialization.
 | Range-Separated Hybrids | Global Hybrid GGAs | Pure GGAs | Pure Meta-GGAs |
 | :--- | :--- | :--- | :--- |
 | `wb97m-v` | `b3lyp-d3` | `pbe-d3` | `r2scan-d4` |
-| `wb97x-d3` | `b3lyp-d4` | `pbe-d4` | |
-| `wb97x-d4` | `pbe0-d3` | | |
-| | `pbe0-d4` | | |
+| `wb97m-d3` | `b3lyp-d4` | `pbe-d4` | |
+| `wb97x-d3` | `pbe0-d3` | | |
+| `wb97x-d4` | `pbe0-d4` | | |
 
 ### Supported Basis Sets
 
