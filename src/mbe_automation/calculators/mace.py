@@ -135,7 +135,7 @@ class DeltaMACE(Calculator):
             delta.calculate(
                 atoms, properties=properties, system_changes=system_changes
             )
-            for key in ("energy", "forces", "stress", "free_energy"):
+            for key in self.implemented_properties:
                 if key in self.results and key in delta.results:
                     self.results[key] += delta.results[key]
 
