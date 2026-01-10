@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 import mbe_automation.structure
 import mbe_automation.storage.core
 import mbe_automation.storage.views
+import mbe_automation.common.display
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 def _cif_with_adps(
@@ -191,6 +192,11 @@ def from_xyz_file(
         transform_to_symmetrized_primitive: bool = True,
         symprec: float = SYMMETRY_TOLERANCE_LOOSE
 ) -> ase.Atoms:
+
+    mbe_automation.common.display.framed([
+        "Loading Structure",
+        f"Path: {read_path}"
+    ])
     
     if read_path.lower().endswith(".cif"):
         structure = pymatgen.core.Structure.from_file(read_path)
@@ -199,10 +205,35 @@ def from_xyz_file(
         system = ase.io.read(read_path)
 
     if transform_to_symmetrized_primitive and np.all(system.pbc):
+        input_space_group, input_hmsymbol = mbe_automation.structure.crystal.check_symmetry(
+            unit_cell=system,
+            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT,
+        )
+
+        print("Reduction to standardized primitive cell (pymatgen)...")
         system = mbe_automation.structure.crystal.to_symmetrized_primitive(
             unit_cell=system,
             symprec=symprec
         )
+
+        space_group, hmsymbol = mbe_automation.structure.crystal.check_symmetry(
+            unit_cell=system,
+            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT
+        )
+
+        if space_group != input_space_group:
+            print(
+                f"Performed symmetry refinement: "
+                f"[{input_hmsymbol}][{input_space_group}] → [{hmsymbol}][{space_group}]"
+            )
+        else:
+            print(f"No symmetry refinement needed")
+            print(f"Symmetry under strict tolerance: [{input_hmsymbol}][{input_space_group}]")
+
+        print(f"Lattice lengths   a={system.cell.lengths()[0]:.4f}, b={system.cell.lengths()[1]:.4f}, c={system.cell.lengths()[2]:.4f} Å")
+        print(f"Lattice angles    alpha={system.cell.angles()[0]:.4f}, beta={system.cell.angles()[1]:.4f}, gamma={system.cell.angles()[2]:.4f} °")
+        print(f"Cell volume       {system.get_volume():.4f} Å³")
+        print(f"Number of atoms   {len(system)}")
         
     return system
 
