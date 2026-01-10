@@ -12,6 +12,7 @@ While these calculators inherit from the standard ASE `Calculator` interface, th
 ## Table of Contents
 
 *   [MACE](#mace)
+*   [DeltaMACE](#deltamace)
 *   [PySCF (DFT & HF)](#pyscf-dft--hf)
 *   [DFTB+ (Semi-empirical)](#dftb-semi-empirical)
 
@@ -23,8 +24,8 @@ The `MACE` class wraps the `mace-torch` calculator, providing automatic device s
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `model_paths` | `str` or `list[str]` | - | Path or list of paths to MACE model files. If a list is provided, delta learning is enabled. |
-| `head` | `str` | `"default"` | Name of the readout head to use.† |
+| `model_path` | `str` | - | Path to the MACE model file. |
+| `head` | `str` | `"Default"` | Name of the readout head to use.† |
 
 † *Some models, such as `mace-mh-1.model`, require specifying a readout head (e.g., `head="omol"`).*
 
@@ -35,10 +36,10 @@ from mbe_automation import Structure
 from mbe_automation.calculators import MACE
 
 # Load a MACE model
-# Note: mace-mh-1 requires specifying the readout head.
+# Note: mbe-mh-1 requires specifying the readout head.
 # In our tests we have found that "omol" works well for molecular
 # crystals.
-calc = MACE(model_paths="~/models/mace-mh-1.model", head="omol")
+calc = MACE(model_path="~/models/mace-mh-1.model", head="omol")
 
 # Load a structure
 structure = Structure.from_xyz_file("structure.xyz")
@@ -53,6 +54,49 @@ energy = structure.ground_truth.energies[calc.level_of_theory]
 forces = structure.ground_truth.forces[calc.level_of_theory]
 
 print(f"Potential Energy: {energy} eV/atom")
+print(f"Forces:\n{forces}")
+```
+
+## DeltaMACE
+
+The `DeltaMACE` class implements a delta-learning model. It takes a list of MACE models, where the first is treated as the baseline and the rest are additive corrections (deltas).
+
+### Adjustable parameters
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `model_paths` | `list[str]` | - | List of paths to MACE model files. The first model is the baseline, and subsequent models are deltas. |
+| `head` | `str` | `"Default"` | Name of the readout head to use for all models. |
+
+### Code Example
+
+```python
+from mbe_automation import Structure
+from mbe_automation.calculators import DeltaMACE
+
+# Define paths to the baseline and delta models
+baseline_model = "~/models/mace-mh-1.model"  # e.g., trained on DFTB
+delta_model = "~/models/delta_dft.model"      # e.g., trained on DFT - DFTB
+
+# Initialize the delta-learning calculator
+# Note: mace-mh-1 requires specifying the readout head
+calc = DeltaMACE(
+    model_paths=[baseline_model, delta_model],
+    head="omol"
+)
+
+# Load a structure
+structure = Structure.from_xyz_file("structure.xyz")
+
+# Run calculation
+structure.run(calc)
+
+# Retrieve results
+# The level_of_theory will be baseline_architecture+Δ
+energy = structure.ground_truth.energies[calc.level_of_theory]
+forces = structure.ground_truth.forces[calc.level_of_theory]
+
+print(f"Delta-learning Energy: {energy} eV/atom")
 print(f"Forces:\n{forces}")
 ```
 
