@@ -23,7 +23,7 @@ The `MACE` class wraps the `mace-torch` calculator, providing automatic device s
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `model_paths` | `str` | - | Path to the MACE model file (`.model`). |
+| `model_paths` | `str` or `list[str]` | - | Path or list of paths to MACE model files. If a list is provided, delta learning is enabled. |
 | `head` | `str` | `"default"` | Name of the readout head to use.† |
 
 † *Some models, such as `mace-mh-1.model`, require specifying a readout head (e.g., `head="omol"`).*
