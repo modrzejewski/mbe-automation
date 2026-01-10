@@ -103,6 +103,10 @@ class DeltaMACE(Calculator):
             device: str | None = None,
             head: str = DEFAULT_HEAD,
     ):
+        assert len(model_paths) >= 2, (
+            "At least two model paths must be provided to initialize DeltaMACE."
+        )
+        
         super().__init__()
 
         self.models = [
