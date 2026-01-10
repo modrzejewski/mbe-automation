@@ -118,15 +118,15 @@ mbe_automation.run(phonon_sampling_config)
 
 ## Adjustable parameters
 
-Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./13_configuration_classes.md) chapter.
+Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./03_configuration_classes.md) chapter.
 
-*   **[`MDSampling`](./13_configuration_classes.md#mdsampling-class)**: Configuration for the MD sampling stage.
-*   **[`PhononSampling`](./13_configuration_classes.md#phononsampling-class)**: Configuration for the phonon sampling stage.
-*   **[`ClassicalMD`](./13_configuration_classes.md#classicalmd-class)**: Configuration for the MD simulation parameters within `MDSampling`.
-*   **[`FreeEnergy`](./13_configuration_classes.md#freeenergy-class)**: Configuration for the force constants calculation.
-*   **[`Minimum`](./13_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
-*   **[`FiniteSubsystemFilter`](./13_configuration_classes.md#finitesubsystemfilter-class)**: Configuration for extracting molecular clusters.
-*   **[`PhononFilter`](./13_configuration_classes.md#phononfilter-class)**: Configuration for selecting phonon modes.
+*   **[`MDSampling`](./03_configuration_classes.md#mdsampling-class)**: Configuration for the MD sampling stage.
+*   **[`PhononSampling`](./03_configuration_classes.md#phononsampling-class)**: Configuration for the phonon sampling stage.
+*   **[`ClassicalMD`](./03_configuration_classes.md#classicalmd-class)**: Configuration for the MD simulation parameters within `MDSampling`.
+*   **[`FreeEnergy`](./03_configuration_classes.md#freeenergy-class)**: Configuration for the force constants calculation.
+*   **[`Minimum`](./03_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
+*   **[`FiniteSubsystemFilter`](./03_configuration_classes.md#finitesubsystemfilter-class)**: Configuration for extracting molecular clusters.
+*   **[`PhononFilter`](./03_configuration_classes.md#phononfilter-class)**: Configuration for selecting phonon modes.
 
 ## Subsampling
 
@@ -173,8 +173,17 @@ The `Structure` and `Trajectory` classes allow updating an existing dataset with
 To update a dataset, first load the structure, run the calculator, and then save the specific properties using the `only` argument in the `save` method.
 
 ```python
-from mbe_automation.storage import Trajectory
-# Assuming mace_calc is already initialized
+from mbe_automation import Trajectory
+from mbe_automation.calculators import MACE
+
+# Initialize the calculator that will be used to update the structures
+#
+# Note we assume here that you will be adding feature vectors.
+# The `feature_vectors_type` is not available for other calculators
+mace_calc = MACE(
+    model_path="path/to/your/mace.model",
+    head="omol",
+)
 
 # Load structure
 traj = Trajectory.read(
@@ -182,7 +191,10 @@ traj = Trajectory.read(
     key="training/md_sampling/trajectories/crystal[dyn:T=298.15,p=0.00010]"
 )
 
-# Compute new properties (e.g., feature vectors)
+# Compute new properties
+#
+# Note that we do not want to re-calculate energies and forces,
+# so we set the corresponding keywords to `False`.
 traj.run(
     calculator=mace_calc,
     feature_vectors_type="averaged_environments",
@@ -190,7 +202,7 @@ traj.run(
     forces=False
 )
 
-# Save only the new feature vectors
+# Save only the new feature vectors to the same location
 traj.save(
     dataset="training_set.hdf5",
     key="training/md_sampling/trajectories/crystal[dyn:T=298.15,p=0.00010]",
@@ -270,7 +282,7 @@ traj.save(
 
 ## Computational Bottlenecks
 
-For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
+For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./05_bottlenecks.md) section.
 
 ## Complete Input Files
 
@@ -365,9 +377,6 @@ mbe_automation.run(phonon_sampling_config)
 #SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00
 #SBATCH --mem=180gb
-
-export OMP_NUM_THREADS=8
-export MKL_NUM_THREADS=8
 
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate

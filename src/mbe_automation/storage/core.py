@@ -167,9 +167,12 @@ class Structure:
             self,
             dataset: str,
             key: str,
-            only: List[Literal[*DATA_FOR_TRAINING]] | None = None,
+            only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
     ) -> None:
         """Save the structure to a dataset."""
+
+        if isinstance(only, str):
+            only = [only]
 
         if only is None:
             save_structure(
@@ -211,11 +214,11 @@ class Structure:
 
     def to_ase_atoms(self, frame_index: int = 0) -> ase.Atoms:
         from .views import to_ase
-        return to_ase(self, frame_index)
+        return to_ase(structure=self, frame_index=frame_index)
 
     def to_pymatgen(self, frame_index: int = 0) -> pymatgen.core.Structure | pymatgen.core.Molecule:
         from .views import to_pymatgen
-        return to_pymatgen(self, frame_index)
+        return to_pymatgen(structure=self, frame_index=frame_index)
     
     def lattice(self, frame_index: int = 0) -> pymatgen.core.Lattice:
         assert self.periodic, "Structure must be periodic."
@@ -310,9 +313,12 @@ class Trajectory(Structure):
             self,
             dataset: str,
             key: str,
-            only: List[Literal[*DATA_FOR_TRAINING]] | None = None,
+            only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
     ) -> None:
         """Save the trajectory to a dataset."""
+
+        if isinstance(only, str):
+            only = [only]
 
         if only is None:
             save_trajectory(
@@ -1113,9 +1119,12 @@ def save_finite_subsystem(
         dataset: str,
         key: str,
         subsystem: FiniteSubsystem,
-        only: List[Literal[*DATA_FOR_TRAINING]] | None = None,
+        only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
 ) -> None:
     """Save a FiniteSubsystem object to a dataset."""
+
+    if isinstance(only, str):
+        only = [only]
 
     if only is None:
         Path(dataset).parent.mkdir(parents=True, exist_ok=True)

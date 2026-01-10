@@ -395,7 +395,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             self,
             dataset: str,
             key: str,
-            only: List[Literal[*DATA_FOR_TRAINING]] | None = None,            
+            only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
     ) -> None:
 
         mbe_automation.storage.core.save_finite_subsystem(

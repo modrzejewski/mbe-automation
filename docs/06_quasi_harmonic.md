@@ -60,10 +60,10 @@ mbe_automation.run(properties_config)
 
 ## Adjustable parameters
 
-Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./13_configuration_classes.md) chapter.
+Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./03_configuration_classes.md) chapter.
 
-*   **[`FreeEnergy`](./13_configuration_classes.md#freeenergy-class)**: Main configuration for the quasi-harmonic workflow.
-*   **[`Minimum`](./13_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
+*   **[`FreeEnergy`](./03_configuration_classes.md#freeenergy-class)**: Main configuration for the quasi-harmonic workflow.
+*   **[`Minimum`](./03_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
 
 ## Function Call Overview
 
@@ -125,7 +125,7 @@ Detailed descriptions of the configuration classes can be found in the [Configur
 
 ## Computational Bottlenecks
 
-For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./06_bottlenecks.md) section.
+For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./05_bottlenecks.md) section.
 
 ## How to read the results
 
@@ -264,9 +264,6 @@ mbe_automation.run(properties_config)
 #SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00
 #SBATCH --mem=180gb
-
-export OMP_NUM_THREADS=8
-export MKL_NUM_THREADS=8
 
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate

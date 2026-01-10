@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import List, Literal
+from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 import ase.io
@@ -10,7 +11,7 @@ from mbe_automation.storage.core import Structure, AtomicReference
 
 def _to_xyz_training_set(
         structure: Structure,
-        save_path: str,
+        save_path: str | Path,
         E_pot: npt.NDArray[np.float64] | None, # eV/atom
         forces: npt.NDArray[np.float64] | None, # eV/Angs
         append: bool = False,
@@ -49,7 +50,7 @@ def _to_xyz_training_set(
     )
     
 def _save_atomic_energies(
-        save_path: str,
+        save_path: str | Path,
         atomic_numbers: npt.NDArray[np.int64],
         E_atomic: npt.NDArray[np.float64],
 ) -> None:
@@ -90,13 +91,16 @@ def _process_atomic_energies(
 def to_xyz_training_set(
         structures: List[Structure],
         level_of_theory: str | dict[Literal["target", "baseline"], str],
-        save_path: str,
+        save_path: str | Path,
         atomic_reference: AtomicReference | None = None,
 ) -> None:
     """
     Export a list of Structure objects to a dataset
     compatible with MACE.
     """
+    save_path = Path(save_path)
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    
     delta_learning = isinstance(level_of_theory, dict)
 
     if delta_learning:
@@ -172,7 +176,7 @@ def to_xyz_training_set(
             forces = forces_target
 
         if (energies is None and forces is None):
-            raise ValueError(f"Structure {i} does not contain requested data.")
+            raise ValueError(f"Structure {i} does not contain energies/forces data at the requested level of theory: {level_of_theory}")
         
         _to_xyz_training_set(
             structure=structure,
