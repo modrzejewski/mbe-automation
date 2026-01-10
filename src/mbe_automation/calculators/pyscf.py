@@ -49,7 +49,7 @@ DFT_METHODS = [
 
 XC_MAP = {
     "wb97m-v": {"xc": "wb97m-v"},
-    "wb97m-d3": {"xc": "wb97m-d3bjatm"},
+    "wb97m-d3": {"xc": "wb97m-d3bj"},
     "wb97x-d3": {"xc": "wb97x-d3bjatm"},
     "wb97x-d4": {"xc": "wb97x-d4"},
     "b3lyp-d3": {"xc": "b3lyp-d3bjatm"},
