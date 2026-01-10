@@ -23,7 +23,7 @@ from mbe_automation import Structure
 xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/mace.model")
+mace_calc = MACE(model_paths="path/to/your/mace.model")
 ```
 
 ## NPT/NVT Propagation
@@ -175,7 +175,7 @@ from mbe_automation import Structure
 xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/model.model")
+mace_calc = MACE(model_paths="path/to/your/model.model")
 
 md_config = mbe_automation.configs.md.Enthalpy(
     molecule=Structure.from_xyz_file(xyz_molecule),

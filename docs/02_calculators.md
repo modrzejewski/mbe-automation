@@ -23,7 +23,7 @@ The `MACE` class wraps the `mace-torch` calculator, providing automatic device s
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `model_path` | `str` | - | Path to the MACE model file (`.model`). |
+| `model_paths` | `str` | - | Path to the MACE model file (`.model`). |
 | `head` | `str` | `"default"` | Name of the readout head to use.† |
 
 † *Some models, such as `mace-mh-1.model`, require specifying a readout head (e.g., `head="omol"`).*
@@ -38,7 +38,7 @@ from mbe_automation.calculators import MACE
 # Note: mace-mh-1 requires specifying the readout head.
 # In our tests we have found that "omol" works well for molecular
 # crystals.
-calc = MACE(model_path="~/models/mace-mh-1.model", head="omol")
+calc = MACE(model_paths="~/models/mace-mh-1.model", head="omol")
 
 # Load a structure
 structure = Structure.from_xyz_file("structure.xyz")
