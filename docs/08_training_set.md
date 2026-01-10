@@ -41,7 +41,7 @@ mlip_parameter_file = "path/to/your/mace.model"
 temperature_K = 298.15
 dataset = "training_set.hdf5"
 
-mace_calc = MACE(model_paths=mlip_parameter_file)
+mace_calc = MACE(model_path=mlip_parameter_file)
 ```
 
 ## Step 1: MD Sampling
@@ -173,8 +173,17 @@ The `Structure` and `Trajectory` classes allow updating an existing dataset with
 To update a dataset, first load the structure, run the calculator, and then save the specific properties using the `only` argument in the `save` method.
 
 ```python
-from mbe_automation.storage import Trajectory
-# Assuming mace_calc is already initialized
+from mbe_automation import Trajectory
+from mbe_automation.calculators import MACE
+
+# Initialize the calculator that will be used to update the structures
+#
+# Note we assume here that you will be adding feature vectors.
+# The `feature_vectors_type` is not available for other calculators
+mace_calc = MACE(
+    model_path="path/to/your/mace.model",
+    head="omol",
+)
 
 # Load structure
 traj = Trajectory.read(
@@ -182,7 +191,10 @@ traj = Trajectory.read(
     key="training/md_sampling/trajectories/crystal[dyn:T=298.15,p=0.00010]"
 )
 
-# Compute new properties (e.g., feature vectors)
+# Compute new properties
+#
+# Note that we do not want to re-calculate energies and forces,
+# so we set the corresponding keywords to `False`.
 traj.run(
     calculator=mace_calc,
     feature_vectors_type="averaged_environments",
@@ -190,7 +202,7 @@ traj.run(
     forces=False
 )
 
-# Save only the new feature vectors
+# Save only the new feature vectors to the same location
 traj.save(
     dataset="training_set.hdf5",
     key="training/md_sampling/trajectories/crystal[dyn:T=298.15,p=0.00010]",
@@ -293,7 +305,7 @@ mlip_parameter_file = "path/to/your/mace.model"
 temperature_K = 298.15
 dataset = "training_set.hdf5"
 
-mace_calc = MACE(model_paths=mlip_parameter_file)
+mace_calc = MACE(model_path=mlip_parameter_file)
 
 md_sampling_config = MDSampling(
     crystal=Structure.from_xyz_file(xyz_solid),

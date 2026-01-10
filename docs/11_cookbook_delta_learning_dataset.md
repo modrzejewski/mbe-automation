@@ -23,7 +23,7 @@ from mbe_automation.calculators import DFT, MACE
 # Initialize Calculators
 # Baseline: Pre-trained MACE model
 calc_baseline = MACE(
-    model_paths="~/models/mace/mace-mh-1.model",
+    model_path="~/models/mace/mace-mh-1.model",
     head="omol",
 )
 
@@ -211,4 +211,37 @@ python -m mace.cli.run_train \
     --save_cpu \
     --seed=3 \
     --restart_latest > "train.log" 2>&1
+```
+
+## Using the Trained Delta Model
+
+Once the delta model has been trained (e.g., producing `urea_r2scan_d4_delta.model`), you can use the `DeltaMACE` calculator to run simulations at the target level of theory. This calculator combines the baseline model with the delta model for efficient and accurate calculations.
+
+```python
+from mbe_automation import Structure
+from mbe_automation.calculators import DeltaMACE
+
+# Define paths to the baseline and the newly trained delta model
+baseline_model = "~/models/mace/mace-mh-1.model"
+delta_model = "urea_r2scan_d4_delta.model" # From the training step
+
+# Initialize the delta-learning calculator
+calc = DeltaMACE(
+    model_paths=[baseline_model, delta_model],
+    head="omol"
+)
+
+# Load a structure to test
+structure = Structure.from_xyz_file("some_test_structure.xyz")
+
+# Run calculation
+# The result will be at the target level of theory
+structure.run(calc)
+
+# Retrieve results
+energy = structure.ground_truth.energies[calc.level_of_theory]
+forces = structure.ground_truth.forces[calc.level_of_theory]
+
+print(f"Delta-learning Energy: {energy} eV/atom")
+print(f"Final Level of Theory: {calc.level_of_theory}")
 ```
