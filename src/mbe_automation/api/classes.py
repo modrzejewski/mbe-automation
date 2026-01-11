@@ -125,14 +125,10 @@ class ForceConstants(_ForceConstants):
             phonon_filter: A PhononFilter object which defines the subset
                 of phonons. If None, all phonons up to infinite frequency are included.
         """
-        if phonon_filter is None:
-            phonon_filter = PhononFilter(freq_max_THz=None)
-            
-        return mbe_automation.dynamics.harmonic.modes.thermal_displacements(
+        return _thermal_displacements(
             force_constants=self,
-            temperatures_K=np.array([temperature_K]),
-            phonon_filter=phonon_filter,
-            cell_type="primitive"
+            temperature_K=temperature_K,
+            phonon_filter=phonon_filter
         )
         
     def to_cif_file(
@@ -943,6 +939,24 @@ def _energy_fluctuations(
     
     return mbe_automation.dynamics.md.display.energy_fluctuations(df, save_path)
 
+def _thermal_displacements(
+        force_constants: ForceConstants,
+        temperature_K: float,
+        phonon_filter: PhononFilter | None = None,
+) -> ThermalDisplacements:
+    
+    if phonon_filter is None:
+        phonon_filter = PhononFilter(
+            freq_max_THz=None,
+            k_point_mesh=50.0,
+        )
+        
+    return mbe_automation.dynamics.harmonic.modes.thermal_displacements(
+        force_constants=self,
+        temperatures_K=np.array([temperature_K]),
+        phonon_filter=phonon_filter,
+        cell_type="primitive"
+    )
 
 def _to_cif_file(
     force_constants: ForceConstants,
