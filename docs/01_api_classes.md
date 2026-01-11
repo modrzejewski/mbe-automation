@@ -24,7 +24,7 @@ This chapter provides an overview of the physical content each class represents 
 | **`Structure`** | Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single frame or a sequence of frames of equal size (e.g., from a short trajectory or a collection of configurations). |
 | **`Trajectory`** | Time evolution of an atomistic system generated with molecular dynamics. Includes time-dependent properties like positions, velocities, kinetic energies, and thermodynamic variables. |
 | **`MolecularCrystal`** | Periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). Serves as an intermediate necessary for finite cluster extraction. |
-| **`FiniteSubsystem`** | Finite clusters of molecules extracted from a periodic structure or trajectory. Used to generate training data for fragment-based methods. |
+| **`FiniteSubsystem`** | Finite clusters of molecules extracted from a periodic structure or trajectory. Includes all geometric information of `Structure`, supplemented with extra data which enables tracing back the cleaved molecules to their positions in the cell of the original `MolecularCrystal`. Used to generate training data for fragment-based methods. |
 | **`Dataset`** | A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets. |
 | **`AtomicReference`** | Isolated atom energies required to generate reference energy for machine-learning interatomic potentials. Can store data at multiple levels of theory. |
 
