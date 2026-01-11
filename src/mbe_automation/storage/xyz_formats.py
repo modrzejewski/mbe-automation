@@ -230,8 +230,10 @@ def from_xyz_file(
             print(f"No symmetry refinement needed")
             print(f"Symmetry under strict tolerance: [{input_hmsymbol}][{input_space_group}]")
 
-        print(f"Lattice lengths   a={system.cell.lengths()[0]:.4f}, b={system.cell.lengths()[1]:.4f}, c={system.cell.lengths()[2]:.4f} Å")
-        print(f"Lattice angles    alpha={system.cell.angles()[0]:.4f}, beta={system.cell.angles()[1]:.4f}, gamma={system.cell.angles()[2]:.4f} °")
+        lengths = system.cell.lengths()
+        print(f"Lattice lengths   a={lengths[0]:.4f}, b={lengths[1]:.4f}, c={lengths[2]:.4f} Å")
+        angles = system.cell.angles()
+        print(f"Lattice angles    alpha={angles[0]:.4f}, beta={angles[1]:.4f}, gamma={angles[2]:.4f} °")
         print(f"Cell volume       {system.get_volume():.4f} Å³")
         print(f"Number of atoms   {len(system)}")
         
