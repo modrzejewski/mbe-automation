@@ -952,7 +952,7 @@ def _thermal_displacements(
         )
         
     return mbe_automation.dynamics.harmonic.modes.thermal_displacements(
-        force_constants=self,
+        force_constants=force_constants,
         temperatures_K=np.array([temperature_K]),
         phonon_filter=phonon_filter,
         cell_type="primitive"
