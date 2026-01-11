@@ -16,6 +16,7 @@ except ImportError:
 
 import mbe_automation.common
 import mbe_automation.storage
+from mbe_automation.storage.core import ForceConstants
 import mbe_automation.structure
 
 AMPLITUDE_SCAN_MODES = [
@@ -462,8 +463,7 @@ def _thermal_displacements(
     )
 
 def thermal_displacements(
-        dataset: str,
-        key: str,
+        force_constants: ForceConstants,
         temperatures_K: npt.NDArray[np.floating],
         phonon_filter: PhononFilter,
         time_points_fs: npt.NDArray = np.array([0.0]),
@@ -483,9 +483,7 @@ def thermal_displacements(
     The calculation is based on the formalism described in Ref. 1.
 
     Args:
-        dataset: Path to the dataset file containing the crystal structure
-            and force constants.
-        key: Key to the harmonic force constants model within the dataset.
+        force_constants: The harmonic force constants model.
         temperatures_K: An array of temperatures (in Kelvin) at which to
             calculate the thermal displacements.
         phonon_filter: A PhononFilter object which defines the subset
@@ -522,8 +520,7 @@ def thermal_displacements(
     
     """    
     ph = mbe_automation.storage.to_phonopy(
-        dataset=dataset,
-        key=key
+        force_constants=force_constants
     )
     if isinstance(phonon_filter.k_point_mesh, float):
         k_point_mesh = phonopy.structure.grid_points.length2mesh(
@@ -609,9 +606,13 @@ def trajectory(
         time_points_fs = np.array([])
         n_random_samples = n_frames
 
-    disp = thermal_displacements(
+    fc = mbe_automation.storage.read_force_constants(
         dataset=dataset,
-        key=key,
+        key=key
+    )
+
+    disp = thermal_displacements(
+        force_constants=fc,
         temperatures_K=np.array([temperature_K]),
         phonon_filter=phonon_filter,
         time_points_fs=time_points_fs,
@@ -622,8 +623,7 @@ def trajectory(
     )
         
     ph = mbe_automation.storage.to_phonopy(
-        dataset=dataset,
-        key=key
+        force_constants=fc
     )
 
     if cell_type == "supercell":

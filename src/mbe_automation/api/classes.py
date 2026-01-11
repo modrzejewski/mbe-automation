@@ -23,6 +23,7 @@ from mbe_automation.storage import MolecularCrystal as _MolecularCrystal
 from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 from mbe_automation.storage import AtomicReference as _AtomicReference
 import mbe_automation.dynamics.harmonic.modes
+from mbe_automation.dynamics.harmonic.modes import PhononFilter, ThermalDisplacements
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
 import mbe_automation.calculators
@@ -110,6 +111,54 @@ class ForceConstants(_ForceConstants):
             dynamical_matrix=ph.dynamical_matrix,
             k_point=k_point,
         )
+
+    def thermal_displacements(
+            self,
+            temperature_K: float,
+            phonon_filter: PhononFilter | None = None
+    ) -> ThermalDisplacements:
+        """
+        Compute thermal displacement properties of atoms in the primitive cell.
+        
+        Args:
+            temperature_K: Temperature in Kelvin.
+            phonon_filter: A PhononFilter object which defines the subset
+                of phonons. If None, all phonons up to infinite frequency are included.
+        """
+        if phonon_filter is None:
+            phonon_filter = PhononFilter(freq_max_THz=None)
+            
+        return mbe_automation.dynamics.harmonic.modes.thermal_displacements(
+            force_constants=self,
+            temperatures_K=np.array([temperature_K]),
+            phonon_filter=phonon_filter,
+            cell_type="primitive"
+        )
+        
+    def to_cif_file(
+            self,
+            save_path: str,
+            save_adps: bool = False,
+            temperature_K: float | None = None,
+            phonon_filter: PhononFilter | None = None,
+    ) -> None:
+        """
+        Save the primitive cell to a CIF file.
+        
+        Args:
+            save_path: Path to the output CIF file.
+            save_adps: Whether to calculate and include anisotropic displacement parameters.
+            temperature_K: Temperature in Kelvin (required if save_adps is True).
+            phonon_filter: Optional filter for phonons (used if save_adps is True).
+        """
+        _to_cif_file(
+            force_constants=self,
+            save_path=save_path,
+            save_adps=save_adps,
+            temperature_K=temperature_K,
+            phonon_filter=phonon_filter
+        )
+
 
 @dataclass(kw_only=True)
 class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
@@ -891,3 +940,27 @@ def _energy_fluctuations(
     df.attrs["target_pressure (GPa)"] = traj.target_pressure
     
     return mbe_automation.dynamics.md.display.energy_fluctuations(df, save_path)
+
+
+def _to_cif_file(
+    force_constants: ForceConstants,
+    save_path: str,
+    save_adps: bool = False,
+    temperature_K: float | None = None,
+    phonon_filter: PhononFilter | None = None,
+) -> None:
+    disp = None
+    if save_adps:
+        if temperature_K is None:
+            raise ValueError("temperature_K must be provided to save thermal displacements (ADPs).")
+        disp = force_constants.thermal_displacements(
+            temperature_K=temperature_K,
+            phonon_filter=phonon_filter
+        )
+    
+    mbe_automation.storage.to_xyz_file(
+        save_path=save_path,
+        system=force_constants.primitive,
+        thermal_displacements=disp,
+        temperature_idx=0 
+    )
