@@ -195,6 +195,19 @@ class DatasetKeys:
                 level_of_theory in x.ground_truth_levels
             ))
 
+    def without_ground_truth(self, level_of_theory: str | None = None) -> DatasetKeys:
+        """
+        Return keys without ground truth.
+        """
+        if level_of_theory is None:
+            return self._filter(lambda x: not x.has_ground_truth)
+        else:
+            return self._filter(lambda x: not (
+                x.has_ground_truth and
+                x.ground_truth_levels and
+                level_of_theory in x.ground_truth_levels
+            ))
+
     def starts_with(self, root_key: str) -> DatasetKeys:
         """Select keys under a specific root group."""
         prefix = root_key.strip("/") + "/"
