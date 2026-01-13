@@ -24,6 +24,11 @@ DATA_FOR_TRAINING = [
 #
 UNICODE_DIVISION_SLASH = "∕"
 
+CALCULATION_STATUS_COMPLETED = 0
+CALCULATION_STATUS_UNDEFINED = 1
+CALCULATION_STATUS_UNCONVERGED_SCF = 2
+CALCULATION_STATUS_FAILED = 3
+
 @dataclass
 class BrillouinZonePath:
     kpoints: List[npt.NDArray[np.floating]]
@@ -91,17 +96,20 @@ class AtomicReference:
 class GroundTruth:
     energies: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
     forces: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
+    calculation_status: Dict[str, npt.NDArray[np.int64]] = field(default_factory=dict)
 
     def copy(self) -> GroundTruth:
         return GroundTruth(
             energies={k: v.copy() for k, v in self.energies.items()},
             forces={k: v.copy() for k, v in self.forces.items()},
+            calculation_status={k: v.copy() for k, v in self.calculation_status.items()},
         )
 
     def select_frames(self, indices: npt.NDArray[np.integer]) -> GroundTruth:
         return GroundTruth(
             energies={k: v[indices] for k, v in self.energies.items()},
             forces={k: v[indices] for k, v in self.forces.items()},
+            calculation_status={k: v[indices] for k, v in self.calculation_status.items()},
         )
         
 @dataclass
@@ -1311,6 +1319,12 @@ def _save_ground_truth(
         group.create_dataset(ds_name, data=forces)
         levels_of_theory.add(name)
 
+    for name, status in ground_truth.calculation_status.items():
+        sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
+        ds_name = f"status_{sanitized_method_name}"
+        if ds_name in group: del group[ds_name]
+        group.create_dataset(ds_name, data=status)
+
     group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
 
     return
@@ -1323,6 +1337,7 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
 
         energies = {}
         forces = {}
+        calculation_status = {}
 
         for name in levels_of_theory:
             sanitized_name = name.replace("/", UNICODE_DIVISION_SLASH)
@@ -1330,10 +1345,30 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
                 energies[name] = group[f"E_{sanitized_name} (eV∕atom)"][...]
             if f"forces_{sanitized_name} (eV∕Å)" in group:
                 forces[name] = group[f"forces_{sanitized_name} (eV∕Å)"][...]
+            
+            if f"status_{sanitized_name}" in group:
+                calculation_status[name] = group[f"status_{sanitized_name}"][...]
+            else:
+                # Fallback for backward compatibility
+                # If we have energies, we can infer the number of frames from there
+                # If not, we try forces.
+                n_frames = 0
+                if name in energies:
+                    n_frames = len(energies[name])
+                elif name in forces:
+                    n_frames = len(forces[name])
+                
+                if n_frames > 0:
+                    calculation_status[name] = np.full(
+                        n_frames, 
+                        CALCULATION_STATUS_COMPLETED, 
+                        dtype=np.int64
+                    )
 
         ground_truth = GroundTruth(
             energies=energies,
             forces=forces,
+            calculation_status=calculation_status,
         )
     else:
         ground_truth = None
