@@ -11,8 +11,13 @@ except ImportError:
     RAY_AVAILABLE = False
 
 from mbe_automation.storage import Structure
+from mbe_automation.storage.core import (
+    CALCULATION_STATUS_COMPLETED,
+    CALCULATION_STATUS_FAILED,
+    CALCULATION_STATUS_UNCONVERGED_SCF,
+)
 from mbe_automation.calculators.mace import MACE, DeltaMACE
-from mbe_automation.calculators.pyscf import PySCFCalculator
+from mbe_automation.calculators.pyscf import PySCFCalculator, SCFNotConverged
 from mbe_automation.calculators.dftb import DFTBCalculator
 import mbe_automation.common.display
 import mbe_automation.common.resources
@@ -66,7 +71,7 @@ def _sequential_loop(
     compute_forces: bool,
     compute_feature_vectors: bool,
     average_over_atoms: bool,
-) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None]:
+) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None, npt.NDArray]:
 
     if positions.ndim == 2:
         positions = positions[np.newaxis, :, :]
@@ -77,6 +82,8 @@ def _sequential_loop(
     variable_cell = is_periodic and cell_vectors.ndim == 3
 
     assert masses.ndim == atomic_numbers.ndim
+
+    statuses = np.full(n_frames, CALCULATION_STATUS_COMPLETED, dtype=np.int64)
 
     if compute_energies:
         E_pot = np.zeros(n_frames)
@@ -140,23 +147,32 @@ def _sequential_loop(
         )
         atoms.calc = calculator
 
-        if compute_forces:
-            forces[i] = atoms.get_forces()
+        try:
+            if compute_forces:
+                forces[i] = atoms.get_forces()
 
-        if compute_energies:
-            E_pot[i] = atoms.get_potential_energy() / n_atoms  # eV/atom
+            if compute_energies:
+                E_pot[i] = atoms.get_potential_energy() / n_atoms  # eV/atom
 
-        if compute_feature_vectors:
-            feature_vectors_i = calculator.get_descriptors(atoms).reshape(
-                n_atoms, -1
-            )
+            if compute_feature_vectors:
+                feature_vectors_i = calculator.get_descriptors(atoms).reshape(
+                    n_atoms, -1
+                )
 
-            if average_over_atoms:
-                feature_vectors[i] = np.average(feature_vectors_i, axis=0)
-            else:
-                feature_vectors[i] = feature_vectors_i
+                if average_over_atoms:
+                    feature_vectors[i] = np.average(feature_vectors_i, axis=0)
+                else:
+                    feature_vectors[i] = feature_vectors_i
+            
+            statuses[i] = CALCULATION_STATUS_COMPLETED
 
-    return E_pot, forces, feature_vectors
+        except SCFNotConverged:
+            statuses[i] = CALCULATION_STATUS_UNCONVERGED_SCF
+        
+        except Exception:
+            statuses[i] = CALCULATION_STATUS_FAILED
+
+    return E_pot, forces, feature_vectors, statuses
 
 
 def _parallel_loop(
@@ -170,7 +186,7 @@ def _parallel_loop(
     n_gpus_per_worker: int,
     n_cpus_per_worker: int,
     silent: bool,
-) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None]:
+) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None, npt.NDArray]:
 
     if compute_energies:
         E_pot = np.zeros(structure.n_frames)
@@ -192,6 +208,8 @@ def _parallel_loop(
             )
     else:
         feature_vectors = None
+
+    statuses = np.full(structure.n_frames, CALCULATION_STATUS_COMPLETED, dtype=np.int64)
 
     chunk_frames, positions, atomic_numbers, masses, cell_vectors = _split_work(
         structure, n_workers
@@ -252,7 +270,9 @@ def _parallel_loop(
         results = ray.get(futures)
 
         for i, result in enumerate(results):
-            chunk_E, chunk_forces, chunk_features = result
+            chunk_E, chunk_forces, chunk_features, chunk_statuses = result
+
+            statuses[chunk_frames[i]] = chunk_statuses
 
             if compute_energies:
                 E_pot[chunk_frames[i]] = chunk_E
@@ -267,7 +287,7 @@ def _parallel_loop(
         if shutdown_ray:
             ray.shutdown()
 
-    return E_pot, forces, feature_vectors
+    return E_pot, forces, feature_vectors, statuses
 
 if RAY_AVAILABLE:
     @ray.remote
@@ -313,7 +333,7 @@ def run_model(
     average_over_atoms: bool = False,
     silent: bool = False,
     resources: Resources | None = None,
-) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None]:
+) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None, npt.NDArray]:
     """
     Run a calculator of energies/forces/feature vectors for all frames of a given
     Structure. Store computed quantities in-place or return them as arrays.
@@ -354,7 +374,7 @@ def run_model(
         print(f"Loop over frames...")
 
     if use_ray:
-        E_pot, forces, feature_vectors = _parallel_loop(
+        E_pot, forces, feature_vectors, statuses = _parallel_loop(
             calculator=calculator,
             structure=structure,
             compute_energies=compute_energies,
@@ -367,7 +387,7 @@ def run_model(
             silent=silent,
         )
     else:
-        E_pot, forces, feature_vectors = _sequential_loop(
+        E_pot, forces, feature_vectors, statuses = _sequential_loop(
             calculator=calculator,
             positions=structure.positions,
             cell_vectors=structure.cell_vectors,
@@ -380,4 +400,4 @@ def run_model(
             average_over_atoms=average_over_atoms,
         )
 
-    return E_pot, forces, feature_vectors
+    return E_pot, forces, feature_vectors, statuses

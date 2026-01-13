@@ -832,7 +832,7 @@ def _run_model(
 
     exec_params.set()
 
-    E_pot, F, d = mbe_automation.calculators.run_model(
+    E_pot, F, d, statuses = mbe_automation.calculators.run_model(
         structure=structure,
         calculator=calculator,
         compute_energies=energies,
@@ -851,6 +851,8 @@ def _run_model(
         
     if forces:
         structure.ground_truth.forces[level_of_theory] = F
+    
+    structure.ground_truth.calculation_status[level_of_theory] = statuses
 
     return
 

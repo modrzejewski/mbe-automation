@@ -148,6 +148,9 @@ def DFT(
         multigrid=multigrid,
     )
 
+class SCFNotConverged(RuntimeError):
+    pass
+
 class PySCFCalculator(Calculator):
     implemented_properties = ['energy', 'forces']
 
@@ -240,7 +243,7 @@ class PySCFCalculator(Calculator):
 
         self.method.kernel()
         if not self.method.converged:
-            raise RuntimeError(f'{self.method} not converged')
+            raise SCFNotConverged(f'{self.method} not converged')
         
         self.results['energy'] = self.method.e_tot * HARTREE2EV
 
