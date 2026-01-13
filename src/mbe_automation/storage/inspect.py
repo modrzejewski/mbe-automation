@@ -127,6 +127,10 @@ class DatasetKeys:
             return [item.key for item in self._items[index]]
         return self._items[index].key
 
+    def __contains__(self, key: str) -> bool:
+        """Check if key exists."""
+        return any(item.key == key for item in self._items)
+
     def __iter__(self) -> Iterator[str]:
         return (item.key for item in self._items)
 
