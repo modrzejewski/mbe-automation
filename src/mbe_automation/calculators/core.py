@@ -400,4 +400,15 @@ def run_model(
             average_over_atoms=average_over_atoms,
         )
 
+    if not silent:
+        n_unconverged = np.count_nonzero(statuses == CALCULATION_STATUS_UNCONVERGED_SCF)
+        n_failed = np.count_nonzero(statuses == CALCULATION_STATUS_FAILED)
+        n_total = len(statuses)
+
+        if n_unconverged > 0:
+            print(f"SCF did not converge in {n_unconverged} out of {n_total} frames")
+        
+        if n_failed > 0:
+            print(f"{n_failed} out of {n_total} frames failed")
+
     return E_pot, forces, feature_vectors, statuses
