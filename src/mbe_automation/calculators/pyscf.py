@@ -243,7 +243,7 @@ class PySCFCalculator(Calculator):
 
         self.method.kernel()
         if not self.method.converged:
-            raise SCFNotConverged(f'{self.method} not converged')
+            raise SCFNotConverged(f'Self-consistent field not converged')
         
         self.results['energy'] = self.method.e_tot * HARTREE2EV
 

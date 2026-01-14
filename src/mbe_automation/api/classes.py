@@ -30,7 +30,10 @@ import mbe_automation.calculators
 from mbe_automation.calculators import CALCULATORS
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
-from mbe_automation.storage.core import DATA_FOR_TRAINING
+from mbe_automation.storage.core import (
+    DATA_FOR_TRAINING,
+    CALCULATION_STATUS_UNDEFINED,
+)
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 class _TrainingStructure:
@@ -219,7 +222,8 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             forces: bool = True,
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
             exec_params: Resources | None = None,
-            overwrite: bool = False
+            overwrite: bool = False,
+            selected_frames: npt.NDArray[np.int64] | None = None,
     ) -> None:
         _run_model(
             structure=self,
@@ -229,6 +233,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
             overwrite=overwrite,
+            selected_frames=selected_frames,
         )
 
     run_model = run # synonym
@@ -349,6 +354,7 @@ class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
             exec_params: Resources | None = None,
             overwrite: bool = False,
+            selected_frames: npt.NDArray[np.int64] | None = None,
     ) -> None:
         _run_model(
             structure=self,
@@ -358,6 +364,7 @@ class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
             overwrite=overwrite,
+            selected_frames=selected_frames,
         )
 
     run_model = run
@@ -472,6 +479,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
             exec_params: Resources | None = None,
             overwrite: bool = False,
+            selected_frames: npt.NDArray[np.int64] | None = None,
     ) -> None:
         _run_model(
             structure=self.cluster_of_molecules,
@@ -481,6 +489,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
             overwrite=overwrite,
+            selected_frames=selected_frames,
         )
 
     run_model = run
@@ -758,10 +767,16 @@ def _run_model(
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
         exec_params: Resources | None = None,
         overwrite: bool = False,
+        selected_frames: npt.NDArray[np.int64] | None = None,
 ) -> None:
     """
     Generate energies, forces, and feature vectors for a series of structure
     frames.
+    
+    Args:
+        selected_frames: Optional list of frame indices to process.
+            If provided, calculations will be performed only for these frames.
+            Must not be used with feature_vectors.
     
     (1) Energies and forces computed with this function
         are stored as ground truth. Ground truth data consists of multiple
@@ -780,6 +795,12 @@ def _run_model(
             f"Import a calculator class from mbe_automation.calculators."
         )
     
+    if selected_frames is not None:
+        if feature_vectors_type != "none":
+            raise ValueError(
+                "selected_frames cannot be used when calculating feature vectors (feature_vectors_type != 'none')."
+            )
+    
     assert feature_vectors_type in FEATURE_VECTOR_TYPES
 
     level_of_theory = calculator.level_of_theory
@@ -795,35 +816,39 @@ def _run_model(
             f"precomputed structures. "
         )
 
-    if (
-            energies and
-            level_of_theory in structure.available_energies("ground_truth") and
-            not overwrite
-    ):
-        raise ValueError(
-            f"Structure already contains energies computed with {level_of_theory}. "
-            f"Use a different calculator or set overwrite=True."
-        )
+    if selected_frames is None:
+        #
+        # Full calculation for all frames
+        #
+        if (
+                energies and
+                level_of_theory in structure.available_energies("ground_truth") and
+                not overwrite
+        ):
+            raise ValueError(
+                f"Structure already contains energies computed with {level_of_theory}. "
+                f"Use a different calculator or set overwrite=True."
+            )
 
-    if (
-            forces and
-            level_of_theory in structure.available_forces("ground_truth") and
-            not overwrite
-    ):
-        raise ValueError(
-            f"Structure already contains forces computed with {level_of_theory}. "
-            f"Use a different calculator or set overwrite=True."
-        )
+        if (
+                forces and
+                level_of_theory in structure.available_forces("ground_truth") and
+                not overwrite
+        ):
+            raise ValueError(
+                f"Structure already contains forces computed with {level_of_theory}. "
+                f"Use a different calculator or set overwrite=True."
+            )
 
-    if (
-            feature_vectors_type != "none" and
-            structure.feature_vectors_type != "none" and
-            not overwrite
-    ):
-        raise ValueError(
-            "Structure already contains feature vectors. Set overwrite=True to confirm your choice."
-        )
-
+        if (
+                feature_vectors_type != "none" and
+                structure.feature_vectors_type != "none" and
+                not overwrite
+        ):
+            raise ValueError(
+                "Structure already contains feature vectors. Set overwrite=True to confirm your choice."
+            )
+            
     if (energies or forces) and structure.ground_truth is None:
         structure.ground_truth = mbe_automation.storage.GroundTruth()
 
@@ -832,8 +857,12 @@ def _run_model(
 
     exec_params.set()
 
+    calculation_structure = structure
+    if selected_frames is not None:
+        calculation_structure = structure.select(selected_frames)
+
     E_pot, F, d, statuses = mbe_automation.calculators.run_model(
-        structure=structure,
+        structure=calculation_structure,
         calculator=calculator,
         compute_energies=energies,
         compute_forces=forces,
@@ -842,17 +871,42 @@ def _run_model(
         resources=exec_params,
     )
 
-    if feature_vectors_type != "none" and d is not None:
-        structure.feature_vectors = d
-        structure.feature_vectors_type = feature_vectors_type
+    if selected_frames is None:
+        if feature_vectors_type != "none" and d is not None:
+            structure.feature_vectors = d
+            structure.feature_vectors_type = feature_vectors_type
 
-    if energies:
-        structure.ground_truth.energies[level_of_theory] = E_pot
+        if energies:
+            structure.ground_truth.energies[level_of_theory] = E_pot
+            
+        if forces:
+            structure.ground_truth.forces[level_of_theory] = F
         
-    if forces:
-        structure.ground_truth.forces[level_of_theory] = F
-    
-    structure.ground_truth.calculation_status[level_of_theory] = statuses
+        structure.ground_truth.calculation_status[level_of_theory] = statuses
+    else:
+        #
+        # Partial update for selected frames
+        #
+        if energies:
+            if level_of_theory not in structure.ground_truth.energies:
+                structure.ground_truth.energies[level_of_theory] = np.full(
+                    structure.n_frames, np.nan
+                )
+            
+            structure.ground_truth.energies[level_of_theory][selected_frames] = E_pot
+
+        if forces:
+            if level_of_theory not in structure.ground_truth.forces:
+                structure.ground_truth.forces[level_of_theory] = np.full(
+                    (structure.n_frames, structure.n_atoms, 3), np.nan
+                )
+            structure.ground_truth.forces[level_of_theory][selected_frames] = F
+            
+        if level_of_theory not in structure.ground_truth.calculation_status:
+            structure.ground_truth.calculation_status[level_of_theory] = np.full(
+                structure.n_frames, CALCULATION_STATUS_UNDEFINED, dtype=np.int64
+            )
+        structure.ground_truth.calculation_status[level_of_theory][selected_frames] = statuses
 
     return
 
