@@ -33,6 +33,7 @@ from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 from mbe_automation.storage.core import (
     DATA_FOR_TRAINING,
     CALCULATION_STATUS_UNDEFINED,
+    CALCULATION_STATUS_COMPLETED,
 )
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
@@ -199,10 +200,19 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
 
     def select(
             self,
-            indices: npt.NDArray[np.integer]
+            indices: npt.NDArray[np.integer] | None = None,
+            level_of_theory: str | dict | None = None,
     ) -> Structure:
+        
+        valid_indices = _get_valid_indices(self, level_of_theory)
+        
+        if indices is not None:
+             final_indices = np.intersect1d(indices, valid_indices)
+        else:
+             final_indices = valid_indices
+        
         return Structure(**vars(
-            _select_frames(self, indices)
+            _select_frames(self, final_indices)
         ))
 
     def random_split(
@@ -549,6 +559,34 @@ class Dataset(_AtomicEnergiesCalc):
         """
         unique_elements = [structure.unique_elements for structure in self.structures]
         return np.unique(np.concatenate(unique_elements))
+
+def _get_valid_indices(structure: _Structure, level_of_theory: str | dict | None) -> npt.NDArray[np.int64]:
+    """
+    Get indices of frames where calculations for a given level of theory
+    are completed.
+    
+    If level_of_theory is None, returns all indices.
+    """
+    if level_of_theory is None:
+        return np.arange(structure.n_frames)
+
+    valid_mask = np.ones(structure.n_frames, dtype=bool)
+
+    targets = []
+    if isinstance(level_of_theory, dict):
+        if "target" in level_of_theory: targets.append(level_of_theory["target"])
+        if "baseline" in level_of_theory: targets.append(level_of_theory["baseline"])
+    else:
+        targets.append(level_of_theory)
+
+    if structure.ground_truth is not None:
+        for method in targets:
+            if method in structure.ground_truth.calculation_status:
+                valid_mask &= (
+                    structure.ground_truth.calculation_status[method] == CALCULATION_STATUS_COMPLETED
+                )
+
+    return np.nonzero(valid_mask)[0]
 
 def _select_frames(
         struct: _Structure,
@@ -934,9 +972,12 @@ def _to_mace_dataset(
     structures = []
     for x in dataset:
         if isinstance(x, FiniteSubsystem):
-            structures.append(x.cluster_of_molecules)
+            valid_indices = _get_valid_indices(x.cluster_of_molecules, level_of_theory)
+            structures.append(
+                _select_frames(x.cluster_of_molecules, valid_indices)
+            )
         else:
-            structures.append(x)
+            structures.append(x.select(level_of_theory=level_of_theory))
 
     mbe_automation.ml.mace.to_xyz_training_set(
         structures=structures,

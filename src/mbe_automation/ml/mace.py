@@ -174,7 +174,7 @@ def to_xyz_training_set(
         else:
             energies = energies_target
             forces = forces_target
-
+        
         if (energies is None and forces is None):
             raise ValueError(f"Structure {i} does not contain energies/forces data at the requested level of theory: {level_of_theory}")
         
