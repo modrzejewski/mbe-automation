@@ -86,12 +86,12 @@ def _sequential_loop(
     statuses = np.full(n_frames, CALCULATION_STATUS_COMPLETED, dtype=np.int64)
 
     if compute_energies:
-        E_pot = np.zeros(n_frames)
+        E_pot = np.full(n_frames, np.nan)
     else:
         E_pot = None
 
     if compute_forces:
-        forces = np.zeros((n_frames, n_atoms, 3))
+        forces = np.full((n_frames, n_atoms, 3), np.nan)
     else:
         forces = None
 
