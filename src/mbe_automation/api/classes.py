@@ -1094,7 +1094,8 @@ def _statistics(
     energies = []
     for i, x in enumerate(systems):
         if isinstance(x, FiniteSubsystem):
-            y = x.select(level_of_theory=level_of_theory).cluster_of_molecules
+            selected_subsystem = x.select(level_of_theory=level_of_theory)
+            y = selected_subsystem.cluster_of_molecules if selected_subsystem is not None else None
         else:
             y = x.select(level_of_theory=level_of_theory)
 
