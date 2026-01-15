@@ -1064,16 +1064,16 @@ def _to_mace_dataset(
         "Exporting dataset to MACE training file"
     ])
 
-    print(f"save_path: {save_path}")
-    print(f"Atomic reference: {'Available' if atomic_reference is not None else 'None'}")
-    print(f"Level of theory: {level_of_theory}")
+    print(f"save_path:        {save_path}")
+    print(f"atomic_reference: {'available' if atomic_reference is not None else 'not available'}")
+    print(f"level_of_theory:  {level_of_theory}")
     print("")
 
     if isinstance(level_of_theory, str):
         _statistics(dataset, level_of_theory)
     elif isinstance(level_of_theory, dict):
          for key, method in level_of_theory.items():
-            print(f"Statistics for {key} method ({method}):")
+            print(f"statistics for {key} method ({method}):")
             _statistics(dataset, method)
             print("")
 
