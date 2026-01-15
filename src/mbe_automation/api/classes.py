@@ -927,10 +927,10 @@ def _run_model(
         if np.min(selected_frames) < 0 or np.max(selected_frames) > structure.n_frames - 1:
             raise ValueError("Invalid indices in selected_frames")
 
-        n_selected_frames = len(selected_frames)
-        selected_frames = np.unique(selected_frames)
-        if len(selected_frames) != n_selected_frames:
+        unique_selected_frames = np.unique(selected_frames)
+        if len(unique_selected_frames) != len(selected_frames):
             raise ValueError("Repeated elements in selected_frames")
+        selected_frames = unique_selected_frames
 
     if (
             feature_vectors_type != "none" and
