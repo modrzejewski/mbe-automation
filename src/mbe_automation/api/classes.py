@@ -1066,12 +1066,13 @@ def _to_mace_dataset(
         # are available
         #
         if isinstance(x, FiniteSubsystem):
-            y = x.select(level_of_theory=level_of_theory).cluster_of_molecules
+            y = x.select(level_of_theory=level_of_theory)
+            if y is not None:
+                structures.append(y.cluster_of_molecules)
         else:
             y = x.select(level_of_theory=level_of_theory)
-
-        if y is not None:
-            structures.append(y)
+            if y is not None:
+                structures.append(y)
 
     if len(structures) == 0:
         raise ValueError("No structures with completed calculations found.") 
@@ -1094,8 +1095,9 @@ def _statistics(
     energies = []
     for i, x in enumerate(systems):
         if isinstance(x, FiniteSubsystem):
-            selected_subsystem = x.select(level_of_theory=level_of_theory)
-            y = selected_subsystem.cluster_of_molecules if selected_subsystem is not None else None
+            y = x.select(level_of_theory=level_of_theory)
+            if y is not None:
+                y = y.cluster_of_molecules
         else:
             y = x.select(level_of_theory=level_of_theory)
 
