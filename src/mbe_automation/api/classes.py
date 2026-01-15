@@ -204,7 +204,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             level_of_theory: str | dict | None = None,
     ) -> Structure | None:
         
-        valid_indices = _get_completed_frames(self, level_of_theory)
+        valid_indices = _completed_frames(self, level_of_theory)
         
         if indices is not None:
              final_indices = np.intersect1d(indices, valid_indices)
@@ -490,7 +490,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             level_of_theory: str | dict | None = None,
     ) -> FiniteSubsystem | None:
         
-        valid_indices = _get_completed_frames(self.cluster_of_molecules, level_of_theory)
+        valid_indices = _completed_frames(self.cluster_of_molecules, level_of_theory)
         
         if indices is not None:
              final_indices = np.intersect1d(indices, valid_indices)
@@ -585,7 +585,7 @@ class Dataset(_AtomicEnergiesCalc):
         unique_elements = [structure.unique_elements for structure in self.structures]
         return np.unique(np.concatenate(unique_elements))
 
-def _get_completed_frames(structure: _Structure, level_of_theory: str | dict | None) -> npt.NDArray[np.int64]:
+def _completed_frames(structure: _Structure, level_of_theory: str | dict | None) -> npt.NDArray[np.int64]:
     """
     Get indices of frames where calculations for a given level of theory
     are completed.
@@ -645,39 +645,35 @@ def _get_completed_frames(structure: _Structure, level_of_theory: str | dict | N
 
     return np.nonzero(valid_mask)[0]
 
-def _get_indices_to_compute(
+def _frames_to_compute(
     structure: _Structure,
     level_of_theory: str,
     overwrite: bool,
     selected_frames: npt.NDArray[np.int64] | None,
 ) -> npt.NDArray[np.int64]:
     """
-    Determine which frames need calculation.
+    Determine which frames need calculation at a given level_of_theory.
     
-    If overwrite is True, returns all selected frames (or all frames if selected_frames is None).
-    If overwrite is False, filters out frames that already have COMPLETED status for the given level_of_theory.
+    If overwrite is False, skips frames where the data are already
+    computed (status COMPLETED at a given level_of_theory)
+    If overwrite is True, does not take into account if the frame
+    status is COMPLETED or not.
     """
-    candidates = (
+    all_frames = (
         selected_frames if selected_frames is not None 
         else np.arange(structure.n_frames)
     )
-
     if overwrite:
-        return candidates
-    
-    # If not overwriting, filter out completed
-    if structure.ground_truth is None or level_of_theory not in structure.ground_truth.calculation_status:
-        return candidates
-        
-    statuses = structure.ground_truth.calculation_status[level_of_theory]
-    
-    # We want frames that are NOT completed
-    # Note: candidates is an array of indices. We check the status at those indices.
-    
-    # Only keep candidates where status != COMPLETED
-    # statuses[candidates] retrieves the status for each candidate frame
-    mask = statuses[candidates] != CALCULATION_STATUS_COMPLETED
-    return candidates[mask]
+        return all_frames
+    else:
+        #
+        # (frames to compute) = (all frames) - (completed frames)
+        #
+        return np.setdiff1d(
+            all_frames,
+            _completed_frames(structure, level_of_theory),
+            assume_unique=True
+        )
 
 def _select_frames(
         struct: _Structure,
@@ -924,60 +920,46 @@ def _run_model(
             f"Import a calculator class from mbe_automation.calculators."
         )
     
-    if selected_frames is not None:
-        if feature_vectors_type != "none":
-            raise ValueError(
-                "selected_frames cannot be used when calculating feature vectors (feature_vectors_type != 'none')."
-            )
-    
-    assert feature_vectors_type in FEATURE_VECTOR_TYPES
+    if feature_vectors_type not in FEATURE_VECTOR_TYPES:
+        raise ValueError("Invalid type of feature vectors")
 
-    level_of_theory = calculator.level_of_theory
+    if selected_frames is not None:
+        if np.min(selected_frames) < 0 or np.max(selected_frames) > structure.n_frames - 1:
+            raise ValueError("Invalid indices in selected_frames")
+
+        n_selected_frames = len(selected_frames)
+        selected_frames = np.unique(selected_frames)
+        if len(selected_frames) != n_selected_frames:
+            raise ValueError("Repeated elements in selected_frames")
 
     if (
-            (energies and level_of_theory in structure.available_energies("structure_generation")) or
-            (forces and level_of_theory in structure.available_forces("structure_generation"))
+            feature_vectors_type != "none" and
+            structure.feature_vectors_type != none and
+            not overwrite
+    ):
+        raise ValueError("Cannot overwrite existing feature vectors unless overwrite=True.")
+
+    frames_to_compute = _frames_to_compute(
+        structure=structure,
+        level_of_theory=calculator.level_of_theory,
+        overwrite=overwrite,
+        selected_frames=selected_frames,
+    )
+
+    if (
+            feature_vectors_type != "none" and
+            len(frames_to_compute) < structure.n_frames
     ):
         raise ValueError(
-            f"run_model cannot be used to update the energies and forces computed during "
-            f"the structure generation stage (level_of_theory = {level_of_theory}). "
-            f"Use run_model to compute ground truth with alternative methods on fixed, "
-            f"precomputed structures. "
+            "Feature vectors can be computed only for the full set of frames. "
         )
 
-    if selected_frames is None:
-        #
-        # Full calculation for all frames
-        #
-        if (
-                energies and
-                level_of_theory in structure.available_energies("ground_truth") and
-                not overwrite
-        ):
-            raise ValueError(
-                f"Structure already contains energies computed with {level_of_theory}. "
-                f"Use a different calculator or set overwrite=True."
-            )
+    if len(frames_to_compute) == 0:
+        print(f"Found zero uncompleted frames to process with {calculator.level_of_theory}.")
+        return
+    
+    level_of_theory = calculator.level_of_theory
 
-        if (
-                forces and
-                level_of_theory in structure.available_forces("ground_truth") and
-                not overwrite
-        ):
-            raise ValueError(
-                f"Structure already contains forces computed with {level_of_theory}. "
-                f"Use a different calculator or set overwrite=True."
-            )
-
-        if (
-                feature_vectors_type != "none" and
-                structure.feature_vectors_type != "none" and
-                not overwrite
-        ):
-                 raise ValueError(
-                "Structure already contains feature vectors. Set overwrite=True to confirm your choice."
-                 )
-        
     if (energies or forces) and structure.ground_truth is None:
         structure.ground_truth = mbe_automation.storage.GroundTruth()
 
