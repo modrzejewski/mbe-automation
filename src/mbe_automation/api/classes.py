@@ -202,7 +202,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             self,
             indices: npt.NDArray[np.integer] | None = None,
             level_of_theory: str | dict | None = None,
-    ) -> Structure:
+    ) -> Structure | None:
         
         valid_indices = _get_completed_frames(self, level_of_theory)
         
@@ -211,6 +211,9 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
         else:
              final_indices = valid_indices
         
+        if len(final_indices) == 0:
+            return None
+
         return Structure(**vars(
             _select_frames(self, final_indices)
         ))
@@ -485,7 +488,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             self,
             indices: npt.NDArray[np.integer] | None = None,
             level_of_theory: str | dict | None = None,
-    ) -> FiniteSubsystem:
+    ) -> FiniteSubsystem | None:
         
         valid_indices = _get_completed_frames(self.cluster_of_molecules, level_of_theory)
         
@@ -494,6 +497,9 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
         else:
              final_indices = valid_indices
         
+        if len(final_indices) == 0:
+            return None
+
         return FiniteSubsystem(
             cluster_of_molecules=_select_frames(self.cluster_of_molecules, final_indices),
             molecule_indices=self.molecule_indices,
@@ -1054,15 +1060,39 @@ def _to_mace_dataset(
     
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
+    mbe_automation.common.display.framed([
+        "Exporting dataset to MACE training file"
+    ])
+
+    print(f"save_path: {save_path}")
+    print(f"Atomic reference: {'Available' if atomic_reference is not None else 'None'}")
+    print(f"Level of theory: {level_of_theory}")
+    print("")
+
+    if isinstance(level_of_theory, str):
+        _statistics(dataset, level_of_theory)
+    elif isinstance(level_of_theory, dict):
+         for key, method in level_of_theory.items():
+            print(f"Statistics for {key} method ({method}):")
+            _statistics(dataset, method)
+            print("")
+
     structures = []
     for x in dataset:
+        #
+        # Select frames for which the energies and optionally forces
+        # are available
+        #
         if isinstance(x, FiniteSubsystem):
-            valid_indices = _get_completed_frames(x.cluster_of_molecules, level_of_theory)
-            structures.append(
-                _select_frames(x.cluster_of_molecules, valid_indices)
-            )
+            y = x.select(level_of_theory=level_of_theory).cluster_of_molecules
         else:
-            structures.append(x.select(level_of_theory=level_of_theory))
+            y = x.select(level_of_theory=level_of_theory)
+
+        if y is not None:
+            structures.append(y)
+
+    if len(structures) == 0:
+        raise ValueError("No structures with completed calculations found.") 
 
     mbe_automation.ml.mace.to_xyz_training_set(
         structures=structures,
@@ -1079,26 +1109,26 @@ def _statistics(
     Print mean and standard deviation of energy per atom.
     """
 
-    mbe_automation.common.display.framed([
-        "Dataset statistics"
-    ])
-
     energies = []
     for i, x in enumerate(systems):
-        struct = x.cluster_of_molecules if isinstance(x, FiniteSubsystem) else x
+        if isinstance(x, FiniteSubsystem):
+            y = x.select(level_of_theory=level_of_theory).cluster_of_molecules
+        else:
+            y = x.select(level_of_theory=level_of_theory)
 
-        if struct.ground_truth is None:
-            raise ValueError(f"Ground truth data missing in structure {i}.")
+        if y is not None:
+            e_i = y.energies_at_level_of_theory(level_of_theory)
+            if e_i is not None:
+                 energies.append(e_i)
 
-        E_i = struct.ground_truth.energies.get(level_of_theory)
-
-        if E_i is None:
-            raise ValueError(f"Missing energies in structure {i}.")
-
-        energies.append(E_i)
+    if len(energies) == 0:
+        print(f"Zero frames with data at level of theory '{level_of_theory}'.")
+        return
 
     data = np.concatenate(energies)
+    n_frames = len(data)
 
+    print(f"Statistics computed on {n_frames} frames at level of theory '{level_of_theory}'.")
     print(f"Mean energy: {np.mean(data):.5f} eV/atom")
     print(f"Std energy:  {np.std(data):.5f} eV/atom")
 
