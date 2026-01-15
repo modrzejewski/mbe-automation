@@ -1054,7 +1054,7 @@ def _to_mace_dataset(
     if isinstance(level_of_theory, str):
         _statistics(dataset, level_of_theory)
     elif isinstance(level_of_theory, dict):
-         for key, method in level_of_theory.items():
+        for key, method in level_of_theory.items():
             print(f"statistics for {key} method ({method}):")
             _statistics(dataset, method)
             print("")
