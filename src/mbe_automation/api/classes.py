@@ -934,7 +934,7 @@ def _run_model(
 
     if (
             feature_vectors_type != "none" and
-            structure.feature_vectors_type != none and
+            structure.feature_vectors_type != "none" and
             not overwrite
     ):
         raise ValueError("Cannot overwrite existing feature vectors unless overwrite=True.")
