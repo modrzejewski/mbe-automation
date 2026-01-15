@@ -493,9 +493,9 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
         valid_indices = _completed_frames(self.cluster_of_molecules, level_of_theory)
         
         if indices is not None:
-             final_indices = np.intersect1d(indices, valid_indices)
+            final_indices = np.intersect1d(indices, valid_indices)
         else:
-             final_indices = valid_indices
+            final_indices = valid_indices
         
         if len(final_indices) == 0:
             return None
