@@ -14,7 +14,7 @@ from mbe_automation.storage import Structure
 from mbe_automation.storage.core import (
     CALCULATION_STATUS_COMPLETED,
     CALCULATION_STATUS_FAILED,
-    CALCULATION_STATUS_UNCONVERGED_SCF,
+    CALCULATION_STATUS_SCF_NOT_CONVERGED,
 )
 from mbe_automation.calculators.mace import MACE, DeltaMACE
 from mbe_automation.calculators.pyscf import PySCFCalculator, SCFNotConverged
@@ -167,7 +167,7 @@ def _sequential_loop(
             statuses[i] = CALCULATION_STATUS_COMPLETED
 
         except SCFNotConverged:
-            statuses[i] = CALCULATION_STATUS_UNCONVERGED_SCF
+            statuses[i] = CALCULATION_STATUS_SCF_NOT_CONVERGED
         
         except Exception:
             statuses[i] = CALCULATION_STATUS_FAILED
@@ -401,7 +401,7 @@ def run_model(
         )
 
     if not silent:
-        n_unconverged = np.count_nonzero(statuses == CALCULATION_STATUS_UNCONVERGED_SCF)
+        n_unconverged = np.count_nonzero(statuses == CALCULATION_STATUS_SCF_NOT_CONVERGED)
         n_failed = np.count_nonzero(statuses == CALCULATION_STATUS_FAILED)
         n_total = len(statuses)
 
