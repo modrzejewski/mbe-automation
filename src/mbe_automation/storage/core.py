@@ -178,7 +178,30 @@ class Structure:
             only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
             update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
     ) -> None:
-        """Save the structure to a dataset."""
+        """
+        Save the structure to a dataset.
+
+        Parameters
+        ----------
+        dataset : str
+            Path to the HDF5 dataset file.
+        key : str
+            Key within the HDF5 file.
+        update_mode : Literal["update_ground_truth", "replace"]
+            Mode for updating existing data. Defaults to "update_ground_truth".
+
+        Notes
+        -----
+        When ``update_mode="update_ground_truth"`` (default), if the HDF5 key already exists,
+        basic structural data (positions, atomic_numbers, cell_vectors) is NOT saved.
+        Only energies, forces, and ground truth data are updated.
+
+        .. warning::
+           If you modify the geometry of a Structure in memory and call save() with
+           ``update_mode="update_ground_truth"`` on an existing key, the file will contain
+           the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
+           Use ``update_mode="replace"`` if the geometry has changed.
+        """
 
         if isinstance(only, str):
             only = [only]
@@ -326,7 +349,30 @@ class Trajectory(Structure):
             only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
             update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
     ) -> None:
-        """Save the trajectory to a dataset."""
+        """
+        Save the trajectory to a dataset.
+
+        Parameters
+        ----------
+        dataset : str
+            Path to the HDF5 dataset file.
+        key : str
+            Key within the HDF5 file.
+        update_mode : Literal["update_ground_truth", "replace"]
+            Mode for updating existing data. Defaults to "update_ground_truth".
+
+        Notes
+        -----
+        When ``update_mode="update_ground_truth"`` (default), if the HDF5 key already exists,
+        basic structural data (positions, atomic_numbers, cell_vectors) is NOT saved.
+        Only energies, forces, and ground truth data are updated.
+
+        .. warning::
+           If you modify the geometry of a Trajectory in memory and call save() with
+           ``update_mode="update_ground_truth"`` on an existing key, the file will contain
+           the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
+           Use ``update_mode="replace"`` if the geometry has changed.
+        """
 
         if isinstance(only, str):
             only = [only]
@@ -654,6 +700,26 @@ def _save_structure(
         level_of_theory: str | None = None,
         update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
 ):
+    """
+    Internal function to save structure components.
+
+    Parameters
+    ----------
+    update_mode : Literal["update_ground_truth", "replace"]
+        Mode for updating existing data. Defaults to "update_ground_truth".
+
+    Notes
+    -----
+    When ``update_mode="update_ground_truth"`` (default), if the HDF5 key already exists,
+    basic structural data (positions, atomic_numbers, cell_vectors) is NOT saved.
+    Only energies, forces, and ground truth data are updated.
+
+    .. warning::
+       If you modify the geometry of a Structure in memory and call save() with
+       ``update_mode="update_ground_truth"`` on an existing key, the file will contain
+       the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
+       Use ``update_mode="replace"`` if the geometry has changed.
+    """
     if positions.ndim == 2:
         n_frames = 1
         n_atoms = positions.shape[0]
@@ -845,6 +911,32 @@ def save_trajectory(
         traj: Trajectory,
         update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
 ):
+    """
+    Save the trajectory to a dataset.
+
+    Parameters
+    ----------
+    dataset : str
+        Path to the HDF5 dataset file.
+    key : str
+        Key within the HDF5 file.
+    traj : Trajectory
+        Trajectory object to save.
+    update_mode : Literal["update_ground_truth", "replace"]
+        Mode for updating existing data. Defaults to "update_ground_truth".
+
+    Notes
+    -----
+    When ``update_mode="update_ground_truth"`` (default), if the HDF5 key already exists,
+    basic structural data (positions, atomic_numbers, cell_vectors) is NOT saved.
+    Only energies, forces, and ground truth data are updated.
+
+    .. warning::
+       If you modify the geometry of a Trajectory in memory and call save() with
+       ``update_mode="update_ground_truth"`` on an existing key, the file will contain
+       the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
+       Use ``update_mode="replace"`` if the geometry has changed.
+    """
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with dataset_file(dataset, "a") as f:
