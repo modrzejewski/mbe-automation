@@ -169,7 +169,8 @@ def _sequential_loop(
         except SCFNotConverged:
             statuses[i] = CALCULATION_STATUS_SCF_NOT_CONVERGED
         
-        except Exception:
+        except Exception as e:
+            print(f"Warning: Calculation for frame {i} failed with an unexpected error: {e}")
             statuses[i] = CALCULATION_STATUS_FAILED
 
     return E_pot, forces, feature_vectors, statuses
