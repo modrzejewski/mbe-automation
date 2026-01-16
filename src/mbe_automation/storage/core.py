@@ -176,6 +176,7 @@ class Structure:
             dataset: str,
             key: str,
             only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
+            update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
     ) -> None:
         """Save the structure to a dataset."""
 
@@ -187,6 +188,7 @@ class Structure:
                 dataset=dataset,
                 key=key,
                 structure=self,
+                update_mode=update_mode
             )
         else:
             _save_only(
@@ -648,6 +650,7 @@ def _save_structure(
         feature_vectors_type: str="none",
         ground_truth: GroundTruth | None=None,
         level_of_theory: str | None = None,
+        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
 ):
     if positions.ndim == 2:
         n_frames = 1
@@ -662,56 +665,64 @@ def _save_structure(
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)    
     with dataset_file(dataset, "a") as f:
-        if key in f:
+        if key in f and update_mode == "replace":
             del f[key]
+        
+        # Check if we need to initialize the structure data
+        # If the key is present, we assume the structure data is already there 
+        # (based on the assumption "either all of them are in hdf5, or none of them")
+        save_basics = (key not in f)
+        
         group = f.require_group(key)
 
-        group.create_dataset(
-            name="positions (Å)",
-            data=positions
-        )
-        group.create_dataset(
-            name="atomic_numbers",
-            data=atomic_numbers
-        )
-        group.create_dataset(
-            name="masses (u)",
-            data=masses
-        )
-        is_periodic = (cell_vectors is not None)
-        if is_periodic:
+        if save_basics:
             group.create_dataset(
-                name="cell_vectors (Å)",
-                data=cell_vectors
+                name="positions (Å)",
+                data=positions
             )
-        if feature_vectors_type != "none":
             group.create_dataset(
-                name="feature_vectors",
-                data=feature_vectors
+                name="atomic_numbers",
+                data=atomic_numbers
             )
-        if E_pot is not None:
             group.create_dataset(
-                name="E_pot (eV∕atom)",
-                data=E_pot
+                name="masses (u)",
+                data=masses
             )
-        if forces is not None:
-            group.create_dataset(
-                name="forces (eV∕Å)",
-                data=forces
-            )
-        if ground_truth is not None:
-            _save_ground_truth(f, f"{key}/ground_truth", ground_truth)
+            is_periodic = (cell_vectors is not None)
+            if is_periodic:
+                group.create_dataset(
+                    name="cell_vectors (Å)",
+                    data=cell_vectors
+                )
+            if feature_vectors_type != "none":
+                group.create_dataset(
+                    name="feature_vectors",
+                    data=feature_vectors
+                )
+            if E_pot is not None:
+                group.create_dataset(
+                    name="E_pot (eV∕atom)",
+                    data=E_pot
+                )
+            if forces is not None:
+                group.create_dataset(
+                    name="forces (eV∕Å)",
+                    data=forces
+                )
+                
+            group.attrs["dataclass"] = "Structure"
+            group.attrs["n_frames"] = n_frames
+            group.attrs["n_atoms"] = n_atoms
+            group.attrs["periodic"] = is_periodic
+            group.attrs["feature_vectors_type"] = feature_vectors_type
+            if level_of_theory is not None:
+                group.attrs["level_of_theory"] = level_of_theory
 
-        group.attrs["dataclass"] = "Structure"
-        group.attrs["n_frames"] = n_frames
-        group.attrs["n_atoms"] = n_atoms
-        group.attrs["periodic"] = is_periodic
-        group.attrs["feature_vectors_type"] = feature_vectors_type
-        if level_of_theory is not None:
-            group.attrs["level_of_theory"] = level_of_theory
+        if ground_truth is not None:
+            _save_ground_truth(f, f"{key}/ground_truth", ground_truth, update_mode=update_mode)
 
 @overload
-def save_structure(*, dataset: str, key: str, structure: Structure) -> None: ...
+def save_structure(*, dataset: str, key: str, structure: Structure, update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth") -> None: ...
 
 @overload
 def save_structure(
@@ -728,6 +739,7 @@ def save_structure(
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
     ground_truth: GroundTruth | None = None,
     level_of_theory: str | None = None,
+    update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
 ) -> None: ...
 
 def save_structure(*, dataset: str, key: str, **kwargs):
@@ -763,6 +775,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             feature_vectors_type=structure.feature_vectors_type,
             ground_truth=structure.ground_truth,
             level_of_theory=structure.level_of_theory,
+            update_mode=kwargs.get("update_mode", "update_ground_truth"),
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -779,6 +792,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             ground_truth=kwargs.get("ground_truth"),
             feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
             level_of_theory=kwargs.get("level_of_theory"),
+            update_mode=kwargs.get("update_mode", "update_ground_truth"),
         )
     else:
         raise ValueError(
@@ -1291,7 +1305,7 @@ def _save_only(
                     "Ground truth not present, cannot save requested data."
                 )
 
-            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth)
+            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth, update_mode=None)
             
     return
 
@@ -1299,31 +1313,84 @@ def _save_ground_truth(
         f: h5py.File,
         key: str,
         ground_truth: GroundTruth,
+        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
 ) -> None:
 
     group = f.require_group(key)
-
-    levels_of_theory = set()
+    existing_levels_of_theory = set(group.attrs.get("levels_of_theory", []))
+    levels_of_theory = existing_levels_of_theory.copy()
 
     for name, energy in ground_truth.energies.items():
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         sanitized_quantity_name = f"E_{sanitized_method_name} (eV∕atom)"
+        
+        # Prepare data to write
+        data_to_write = energy
+        
+        if update_mode == "update_ground_truth" and sanitized_quantity_name in group:
+            existing_data = group[sanitized_quantity_name][...]
+            
+            # Get statuses
+            new_status = ground_truth.calculation_status.get(name)
+            
+            ds_status_name = f"status_{sanitized_method_name}"
+            if ds_status_name in group:
+                old_status = group[ds_status_name][...]
+            else:
+                 # Assume completed if exists but no status (legacy)
+                 old_status = np.full(existing_data.shape[0], CALCULATION_STATUS_COMPLETED)
+
+            if new_status is not None:
+                mask = (new_status == CALCULATION_STATUS_COMPLETED) & (old_status != CALCULATION_STATUS_COMPLETED)
+                existing_data[mask] = energy[mask]
+                data_to_write = existing_data
+            
         if sanitized_quantity_name in group: del group[sanitized_quantity_name]
-        group.create_dataset(sanitized_quantity_name, data=energy)
+        group.create_dataset(sanitized_quantity_name, data=data_to_write)
         levels_of_theory.add(name)
 
     for name, forces in ground_truth.forces.items():
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         ds_name = f"forces_{sanitized_method_name} (eV∕Å)"
+        
+        data_to_write = forces
+        
+        if update_mode == "update_ground_truth" and ds_name in group:
+            existing_data = group[ds_name][...]
+            
+            # Get statuses
+            new_status = ground_truth.calculation_status.get(name)
+            
+            ds_status_name = f"status_{sanitized_method_name}"
+            if ds_status_name in group:
+                old_status = group[ds_status_name][...]
+            else:
+                 # Assume completed if exists but no status (legacy)
+                 old_status = np.full(existing_data.shape[0], CALCULATION_STATUS_COMPLETED)
+
+            if new_status is not None:
+                mask = (new_status == CALCULATION_STATUS_COMPLETED) & (old_status != CALCULATION_STATUS_COMPLETED)
+                existing_data[mask] = forces[mask]
+                data_to_write = existing_data
+        
         if ds_name in group: del group[ds_name]
-        group.create_dataset(ds_name, data=forces)
+        group.create_dataset(ds_name, data=data_to_write)
         levels_of_theory.add(name)
 
     for name, status in ground_truth.calculation_status.items():
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         ds_name = f"status_{sanitized_method_name}"
+        
+        data_to_write = status
+        
+        if update_mode == "update_ground_truth" and ds_name in group:
+             existing_data = group[ds_name][...]
+             mask = (status == CALCULATION_STATUS_COMPLETED) & (existing_data != CALCULATION_STATUS_COMPLETED)
+             existing_data[mask] = status[mask]
+             data_to_write = existing_data
+        
         if ds_name in group: del group[ds_name]
-        group.create_dataset(ds_name, data=status)
+        group.create_dataset(ds_name, data=data_to_write)
 
     group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
 
