@@ -324,6 +324,7 @@ class Trajectory(Structure):
             dataset: str,
             key: str,
             only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
+            update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
     ) -> None:
         """Save the trajectory to a dataset."""
 
@@ -335,6 +336,7 @@ class Trajectory(Structure):
                 dataset=dataset,
                 key=key,
                 traj=self,
+                update_mode=update_mode,
             )
             
         else:
@@ -840,98 +842,103 @@ def read_structure(dataset, key):
 def save_trajectory(
         dataset: str,
         key: str,
-        traj: Trajectory
+        traj: Trajectory,
+        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
 ):
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with dataset_file(dataset, "a") as f:
-        if key in f:
+        if key in f and update_mode == "replace":
             del f[key]
 
+        save_basics = (key not in f)
+
         group = f.require_group(key)
-        group.attrs["dataclass"] = "Trajectory"
-        group.attrs["ensemble"] = traj.ensemble
-        group.attrs["n_frames"] = traj.n_frames
-        group.attrs["n_atoms"] = traj.n_atoms
-        group.attrs["periodic"] = traj.periodic
-        group.attrs["feature_vectors_type"] = traj.feature_vectors_type
-        group.attrs["target_temperature (K)"] = traj.target_temperature
-        group.attrs["time_equilibration (fs)"] = traj.time_equilibration
-        group.attrs["n_removed_trans_dof"] = traj.n_removed_trans_dof
-        group.attrs["n_removed_rot_dof"] = traj.n_removed_rot_dof
-        if traj.ensemble == "NPT":
-            group.attrs["target_pressure (GPa)"] = traj.target_pressure
+        
+        if save_basics:
+            group.attrs["dataclass"] = "Trajectory"
+            group.attrs["ensemble"] = traj.ensemble
+            group.attrs["n_frames"] = traj.n_frames
+            group.attrs["n_atoms"] = traj.n_atoms
+            group.attrs["periodic"] = traj.periodic
+            group.attrs["feature_vectors_type"] = traj.feature_vectors_type
+            group.attrs["target_temperature (K)"] = traj.target_temperature
+            group.attrs["time_equilibration (fs)"] = traj.time_equilibration
+            group.attrs["n_removed_trans_dof"] = traj.n_removed_trans_dof
+            group.attrs["n_removed_rot_dof"] = traj.n_removed_rot_dof
+            if traj.ensemble == "NPT":
+                group.attrs["target_pressure (GPa)"] = traj.target_pressure
 
-        if traj.level_of_theory is not None:
-            group.attrs["level_of_theory"] = traj.level_of_theory
+            if traj.level_of_theory is not None:
+                group.attrs["level_of_theory"] = traj.level_of_theory
 
-        group.create_dataset(
-            name="time (fs)",
-            data=traj.time
-        )
-        group.create_dataset(
-            name="T (K)",
-            data=traj.temperature
-        )
-        if traj.ensemble == "NPT":
             group.create_dataset(
-                name="p (GPa)",
-                data=traj.pressure
+                name="time (fs)",
+                data=traj.time
             )
             group.create_dataset(
-                name="V (Å³∕atom)",
-                data=traj.volume
+                name="T (K)",
+                data=traj.temperature
             )
-        group.create_dataset(
-            name="forces (eV∕Å)",
-            data=traj.forces
-        )
-        group.create_dataset(
-            name="velocities (Å∕fs)",
-            data=traj.velocities
-        )
-        group.create_dataset(
-            name="E_kin (eV∕atom)",
-            data=traj.E_kin
-        )
-        group.create_dataset(
-            name="E_pot (eV∕atom)",
-            data=traj.E_pot
-        )   
-        group.create_dataset(
-            name="E_trans_drift (eV∕atom)",
-            data=traj.E_trans_drift
-        )
-        if not traj.periodic:
+            if traj.ensemble == "NPT":
+                group.create_dataset(
+                    name="p (GPa)",
+                    data=traj.pressure
+                )
+                group.create_dataset(
+                    name="V (Å³∕atom)",
+                    data=traj.volume
+                )
             group.create_dataset(
-                name="E_rot_drift (eV∕atom)",
-                data=traj.E_rot_drift
+                name="forces (eV∕Å)",
+                data=traj.forces
             )
-        group.create_dataset(
-            name="positions (Å)",
-            data=traj.positions
-        )
-        group.create_dataset(
-            name="atomic_numbers",
-            data=traj.atomic_numbers
-        )
-        group.create_dataset(
-            name="masses (u)",
-            data=traj.masses
-        )
-        if traj.periodic:
             group.create_dataset(
-                name="cell_vectors (Å)",
-                data=traj.cell_vectors
+                name="velocities (Å∕fs)",
+                data=traj.velocities
             )
-        if traj.feature_vectors_type != "none":
+            group.create_dataset(
+                name="E_kin (eV∕atom)",
+                data=traj.E_kin
+            )
+            group.create_dataset(
+                name="E_pot (eV∕atom)",
+                data=traj.E_pot
+            )   
+            group.create_dataset(
+                name="E_trans_drift (eV∕atom)",
+                data=traj.E_trans_drift
+            )
+            if not traj.periodic:
+                group.create_dataset(
+                    name="E_rot_drift (eV∕atom)",
+                    data=traj.E_rot_drift
+                )
+            group.create_dataset(
+                name="positions (Å)",
+                data=traj.positions
+            )
+            group.create_dataset(
+                name="atomic_numbers",
+                data=traj.atomic_numbers
+            )
+            group.create_dataset(
+                name="masses (u)",
+                data=traj.masses
+            )
+            if traj.periodic:
+                group.create_dataset(
+                    name="cell_vectors (Å)",
+                    data=traj.cell_vectors
+                )
+        if save_basics and traj.feature_vectors_type != "none":
             group.create_dataset(
                 name="feature_vectors",
                 data=traj.feature_vectors
             )
 
         if traj.ground_truth is not None:
-            _save_ground_truth(f, f"{key}/ground_truth", traj.ground_truth)
+            _save_ground_truth(f, f"{key}/ground_truth", traj.ground_truth, update_mode=update_mode)
 
 
 def read_trajectory(dataset: str, key: str) -> Trajectory:
