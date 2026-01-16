@@ -1309,6 +1309,38 @@ def _save_only(
             
     return
 
+def _update_dataset(
+        group: h5py.Group,
+        dataset_name: str,
+        new_data: npt.NDArray,
+        method_name: str,
+        ground_truth: GroundTruth,
+        update_mode: str,
+) -> None:
+    sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
+    
+    data_to_write = new_data
+
+    if update_mode == "update_ground_truth" and dataset_name in group:
+        existing_data = group[dataset_name][...]
+
+        new_status = ground_truth.calculation_status.get(method_name)
+
+        ds_status_name = f"status_{sanitized_method_name}"
+        if ds_status_name in group:
+            old_status = group[ds_status_name][...]
+        else:
+            old_status = np.full(existing_data.shape[0], CALCULATION_STATUS_COMPLETED)
+
+        if new_status is not None:
+            mask = (new_status == CALCULATION_STATUS_COMPLETED) & (old_status != CALCULATION_STATUS_COMPLETED)
+            existing_data[mask] = new_data[mask]
+            data_to_write = existing_data
+    
+    if dataset_name in group: del group[dataset_name]
+    group.create_dataset(dataset_name, data=data_to_write)
+
+
 def _save_ground_truth(
         f: h5py.File,
         key: str,
@@ -1324,73 +1356,42 @@ def _save_ground_truth(
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         sanitized_quantity_name = f"E_{sanitized_method_name} (eV∕atom)"
         
-        # Prepare data to write
-        data_to_write = energy
-        
-        if update_mode == "update_ground_truth" and sanitized_quantity_name in group:
-            existing_data = group[sanitized_quantity_name][...]
-            
-            # Get statuses
-            new_status = ground_truth.calculation_status.get(name)
-            
-            ds_status_name = f"status_{sanitized_method_name}"
-            if ds_status_name in group:
-                old_status = group[ds_status_name][...]
-            else:
-                 # Assume completed if exists but no status (legacy)
-                 old_status = np.full(existing_data.shape[0], CALCULATION_STATUS_COMPLETED)
-
-            if new_status is not None:
-                mask = (new_status == CALCULATION_STATUS_COMPLETED) & (old_status != CALCULATION_STATUS_COMPLETED)
-                existing_data[mask] = energy[mask]
-                data_to_write = existing_data
-            
-        if sanitized_quantity_name in group: del group[sanitized_quantity_name]
-        group.create_dataset(sanitized_quantity_name, data=data_to_write)
+        _update_dataset(
+            group=group,
+            dataset_name=sanitized_quantity_name,
+            new_data=energy,
+            method_name=name,
+            ground_truth=ground_truth,
+            update_mode=update_mode
+        )
         levels_of_theory.add(name)
 
     for name, forces in ground_truth.forces.items():
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         ds_name = f"forces_{sanitized_method_name} (eV∕Å)"
         
-        data_to_write = forces
-        
-        if update_mode == "update_ground_truth" and ds_name in group:
-            existing_data = group[ds_name][...]
-            
-            # Get statuses
-            new_status = ground_truth.calculation_status.get(name)
-            
-            ds_status_name = f"status_{sanitized_method_name}"
-            if ds_status_name in group:
-                old_status = group[ds_status_name][...]
-            else:
-                 # Assume completed if exists but no status (legacy)
-                 old_status = np.full(existing_data.shape[0], CALCULATION_STATUS_COMPLETED)
-
-            if new_status is not None:
-                mask = (new_status == CALCULATION_STATUS_COMPLETED) & (old_status != CALCULATION_STATUS_COMPLETED)
-                existing_data[mask] = forces[mask]
-                data_to_write = existing_data
-        
-        if ds_name in group: del group[ds_name]
-        group.create_dataset(ds_name, data=data_to_write)
+        _update_dataset(
+            group=group,
+            dataset_name=ds_name,
+            new_data=forces,
+            method_name=name,
+            ground_truth=ground_truth,
+            update_mode=update_mode
+        )
         levels_of_theory.add(name)
 
     for name, status in ground_truth.calculation_status.items():
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         ds_name = f"status_{sanitized_method_name}"
         
-        data_to_write = status
-        
-        if update_mode == "update_ground_truth" and ds_name in group:
-             existing_data = group[ds_name][...]
-             mask = (status == CALCULATION_STATUS_COMPLETED) & (existing_data != CALCULATION_STATUS_COMPLETED)
-             existing_data[mask] = status[mask]
-             data_to_write = existing_data
-        
-        if ds_name in group: del group[ds_name]
-        group.create_dataset(ds_name, data=data_to_write)
+        _update_dataset(
+            group=group,
+            dataset_name=ds_name,
+            new_data=status,
+            method_name=name,
+            ground_truth=ground_truth,
+            update_mode=update_mode
+        )
 
     group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
 
