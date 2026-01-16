@@ -1415,6 +1415,7 @@ def _update_dataset(
         method_name: str,
         ground_truth: GroundTruth,
         update_mode: str,
+        energies_and_forces_data: bool,
 ) -> None:
     sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
     
@@ -1432,9 +1433,28 @@ def _update_dataset(
             old_status = np.full(existing_data.shape[0], CALCULATION_STATUS_COMPLETED)
 
         if new_status is not None:
-            mask = (new_status == CALCULATION_STATUS_COMPLETED)
-            existing_data[mask] = new_data[mask]
-            data_to_write = existing_data
+            if energies_and_forces_data:
+                mask = (new_status == CALCULATION_STATUS_COMPLETED)
+                existing_data[mask] = new_data[mask]
+                data_to_write = existing_data
+            else:
+                #
+                # Writing calculation status. Here, it's importand to store 
+                # the information not only which calculations are completed,
+                # but also which calculations failed. Note that if the status
+                # of a calculation is UNDEFINED, then it wasn't even started and
+                # we have no information on it. It might happen that some other 
+                # process has managed to complete the calculation because, e.g.,
+                # it had access to more resources. Therefore, we're not updating
+                # the status of COMPLETED calculations to avoid tagging valid
+                # calculations as failed.
+                #
+                mask = (
+                    new_status != CALCULATION_STATUS_UNDEFINED and 
+                    old_status != CALCULATION_STATUS_COMPLETED
+                )
+                existing_data[mask] = new_data[mask]
+                data_to_write = existing_data
     
     if dataset_name in group: del group[dataset_name]
     group.create_dataset(dataset_name, data=data_to_write)
@@ -1461,7 +1481,8 @@ def _save_ground_truth(
             new_data=energy,
             method_name=name,
             ground_truth=ground_truth,
-            update_mode=update_mode
+            update_mode=update_mode,
+            energies_and_forces_data=True,
         )
         levels_of_theory.add(name)
 
@@ -1475,7 +1496,8 @@ def _save_ground_truth(
             new_data=forces,
             method_name=name,
             ground_truth=ground_truth,
-            update_mode=update_mode
+            update_mode=update_mode,
+            energies_and_forces_data=True,
         )
         levels_of_theory.add(name)
 
@@ -1489,7 +1511,8 @@ def _save_ground_truth(
             new_data=status,
             method_name=name,
             ground_truth=ground_truth,
-            update_mode=update_mode
+            update_mode=update_mode,
+            energies_and_forces_data=False,
         )
 
     group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
