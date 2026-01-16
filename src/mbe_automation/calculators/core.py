@@ -190,12 +190,12 @@ def _parallel_loop(
 ) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None, npt.NDArray]:
 
     if compute_energies:
-        E_pot = np.zeros(structure.n_frames)
+        E_pot = np.full(structure.n_frames, np.nan)
     else:
         E_pot = None
 
     if compute_forces:
-        forces = np.zeros((structure.n_frames, structure.n_atoms, 3))
+        forces = np.full((structure.n_frames, structure.n_atoms, 3), np.nan)
     else:
         forces = None
 
