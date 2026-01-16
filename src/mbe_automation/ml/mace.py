@@ -99,6 +99,11 @@ def _process_atomic_energies(
     atomic_numbers = [s.unique_elements for s in structures]
     atomic_numbers = np.sort(np.unique(np.concatenate(atomic_numbers)))
     data = atomic_reference[level_of_theory]
+
+    missing_elements = [z for z in atomic_numbers if z not in data]
+    if missing_elements:
+        raise ValueError(f"Missing atomic energies for elements: {missing_elements} at level of theory '{level_of_theory}'")
+
     energies = np.array([data[z] for z in atomic_numbers])
     return atomic_numbers, energies
 
