@@ -1006,7 +1006,12 @@ def _run_model(
         structure.ground_truth.calculation_status[level_of_theory] = np.full(
             structure.n_frames, CALCULATION_STATUS_UNDEFINED, dtype=np.int64
         )
+        
     structure.ground_truth.calculation_status[level_of_theory][frames_to_compute] = statuses
+
+    if feature_vectors_type != "none" and d is not None:
+        assert len(frames_to_compute) == structure.n_frames
+        structure.feature_vectors = d
 
     return
 
