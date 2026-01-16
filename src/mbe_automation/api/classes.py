@@ -955,7 +955,7 @@ def _run_model(
         )
 
     if len(frames_to_compute) == 0:
-        print(f"Found zero uncompleted frames to process with {calculator.level_of_theory}.")
+        print(f"Found zero frames to process with {calculator.level_of_theory}.")
         return
     
     level_of_theory = calculator.level_of_theory
@@ -967,10 +967,12 @@ def _run_model(
         exec_params = Resources.auto_detect()
 
     exec_params.set()
-
-    calculation_structure = structure
-    if selected_frames is not None:
-        calculation_structure = structure.select(selected_frames)
+    #
+    # To avoid calculation on frames with COMPLETE status,
+    # create a new view of the structure with the subset
+    # of frames where the data are missing
+    #
+    calculation_structure = structure.select(frames_to_compute)
     
     E_pot, F, d, statuses = mbe_automation.calculators.run_model(
         structure=calculation_structure,
@@ -981,43 +983,30 @@ def _run_model(
         average_over_atoms=(feature_vectors_type=="averaged_environments"),
         resources=exec_params,
     )
-
-    if selected_frames is None:
-        if feature_vectors_type != "none" and d is not None:
-            structure.feature_vectors = d
-        structure.feature_vectors_type = feature_vectors_type
-
-        if energies:
-            structure.ground_truth.energies[level_of_theory] = E_pot
-            
-        if forces:
-            structure.ground_truth.forces[level_of_theory] = F
-        
-        structure.ground_truth.calculation_status[level_of_theory] = statuses
-    else:
-        #
-        # Partial update for selected frames
-        #
-        if energies:
-            if level_of_theory not in structure.ground_truth.energies:
-                structure.ground_truth.energies[level_of_theory] = np.full(
-                    structure.n_frames, np.nan
-                )
-            
-            structure.ground_truth.energies[level_of_theory][selected_frames] = E_pot
-
-        if forces:
-            if level_of_theory not in structure.ground_truth.forces:
-                structure.ground_truth.forces[level_of_theory] = np.full(
-                    (structure.n_frames, structure.n_atoms, 3), np.nan
-                )
-            structure.ground_truth.forces[level_of_theory][selected_frames] = F
-        
-        if level_of_theory not in structure.ground_truth.calculation_status:
-            structure.ground_truth.calculation_status[level_of_theory] = np.full(
-                structure.n_frames, CALCULATION_STATUS_UNDEFINED, dtype=np.int64
+    #
+    # Broadcast the computed data to arrays
+    # of full dimension (structure.n_frames).
+    #
+    if energies:
+        if level_of_theory not in structure.ground_truth.energies:
+            structure.ground_truth.energies[level_of_theory] = np.full(
+                structure.n_frames, np.nan
             )
-        structure.ground_truth.calculation_status[level_of_theory][selected_frames] = statuses
+
+        structure.ground_truth.energies[level_of_theory][frames_to_compute] = E_pot
+
+    if forces:
+        if level_of_theory not in structure.ground_truth.forces:
+            structure.ground_truth.forces[level_of_theory] = np.full(
+                (structure.n_frames, structure.n_atoms, 3), np.nan
+            )
+        structure.ground_truth.forces[level_of_theory][frames_to_compute] = F
+
+    if level_of_theory not in structure.ground_truth.calculation_status:
+        structure.ground_truth.calculation_status[level_of_theory] = np.full(
+            structure.n_frames, CALCULATION_STATUS_UNDEFINED, dtype=np.int64
+        )
+    structure.ground_truth.calculation_status[level_of_theory][frames_to_compute] = statuses
 
     return
 
