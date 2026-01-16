@@ -1,6 +1,6 @@
 # Issues Report for `machine-learning` branch
 
-This report updates the status of previously identified issues in the `machine-learning` branch after the recent patch.
+This report summarizes the status of issues identified in the `machine-learning` branch following recent updates.
 
 ## Status Summary
 
@@ -10,18 +10,23 @@ This report updates the status of previously identified issues in the `machine-l
 | **2** | Feature Vector Logic Flaw | **RESOLVED** | Fixed by allowing `energies=False` with `overwrite=True`, enabling FV-only computation. |
 | **3** | `Structure.save` ignores geometry | **MITIGATED** | Warning added to docstring. Logic remains unchanged (geometry changes are ignored in default mode). |
 | **4** | `AtomicReference` validation | **FIXED** | Explicit validation added for missing elements. |
-| **5** | Missing import in `from_xyz_file` | **INVALID** | Verified that `structure` package exposes `crystal` submodule. |
-| **6** | Ambiguous Import in `AtomicReference` | **INVALID** | Verified that `mbe_automation.storage.core` resolves correctly at runtime. |
 
-## Remaining Concerns
+## Verification Notes
 
-### 1. Data Integrity Risk in `Structure.save`
+*   **Imports:** Potential issues regarding missing or ambiguous imports (`mbe_automation.structure.crystal`, `mbe_automation.storage.core`) were investigated. These were determined to be **false positives** as the submodules are correctly exposed via their respective `__init__.py` files or loaded into the namespace.
+*   **Dependencies:** The `run_model` function and MACE integration depend on several optional packages (`mace-torch`, `pyscf`, `phonopy`, etc.). Ensure these are installed in the target environment.
+
+## Remaining Risks
+
+### Data Integrity in `Structure.save`
 
 **Location:** `src/mbe_automation/storage/core.py` inside `_save_structure`.
 
-**Description:**
-While a warning has been added to the documentation, the code still silently ignores geometry updates (positions, cell vectors, atomic numbers) when `update_mode="update_ground_truth"` (default) is used on an existing dataset key.
-If a user modifies `structure.positions` in memory and calls `save()`, the HDF5 file will store the *new* energies (computed on new positions) associated with the *old* positions (retained in file). This leads to a mismatch between geometry and properties.
+**Observation:**
+The default behavior of `Structure.save` (`update_mode="update_ground_truth"`) effectively locks the geometry (positions, cell, atomic numbers) once the key exists in the HDF5 file. If a user modifies the structure in memory and calls `save()`, the function will save the *newly computed properties* but associate them with the *old geometry* on disk.
+
+**Mitigation:**
+A warning has been added to the docstring advising users to use `update_mode="replace"` if the geometry has changed.
 
 **Recommendation:**
-Consider implementing a check that compares the in-memory geometry with the stored geometry when `save_basics` is skipped. If they differ, raise a `ValueError` or print a runtime warning, prompting the user to use `update_mode="replace"`.
+For future hardening, consider adding a runtime check that compares the in-memory geometry with the stored geometry (if `save_basics` is skipped). If they differ, raise a `ValueError` or warning to prevent accidental data corruption.
