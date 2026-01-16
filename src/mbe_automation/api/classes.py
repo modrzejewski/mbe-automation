@@ -926,7 +926,10 @@ def _run_model(
         raise ValueError("Invalid type of feature vectors")
 
     if selected_frames is not None:
-        if np.min(selected_frames) < 0 or np.max(selected_frames) > structure.n_frames - 1:
+        if (
+                len(selected_frames) > 0 and
+                (np.min(selected_frames) < 0 or np.max(selected_frames) > structure.n_frames - 1)
+        ):
             raise ValueError("Invalid indices in selected_frames")
 
         unique_selected_frames = np.unique(selected_frames)
@@ -941,6 +944,13 @@ def _run_model(
     ):
         raise ValueError("Cannot overwrite existing feature vectors unless overwrite=True.")
 
+    if (
+            feature_vectors_type != "none" and
+            selected_frames is not None
+    ):
+        raise ValueError("Feature vectors can be computed only for the full set of frames. "
+                         "Do not specify selected_frames.")
+
     frames_to_compute = _frames_to_compute(
         structure=structure,
         level_of_theory=calculator.level_of_theory,
@@ -954,6 +964,7 @@ def _run_model(
     ):
         raise ValueError(
             "Feature vectors can be computed only for the full set of frames. "
+            "If computed alongside energies and forces, set overwrite=True. "
         )
 
     if len(frames_to_compute) == 0:
