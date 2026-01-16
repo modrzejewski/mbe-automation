@@ -1340,7 +1340,7 @@ def _update_dataset(
             old_status = np.full(existing_data.shape[0], CALCULATION_STATUS_COMPLETED)
 
         if new_status is not None:
-            mask = (new_status == CALCULATION_STATUS_COMPLETED) & (old_status != CALCULATION_STATUS_COMPLETED)
+            mask = (new_status == CALCULATION_STATUS_COMPLETED)
             existing_data[mask] = new_data[mask]
             data_to_write = existing_data
     

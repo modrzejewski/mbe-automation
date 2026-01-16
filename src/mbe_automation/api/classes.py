@@ -1004,12 +1004,19 @@ def _run_model(
             )
         structure.ground_truth.forces[level_of_theory][frames_to_compute] = F
 
-    if level_of_theory not in structure.ground_truth.calculation_status:
-        structure.ground_truth.calculation_status[level_of_theory] = np.full(
-            structure.n_frames, CALCULATION_STATUS_UNDEFINED, dtype=np.int64
-        )
-        
-    structure.ground_truth.calculation_status[level_of_theory][frames_to_compute] = statuses
+    if energies or forces:
+        #
+        # We store the calculation status only for energies and forces
+        # because that's where something can go wrong. For feature vectors,
+        # which are computed using MLIPs, we assume that the computation is performed
+        # for all frames in the structure and always succeeds.
+        #
+        if level_of_theory not in structure.ground_truth.calculation_status:
+            structure.ground_truth.calculation_status[level_of_theory] = np.full(
+                structure.n_frames, CALCULATION_STATUS_UNDEFINED, dtype=np.int64
+            )
+
+        structure.ground_truth.calculation_status[level_of_theory][frames_to_compute] = statuses
 
     if feature_vectors_type != "none" and d is not None:
         assert len(frames_to_compute) == structure.n_frames
