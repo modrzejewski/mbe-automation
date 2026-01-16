@@ -24,6 +24,11 @@ DATA_FOR_TRAINING = [
 #
 UNICODE_DIVISION_SLASH = "∕"
 
+CALCULATION_STATUS_COMPLETED = 0
+CALCULATION_STATUS_UNDEFINED = 1
+CALCULATION_STATUS_SCF_NOT_CONVERGED = 2
+CALCULATION_STATUS_FAILED = 3
+
 @dataclass
 class BrillouinZonePath:
     kpoints: List[npt.NDArray[np.floating]]
@@ -91,17 +96,20 @@ class AtomicReference:
 class GroundTruth:
     energies: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
     forces: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
+    calculation_status: Dict[str, npt.NDArray[np.int64]] = field(default_factory=dict)
 
     def copy(self) -> GroundTruth:
         return GroundTruth(
             energies={k: v.copy() for k, v in self.energies.items()},
             forces={k: v.copy() for k, v in self.forces.items()},
+            calculation_status={k: v.copy() for k, v in self.calculation_status.items()},
         )
 
     def select_frames(self, indices: npt.NDArray[np.integer]) -> GroundTruth:
         return GroundTruth(
             energies={k: v[indices] for k, v in self.energies.items()},
             forces={k: v[indices] for k, v in self.forces.items()},
+            calculation_status={k: v[indices] for k, v in self.calculation_status.items()},
         )
         
 @dataclass
@@ -168,6 +176,7 @@ class Structure:
             dataset: str,
             key: str,
             only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
+            update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
     ) -> None:
         """Save the structure to a dataset."""
 
@@ -179,6 +188,7 @@ class Structure:
                 dataset=dataset,
                 key=key,
                 structure=self,
+                update_mode=update_mode
             )
         else:
             _save_only(
@@ -314,6 +324,7 @@ class Trajectory(Structure):
             dataset: str,
             key: str,
             only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
+            update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
     ) -> None:
         """Save the trajectory to a dataset."""
 
@@ -325,6 +336,7 @@ class Trajectory(Structure):
                 dataset=dataset,
                 key=key,
                 traj=self,
+                update_mode=update_mode,
             )
             
         else:
@@ -640,6 +652,7 @@ def _save_structure(
         feature_vectors_type: str="none",
         ground_truth: GroundTruth | None=None,
         level_of_theory: str | None = None,
+        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
 ):
     if positions.ndim == 2:
         n_frames = 1
@@ -654,56 +667,64 @@ def _save_structure(
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)    
     with dataset_file(dataset, "a") as f:
-        if key in f:
+        if key in f and update_mode == "replace":
             del f[key]
+        
+        # Check if we need to initialize the structure data
+        # If the key is present, we assume the structure data is already there 
+        # (based on the assumption "either all of them are in hdf5, or none of them")
+        save_basics = (key not in f)
+        
         group = f.require_group(key)
 
-        group.create_dataset(
-            name="positions (Å)",
-            data=positions
-        )
-        group.create_dataset(
-            name="atomic_numbers",
-            data=atomic_numbers
-        )
-        group.create_dataset(
-            name="masses (u)",
-            data=masses
-        )
-        is_periodic = (cell_vectors is not None)
-        if is_periodic:
+        if save_basics:
             group.create_dataset(
-                name="cell_vectors (Å)",
-                data=cell_vectors
+                name="positions (Å)",
+                data=positions
             )
-        if feature_vectors_type != "none":
             group.create_dataset(
-                name="feature_vectors",
-                data=feature_vectors
+                name="atomic_numbers",
+                data=atomic_numbers
             )
-        if E_pot is not None:
             group.create_dataset(
-                name="E_pot (eV∕atom)",
-                data=E_pot
+                name="masses (u)",
+                data=masses
             )
-        if forces is not None:
-            group.create_dataset(
-                name="forces (eV∕Å)",
-                data=forces
-            )
-        if ground_truth is not None:
-            _save_ground_truth(f, f"{key}/ground_truth", ground_truth)
+            is_periodic = (cell_vectors is not None)
+            if is_periodic:
+                group.create_dataset(
+                    name="cell_vectors (Å)",
+                    data=cell_vectors
+                )
+            if feature_vectors_type != "none":
+                group.create_dataset(
+                    name="feature_vectors",
+                    data=feature_vectors
+                )
+            if E_pot is not None:
+                group.create_dataset(
+                    name="E_pot (eV∕atom)",
+                    data=E_pot
+                )
+            if forces is not None:
+                group.create_dataset(
+                    name="forces (eV∕Å)",
+                    data=forces
+                )
+                
+            group.attrs["dataclass"] = "Structure"
+            group.attrs["n_frames"] = n_frames
+            group.attrs["n_atoms"] = n_atoms
+            group.attrs["periodic"] = is_periodic
+            group.attrs["feature_vectors_type"] = feature_vectors_type
+            if level_of_theory is not None:
+                group.attrs["level_of_theory"] = level_of_theory
 
-        group.attrs["dataclass"] = "Structure"
-        group.attrs["n_frames"] = n_frames
-        group.attrs["n_atoms"] = n_atoms
-        group.attrs["periodic"] = is_periodic
-        group.attrs["feature_vectors_type"] = feature_vectors_type
-        if level_of_theory is not None:
-            group.attrs["level_of_theory"] = level_of_theory
+        if ground_truth is not None:
+            _save_ground_truth(f, f"{key}/ground_truth", ground_truth, update_mode=update_mode)
 
 @overload
-def save_structure(*, dataset: str, key: str, structure: Structure) -> None: ...
+def save_structure(*, dataset: str, key: str, structure: Structure, update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth") -> None: ...
 
 @overload
 def save_structure(
@@ -720,6 +741,7 @@ def save_structure(
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
     ground_truth: GroundTruth | None = None,
     level_of_theory: str | None = None,
+    update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
 ) -> None: ...
 
 def save_structure(*, dataset: str, key: str, **kwargs):
@@ -755,6 +777,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             feature_vectors_type=structure.feature_vectors_type,
             ground_truth=structure.ground_truth,
             level_of_theory=structure.level_of_theory,
+            update_mode=kwargs.get("update_mode", "update_ground_truth"),
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -771,6 +794,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             ground_truth=kwargs.get("ground_truth"),
             feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
             level_of_theory=kwargs.get("level_of_theory"),
+            update_mode=kwargs.get("update_mode", "update_ground_truth"),
         )
     else:
         raise ValueError(
@@ -818,98 +842,103 @@ def read_structure(dataset, key):
 def save_trajectory(
         dataset: str,
         key: str,
-        traj: Trajectory
+        traj: Trajectory,
+        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
 ):
 
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with dataset_file(dataset, "a") as f:
-        if key in f:
+        if key in f and update_mode == "replace":
             del f[key]
 
+        save_basics = (key not in f)
+
         group = f.require_group(key)
-        group.attrs["dataclass"] = "Trajectory"
-        group.attrs["ensemble"] = traj.ensemble
-        group.attrs["n_frames"] = traj.n_frames
-        group.attrs["n_atoms"] = traj.n_atoms
-        group.attrs["periodic"] = traj.periodic
-        group.attrs["feature_vectors_type"] = traj.feature_vectors_type
-        group.attrs["target_temperature (K)"] = traj.target_temperature
-        group.attrs["time_equilibration (fs)"] = traj.time_equilibration
-        group.attrs["n_removed_trans_dof"] = traj.n_removed_trans_dof
-        group.attrs["n_removed_rot_dof"] = traj.n_removed_rot_dof
-        if traj.ensemble == "NPT":
-            group.attrs["target_pressure (GPa)"] = traj.target_pressure
+        
+        if save_basics:
+            group.attrs["dataclass"] = "Trajectory"
+            group.attrs["ensemble"] = traj.ensemble
+            group.attrs["n_frames"] = traj.n_frames
+            group.attrs["n_atoms"] = traj.n_atoms
+            group.attrs["periodic"] = traj.periodic
+            group.attrs["feature_vectors_type"] = traj.feature_vectors_type
+            group.attrs["target_temperature (K)"] = traj.target_temperature
+            group.attrs["time_equilibration (fs)"] = traj.time_equilibration
+            group.attrs["n_removed_trans_dof"] = traj.n_removed_trans_dof
+            group.attrs["n_removed_rot_dof"] = traj.n_removed_rot_dof
+            if traj.ensemble == "NPT":
+                group.attrs["target_pressure (GPa)"] = traj.target_pressure
 
-        if traj.level_of_theory is not None:
-            group.attrs["level_of_theory"] = traj.level_of_theory
+            if traj.level_of_theory is not None:
+                group.attrs["level_of_theory"] = traj.level_of_theory
 
-        group.create_dataset(
-            name="time (fs)",
-            data=traj.time
-        )
-        group.create_dataset(
-            name="T (K)",
-            data=traj.temperature
-        )
-        if traj.ensemble == "NPT":
             group.create_dataset(
-                name="p (GPa)",
-                data=traj.pressure
+                name="time (fs)",
+                data=traj.time
             )
             group.create_dataset(
-                name="V (Å³∕atom)",
-                data=traj.volume
+                name="T (K)",
+                data=traj.temperature
             )
-        group.create_dataset(
-            name="forces (eV∕Å)",
-            data=traj.forces
-        )
-        group.create_dataset(
-            name="velocities (Å∕fs)",
-            data=traj.velocities
-        )
-        group.create_dataset(
-            name="E_kin (eV∕atom)",
-            data=traj.E_kin
-        )
-        group.create_dataset(
-            name="E_pot (eV∕atom)",
-            data=traj.E_pot
-        )   
-        group.create_dataset(
-            name="E_trans_drift (eV∕atom)",
-            data=traj.E_trans_drift
-        )
-        if not traj.periodic:
+            if traj.ensemble == "NPT":
+                group.create_dataset(
+                    name="p (GPa)",
+                    data=traj.pressure
+                )
+                group.create_dataset(
+                    name="V (Å³∕atom)",
+                    data=traj.volume
+                )
             group.create_dataset(
-                name="E_rot_drift (eV∕atom)",
-                data=traj.E_rot_drift
+                name="forces (eV∕Å)",
+                data=traj.forces
             )
-        group.create_dataset(
-            name="positions (Å)",
-            data=traj.positions
-        )
-        group.create_dataset(
-            name="atomic_numbers",
-            data=traj.atomic_numbers
-        )
-        group.create_dataset(
-            name="masses (u)",
-            data=traj.masses
-        )
-        if traj.periodic:
             group.create_dataset(
-                name="cell_vectors (Å)",
-                data=traj.cell_vectors
+                name="velocities (Å∕fs)",
+                data=traj.velocities
             )
-        if traj.feature_vectors_type != "none":
+            group.create_dataset(
+                name="E_kin (eV∕atom)",
+                data=traj.E_kin
+            )
+            group.create_dataset(
+                name="E_pot (eV∕atom)",
+                data=traj.E_pot
+            )   
+            group.create_dataset(
+                name="E_trans_drift (eV∕atom)",
+                data=traj.E_trans_drift
+            )
+            if not traj.periodic:
+                group.create_dataset(
+                    name="E_rot_drift (eV∕atom)",
+                    data=traj.E_rot_drift
+                )
+            group.create_dataset(
+                name="positions (Å)",
+                data=traj.positions
+            )
+            group.create_dataset(
+                name="atomic_numbers",
+                data=traj.atomic_numbers
+            )
+            group.create_dataset(
+                name="masses (u)",
+                data=traj.masses
+            )
+            if traj.periodic:
+                group.create_dataset(
+                    name="cell_vectors (Å)",
+                    data=traj.cell_vectors
+                )
+        if save_basics and traj.feature_vectors_type != "none":
             group.create_dataset(
                 name="feature_vectors",
                 data=traj.feature_vectors
             )
 
         if traj.ground_truth is not None:
-            _save_ground_truth(f, f"{key}/ground_truth", traj.ground_truth)
+            _save_ground_truth(f, f"{key}/ground_truth", traj.ground_truth, update_mode=update_mode)
 
 
 def read_trajectory(dataset: str, key: str) -> Trajectory:
@@ -1283,33 +1312,93 @@ def _save_only(
                     "Ground truth not present, cannot save requested data."
                 )
 
-            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth)
+            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth, update_mode="update_ground_truth")
             
     return
+
+def _update_dataset(
+        group: h5py.Group,
+        dataset_name: str,
+        new_data: npt.NDArray,
+        method_name: str,
+        ground_truth: GroundTruth,
+        update_mode: str,
+) -> None:
+    sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
+    
+    data_to_write = new_data
+
+    if update_mode == "update_ground_truth" and dataset_name in group:
+        existing_data = group[dataset_name][...]
+
+        new_status = ground_truth.calculation_status.get(method_name)
+
+        ds_status_name = f"status_{sanitized_method_name}"
+        if ds_status_name in group:
+            old_status = group[ds_status_name][...]
+        else:
+            old_status = np.full(existing_data.shape[0], CALCULATION_STATUS_COMPLETED)
+
+        if new_status is not None:
+            mask = (new_status == CALCULATION_STATUS_COMPLETED) & (old_status != CALCULATION_STATUS_COMPLETED)
+            existing_data[mask] = new_data[mask]
+            data_to_write = existing_data
+    
+    if dataset_name in group: del group[dataset_name]
+    group.create_dataset(dataset_name, data=data_to_write)
+
 
 def _save_ground_truth(
         f: h5py.File,
         key: str,
         ground_truth: GroundTruth,
+        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
 ) -> None:
 
     group = f.require_group(key)
-
-    levels_of_theory = set()
+    existing_levels_of_theory = set(group.attrs.get("levels_of_theory", []))
+    levels_of_theory = existing_levels_of_theory.copy()
 
     for name, energy in ground_truth.energies.items():
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         sanitized_quantity_name = f"E_{sanitized_method_name} (eV∕atom)"
-        if sanitized_quantity_name in group: del group[sanitized_quantity_name]
-        group.create_dataset(sanitized_quantity_name, data=energy)
+        
+        _update_dataset(
+            group=group,
+            dataset_name=sanitized_quantity_name,
+            new_data=energy,
+            method_name=name,
+            ground_truth=ground_truth,
+            update_mode=update_mode
+        )
         levels_of_theory.add(name)
 
     for name, forces in ground_truth.forces.items():
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         ds_name = f"forces_{sanitized_method_name} (eV∕Å)"
-        if ds_name in group: del group[ds_name]
-        group.create_dataset(ds_name, data=forces)
+        
+        _update_dataset(
+            group=group,
+            dataset_name=ds_name,
+            new_data=forces,
+            method_name=name,
+            ground_truth=ground_truth,
+            update_mode=update_mode
+        )
         levels_of_theory.add(name)
+
+    for name, status in ground_truth.calculation_status.items():
+        sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
+        ds_name = f"status_{sanitized_method_name}"
+        
+        _update_dataset(
+            group=group,
+            dataset_name=ds_name,
+            new_data=status,
+            method_name=name,
+            ground_truth=ground_truth,
+            update_mode=update_mode
+        )
 
     group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
 
@@ -1323,6 +1412,7 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
 
         energies = {}
         forces = {}
+        calculation_status = {}
 
         for name in levels_of_theory:
             sanitized_name = name.replace("/", UNICODE_DIVISION_SLASH)
@@ -1330,10 +1420,30 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
                 energies[name] = group[f"E_{sanitized_name} (eV∕atom)"][...]
             if f"forces_{sanitized_name} (eV∕Å)" in group:
                 forces[name] = group[f"forces_{sanitized_name} (eV∕Å)"][...]
+            
+            if f"status_{sanitized_name}" in group:
+                calculation_status[name] = group[f"status_{sanitized_name}"][...]
+            else:
+                # Fallback for backward compatibility
+                # If we have energies, we can infer the number of frames from there
+                # If not, we try forces.
+                n_frames = 0
+                if name in energies:
+                    n_frames = len(energies[name])
+                elif name in forces:
+                    n_frames = len(forces[name])
+                
+                if n_frames > 0:
+                    calculation_status[name] = np.full(
+                        n_frames, 
+                        CALCULATION_STATUS_COMPLETED, 
+                        dtype=np.int64
+                    )
 
         ground_truth = GroundTruth(
             energies=energies,
             forces=forces,
+            calculation_status=calculation_status,
         )
     else:
         ground_truth = None

@@ -8,6 +8,20 @@ import ase.data
 
 import mbe_automation.storage.views
 from mbe_automation.storage.core import Structure, AtomicReference
+ 
+def _check_nans(energies: npt.NDArray[np.float64] | None, forces: npt.NDArray[np.float64] | None) -> None:
+    if energies is not None and np.isnan(energies).any():
+        raise ValueError(
+            "Energies contain NaNs. This frame might be marked as "
+            "complete, but force/energy data is missing. "
+            "This is likely an implementation bug."
+        )
+    if forces is not None and np.isnan(forces).any():
+        raise ValueError(
+            "Forces contain NaNs. This frame might be marked as "
+            "complete, but force/energy data is missing. "
+            "This is likely an implementation bug."
+        )
 
 def _to_xyz_training_set(
         structure: Structure,
@@ -174,9 +188,11 @@ def to_xyz_training_set(
         else:
             energies = energies_target
             forces = forces_target
-
+        
         if (energies is None and forces is None):
             raise ValueError(f"Structure {i} does not contain energies/forces data at the requested level of theory: {level_of_theory}")
+
+        _check_nans(energies, forces)
         
         _to_xyz_training_set(
             structure=structure,
