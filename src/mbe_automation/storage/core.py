@@ -1514,6 +1514,10 @@ def _save_ground_truth(
             update_mode=update_mode,
             energies_and_forces_data=False,
         )
+        #
+        # We don't save the level_of_theory because there can't be a calculation status
+        # without either energies or forces, so this information is redundant at this point.
+        #
 
     group.attrs["levels_of_theory"] = sorted(list(levels_of_theory))
 
