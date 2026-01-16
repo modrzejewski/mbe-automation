@@ -1312,7 +1312,7 @@ def _save_only(
                     "Ground truth not present, cannot save requested data."
                 )
 
-            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth, update_mode=None)
+            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth, update_mode="update_ground_truth")
             
     return
 
