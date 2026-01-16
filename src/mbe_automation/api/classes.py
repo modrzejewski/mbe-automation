@@ -1012,6 +1012,7 @@ def _run_model(
     if feature_vectors_type != "none" and d is not None:
         assert len(frames_to_compute) == structure.n_frames
         structure.feature_vectors = d
+        structure.feature_vectors_type = feature_vectors_type
 
     return
 
