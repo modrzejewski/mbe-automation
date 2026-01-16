@@ -34,6 +34,8 @@ from mbe_automation.storage.core import (
     DATA_FOR_TRAINING,
     CALCULATION_STATUS_UNDEFINED,
     CALCULATION_STATUS_COMPLETED,
+    CALCULATION_STATUS_SCF_NOT_CONVERGED,
+    CALCULATION_STATUS_FAILED,
 )
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
@@ -1048,10 +1050,12 @@ def _to_mace_dataset(
 
     if isinstance(level_of_theory, str):
         _statistics(dataset, level_of_theory)
+        _print_status_report(dataset, level_of_theory)
     elif isinstance(level_of_theory, dict):
         for key, method in level_of_theory.items():
             print(f"statistics for {key} method ({method}):")
             _statistics(dataset, method)
+            _print_status_report(dataset, method)
             print("")
 
     structures = []
@@ -1111,6 +1115,56 @@ def _statistics(
     print(f"Statistics computed on {n_frames} frames at level of theory '{level_of_theory}'.")
     print(f"Mean energy: {np.mean(data):.5f} eV/atom")
     print(f"Std energy:  {np.std(data):.5f} eV/atom")
+
+def _print_status_report(
+    dataset: List[Structure | FiniteSubsystem],
+    level_of_theory: str
+) -> None:
+    """
+    Print a report of calculation statuses for a given level of theory.
+    """
+    total_frames = 0
+    completed = 0
+    unconverged = 0
+    failed = 0
+    
+    for x in dataset:
+        if isinstance(x, FiniteSubsystem):
+             curr_struct = x.cluster_of_molecules
+        else:
+             curr_struct = x
+        
+        total_frames += curr_struct.n_frames
+        
+        if curr_struct.ground_truth is not None and level_of_theory in curr_struct.ground_truth.calculation_status:
+            statuses = curr_struct.ground_truth.calculation_status[level_of_theory]
+             
+            completed += np.sum(statuses == CALCULATION_STATUS_COMPLETED)
+            unconverged += np.sum(statuses == CALCULATION_STATUS_SCF_NOT_CONVERGED)
+            failed += np.sum(statuses == CALCULATION_STATUS_FAILED)
+             
+        else:
+            #
+            # If no ground truth or level of theory not present, all are undefined/missing
+            # unless the structure ITSELF is generated at this level of theory and includes
+            # energies or forces.
+            #
+            if (
+                    curr_struct.level_of_theory == level_of_theory and
+                    (curr_struct.E_pot is not None or curr_struct.forces is not None)
+            ):
+                completed += curr_struct.n_frames
+
+    print(f"Status report for {level_of_theory}:")
+    print(f"  Total frames                   {total_frames}")
+    print(f"  Frames with complete data      {completed}")
+    print(f"  Unconverged SCF                {unconverged}")
+    print(f"  Failed                         {failed}")
+    
+    if completed > 0:
+        print("Only frames with complete data will be exported")
+    else:
+        print("No frames with complete data found!")
 
 def _energy_fluctuations(
         traj: Trajectory,
