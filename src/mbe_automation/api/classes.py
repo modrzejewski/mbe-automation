@@ -1006,18 +1006,12 @@ def _run_model(
         structure.ground_truth.calculation_status[level_of_theory] = np.full(
             structure.n_frames, CALCULATION_STATUS_UNDEFINED, dtype=np.int64
         )
+
     structure.ground_truth.calculation_status[level_of_theory][frames_to_compute] = statuses
 
     if feature_vectors_type != "none" and d is not None:
-        if structure.feature_vectors is None:
-            #
-            # Initialize feature vectors array if not present.
-            # We use d.shape[1:] to get (n_atoms, n_features) or (n_features,).
-            #
-            structure.feature_vectors = np.full(
-                (structure.n_frames, *d.shape[1:]), np.nan
-            )
-        structure.feature_vectors[frames_to_compute] = d
+        assert len(frames_to_compute) == structure.n_frames
+        structure.feature_vectors = d
         structure.feature_vectors_type = feature_vectors_type
 
     return
