@@ -176,7 +176,7 @@ class Structure:
             dataset: str,
             key: str,
             only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
-            update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+            update_mode: Literal["update_properties", "replace"] = "update_properties",
     ) -> None:
         """
         Save the structure to a dataset.
@@ -347,7 +347,7 @@ class Trajectory(Structure):
             dataset: str,
             key: str,
             only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
-            update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+            update_mode: Literal["update_properties", "replace"] = "update_properties",
     ) -> None:
         """
         Save the trajectory to a dataset.
@@ -698,25 +698,25 @@ def _save_structure(
         feature_vectors_type: str="none",
         ground_truth: GroundTruth | None=None,
         level_of_theory: str | None = None,
-        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+        update_mode: Literal["update_properties", "replace"] = "update_properties",
 ):
     """
     Internal function to save structure components.
 
     Parameters
     ----------
-    update_mode : Literal["update_ground_truth", "replace"]
-        Mode for updating existing data. Defaults to "update_ground_truth".
+    update_mode : Literal["update_properties", "replace"]
+        Mode for updating existing data. Defaults to "update_properties".
 
     Notes
     -----
-    When ``update_mode="update_ground_truth"`` (default), if the HDF5 key already exists,
-    basic structural data (positions, atomic_numbers, cell_vectors) is NOT saved.
-    Only energies, forces, and ground truth data are updated.
+    When ``update_mode="update_properties"`` (default), if the HDF5 key already exists,
+    basic structural data (positions, atomic_numbers, cell_vectors) are NOT saved.
+    Only energies, forces, feature vectors (if missing), and ground truth data are updated.
 
     .. warning::
        If you modify the geometry of a Structure in memory and call save() with
-       ``update_mode="update_ground_truth"`` on an existing key, the file will contain
+       ``update_mode="update_properties"`` on an existing key, the file will contain
        the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
        Use ``update_mode="replace"`` if the geometry has changed.
     """
@@ -786,11 +786,25 @@ def _save_structure(
             if level_of_theory is not None:
                 group.attrs["level_of_theory"] = level_of_theory
 
+        elif update_mode == "update_properties":
+            #
+            # If we are in update_properties mode and the structure already exists,
+            # we check if we need to add feature vectors which might have been computed
+            # after the structure was saved.
+            #
+            if feature_vectors is not None and feature_vectors_type != "none":
+                if "feature_vectors" not in group:
+                    group.create_dataset(
+                        name="feature_vectors",
+                        data=feature_vectors
+                    )
+                    group.attrs["feature_vectors_type"] = feature_vectors_type
+
         if ground_truth is not None:
             _save_ground_truth(f, f"{key}/ground_truth", ground_truth, update_mode=update_mode)
 
 @overload
-def save_structure(*, dataset: str, key: str, structure: Structure, update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth") -> None: ...
+def save_structure(*, dataset: str, key: str, structure: Structure, update_mode: Literal["update_properties", "replace"] = "update_properties") -> None: ...
 
 @overload
 def save_structure(
@@ -807,7 +821,7 @@ def save_structure(
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
     ground_truth: GroundTruth | None = None,
     level_of_theory: str | None = None,
-    update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+    update_mode: Literal["update_properties", "replace"] = "update_properties",
 ) -> None: ...
 
 def save_structure(*, dataset: str, key: str, **kwargs):
@@ -843,7 +857,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             feature_vectors_type=structure.feature_vectors_type,
             ground_truth=structure.ground_truth,
             level_of_theory=structure.level_of_theory,
-            update_mode=kwargs.get("update_mode", "update_ground_truth"),
+            update_mode=kwargs.get("update_mode", "update_properties"),
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -860,7 +874,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             ground_truth=kwargs.get("ground_truth"),
             feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
             level_of_theory=kwargs.get("level_of_theory"),
-            update_mode=kwargs.get("update_mode", "update_ground_truth"),
+            update_mode=kwargs.get("update_mode", "update_properties"),
         )
     else:
         raise ValueError(
@@ -909,7 +923,7 @@ def save_trajectory(
         dataset: str,
         key: str,
         traj: Trajectory,
-        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+        update_mode: Literal["update_properties", "replace"] = "update_properties",
 ):
     """
     Save the trajectory to a dataset.
@@ -922,18 +936,18 @@ def save_trajectory(
         Key within the HDF5 file.
     traj : Trajectory
         Trajectory object to save.
-    update_mode : Literal["update_ground_truth", "replace"]
-        Mode for updating existing data. Defaults to "update_ground_truth".
+    update_mode : Literal["update_properties", "replace"]
+        Mode for updating existing data. Defaults to "update_properties".
 
     Notes
     -----
-    When ``update_mode="update_ground_truth"`` (default), if the HDF5 key already exists,
+    When ``update_mode="update_properties"`` (default), if the HDF5 key already exists,
     basic structural data (positions, atomic_numbers, cell_vectors) is NOT saved.
-    Only energies, forces, and ground truth data are updated.
+    Only energies, forces, feature vectors (if missing), and ground truth data are updated.
 
     .. warning::
        If you modify the geometry of a Trajectory in memory and call save() with
-       ``update_mode="update_ground_truth"`` on an existing key, the file will contain
+       ``update_mode="update_properties"`` on an existing key, the file will contain
        the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
        Use ``update_mode="replace"`` if the geometry has changed.
     """
@@ -1028,6 +1042,20 @@ def save_trajectory(
                 name="feature_vectors",
                 data=traj.feature_vectors
             )
+
+        elif update_mode == "update_properties":
+            #
+            # If we are in update_properties mode and the trajectory already exists,
+            # we check if we need to add feature vectors which might have been computed
+            # after the trajectory was saved.
+            #
+            if traj.feature_vectors is not None and traj.feature_vectors_type != "none":
+                if "feature_vectors" not in group:
+                    group.create_dataset(
+                        name="feature_vectors",
+                        data=traj.feature_vectors
+                    )
+                    group.attrs["feature_vectors_type"] = traj.feature_vectors_type
 
         if traj.ground_truth is not None:
             _save_ground_truth(f, f"{key}/ground_truth", traj.ground_truth, update_mode=update_mode)
@@ -1404,7 +1432,7 @@ def _save_only(
                     "Ground truth not present, cannot save requested data."
                 )
 
-            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth, update_mode="update_ground_truth")
+            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth, update_mode="update_properties")
             
     return
 
@@ -1419,52 +1447,63 @@ def _update_dataset(
 ) -> None:
     sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
     
-    data_to_write = new_data
+    #
+    # If update_mode is not "update_properties" or the dataset does not exist,
+    # we proceed with the standard overwrite (delete and create).
+    #
+    if update_mode != "update_properties" or dataset_name not in group:
+        if dataset_name in group:
+            del group[dataset_name]
+        group.create_dataset(dataset_name, data=new_data)
+        return
 
-    if update_mode == "update_ground_truth" and dataset_name in group:
-        existing_data = group[dataset_name][...]
+    #
+    # Partial Update Logic
+    #
+    dset = group[dataset_name]
 
-        new_status = ground_truth.calculation_status.get(method_name)
+    if dset.shape != new_data.shape:
+        raise ValueError(
+            f"Shape mismatch when updating dataset '{dataset_name}': "
+            f"existing shape {dset.shape}, new data shape {new_data.shape}. "
+            "This indicates a potential logic error or data corruption risk."
+        )
 
-        ds_status_name = f"status_{sanitized_method_name}"
-        if ds_status_name in group:
-            old_status = group[ds_status_name][...]
+    new_status = ground_truth.calculation_status.get(method_name)
+
+    # Calculate the mask of indices to update
+    mask = None
+    if new_status is not None:
+        if energies_and_forces_data:
+            mask = (new_status == CALCULATION_STATUS_COMPLETED)
         else:
-            old_status = np.full(existing_data.shape[0], CALCULATION_STATUS_COMPLETED)
-
-        if new_status is not None:
-            if energies_and_forces_data:
-                mask = (new_status == CALCULATION_STATUS_COMPLETED)
-                existing_data[mask] = new_data[mask]
-                data_to_write = existing_data
+            ds_status_name = f"status_{sanitized_method_name}"
+            if ds_status_name in group:
+                old_status = group[ds_status_name][...]
             else:
-                #
-                # Writing calculation status. Here, it's importand to store 
-                # the information not only which calculations are completed,
-                # but also which calculations failed. Note that if the status
-                # of a calculation is UNDEFINED, then it wasn't even started and
-                # we have no information on it. It might happen that some other 
-                # process has managed to complete the calculation because, e.g.,
-                # it had access to more resources. Therefore, we're not updating
-                # the status of COMPLETED calculations to avoid tagging valid
-                # calculations as failed.
-                #
-                mask = (
-                    new_status != CALCULATION_STATUS_UNDEFINED and 
-                    old_status != CALCULATION_STATUS_COMPLETED
-                )
-                existing_data[mask] = new_data[mask]
-                data_to_write = existing_data
-    
-    if dataset_name in group: del group[dataset_name]
-    group.create_dataset(dataset_name, data=data_to_write)
+                old_status = np.full(dset.shape[0], CALCULATION_STATUS_COMPLETED)
+
+            mask = (
+                (new_status != CALCULATION_STATUS_UNDEFINED) &
+                (old_status != CALCULATION_STATUS_COMPLETED)
+            )
+
+    # Perform the update
+    if mask is not None:
+        # Only write to the indices where mask is True to save I/O and memory
+        if np.any(mask):
+            indices = np.where(mask)[0]
+            dset[indices] = new_data[indices]
+    else:
+        # If no status information is available, overwrite the existing data in-place
+        dset[...] = new_data
 
 
 def _save_ground_truth(
         f: h5py.File,
         key: str,
         ground_truth: GroundTruth,
-        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+        update_mode: Literal["update_properties", "replace"] = "update_properties",
 ) -> None:
 
     group = f.require_group(key)
