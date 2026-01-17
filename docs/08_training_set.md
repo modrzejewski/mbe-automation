@@ -202,11 +202,14 @@ traj.run(
     forces=False
 )
 
-# Save only the new feature vectors to the same location
+# Save the new feature vectors to the same location
+#
+# By default, the save method uses `update_mode="update_properties"`,
+# which will add the missing feature vectors to the existing group
+# without modifying other data.
 traj.save(
     dataset="training_set.hdf5",
     key="training/md_sampling/trajectories/crystal[dyn:T=298.15,p=0.00010]",
-    only=["feature_vectors"]
 )
 ```
 
