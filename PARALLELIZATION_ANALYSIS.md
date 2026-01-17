@@ -2,7 +2,11 @@
 
 ## Scenario Overview
 
-This analysis addresses a scenario where multiple concurrent processes (SLURM jobs) perform calculations on subsets of a precomputed `Structure` stored in an HDF5 file.
+This analysis addresses a scenario where a small number of concurrent processes (approx. 4 SLURM jobs) perform long-running electronic structure calculations on subsets of a precomputed `Structure` stored in an HDF5 file.
+
+**Assumptions:**
+1.  **Low Concurrency:** At most 4 concurrent processes.
+2.  **Compute-Bound:** Calculations are extremely expensive compared to storage operations. Storage occurs only once per process execution.
 
 **Workflow:**
 1.  **Read:** Each process reads the full `Structure`.
@@ -13,7 +17,7 @@ This analysis addresses a scenario where multiple concurrent processes (SLURM jo
 
 ### 1. File Locking
 *   **Mechanism:** `mbe_automation.storage.file_lock.dataset_file` uses `fcntl.flock` with `LOCK_EX` (exclusive lock) on a separate `.lock` file.
-*   **Assessment:** This mechanism effectively serializes access to the HDF5 file. It prevents race conditions during the critical read-modify-write cycle of the `save()` operation. It ensures that only one process can modify the file at a time.
+*   **Assessment:** This mechanism effectively serializes access to the HDF5 file. Given the low concurrency and infrequent writes, lock contention will be negligible. The current locking strategy is **sufficient and safe**.
 
 ### 2. Partial Calculation Logic
 *   **Mechanism:** `api.classes._run_model` accepts `selected_frames`. It updates the in-memory `structure.ground_truth` arrays at the specified indices and marks them as `CALCULATION_STATUS_COMPLETED`.
@@ -27,53 +31,39 @@ This analysis addresses a scenario where multiple concurrent processes (SLURM jo
     if dataset_name in group: del group[dataset_name] # Delete OLD dataset
     group.create_dataset(dataset_name, data=data_to_write) # Create NEW dataset
     ```
-*   **Assessment:** This "Read-Modify-Write-Replace" pattern is the critical bottleneck.
+*   **Assessment:** This "Read-Modify-Write-Replace" pattern is inefficient but functional.
 
-## Identified Problems
+## Identified Risks and Bottlenecks
 
-### 1. Performance and Scalability (Critical)
-The current implementation writes the **entire** dataset (all frames) every time a process saves its partial results.
-*   **I/O Complexity:** For $N$ total frames and $P$ processes, the total I/O volume is proportional to $P \times N$. Ideally, it should be proportional to $N$ (each result written once).
-*   **Lock Contention:** Because rewriting the full dataset takes significant time (proportional to $N$), the exclusive lock is held for long durations. This serialization forces concurrent processes to wait in a queue, negating the benefits of parallelization for the I/O phase.
-*   **Fragmentation:** Repeatedly deleting and creating datasets (`del group[dataset_name]` followed by `create_dataset`) can cause file fragmentation in HDF5, potentially increasing file size and reducing read performance over time.
+### 1. Memory Usage (Primary Risk)
+The current implementation reads the **entire** dataset (all frames) into RAM (`existing_data = ...`) during the save operation.
+*   **Risk:** For large datasets (e.g., millions of frames with forces), this can lead to **Out-Of-Memory (OOM)** errors.
+*   **Impact:** Even with a single process, if the dataset size exceeds available RAM, the job will crash during the write phase, losing the computed results. This is the most significant technical risk.
 
-### 2. Memory Usage (High Risk)
-*   `existing_data = group[dataset_name][...]` reads the entire dataset into RAM.
-*   For large datasets (e.g., millions of frames with forces), this can lead to **Out-Of-Memory (OOM)** errors, causing jobs to crash.
+### 2. Performance and Scalability (Minor Concern)
+*   **I/O Overhead:** Writing the full dataset is inefficient ($O(P \times N)$ total I/O). However, since the computation time is dominant and $P$ is small, the relative time cost of this inefficiency is negligible.
+*   **Lock Wait Times:** With only ~4 writes spread over a long runtime, the probability of processes waiting on the lock is low.
 
-### 3. HDF5 Chunking Reset
-*   `create_dataset` is called without explicit chunking parameters (using defaults). If the original dataset had custom chunking optimized for specific access patterns, this information is lost during the rewrite.
+### 3. Fragmentation and Metadata (Minor Concern)
+*   Repeatedly deleting and creating datasets can cause HDF5 file fragmentation. With only ~4 updates, this effect is likely negligible.
+*   **Chunking:** Re-creating datasets resets chunking parameters to defaults. If specific chunking was optimized for read patterns, it will be lost.
 
 ## Recommendations
 
-To support scalable parallel execution, the storage logic must be refactored to support **partial updates**.
+### 1. Implement Partial Writes for Memory Safety
+Refactor `_update_dataset` to use partial HDF5 I/O.
+*   **Goal:** Eliminate the need to read the full dataset into memory.
+*   **Benefit:** Prevents OOM errors on large datasets. This makes the workflow robust regardless of dataset size.
+*   **Method:**
+    1.  Open file in `r+` mode.
+    2.  Identify indices to update.
+    3.  Write only to those indices: `dset[indices] = new_data[indices]`.
 
-### 1. Implement Partial Writes
-Modify `_update_dataset` to write only the modified data slices directly into the existing HDF5 dataset, avoiding full reads and rewrites.
+### 2. Retain Current Locking Strategy
+The existing exclusive file lock is adequate. No changes are needed for the locking mechanism.
 
-**Proposed Logic:**
-1.  **Check Existence:** If the dataset does not exist, create it (with appropriate size and chunking).
-2.  **Hyperslab Selection:** Identify the indices that need updating (where `new_status == COMPLETED`).
-3.  **Direct Write:** Use HDF5's partial I/O to write only the new values.
-    ```python
-    # Pseudo-code using h5py
-    dset = group[dataset_name]
-    indices = np.where(mask)[0]
-
-    # If indices are contiguous, use slice (faster)
-    # If scattered, use fancy indexing (h5py supports this)
-    dset[indices] = new_data[indices]
-    ```
-*Note: `h5py` supports writing to a selection `dset[selection] = data`.*
-
-### 2. Eliminate `del` + `create`
-Remove the `del group[dataset_name]` and `group.create_dataset(...)` lines for existing datasets. Open the file in `r+` (read/write) mode and modify in-place. This preserves file layout, chunking, and avoids fragmentation.
-
-### 3. Optimize Memory
-By using partial writes, there is no need to read `existing_data` into memory. This reduces memory footprint from $O(N)$ to $O(N_{subset})$, allowing the workflow to scale to arbitrarily large datasets.
-
-### 4. Verify Ground Truth Initialization
-Ensure that when the dataset is first created (by the first process to save), it is initialized with a fill value (e.g., `NaN`) so that uncomputed frames from other processes remain clearly undefined until they write their results. The current `create_dataset` with a full array containing `NaN`s handles this correctly, but explicit initialization might be safer if partial writes are adopted.
+### 3. Verify Initialization
+Ensure the dataset is initialized with appropriate fill values (e.g., `NaN`) by the first process. Partial writes rely on the target dataset already existing (or being created if missing).
 
 ## Summary
-The current implementation is **functionally correct** (no data corruption or race conditions due to locking) but **inefficient** for the described parallel workload. Refactoring `mbe_automation.storage.core._update_dataset` to use partial HDF5 I/O is strongly recommended to solve performance bottlenecks and memory risks.
+For the described use case (few processes, expensive calculations), the current implementation is **functionally correct** and **performant enough**. The primary concern is **memory safety** due to loading the full dataset during updates. Refactoring to use partial HDF5 writes is recommended primarily to prevent OOM errors on large datasets, rather than for speed optimization.
