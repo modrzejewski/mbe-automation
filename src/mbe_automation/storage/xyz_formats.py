@@ -266,3 +266,29 @@ def to_xyz_file(
         )
     else:
         ase.io.write(save_path, system_ase)
+
+
+def to_cif_file(
+        save_path: str,
+        system: ase.Atoms | mbe_automation.storage.core.Structure,
+        frame_index: int = 0,
+        thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None = None,
+        temperature_idx: int = 0,
+        symprec: float = SYMMETRY_TOLERANCE_STRICT
+) -> None:
+    """
+    Save the system to a CIF file.
+    
+    This is a wrapper around to_xyz_file that enforces the .cif extension.
+    """
+    if not save_path.lower().endswith(".cif"):
+        raise ValueError(f"The save_path must end with .cif, got: {save_path}")
+
+    to_xyz_file(
+        save_path=save_path,
+        system=system,
+        frame_index=frame_index,
+        thermal_displacements=thermal_displacements,
+        temperature_idx=temperature_idx,
+        symprec=symprec
+    )

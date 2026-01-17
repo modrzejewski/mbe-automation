@@ -1348,7 +1348,7 @@ def _to_cif_file(
             phonon_filter=phonon_filter
         )
     
-    mbe_automation.storage.to_xyz_file(
+    mbe_automation.storage.to_cif_file(
         save_path=save_path,
         system=force_constants.primitive,
         thermal_displacements=disp,
