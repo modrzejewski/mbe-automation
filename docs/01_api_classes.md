@@ -67,4 +67,4 @@ The following table summarizes the key methods available across these classes.
 
 ### Usage Notes
 *   **`subsample`**: Requires feature vectors to be present (computed via `run` or during an MD simulation) to calculate distances in chemical space.
-*   **`run`**: Can be used to evaluate ground truth (energies and forces) or to generate descriptors (feature vectors) for subsampling.
+*   **`run`**: Can be used to evaluate ground truth (energies and forces) or to generate descriptors (feature vectors) for subsampling. Supports disjoint work distribution via the `chunk` argument (tuple of `(index, total_chunks)`), enabling parallel execution in high-throughput environments (e.g., SLURM job arrays).

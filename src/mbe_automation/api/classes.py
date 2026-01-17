@@ -239,7 +239,30 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             exec_params: Resources | None = None,
             overwrite: bool = False,
             selected_frames: npt.NDArray[np.int64] | None = None,
+            chunk: Tuple[int, int] | None = None,
     ) -> None:
+        """
+        Run a calculator on the structure.
+        
+        Args:
+            calculator: The calculator class to use.
+            energies: Whether to calculate energies.
+            forces: Whether to calculate forces.
+            feature_vectors_type: Type of feature vectors to compute ("none" to skip).
+            exec_params: Execution resources configuration.
+            overwrite: Whether to overwrite existing results.
+            selected_frames: Specific indices of frames to process.
+            chunk: Tuple of (index, total_chunks) for disjoint work distribution.
+                   Index is 1-based (1..total_chunks). Using this argument enables
+                   parallel execution (e.g. in SLURM job arrays).
+        """
+        
+        final_selected_frames = _resolve_chunk_indices(
+            n_frames=self.n_frames,
+            chunk=chunk,
+            selected_frames=selected_frames,
+        )
+        
         _run_model(
             structure=self,
             calculator=calculator,
@@ -248,7 +271,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
             overwrite=overwrite,
-            selected_frames=selected_frames,
+            selected_frames=final_selected_frames,
         )
 
     run_model = run # synonym
@@ -370,7 +393,30 @@ class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
             exec_params: Resources | None = None,
             overwrite: bool = False,
             selected_frames: npt.NDArray[np.int64] | None = None,
+            chunk: Tuple[int, int] | None = None,
     ) -> None:
+        """
+        Run a calculator on the trajectory frames.
+        
+        Args:
+            calculator: The calculator class to use.
+            energies: Whether to calculate energies.
+            forces: Whether to calculate forces.
+            feature_vectors_type: Type of feature vectors to compute ("none" to skip).
+            exec_params: Execution resources configuration.
+            overwrite: Whether to overwrite existing results.
+            selected_frames: Specific indices of frames to process.
+            chunk: Tuple of (index, total_chunks) for disjoint work distribution.
+                   Index is 1-based (1..total_chunks). Using this argument enables
+                   parallel execution (e.g. in SLURM job arrays).
+        """
+
+        final_selected_frames = _resolve_chunk_indices(
+            n_frames=self.n_frames,
+            chunk=chunk,
+            selected_frames=selected_frames,
+        )
+
         _run_model(
             structure=self,
             calculator=calculator,
@@ -379,7 +425,7 @@ class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
             overwrite=overwrite,
-            selected_frames=selected_frames,
+            selected_frames=final_selected_frames,
         )
 
     run_model = run
@@ -517,7 +563,30 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             exec_params: Resources | None = None,
             overwrite: bool = False,
             selected_frames: npt.NDArray[np.int64] | None = None,
+            chunk: Tuple[int, int] | None = None,
     ) -> None:
+        """
+        Run a calculator on the finite subsystem.
+        
+        Args:
+            calculator: The calculator class to use.
+            energies: Whether to calculate energies.
+            forces: Whether to calculate forces.
+            feature_vectors_type: Type of feature vectors to compute ("none" to skip).
+            exec_params: Execution resources configuration.
+            overwrite: Whether to overwrite existing results.
+            selected_frames: Specific indices of frames to process.
+            chunk: Tuple of (index, total_chunks) for disjoint work distribution.
+                   Index is 1-based (1..total_chunks). Using this argument enables
+                   parallel execution (e.g. in SLURM job arrays).
+        """
+        
+        final_selected_frames = _resolve_chunk_indices(
+            n_frames=self.cluster_of_molecules.n_frames,
+            chunk=chunk,
+            selected_frames=selected_frames,
+        )
+        
         _run_model(
             structure=self.cluster_of_molecules,
             calculator=calculator,
@@ -526,7 +595,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             feature_vectors_type=feature_vectors_type,
             exec_params=exec_params,
             overwrite=overwrite,
-            selected_frames=selected_frames,
+            selected_frames=final_selected_frames,
         )
 
     run_model = run
@@ -885,6 +954,47 @@ def _subsample_trajectory(
                 if traj.E_rot_drift is not None else None
             ),
         )
+
+def _resolve_chunk_indices(
+    n_frames: int,
+    chunk: Tuple[int, int] | None,
+    selected_frames: npt.NDArray[np.int64] | None
+) -> npt.NDArray[np.int64]:
+    """
+    Resolve the subset of frames to process based on chunk distribution.
+    
+    This function handles the scenario where concurrent processes work on the
+    same structure to get energies and forces. It ensures disjoint work distribution
+    and handles edge cases where there are more workers than frames.
+    
+    If chunk is None, returns selected_frames (or all frames if None).
+    """
+    # 1. Determine pool of frames
+    if selected_frames is not None:
+        pool = selected_frames
+    else:
+        pool = np.arange(n_frames)
+        
+    if chunk is None:
+        return pool
+
+    idx, n_chunks = chunk
+    
+    # Validate input
+    if not (1 <= idx <= n_chunks):
+        raise ValueError(f"Chunk index {idx} must be between 1 and {n_chunks}")
+
+    # 2. Split into segments
+    segments = np.array_split(pool, n_chunks)
+    
+    # 3. Select segment (0-based index)
+    my_segment = segments[idx - 1]
+    
+    # 4. Logging
+    print(f"Worker {idx}/{n_chunks}: processing {len(my_segment)} frames "
+          f"(indices: {my_segment if len(my_segment) > 0 else '[]'})")
+          
+    return my_segment
 
 def _run_model(
         structure: _Structure,
