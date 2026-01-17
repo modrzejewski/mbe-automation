@@ -187,18 +187,18 @@ class Structure:
             Path to the HDF5 dataset file.
         key : str
             Key within the HDF5 file.
-        update_mode : Literal["update_ground_truth", "replace"]
-            Mode for updating existing data. Defaults to "update_ground_truth".
+        update_mode : Literal["update_properties", "replace"]
+            Mode for updating existing data. Defaults to "update_properties".
 
         Notes
         -----
-        When ``update_mode="update_ground_truth"`` (default), if the HDF5 key already exists,
+        When ``update_mode="update_properties"`` (default), if the HDF5 key already exists,
         basic structural data (positions, atomic_numbers, cell_vectors) is NOT saved.
         Only energies, forces, and ground truth data are updated.
 
         .. warning::
            If you modify the geometry of a Structure in memory and call save() with
-           ``update_mode="update_ground_truth"`` on an existing key, the file will contain
+           ``update_mode="update_properties"`` on an existing key, the file will contain
            the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
            Use ``update_mode="replace"`` if the geometry has changed.
         """
@@ -358,18 +358,18 @@ class Trajectory(Structure):
             Path to the HDF5 dataset file.
         key : str
             Key within the HDF5 file.
-        update_mode : Literal["update_ground_truth", "replace"]
-            Mode for updating existing data. Defaults to "update_ground_truth".
+        update_mode : Literal["update_properties", "replace"]
+            Mode for updating existing data. Defaults to "update_properties".
 
         Notes
         -----
-        When ``update_mode="update_ground_truth"`` (default), if the HDF5 key already exists,
+        When ``update_mode="update_properties"`` (default), if the HDF5 key already exists,
         basic structural data (positions, atomic_numbers, cell_vectors) is NOT saved.
         Only energies, forces, and ground truth data are updated.
 
         .. warning::
            If you modify the geometry of a Trajectory in memory and call save() with
-           ``update_mode="update_ground_truth"`` on an existing key, the file will contain
+           ``update_mode="update_properties"`` on an existing key, the file will contain
            the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
            Use ``update_mode="replace"`` if the geometry has changed.
         """
