@@ -170,7 +170,7 @@ subsampled_trajectory.save(
 
 The `Structure` and `Trajectory` classes allow updating an existing dataset with new properties, such as feature vectors, potential energies, or forces. This is useful for machine learning workflows where new data needs to be computed for existing geometries.
 
-To update a dataset, first load the structure, run the calculator, and then save the specific properties using the `only` argument in the `save` method.
+To update a dataset, first load the structure, run the calculator, and then simply call the `save` method - it will automatically update the new properties.
 
 ```python
 from mbe_automation import Trajectory
