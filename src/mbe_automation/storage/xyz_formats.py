@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 import mbe_automation.structure
 import mbe_automation.storage.core
 import mbe_automation.storage.views
+import mbe_automation.common.display
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 def _cif_with_adps(
@@ -191,6 +192,11 @@ def from_xyz_file(
         transform_to_symmetrized_primitive: bool = True,
         symprec: float = SYMMETRY_TOLERANCE_LOOSE
 ) -> ase.Atoms:
+
+    mbe_automation.common.display.framed([
+        "Loading Structure",
+        f"Path: {read_path}"
+    ])
     
     if read_path.lower().endswith(".cif"):
         structure = pymatgen.core.Structure.from_file(read_path)
@@ -199,10 +205,37 @@ def from_xyz_file(
         system = ase.io.read(read_path)
 
     if transform_to_symmetrized_primitive and np.all(system.pbc):
+        input_space_group, input_hmsymbol = mbe_automation.structure.crystal.check_symmetry(
+            unit_cell=system,
+            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT,
+        )
+
+        print("Reduction to standardized primitive cell (pymatgen)...")
         system = mbe_automation.structure.crystal.to_symmetrized_primitive(
             unit_cell=system,
             symprec=symprec
         )
+
+        space_group, hmsymbol = mbe_automation.structure.crystal.check_symmetry(
+            unit_cell=system,
+            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT
+        )
+
+        if space_group != input_space_group:
+            print(
+                f"Performed symmetry refinement: "
+                f"[{input_hmsymbol}][{input_space_group}] → [{hmsymbol}][{space_group}]"
+            )
+        else:
+            print(f"No symmetry refinement needed")
+            print(f"Symmetry under strict tolerance: [{input_hmsymbol}][{input_space_group}]")
+
+        lengths = system.cell.lengths()
+        print(f"Lattice lengths   a={lengths[0]:.4f}, b={lengths[1]:.4f}, c={lengths[2]:.4f} Å")
+        angles = system.cell.angles()
+        print(f"Lattice angles    alpha={angles[0]:.4f}, beta={angles[1]:.4f}, gamma={angles[2]:.4f} °")
+        print(f"Cell volume       {system.get_volume():.4f} Å³")
+        print(f"Number of atoms   {len(system)}")
         
     return system
 
@@ -233,3 +266,29 @@ def to_xyz_file(
         )
     else:
         ase.io.write(save_path, system_ase)
+
+
+def to_cif_file(
+        save_path: str,
+        system: ase.Atoms | mbe_automation.storage.core.Structure,
+        frame_index: int = 0,
+        thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None = None,
+        temperature_idx: int = 0,
+        symprec: float = SYMMETRY_TOLERANCE_STRICT
+) -> None:
+    """
+    Save the system to a CIF file.
+    
+    This is a wrapper around to_xyz_file that enforces the .cif extension.
+    """
+    if not save_path.lower().endswith(".cif"):
+        raise ValueError(f"The save_path must end with .cif, got: {save_path}")
+
+    to_xyz_file(
+        save_path=save_path,
+        system=system,
+        frame_index=frame_index,
+        thermal_displacements=thermal_displacements,
+        temperature_idx=temperature_idx,
+        symprec=symprec
+    )

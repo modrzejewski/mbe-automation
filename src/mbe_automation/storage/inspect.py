@@ -127,6 +127,10 @@ class DatasetKeys:
             return [item.key for item in self._items[index]]
         return self._items[index].key
 
+    def __contains__(self, key: str) -> bool:
+        """Check if key exists."""
+        return any(item.key == key for item in self._items)
+
     def __iter__(self) -> Iterator[str]:
         return (item.key for item in self._items)
 
@@ -190,6 +194,19 @@ class DatasetKeys:
             return self._filter(lambda x: x.has_ground_truth)
         else:
             return self._filter(lambda x: (
+                x.has_ground_truth and
+                x.ground_truth_levels and
+                level_of_theory in x.ground_truth_levels
+            ))
+
+    def without_ground_truth(self, level_of_theory: str | None = None) -> DatasetKeys:
+        """
+        Return keys without ground truth.
+        """
+        if level_of_theory is None:
+            return self._filter(lambda x: not x.has_ground_truth)
+        else:
+            return self._filter(lambda x: not (
                 x.has_ground_truth and
                 x.ground_truth_levels and
                 level_of_theory in x.ground_truth_levels

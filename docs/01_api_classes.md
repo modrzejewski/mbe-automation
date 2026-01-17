@@ -24,7 +24,7 @@ This chapter provides an overview of the physical content each class represents 
 | **`Structure`** | Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single frame or a sequence of frames of equal size (e.g., from a short trajectory or a collection of configurations). |
 | **`Trajectory`** | Time evolution of an atomistic system generated with molecular dynamics. Includes time-dependent properties like positions, velocities, kinetic energies, and thermodynamic variables. |
 | **`MolecularCrystal`** | Periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). Serves as an intermediate necessary for finite cluster extraction. |
-| **`FiniteSubsystem`** | Finite clusters of molecules extracted from a periodic structure or trajectory. Used to generate training data for fragment-based methods. |
+| **`FiniteSubsystem`** | Finite clusters of molecules extracted from a periodic structure or trajectory. Includes all geometric information of `Structure`, supplemented with extra data which enables tracing back the cleaved molecules to their positions in the cell of the original `MolecularCrystal`. Used to generate training data for fragment-based methods. |
 | **`Dataset`** | A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets. |
 | **`AtomicReference`** | Isolated atom energies required to generate reference energy for machine-learning interatomic potentials. Can store data at multiple levels of theory. |
 
@@ -35,7 +35,7 @@ The following table summarizes the key methods available across these classes.
 | Method | Description | Available In |
 | :--- | :--- | :--- |
 | **`read`** | Method to load the object from an HDF5 dataset. | `AtomicReference`, `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
-| **`save`** | Saves the object to an HDF5 dataset. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
+| **`save`** | Saves the object to an HDF5 dataset. Supports `update_properties` mode to update energies, forces, and feature vectors (if missing), without overwriting geometry. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`from_xyz_file`** | Creates a structure object from an XYZ file. | `Structure` |
 | **`from_atomic_numbers`** | Creates an `AtomicReference` from a list of atomic numbers and a calculator. | `AtomicReference` |
 | **`subsample`** | Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
@@ -67,4 +67,4 @@ The following table summarizes the key methods available across these classes.
 
 ### Usage Notes
 *   **`subsample`**: Requires feature vectors to be present (computed via `run` or during an MD simulation) to calculate distances in chemical space.
-*   **`run`**: Can be used to evaluate ground truth (energies and forces) or to generate descriptors (feature vectors) for subsampling.
+*   **`run`**: Can be used to evaluate ground truth (energies and forces) or to generate descriptors (feature vectors) for subsampling. Supports disjoint work distribution via the `chunk` argument (tuple of `(index, total_chunks)`), enabling parallel execution in high-throughput environments (e.g., SLURM job arrays).
