@@ -1447,45 +1447,56 @@ def _update_dataset(
 ) -> None:
     sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
     
-    data_to_write = new_data
+    # 
+    # If update_mode is not "update_properties" or the dataset does not exist,
+    # we proceed with the standard overwrite (delete and create).
+    #
+    if update_mode != "update_properties" or dataset_name not in group:
+        if dataset_name in group:
+            del group[dataset_name]
+        group.create_dataset(dataset_name, data=new_data)
+        return
 
-    if update_mode == "update_properties" and dataset_name in group:
-        existing_data = group[dataset_name][...]
-
-        new_status = ground_truth.calculation_status.get(method_name)
-
-        ds_status_name = f"status_{sanitized_method_name}"
-        if ds_status_name in group:
-            old_status = group[ds_status_name][...]
-        else:
-            old_status = np.full(existing_data.shape[0], CALCULATION_STATUS_COMPLETED)
-
-        if new_status is not None:
-            if energies_and_forces_data:
-                mask = (new_status == CALCULATION_STATUS_COMPLETED)
-                existing_data[mask] = new_data[mask]
-                data_to_write = existing_data
-            else:
-                #
-                # Writing calculation status. Here, it's importand to store 
-                # the information not only which calculations are completed,
-                # but also which calculations failed. Note that if the status
-                # of a calculation is UNDEFINED, then it wasn't even started and
-                # we have no information on it. It might happen that some other 
-                # process has managed to complete the calculation because, e.g.,
-                # it had access to more resources. Therefore, we're not updating
-                # the status of COMPLETED calculations to avoid tagging valid
-                # calculations as failed.
-                #
-                mask = (
-                    new_status != CALCULATION_STATUS_UNDEFINED and 
-                    old_status != CALCULATION_STATUS_COMPLETED
-                )
-                existing_data[mask] = new_data[mask]
-                data_to_write = existing_data
+    #
+    # Partial Update Logic
+    #
+    dset = group[dataset_name]
     
-    if dataset_name in group: del group[dataset_name]
-    group.create_dataset(dataset_name, data=data_to_write)
+    if dset.shape != new_data.shape:
+        raise ValueError(
+            f"Shape mismatch when updating dataset '{dataset_name}': "
+            f"existing shape {dset.shape}, new data shape {new_data.shape}. "
+            "This indicates a potential logic error or data corruption risk."
+        )
+
+    new_status = ground_truth.calculation_status.get(method_name)
+
+    # Calculate the mask of indices to update
+    mask = None
+    if new_status is not None:
+        if energies_and_forces_data:
+            mask = (new_status == CALCULATION_STATUS_COMPLETED)
+        else:
+            ds_status_name = f"status_{sanitized_method_name}"
+            if ds_status_name in group:
+                old_status = group[ds_status_name][...]
+            else:
+                old_status = np.full(dset.shape[0], CALCULATION_STATUS_COMPLETED)
+
+            mask = (
+                (new_status != CALCULATION_STATUS_UNDEFINED) & 
+                (old_status != CALCULATION_STATUS_COMPLETED)
+            )
+            
+    # Perform the update
+    if mask is not None:
+        # Only write to the indices where mask is True to save I/O and memory
+        if np.any(mask):
+            indices = np.where(mask)[0]
+            dset[indices] = new_data[indices]
+    else:
+        # If no status information is available, overwrite the existing data in-place
+        dset[...] = new_data
 
 
 def _save_ground_truth(
