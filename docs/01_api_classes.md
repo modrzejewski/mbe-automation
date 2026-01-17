@@ -35,7 +35,7 @@ The following table summarizes the key methods available across these classes.
 | Method | Description | Available In |
 | :--- | :--- | :--- |
 | **`read`** | Method to load the object from an HDF5 dataset. | `AtomicReference`, `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
-| **`save`** | Saves the object to an HDF5 dataset. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
+| **`save`** | Saves the object to an HDF5 dataset. Supports `update_properties` mode to update energies, forces, and feature vectors (if missing), without overwriting geometry. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`from_xyz_file`** | Creates a structure object from an XYZ file. | `Structure` |
 | **`from_atomic_numbers`** | Creates an `AtomicReference` from a list of atomic numbers and a calculator. | `AtomicReference` |
 | **`subsample`** | Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |

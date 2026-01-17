@@ -698,25 +698,25 @@ def _save_structure(
         feature_vectors_type: str="none",
         ground_truth: GroundTruth | None=None,
         level_of_theory: str | None = None,
-        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+        update_mode: Literal["update_properties", "replace"] = "update_properties",
 ):
     """
     Internal function to save structure components.
 
     Parameters
     ----------
-    update_mode : Literal["update_ground_truth", "replace"]
-        Mode for updating existing data. Defaults to "update_ground_truth".
+    update_mode : Literal["update_properties", "replace"]
+        Mode for updating existing data. Defaults to "update_properties".
 
     Notes
     -----
-    When ``update_mode="update_ground_truth"`` (default), if the HDF5 key already exists,
-    basic structural data (positions, atomic_numbers, cell_vectors) is NOT saved.
-    Only energies, forces, and ground truth data are updated.
+    When ``update_mode="update_properties"`` (default), if the HDF5 key already exists,
+    basic structural data (positions, atomic_numbers, cell_vectors) are NOT saved.
+    Only energies, forces, feature vectors (if missing), and ground truth data are updated.
 
     .. warning::
        If you modify the geometry of a Structure in memory and call save() with
-       ``update_mode="update_ground_truth"`` on an existing key, the file will contain
+       ``update_mode="update_properties"`` on an existing key, the file will contain
        the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
        Use ``update_mode="replace"`` if the geometry has changed.
     """
@@ -786,11 +786,25 @@ def _save_structure(
             if level_of_theory is not None:
                 group.attrs["level_of_theory"] = level_of_theory
 
+        elif update_mode == "update_properties":
+            #
+            # If we are in update_properties mode and the structure already exists,
+            # we check if we need to add feature vectors which might have been computed
+            # after the structure was saved.
+            #
+            if feature_vectors is not None and feature_vectors_type != "none":
+                if "feature_vectors" not in group:
+                    group.create_dataset(
+                        name="feature_vectors",
+                        data=feature_vectors
+                    )
+                    group.attrs["feature_vectors_type"] = feature_vectors_type
+
         if ground_truth is not None:
             _save_ground_truth(f, f"{key}/ground_truth", ground_truth, update_mode=update_mode)
 
 @overload
-def save_structure(*, dataset: str, key: str, structure: Structure, update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth") -> None: ...
+def save_structure(*, dataset: str, key: str, structure: Structure, update_mode: Literal["update_properties", "replace"] = "update_properties") -> None: ...
 
 @overload
 def save_structure(
@@ -807,7 +821,7 @@ def save_structure(
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES]="none",
     ground_truth: GroundTruth | None = None,
     level_of_theory: str | None = None,
-    update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+    update_mode: Literal["update_properties", "replace"] = "update_properties",
 ) -> None: ...
 
 def save_structure(*, dataset: str, key: str, **kwargs):
@@ -843,7 +857,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             feature_vectors_type=structure.feature_vectors_type,
             ground_truth=structure.ground_truth,
             level_of_theory=structure.level_of_theory,
-            update_mode=kwargs.get("update_mode", "update_ground_truth"),
+            update_mode=kwargs.get("update_mode", "update_properties"),
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -860,7 +874,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             ground_truth=kwargs.get("ground_truth"),
             feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
             level_of_theory=kwargs.get("level_of_theory"),
-            update_mode=kwargs.get("update_mode", "update_ground_truth"),
+            update_mode=kwargs.get("update_mode", "update_properties"),
         )
     else:
         raise ValueError(
@@ -909,7 +923,7 @@ def save_trajectory(
         dataset: str,
         key: str,
         traj: Trajectory,
-        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+        update_mode: Literal["update_properties", "replace"] = "update_properties",
 ):
     """
     Save the trajectory to a dataset.
@@ -922,18 +936,18 @@ def save_trajectory(
         Key within the HDF5 file.
     traj : Trajectory
         Trajectory object to save.
-    update_mode : Literal["update_ground_truth", "replace"]
-        Mode for updating existing data. Defaults to "update_ground_truth".
+    update_mode : Literal["update_properties", "replace"]
+        Mode for updating existing data. Defaults to "update_properties".
 
     Notes
     -----
-    When ``update_mode="update_ground_truth"`` (default), if the HDF5 key already exists,
+    When ``update_mode="update_properties"`` (default), if the HDF5 key already exists,
     basic structural data (positions, atomic_numbers, cell_vectors) is NOT saved.
-    Only energies, forces, and ground truth data are updated.
+    Only energies, forces, feature vectors (if missing), and ground truth data are updated.
 
     .. warning::
        If you modify the geometry of a Trajectory in memory and call save() with
-       ``update_mode="update_ground_truth"`` on an existing key, the file will contain
+       ``update_mode="update_properties"`` on an existing key, the file will contain
        the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
        Use ``update_mode="replace"`` if the geometry has changed.
     """
@@ -1028,6 +1042,20 @@ def save_trajectory(
                 name="feature_vectors",
                 data=traj.feature_vectors
             )
+            
+        elif update_mode == "update_properties":
+            #
+            # If we are in update_properties mode and the trajectory already exists,
+            # we check if we need to add feature vectors which might have been computed
+            # after the trajectory was saved.
+            #
+            if traj.feature_vectors is not None and traj.feature_vectors_type != "none":
+                if "feature_vectors" not in group:
+                    group.create_dataset(
+                        name="feature_vectors",
+                        data=traj.feature_vectors
+                    )
+                    group.attrs["feature_vectors_type"] = traj.feature_vectors_type
 
         if traj.ground_truth is not None:
             _save_ground_truth(f, f"{key}/ground_truth", traj.ground_truth, update_mode=update_mode)
@@ -1404,7 +1432,7 @@ def _save_only(
                     "Ground truth not present, cannot save requested data."
                 )
 
-            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth, update_mode="update_ground_truth")
+            _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth, update_mode="update_properties")
             
     return
 
@@ -1421,7 +1449,7 @@ def _update_dataset(
     
     data_to_write = new_data
 
-    if update_mode == "update_ground_truth" and dataset_name in group:
+    if update_mode == "update_properties" and dataset_name in group:
         existing_data = group[dataset_name][...]
 
         new_status = ground_truth.calculation_status.get(method_name)
@@ -1464,7 +1492,7 @@ def _save_ground_truth(
         f: h5py.File,
         key: str,
         ground_truth: GroundTruth,
-        update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+        update_mode: Literal["update_properties", "replace"] = "update_properties",
 ) -> None:
 
     group = f.require_group(key)
