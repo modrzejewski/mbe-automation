@@ -13,7 +13,7 @@ The write operation is triggered by `Structure.save()`. The execution flow is as
 
 2.  **Storage Interface:** `src/mbe_automation/storage/core.py`
     *   `save_structure` calls `_save_structure`.
-    *   `_save_structure` checks for the presence of `ground_truth` data. Since `_run_model` populates `structure.ground_truth`, this condition is true.
+    *   `_save_structure` checks for the presence of `ground_truth` data.
     *   `_save_structure` calls `_save_ground_truth`.
 
 3.  **Ground Truth Handling:** `src/mbe_automation/storage/core.py`
@@ -45,23 +45,37 @@ The write operation is triggered by `Structure.save()`. The execution flow is as
         group.create_dataset(dataset_name, data=data_to_write)
     ```
 
+## Post-Implementation Review (Current Status)
+
+**Change Detection:**
+The `_save_only` function has been updated to open files in `r+` (read/write) mode:
+```python
+with dataset_file(dataset, "r+") as f:
+```
+This is a necessary prerequisite for partial updates.
+
+**Remaining Flaw:**
+However, the downstream function `_update_dataset` **has not been refactored**. It still performs the unsafe "Read-Modify-Write-Replace" cycle:
+1.  `existing_data = group[dataset_name][...]` reads the full dataset.
+2.  `del group[dataset_name]` deletes the dataset.
+3.  `create_dataset` rewrites it.
+
 ## Assessment: Is Memory Storage Safe?
 
 **Verdict: NO.**
 
-The current implementation is **NOT memory-safe** for large datasets.
+The implementation remains **NOT memory-safe**.
 
 ### Reasons:
-1.  **Full Dataset Load:** The line `existing_data = group[dataset_name][...]` forces the HDF5 library to read the *entire* array for all frames into the process's memory.
-    *   If the dataset contains 1 million frames with forces (1M * N_atoms * 3 * 8 bytes), this single array can be gigabytes in size.
-    *   If 4 parallel processes attempt this simultaneously (even if serialized by file locks), each process needs enough RAM to hold the *full* dataset, not just its own slice.
-
-2.  **Double Allocation:** The logic creates `data_to_write` which, in the worst case (full rewrite), might hold a second copy or reference to the full data structure in memory before the write completes.
-
-3.  **No Partial I/O:** The code explicitly destroys the existing dataset (`del group[dataset_name]`) and creates a new one (`create_dataset`). It does *not* use HDF5's hyperslab selection features (e.g., `dset[slice] = data`) which allow modifying specific indices on disk without loading the rest of the file.
+1.  **Full Dataset Load Persists:** The change to `r+` mode is ineffective because the code explicitly reads the full array into memory (`existing_data`) immediately after opening the file.
+2.  **OOM Risk Unchanged:** For large datasets (e.g., >10GB of forces), this operation will crash the process just as before. The memory footprint is still $O(N_{total\_frames})$.
+3.  **Inefficient I/O:** The code still rewrites the entire file for every partial update, maintaining the $O(N)$ I/O cost instead of $O(1)$ (constant time relative to total size).
 
 ## Conclusion
 
-While the logic is functionally correct for small datasets, it creates a hard scalability limit. As the dataset size ($N_{frames}$) grows, the memory requirement for *every* partial update operation grows linearly with $N_{frames}$, leading to inevitable Out-Of-Memory (OOM) crashes once $N_{frames}$ exceeds available RAM.
+The attempted fix is incomplete. To achieve memory safety, `_update_dataset` must be rewritten to:
+1.  **Avoid** `existing_data = group[dataset_name][...]`.
+2.  **Avoid** `del group[dataset_name]`.
+3.  **Use** direct assignment: `group[dataset_name][mask] = new_data[mask]` (or using indices).
 
-To fix this, `_update_dataset` must be refactored to perform **in-place partial updates** using `r+` mode and direct index assignment.
+Until this refactoring is applied, the workflow is vulnerable to crashing on large datasets.
