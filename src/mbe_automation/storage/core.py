@@ -176,7 +176,7 @@ class Structure:
             dataset: str,
             key: str,
             only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
-            update_mode: Literal["update_ground_truth", "replace"] = "update_ground_truth",
+            update_mode: Literal["update_properties", "replace"] = "update_properties",
     ) -> None:
         """
         Save the structure to a dataset.
