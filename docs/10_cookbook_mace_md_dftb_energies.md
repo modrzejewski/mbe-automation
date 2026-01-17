@@ -8,7 +8,7 @@ This cookbook outlines a multi-step workflow for generating a machine learning t
 
 2. [**Molecule Subsampling & Labeling**](#step-2-molecule-subsampling-and-labeling): Select diverse isolated molecule configurations and compute reference energies/forces.
 
-3. [**Cluster Extraction & Features**](#step-3-finite-cluster-extraction-and-features): Cleave finite molecular clusters (n ≥ 2) from the periodic trajectory and compute their feature vectors.
+3. [**Finite Cluster Extraction**](#step-3-finite-cluster-extraction): Cleave finite molecular clusters (n ≥ 2) from the periodic trajectory.
 
 4. [**Cluster Subsampling & Labeling**](#step-4-subsampling-and-labeling-clusters): Select diverse cluster configurations and compute reference energies/forces.
 
@@ -146,9 +146,9 @@ for key in DatasetKeys(dataset).trajectories().finite().starts_with("all_md_fram
 print("All calculations completed")
 ```
 
-## Step 3: Finite Cluster Extraction & Features
+## Step 3: Finite Cluster Extraction
 
-Read the periodic MD trajectory, extract finite clusters (n ≥ 2), and compute their feature vectors.
+Read the periodic MD trajectory and extract finite clusters (n ≥ 2). Feature vectors are computed automatically during MD in Step 1.
 
 **Input:** `step_3.py`
 
@@ -157,14 +157,8 @@ import mbe_automation
 import numpy as np
 from mbe_automation import Structure, DatasetKeys
 from mbe_automation.configs.clusters import FiniteSubsystemFilter
-from mbe_automation.calculators import MACE
 
 dataset = "md_structures.hdf5"
-
-mace_calc = MACE(
-    model_path="~/models/mace/mace-mh-1.model",
-    head="omol",
-)
 
 for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_frames"):
     print(f"Generating finite clusters for {key}")
@@ -189,13 +183,7 @@ for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_fr
     )
     
     for cluster in clusters:
-        cluster.run(
-            calculator=mace_calc,
-            energies=False,
-            forces=False,
-            feature_vectors_type="averaged_environments"
-        )
-
+        # Feature vectors are automatically computed during MD in Step 1
         n_molecules = cluster.n_molecules
         cluster.save(
             dataset=dataset,
@@ -398,7 +386,7 @@ python step_1.py > step_1.log 2>&1
 # Molecule Labeling
 python step_2.py > step_2.log 2>&1
 
-# Cluster Extraction & Features
+# Cluster Extraction
 python step_3.py > step_3.log 2>&1
 
 # Cluster Subsampling & Labeling
