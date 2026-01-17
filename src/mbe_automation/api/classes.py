@@ -153,8 +153,6 @@ class ForceConstants(_ForceConstants):
             temperature_K: Temperature in Kelvin (required if save_adps is True).
             phonon_filter: Optional filter for phonons (used if save_adps is True).
         """
-        if not save_path.lower().endswith(".cif"):
-            raise ValueError("The save_path for to_cif_file must end with .cif")
         _to_cif_file(
             force_constants=self,
             save_path=save_path,
