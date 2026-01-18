@@ -38,7 +38,9 @@ calc_target = DFT(
 
 Generating the ground truth data involves calculating the energies and forces for both the baseline and target methods on the structures.
 
-The example below processes an input HDF5 file (`md_trajectories.hdf5`) containing raw MD trajectories and finite structures. It subsamples frames, executes the calculations, and saves the results to `ground_truth.hdf5`.
+> **Prerequisite:** This workflow requires an input HDF5 dataset containing molecular dynamics trajectories and extracted finite subsystems (clusters). Please refer to the [Molecular Dynamics](./07_molecular_dynamics.md) and [Training Set Creation](./08_training_set.md) chapters for instructions on how to generate these data.
+
+The example below processes an input HDF5 file (`md_trajectories.hdf5`) containing these raw MD trajectories and finite structures. It subsamples frames, executes the calculations, and saves the results to `ground_truth.hdf5`.
 
 ```python
 input_dataset = "md_trajectories.hdf5"
