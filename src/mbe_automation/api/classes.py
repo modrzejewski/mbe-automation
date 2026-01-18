@@ -1127,9 +1127,9 @@ def _run_model(
     #
     # To avoid calculation on frames with COMPLETE status,
     # create a new view of the structure with the subset
-    # of frames where the data are missing. This kind of
-    # filtering is executed because we call select with
-    # level_of_theory argument.
+    # of frames where the data are missing. The `frames_to_compute`
+    # indices were determined above, taking `level_of_theory`
+    # and `overwrite` flags into account.
     #
     calculation_structure = structure.select(frames_to_compute)
     
