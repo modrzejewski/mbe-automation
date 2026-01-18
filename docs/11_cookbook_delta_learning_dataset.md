@@ -169,20 +169,24 @@ The following Bash script trains a Delta Learning MACE model using the generated
 
 ```yaml
 name: "urea_r2scan_d4_delta"
-train_file: "delta_learning/train.xyz"
-valid_file: "delta_learning/validate.xyz"
-test_file: "delta_learning/test.xyz"
+
 model: "MACE"
-plot_frequency: 10
 num_interactions: 2
 hidden_irreps: "32x0e + 32x1o"
 correlation: 2
 r_max: 6.0
+
+heads:
+  omol:
+    train_file: "delta_learning/train.xyz"
+    valid_file: "delta_learning/validate.xyz"
+    test_file: "delta_learning/test.xyz"
+    energy_key: "REF_energy"
+    forces_key: "REF_forces"
+
 forces_weight: 1000
 energy_weight: 10
 stress_weight: 0
-energy_key: "REF_energy"
-forces_key: "REF_forces"
 batch_size: 8
 valid_batch_size: 8
 max_num_epochs: 300
@@ -193,6 +197,7 @@ eval_interval: 1
 ema: True
 swa: True
 error_table: "PerAtomRMSE"
+plot_frequency: 10
 default_dtype: "float64"
 device: cuda
 save_cpu: True
