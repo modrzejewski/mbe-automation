@@ -165,6 +165,8 @@ print("Export completed.")
 
 The following Bash script trains a Delta Learning MACE model using the generated files.
 
+> **Attention:** The `DeltaMACE` calculator requires the baseline and delta models to have the same head name. Ensure the head name in `train.yaml` matches your baseline model's head. If mismatched, correct `train.yaml` and restart training from the checkpoint to update the head name.
+
 **Configuration File:** `train.yaml`
 
 ```yaml
