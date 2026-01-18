@@ -3,7 +3,7 @@
 - [Create a Virtual Environment](#1-create-a-virtual-environment)
 - [Clone the Repository](#2-clone-the-repository)
 - [Install the Program](#3-install-the-program)
-- [Supported Methods](#4-supported-methods)
+- [Supported Backends](#4-supported-backends)
 
 ## 1. Create a Virtual Environment
 
@@ -69,7 +69,7 @@ The installation process may take several minutes.
 
 Once the installation is complete, the `mbe-automation` program is ready to use.
 
-## 4. Supported Methods
+## 4. Supported Backends
 
 The `mbe-automation` package supports several calculation methods. While some dependencies are installed automatically via `pip`, others (like binary executables) must be installed separately and made available in your system's PATH.
 
@@ -81,4 +81,4 @@ The `mbe-automation` package supports several calculation methods. While some de
 | DFTB+MBD, DFTB3-D4 | `dftb+` (Executable) |
 | GFN1-xTB, GFN2-xTB | `dftb+` (Executable) |
 
-† These methods are available on both GPUs (via `gpu4pyscf`) and CPUs (via `pyscf`). The CPU implementation is significantly slower and should only be used for debugging. To use GPU, you must [install the optional `gpu-cuda` dependencies](#3-install-the-program) defined in `pyproject.toml` (e.g., `gpu-cuda12` for CUDA 12). Supported functionals for DFT are: `wb97m-v`, `wb97x-d3/d4`, `b3lyp-d3/d4`, `pbe-d3/d4`, `pbe0-d3/d4`, `r2scan-d4`.
+† These methods are available on both GPUs (via `gpu4pyscf`) and CPUs (via `pyscf`). The CPU implementation is significantly slower and should only be used for debugging. To use GPU, you must [install the optional `gpu-cuda` dependencies](#3-install-the-program) defined in `pyproject.toml` (e.g., `gpu-cuda12` for CUDA 12). See [Supported DFT Methods](02_calculators.md#supported-dft-methods) for a list of available functionals.
