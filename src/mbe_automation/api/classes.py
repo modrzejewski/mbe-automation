@@ -36,6 +36,7 @@ from mbe_automation.storage.core import (
     CALCULATION_STATUS_COMPLETED,
     CALCULATION_STATUS_SCF_NOT_CONVERGED,
     CALCULATION_STATUS_FAILED,
+    read_attribute,
 )
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
@@ -1390,3 +1391,32 @@ def _to_cif_file(
         thermal_displacements=disp,
         temperature_idx=0 
     )
+
+class AnySystem:
+    """
+    Helper class to read any supported system type from a dataset
+    based on the stored 'dataclass' attribute.
+    """
+
+    @staticmethod
+    def read(dataset: str, key: str) -> Structure | Trajectory | FiniteSubsystem | MolecularCrystal | ForceConstants:
+        """
+        Reads the object at the given key, automatically determining its type.
+        """
+        dataclass_name = read_attribute(dataset, key, "dataclass")
+
+        if dataclass_name == "Structure":
+            return Structure.read(dataset, key)
+        elif dataclass_name == "Trajectory":
+            return Trajectory.read(dataset, key)
+        elif dataclass_name == "FiniteSubsystem":
+            return FiniteSubsystem.read(dataset, key)
+        elif dataclass_name == "MolecularCrystal":
+            return MolecularCrystal.read(dataset, key)
+        elif dataclass_name == "ForceConstants":
+            return ForceConstants.read(dataset, key)
+        else:
+            raise ValueError(
+                f"Unknown or missing 'dataclass' attribute '{dataclass_name}' "
+                f"at key '{key}' in dataset '{dataset}'."
+            )
