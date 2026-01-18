@@ -1405,16 +1405,17 @@ class AnySystem:
         """
         dataclass_name = read_attribute(dataset, key, "dataclass")
 
-        if dataclass_name == "Structure":
-            return Structure.read(dataset, key)
-        elif dataclass_name == "Trajectory":
-            return Trajectory.read(dataset, key)
-        elif dataclass_name == "FiniteSubsystem":
-            return FiniteSubsystem.read(dataset, key)
-        elif dataclass_name == "MolecularCrystal":
-            return MolecularCrystal.read(dataset, key)
-        elif dataclass_name == "ForceConstants":
-            return ForceConstants.read(dataset, key)
+        _CLASS_MAP = {
+            "Structure": Structure,
+            "Trajectory": Trajectory,
+            "FiniteSubsystem": FiniteSubsystem,
+            "MolecularCrystal": MolecularCrystal,
+            "ForceConstants": ForceConstants,
+        }
+
+        cls_to_read = _CLASS_MAP.get(dataclass_name)
+        if cls_to_read:
+            return cls_to_read.read(dataset, key)
         else:
             raise ValueError(
                 f"Unknown or missing 'dataclass' attribute '{dataclass_name}' "
