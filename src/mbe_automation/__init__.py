@@ -31,5 +31,6 @@ from .api import (
     FiniteSubsystem,
     Dataset,
     AtomicReference,
+    AnySystem,
     run,
 )
