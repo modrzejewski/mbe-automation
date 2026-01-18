@@ -163,6 +163,41 @@ print("Export completed.")
 
 The following Bash script trains a Delta Learning MACE model using the generated files.
 
+**Configuration File:** `train.yaml`
+
+```yaml
+name: "urea_r2scan_d4_delta"
+train_file: "delta_learning/train.xyz"
+valid_file: "delta_learning/validate.xyz"
+test_file: "delta_learning/test.xyz"
+model: "MACE"
+plot_frequency: 10
+num_interactions: 2
+hidden_irreps: "32x0e + 32x1o"
+correlation: 2
+r_max: 6.0
+forces_weight: 1000
+energy_weight: 10
+stress_weight: 0
+energy_key: "REF_energy"
+forces_key: "REF_forces"
+batch_size: 8
+valid_batch_size: 8
+max_num_epochs: 300
+start_swa: 200
+scheduler_patience: 15
+patience: 100
+eval_interval: 1
+ema: True
+swa: True
+error_table: "PerAtomRMSE"
+default_dtype: "float64"
+device: cuda
+save_cpu: True
+seed: 3
+restart_latest: True
+```
+
 **Bash Script:** `train.sh`
 
 ```bash
@@ -180,37 +215,7 @@ The following Bash script trains a Delta Learning MACE model using the generated
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
-python -m mace.cli.run_train \
-    --name="urea_r2scan_d4_delta" \
-    --train_file="delta_learning/train.xyz" \
-    --valid_file="delta_learning/validate.xyz" \
-    --test_file="delta_learning/test.xyz" \
-    --model="MACE" \
-    --plot_frequency=10 \
-    --num_interactions=2 \
-    --hidden_irreps='32x0e + 32x1o' \
-    --correlation=2 \
-    --r_max=6.0 \
-    --forces_weight=1000 \
-    --energy_weight=10 \
-    --stress_weight=0 \
-    --energy_key="REF_energy" \
-    --forces_key="REF_forces" \
-    --batch_size=8 \
-    --valid_batch_size=8 \
-    --max_num_epochs=300 \
-    --start_swa=200 \
-    --scheduler_patience=15 \
-    --patience=100 \
-    --eval_interval=1 \
-    --ema \
-    --swa \
-    --error_table="PerAtomRMSE" \
-    --default_dtype="float64" \
-    --device=cuda \
-    --save_cpu \
-    --seed=3 \
-    --restart_latest > "train.log" 2>&1
+python -m mace.cli.run_train --config train.yaml > "train.log" 2>&1
 ```
 
 ## Using the Trained Delta Model
