@@ -200,7 +200,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
 
     def select(
             self,
-            indices: npt.NDArray[np.integer] | None = None,
+            indices: npt.NDArray[np.int64] | None = None,
             level_of_theory: str | dict | None = None,
     ) -> Structure | None:
         
@@ -428,6 +428,26 @@ class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
 
     run_model = run
 
+    def select(
+            self,
+            indices: npt.NDArray[np.int64] | None = None,
+            level_of_theory: str | dict | None = None,
+    ) -> Trajectory | None:
+        
+        valid_indices = _completed_frames(self, level_of_theory)
+        
+        if indices is not None:
+            final_indices = np.intersect1d(indices, valid_indices)
+        else:
+            final_indices = valid_indices
+        
+        if len(final_indices) == 0:
+            return None
+
+        return Trajectory(**vars(
+            _select_frames_trajectory(self, final_indices)
+        ))
+
     def display(
             self,
             quantity: Literal["energy_fluctuations"] = "energy_fluctuations",
@@ -532,7 +552,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
 
     def select(
             self,
-            indices: npt.NDArray[np.integer] | None = None,
+            indices: npt.NDArray[np.int64] | None = None,
             level_of_theory: str | dict | None = None,
     ) -> FiniteSubsystem | None:
         
@@ -586,7 +606,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
         )
         
         _run_model(
-            structure=self.cluster_of_molecules,
+            structure=Structure(**vars(self.cluster_of_molecules)),
             calculator=calculator,
             energies=energies,
             forces=forces,
@@ -746,7 +766,7 @@ def _frames_to_compute(
 
 def _select_frames(
         struct: _Structure,
-        indices: npt.NDArray[np.integer]
+        indices: npt.NDArray[np.int64]
     ) -> _Structure:
         """
         Return a new Structure containing only the specified frames.
@@ -902,9 +922,22 @@ def _subsample_trajectory(
             rng=rng,
         )
         
+        return _select_frames_trajectory(traj, selected_indices)
+
+
+def _select_frames_trajectory(
+        traj: _Trajectory,
+        indices: npt.NDArray[np.int64]
+) -> _Trajectory:
+        """
+        Return a new Trajectory containing only the specified frames.
+        """
+        if len(indices) == 0:
+            raise ValueError("Cannot create a Trajectory with 0 frames.")
+
         selected_cell_vectors = traj.cell_vectors
         if traj.cell_vectors is not None and traj.cell_vectors.ndim == 3:
-            selected_cell_vectors = traj.cell_vectors[selected_indices]
+            selected_cell_vectors = traj.cell_vectors[indices]
                 
         return _Trajectory(
             time_equilibration=traj.time_equilibration,
@@ -917,38 +950,41 @@ def _subsample_trajectory(
             periodic=traj.periodic,
             atomic_numbers=traj.atomic_numbers,
             masses=traj.masses,
-            n_frames=len(selected_indices),
-            positions=traj.positions[selected_indices],
-            velocities=traj.velocities[selected_indices],
-            time=traj.time[selected_indices],
-            temperature=traj.temperature[selected_indices],
-            E_kin=traj.E_kin[selected_indices],
-            E_trans_drift=traj.E_trans_drift[selected_indices],
+            n_frames=len(indices),
+            positions=traj.positions[indices],
+            velocities=traj.velocities[indices],
+            time=traj.time[indices],
+            temperature=traj.temperature[indices],
+            E_kin=traj.E_kin[indices],
+            E_trans_drift=traj.E_trans_drift[indices],
             cell_vectors=selected_cell_vectors,
             E_pot=(
-                traj.E_pot[selected_indices] 
+                traj.E_pot[indices] 
                 if traj.E_pot is not None else None
             ),
             forces=(
-                traj.forces[selected_indices] 
+                traj.forces[indices] 
                 if traj.forces is not None else None
             ),
-            feature_vectors=traj.feature_vectors[selected_indices],
+            feature_vectors=(
+                traj.feature_vectors[indices]
+                if traj.feature_vectors is not None else None
+            ),
             feature_vectors_type=traj.feature_vectors_type,
             ground_truth=(
-                traj.ground_truth.select_frames(selected_indices)
+                traj.ground_truth.select_frames(indices)
                 if traj.ground_truth is not None else None
             ),
             pressure=(
-                traj.pressure[selected_indices] 
+                traj.pressure[indices] 
                 if traj.pressure is not None else None
             ),
             volume=(
-                traj.volume[selected_indices] 
+                traj.volume[indices] 
                 if traj.volume is not None else None
             ),
             E_rot_drift=(
-                traj.E_rot_drift[selected_indices] 
+                traj.E_rot_drift[indices] 
                 if traj.E_rot_drift is not None else None
             ),
         )
@@ -995,7 +1031,7 @@ def _resolve_chunk_indices(
     return my_segment
 
 def _run_model(
-        structure: _Structure,
+        structure: Structure | Trajectory,
         calculator: CALCULATORS,
         energies: bool = True,
         forces: bool = True,
@@ -1091,7 +1127,9 @@ def _run_model(
     #
     # To avoid calculation on frames with COMPLETE status,
     # create a new view of the structure with the subset
-    # of frames where the data are missing
+    # of frames where the data are missing. This kind of
+    # filtering is executed because we call select with
+    # level_of_theory argument.
     #
     calculation_structure = structure.select(frames_to_compute)
     

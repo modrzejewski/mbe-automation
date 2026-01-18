@@ -39,7 +39,7 @@ The following table summarizes the key methods available across these classes.
 | **`from_xyz_file`** | Creates a structure object from an XYZ file. | `Structure` |
 | **`from_atomic_numbers`** | Creates an `AtomicReference` from a list of atomic numbers and a calculator. | `AtomicReference` |
 | **`subsample`** | Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
-| **`select`** | Returns a new object containing only the specified frames (by index). | `Structure` |
+| **`select`** | Returns a new object containing only the specified frames (by index). | `Structure`, `Trajectory`, `FiniteSubsystem` |
 | **`run`** | Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. | `Structure`, `Trajectory`, `FiniteSubsystem` |
 | **`to_mace_dataset`** | Exports the data (structures, energies, forces) to MACE-compatible XYZ files for model training. | `Structure`, `Trajectory`, `FiniteSubsystem`, `Dataset` |
 | **`random_split`** | Randomly splits the frames into multiple objects (e.g., for creating training and validation sets). | `Structure`, `FiniteSubsystem` |
