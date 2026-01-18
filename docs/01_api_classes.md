@@ -10,7 +10,8 @@ from mbe_automation import (
     Trajectory,
     MolecularCrystal,
     FiniteSubsystem,
-    Dataset
+    Dataset,
+    AnySystem
 )
 ```
 
@@ -27,6 +28,7 @@ This chapter provides an overview of the physical content each class represents 
 | **`FiniteSubsystem`** | Finite clusters of molecules extracted from a periodic structure or trajectory. Includes all geometric information of `Structure`, supplemented with extra data which enables tracing back the cleaved molecules to their positions in the cell of the original `MolecularCrystal`. Used to generate training data for fragment-based methods. |
 | **`Dataset`** | A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets. |
 | **`AtomicReference`** | Isolated atom energies required to generate reference energy for machine-learning interatomic potentials. Can store data at multiple levels of theory. |
+| **`AnySystem`** | Helper class to read any supported system type from a dataset based on the stored `dataclass` attribute. |
 
 ## Methods Summary
 
@@ -34,7 +36,7 @@ The following table summarizes the key methods available across these classes.
 
 | Method | Description | Available In |
 | :--- | :--- | :--- |
-| **`read`** | Method to load the object from an HDF5 dataset. | `AtomicReference`, `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
+| **`read`** | Method to load the object from an HDF5 dataset. | `AtomicReference`, `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem`, `AnySystem` |
 | **`save`** | Saves the object to an HDF5 dataset. Supports `update_properties` mode to update energies, forces, and feature vectors (if missing), without overwriting geometry. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`from_xyz_file`** | Creates a structure object from an XYZ file. | `Structure` |
 | **`from_atomic_numbers`** | Creates an `AtomicReference` from a list of atomic numbers and a calculator. | `AtomicReference` |
