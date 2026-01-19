@@ -1398,6 +1398,14 @@ class AnySystem:
     based on the stored 'dataclass' attribute.
     """
 
+    _CLASS_MAP = {
+        "Structure": Structure,
+        "Trajectory": Trajectory,
+        "FiniteSubsystem": FiniteSubsystem,
+        "MolecularCrystal": MolecularCrystal,
+        "ForceConstants": ForceConstants,
+    }
+
     @staticmethod
     def read(dataset: str, key: str) -> Structure | Trajectory | FiniteSubsystem | MolecularCrystal | ForceConstants:
         """
@@ -1405,15 +1413,7 @@ class AnySystem:
         """
         dataclass_name = read_attribute(dataset, key, "dataclass")
 
-        _CLASS_MAP = {
-            "Structure": Structure,
-            "Trajectory": Trajectory,
-            "FiniteSubsystem": FiniteSubsystem,
-            "MolecularCrystal": MolecularCrystal,
-            "ForceConstants": ForceConstants,
-        }
-
-        cls_to_read = _CLASS_MAP.get(dataclass_name)
+        cls_to_read = AnySystem._CLASS_MAP.get(dataclass_name)
         if cls_to_read:
             return cls_to_read.read(dataset, key)
         else:
