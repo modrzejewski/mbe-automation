@@ -133,7 +133,37 @@ def symmetrize(unit_cell: ase.Atoms, symmetrization_thresh: float = 1.0E-2) -> t
         print(f"Perfect symmetry, no refinement: [{input_hmsymbol}][{input_spacegroup_index}]")
         
     return sym_unit_cell, sym_spacegroup_index
+
+def get_equivalent_indices(
+    structure: ase.Atoms | pymatgen.core.Structure,
+    symprec: float = SYMMETRY_TOLERANCE_STRICT
+) -> list[list[int]]:
+    """
+    Groups atoms by their symmetry equivalence.
+    
+    Args:
+        structure: Input structure (ASE Atoms or Pymatgen Structure).
+        symprec: Symmetry precision for SpacegroupAnalyzer.
         
+    Returns:
+        List of lists, where each inner list contains indices of equivalent atoms.
+    """
+    if isinstance(structure, ase.Atoms):
+        pmg_structure = pymatgen.io.ase.AseAtomsAdaptor.get_structure(structure)
+    else:
+        pmg_structure = structure
+        
+    spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(
+        structure=pmg_structure,
+        symprec=symprec
+    )
+    symmetrized_structure = spg_analyzer.get_symmetrized_structure()
+    
+    # helper to convert numpy array to standard python list of ints
+    return [
+        [int(idx) for idx in group] 
+        for group in symmetrized_structure.equivalent_indices
+    ]
 
 def DetermineSpaceGroupSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-2):
     print("Unit cell symmetry")
