@@ -163,7 +163,22 @@ def _cif_with_adps(
     loops.append(loop_labels)
 
     if adps_cif is not None:
-        adps_asymmetric_unit = adps_cif[original_indices]
+        if symprec is not None:
+            #
+            # Compute averaged ADPs for symmetry-equivalent atoms
+            #
+            equivalent_indices = mbe_automation.structure.crystal.get_equivalent_indices(struct, symprec)
+            adps_averaged = np.zeros_like(adps_cif)
+            for group_indices in equivalent_indices:
+                # Average ADPs for the current group
+                avg_adp = np.mean(adps_cif[group_indices], axis=0)
+                adps_averaged[group_indices] = avg_adp
+            
+            adps_to_use = adps_averaged
+        else:
+            adps_to_use = adps_cif
+
+        adps_asymmetric_unit = adps_to_use[original_indices]
         blocks["_atom_site_aniso_label"] = atom_site_label
         blocks["_atom_site_aniso_U_11"] = [format_str.format(adp[0, 0]) for adp in adps_asymmetric_unit]
         blocks["_atom_site_aniso_U_22"] = [format_str.format(adp[1, 1]) for adp in adps_asymmetric_unit]
