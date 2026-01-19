@@ -577,7 +577,7 @@ def extract_all_molecules(
 
     if calculator is not None:
         for molecule in molecules:
-            E_pot, _, _ = mbe_automation.calculators.core.run_model(
+            E_pot, _, _, _ = mbe_automation.calculators.core.run_model(
                 structure=molecule,
                 calculator=calculator,
                 compute_energies=True,
