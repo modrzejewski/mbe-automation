@@ -17,6 +17,7 @@ import mbe_automation.storage.core
 import mbe_automation.storage.views
 import mbe_automation.common.display
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
+from mbe_automation.dynamics.harmonic.modes import symmetrize_adps
 
 def _cif_with_adps(
         save_path: str,
@@ -165,18 +166,10 @@ def _cif_with_adps(
     if adps_cif is not None:
         if symprec is not None:
             #
-            # Compute averaged ADPs for symmetry-equivalent atoms
-            #
-            equivalent_indices = mbe_automation.structure.crystal.get_equivalent_indices(struct, symprec)
-            adps_averaged = np.zeros_like(adps_cif)
-            for group_indices in equivalent_indices:
-                # Average ADPs for the current group
-                avg_adp = np.mean(adps_cif[group_indices], axis=0)
-                adps_averaged[group_indices] = avg_adp
-            
-            adps_to_use = adps_averaged
-        else:
-            adps_to_use = adps_cif
+            #Compute averaged ADPs for symmetry-equivalent atoms
+            #        
+            adps_to_use = symmetrize_adps(struct, adps_cif, symprec=symprec if symprec else 1e-5)
+            adps_asymmetric_unit = adps_to_use[original_indices]
 
         adps_asymmetric_unit = adps_to_use[original_indices]
         blocks["_atom_site_aniso_label"] = atom_site_label
