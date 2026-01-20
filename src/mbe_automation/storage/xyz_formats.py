@@ -166,12 +166,7 @@ def _cif_with_adps(
     if adps_cif is not None:
         if symprec is not None:
             #
-            #Compute averaged ADPs for symmetry-equivalent atoms
-            #        
-            adps_to_use = symmetrize_adps(struct, adps_cif, symprec=symprec if symprec else 1e-5)
-        if symprec is not None:
-            #
-            #Compute averaged ADPs for symmetry-equivalent atoms
+            # Compute averaged ADPs for symmetry-equivalent atoms
             #        
             adps_to_use = symmetrize_adps(struct, adps_cif, symprec=symprec)
         else:
