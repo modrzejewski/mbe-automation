@@ -169,7 +169,13 @@ def _cif_with_adps(
             #Compute averaged ADPs for symmetry-equivalent atoms
             #        
             adps_to_use = symmetrize_adps(struct, adps_cif, symprec=symprec if symprec else 1e-5)
-            adps_asymmetric_unit = adps_to_use[original_indices]
+        if symprec is not None:
+            #
+            #Compute averaged ADPs for symmetry-equivalent atoms
+            #        
+            adps_to_use = symmetrize_adps(struct, adps_cif, symprec=symprec)
+        else:
+            adps_to_use = adps_cif
 
         adps_asymmetric_unit = adps_to_use[original_indices]
         blocks["_atom_site_aniso_label"] = atom_site_label
