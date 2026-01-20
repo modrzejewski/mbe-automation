@@ -18,6 +18,7 @@ import mbe_automation.common
 import mbe_automation.storage
 from mbe_automation.storage.core import ForceConstants
 import mbe_automation.structure
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 AMPLITUDE_SCAN_MODES = [
     "time_propagation",
@@ -582,6 +583,83 @@ def thermal_displacements(
     print("Thermal displacements completed", flush=True)
     return disp
 
+
+def symmetrize_adps(structure, adps, symprec=1e-5):
+    """
+    Uśrednia tensory ADP (U_cart) zgodnie z symetrią kryształu.
+    
+    Args:
+        structure: Obiekt pymatgen.core.Structure
+        adps: Macierz numpy (N_atoms, 3, 3) zawierająca surowe ADPs
+        symprec: Precyzja symetrii
+        
+    Returns:
+        symmetrized_adps: Macierz (N_atoms, 3, 3) z poprawnie uśrednionymi tensorami.
+    """
+    sga = SpacegroupAnalyzer(structure, symprec=symprec)
+    symmetrized_structure = sga.get_symmetrized_structure()
+    
+    # Kopia do wyników
+    adps_final = np.zeros_like(adps)
+    
+    # Iterujemy po grupach atomów równoważnych (Wyckoff positions)
+    # equivalent_indices to lista list, np. [[0, 1], [2, 3, 4, 5]]
+    for group_indices in symmetrized_structure.equivalent_indices:
+        
+        # 1. Wybieramy reprezentanta (pierwszy atom w grupie)
+        ref_index = group_indices[0]
+        ref_site = structure[ref_index]
+        
+        # Kontener na tensory sprowadzone do układu reprezentanta
+        rotated_tensors = []
+        
+        # 2. "Ściągamy" wszystkie tensory do układu reprezentanta
+        for idx in group_indices:
+            target_site = structure[idx]
+            original_tensor = adps[idx]
+            
+            # Znajdujemy operację symetrii R, która mapuje ref_site -> target_site
+            # Pymatgen nie daje tego wprost dla pary atomów, więc szukamy w operacjach grupy:
+            op = None
+            for symm_op in sga.get_symmetry_operations():
+                # Sprawdzamy czy ta operacja przenosi reprezentanta na cel
+                transformed_coords = symm_op.operate(ref_site.frac_coords)
+                if np.allclose(structure.lattice.get_distance_and_image(transformed_coords, target_site.frac_coords)[0], 0, atol=symprec):
+                    op = symm_op
+                    break
+            
+            if op is None:
+                raise ValueError(f"Nie znaleziono operacji symetrii między atomem {ref_index} a {idx}")
+            
+            # R to macierz obrotu (część kartezjańska operacji)
+            R = op.rotation_matrix
+            
+            # Odkręcamy tensor: U_ref = R.T @ U_target @ R
+            # (R.T to odwrotność dla macierzy ortogonalnych)
+            U_rotated_back = R.T @ original_tensor @ R
+            rotated_tensors.append(U_rotated_back)
+            
+        # 3. Liczymy średnią w układzie reprezentanta
+        # Tutaj np.mean jest bezpieczne, bo wszystkie są "zorientowane" tak samo
+        U_avg_ref = np.mean(rotated_tensors, axis=0)
+        
+        # 4. Rozpropagowujemy średnią z powrotem na wszystkie atomy w grupie
+        for idx in group_indices:
+            # Musimy znów znaleźć tę samą operację R (można by to zoptymalizować zapamiętując R wyżej)
+            op = None
+            target_site = structure[idx]
+            for symm_op in sga.get_symmetry_operations():
+                transformed_coords = symm_op.operate(ref_site.frac_coords)
+                if np.allclose(structure.lattice.get_distance_and_image(transformed_coords, target_site.frac_coords)[0], 0, atol=symprec):
+                    op = symm_op
+                    break
+            
+            R = op.rotation_matrix
+            
+            # Obracamy średnią do pozycji docelowej: U_target = R @ U_avg_ref @ R.T
+            adps_final[idx] = R @ U_avg_ref @ R.T
+            
+    return adps_final
 
 def trajectory(
         dataset: str,
