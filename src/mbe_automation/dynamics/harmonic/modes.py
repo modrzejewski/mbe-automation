@@ -6,6 +6,7 @@ import numpy.typing as npt
 import ase
 import math
 import phonopy
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from ase.calculators.calculator import Calculator as ASECalculator
 try:
     from mace.calculators import MACECalculator
@@ -18,7 +19,7 @@ import mbe_automation.common
 import mbe_automation.storage
 from mbe_automation.storage.core import ForceConstants
 import mbe_automation.structure
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 AMPLITUDE_SCAN_MODES = [
     "time_propagation",
@@ -584,79 +585,88 @@ def thermal_displacements(
     return disp
 
 
-def symmetrize_adps(structure, adps, symprec=1e-5):
+def symmetrize_adps(
+        structure: pymatgen.core.Structure,
+        adps: npt.NDArray[np.float64],
+        symprec: float = SYMMETRY_TOLERANCE_STRICT
+):
     """
-    Uśrednia tensory ADP (U_cart) zgodnie z symetrią kryształu.
+    Averages ADP tensors (U_cart) according to crystal symmetry.
     
     Args:
-        structure: Obiekt pymatgen.core.Structure
-        adps: Macierz numpy (N_atoms, 3, 3) zawierająca surowe ADPs
-        symprec: Precyzja symetrii
+        structure: A pymatgen.core.Structure object
+        adps: Numpy array (N_atoms, 3, 3) containing raw ADPs
+        symprec: Symmetry precision
         
     Returns:
-        symmetrized_adps: Macierz (N_atoms, 3, 3) z poprawnie uśrednionymi tensorami.
+        symmetrized_adps: Matrix (N_atoms, 3, 3) with correctly averaged tensors.
     """
     sga = SpacegroupAnalyzer(structure, symprec=symprec)
     symmetrized_structure = sga.get_symmetrized_structure()
     
-    # Kopia do wyników
     adps_final = np.zeros_like(adps)
     
-    # Iterujemy po grupach atomów równoważnych (Wyckoff positions)
-    # equivalent_indices to lista list, np. [[0, 1], [2, 3, 4, 5]]
+    # Iterate over groups of equivalent atoms (Wyckoff positions)
+    # equivalent_indices is a list of lists, e.g. [[0, 1], [2, 3, 4, 5]]
     for group_indices in symmetrized_structure.equivalent_indices:
         
-        # 1. Wybieramy reprezentanta (pierwszy atom w grupie)
+        # 1. Select a representative (first atom in the group)
         ref_index = group_indices[0]
         ref_site = structure[ref_index]
         
-        # Kontener na tensory sprowadzone do układu reprezentanta
+        # Container for tensors transformed to the representative's frame
         rotated_tensors = []
         
-        # 2. "Ściągamy" wszystkie tensory do układu reprezentanta
+        # 2. Transform all tensors to the representative's reference frame
         for idx in group_indices:
             target_site = structure[idx]
             original_tensor = adps[idx]
             
-            # Znajdujemy operację symetrii R, która mapuje ref_site -> target_site
-            # Pymatgen nie daje tego wprost dla pary atomów, więc szukamy w operacjach grupy:
+            # Find the symmetry operation R that maps ref_site -> target_site
+            # Pymatgen does not provide this directly for a pair of atoms, so we search in the group operations:
             op = None
             for symm_op in sga.get_symmetry_operations():
-                # Sprawdzamy czy ta operacja przenosi reprezentanta na cel
+                # Check if this operation maps the representative to the target
                 transformed_coords = symm_op.operate(ref_site.frac_coords)
-                if np.allclose(structure.lattice.get_distance_and_image(transformed_coords, target_site.frac_coords)[0], 0, atol=symprec):
+                if np.allclose(structure.lattice.get_distance_and_image(
+                        transformed_coords,
+                        target_site.frac_coords
+                )[0], 0, atol=symprec):
                     op = symm_op
                     break
             
             if op is None:
-                raise ValueError(f"Nie znaleziono operacji symetrii między atomem {ref_index} a {idx}")
+                raise ValueError(f"No symmetry operation found between atom {ref_index} and {idx}")
             
-            # R to macierz obrotu (część kartezjańska operacji)
+            # R is the rotation matrix (Cartesian part of the operation)
             R = op.rotation_matrix
             
-            # Odkręcamy tensor: U_ref = R.T @ U_target @ R
-            # (R.T to odwrotność dla macierzy ortogonalnych)
+            # Rotate the tensor back: U_ref = R.T @ U_target @ R
+            # (R.T is the inverse for orthogonal matrices)
             U_rotated_back = R.T @ original_tensor @ R
             rotated_tensors.append(U_rotated_back)
             
-        # 3. Liczymy średnią w układzie reprezentanta
-        # Tutaj np.mean jest bezpieczne, bo wszystkie są "zorientowane" tak samo
+        # 3. Compute the average in the representative's frame
+        # np.mean is safe here because all are "oriented" the same way
         U_avg_ref = np.mean(rotated_tensors, axis=0)
         
-        # 4. Rozpropagowujemy średnią z powrotem na wszystkie atomy w grupie
+        # 4. Propagate the average back to all atoms in the group
         for idx in group_indices:
-            # Musimy znów znaleźć tę samą operację R (można by to zoptymalizować zapamiętując R wyżej)
+            # We need to find the same operation R again (could be optimized by caching R above)
             op = None
             target_site = structure[idx]
             for symm_op in sga.get_symmetry_operations():
                 transformed_coords = symm_op.operate(ref_site.frac_coords)
-                if np.allclose(structure.lattice.get_distance_and_image(transformed_coords, target_site.frac_coords)[0], 0, atol=symprec):
+                if np.allclose(structure.lattice.get_distance_and_image(
+                        transformed_coords,
+                        target_site.frac_coords
+                )[0], 0, atol=symprec):
                     op = symm_op
                     break
             
-            R = op.rotation_matrix
+                R = op.rotation_matrix
             
-            # Obracamy średnią do pozycji docelowej: U_target = R @ U_avg_ref @ R.T
+            # Rotate the average to the target position: U_target = R @ U_avg_ref @ R.T
             adps_final[idx] = R @ U_avg_ref @ R.T
             
     return adps_final
