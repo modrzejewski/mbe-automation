@@ -154,6 +154,7 @@ class ForceConstants(_ForceConstants):
             save_adps: bool = False,
             temperature_K: float | None = None,
             phonon_filter: PhononFilter | None = None,
+            check_roundtrip: bool = True,
     ) -> None:
         """
         Save the primitive cell to a CIF file.
@@ -163,13 +164,15 @@ class ForceConstants(_ForceConstants):
             save_adps: Whether to calculate and include anisotropic displacement parameters.
             temperature_K: Temperature in Kelvin (required if save_adps is True).
             phonon_filter: Optional filter for phonons (used if save_adps is True).
+            check_roundtrip: Whether to verify that ADPs are correctly saved (roundtrip check).
         """
         _to_cif_file(
             force_constants=self,
             save_path=save_path,
             save_adps=save_adps,
             temperature_K=temperature_K,
-            phonon_filter=phonon_filter
+            phonon_filter=phonon_filter,
+            check_roundtrip=check_roundtrip,
         )
 
     def gruneisen_parameters(
@@ -1417,6 +1420,7 @@ def _to_cif_file(
     save_adps: bool = False,
     temperature_K: float | None = None,
     phonon_filter: PhononFilter | None = None,
+    check_roundtrip: bool = True,
 ) -> None:
     disp = None
     if save_adps:
@@ -1433,6 +1437,15 @@ def _to_cif_file(
         thermal_displacements=disp,
         temperature_idx=0 
     )
+
+    if check_roundtrip and save_adps and disp is not None:
+        from mbe_automation.storage.verification import verify_adps_roundtrip
+        verify_adps_roundtrip(
+            cif_path=save_path,
+            original_structure=force_constants.primitive,
+            thermal_displacements=disp,
+            temperature_idx=0
+        )
 
 class AnySystem:
     """

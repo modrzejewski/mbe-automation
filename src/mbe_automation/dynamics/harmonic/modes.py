@@ -319,7 +319,7 @@ def _to_cif(
 ):
     """
     Convert the mean square displacement matrix U(k) to the CIF format.
-    Based on the implementation in phonopy. Different conventions of U(k)
+    Based on the implementation in phonopy. Conventions of U(k)
     are explained in ref 1.
 
     1. R. W. Grosse-Kunstleve and P. D. Adams, On the handling of atomic
@@ -520,7 +520,7 @@ def _thermal_displacements(
         elif amplitude_scan == "equidistant":
             #
             # Equidistant points between -1 and +1.
-            # The resulting phonon coordinates will
+            # The resulting phonon coordinates will be
             # distributed uniformly between -Akj
             # and +Akj.
             #
@@ -805,8 +805,11 @@ def symmetrize_adps(
                     op = symm_op
                     break
             
-                R = op.rotation_matrix
-            
+            if op is None:
+                raise ValueError(f"No symmetry operation found between atom {ref_index} and {idx}")
+
+            R = op.rotation_matrix
+
             # Rotate the average to the target position: U_target = R @ U_avg_ref @ R.T
             adps_final[idx] = R @ U_avg_ref @ R.T
             
