@@ -38,8 +38,10 @@ from mbe_automation.storage.core import (
     CALCULATION_STATUS_FAILED,
     read_attribute,
 )
-from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
-
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE, Minimum
+import mbe_automation.structure.relax
+import mbe_automation.dynamics.harmonic.core
+from copy import deepcopy
 class _TrainingStructure:
     def to_mace_dataset(
             self,
@@ -119,6 +121,14 @@ class ForceConstants(_ForceConstants):
             k_point=k_point,
         )
 
+
+
+
+
+
+
+
+
     def thermal_displacements(
             self,
             temperature_K: float,
@@ -162,6 +172,38 @@ class ForceConstants(_ForceConstants):
             phonon_filter=phonon_filter
         )
 
+    def gruneisen_parameters(
+            self,
+            k_point: npt.NDArray[np.floating],
+            calculator: CALCULATORS | None = None,
+            relaxation_config: Minimum | None = None,
+            delta_V: float = 0.0001,
+            supercell_matrix: npt.NDArray[np.integer] | None = None,
+            supercell_displacement: float = 0.01,
+            work_dir: Path | str = Path("./"),
+    ):
+        """
+        Compute Gruneisen parameters at a given k-point.
+        
+        Args:
+            k_point: The k-point coordinates in reciprocal space (fractional coordinates).
+            calculator: Calculator for optimization and phonon calculations.
+            relaxation_config: Configuration for structure relaxation.
+            delta_V: Fractional volume change for numerical differentiation (e.g. 0.01 for 1%).
+            supercell_matrix: Supercell matrix for phonon calculations.
+            supercell_displacement: Displacement distance for phonon calculations.
+            work_dir: Working directory for intermediate files.
+        """
+        return mbe_automation.dynamics.harmonic.modes.gruneisen_parameters(
+            force_constants=self,
+            k_point=k_point,
+            calculator=calculator,
+            relaxation_config=relaxation_config,
+            delta_V=delta_V,
+            supercell_matrix=supercell_matrix,
+            supercell_displacement=supercell_displacement,
+            work_dir=work_dir
+        )
 
 @dataclass(kw_only=True)
 class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
