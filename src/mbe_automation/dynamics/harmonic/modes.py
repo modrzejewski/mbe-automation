@@ -19,7 +19,11 @@ import mbe_automation.common
 import mbe_automation.storage
 from mbe_automation.storage.core import ForceConstants
 import mbe_automation.structure
-from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE, Minimum
+import mbe_automation.structure.relax
+import mbe_automation.dynamics.harmonic.core
+from copy import deepcopy
+from pathlib import Path
 
 AMPLITUDE_SCAN_MODES = [
     "time_propagation",
@@ -98,6 +102,143 @@ def at_k_point(
     
     return freqs_THz, eigenvecs
 
+
+def gruneisen_parameters(
+        force_constants: ForceConstants,
+        k_point: npt.NDArray[np.floating],
+        calculator: ASECalculator | None = None,
+        relaxation_config: Minimum | None = None,
+        delta_V: float = 0.0001,
+        supercell_matrix: npt.NDArray[np.integer] | None = None,
+        supercell_displacement: float = 0.01,
+        work_dir: Path | str = Path("./"),
+):
+    """
+    Compute Gruneisen parameters at a given k-point.
+    
+    Args:
+        force_constants: The harmonic force constants model.
+        k_point: The k-point coordinates in reciprocal space (fractional coordinates).
+        calculator: Calculator for optimization and phonon calculations.
+        relaxation_config: Configuration for structure relaxation.
+        delta_V: Fractional volume change for numerical differentiation (e.g. 0.01 for 1%).
+        supercell_matrix: Supercell matrix for phonon calculations.
+        supercell_displacement: Displacement distance for phonon calculations.
+        work_dir: Working directory for intermediate files.
+            
+    Returns:
+        tuple containing:
+        - gamma: Gruneisen parameters for each mode at k_point
+        - volume: Equilibrium volume V0
+        - dynamical_matrix: Dynamical matrix D0 at k_point
+        - omega: Frequencies at k_point
+        - e: Eigenvectors at k_point
+        - V_plus: Volume V+
+        - D_plus: Dynamical matrix at V+
+        - V_minus: Volume V-
+        - D_minus: Dynamical matrix at V-
+    """
+    # 1. crystal structure and its volume
+    structure = force_constants.primitive
+    volume = structure.lattice().volume
+    
+    # 2. Dynamic matrix
+    ph = mbe_automation.storage.to_phonopy(force_constants)
+    dynamical_matrix = ph.dynamical_matrix
+    
+    # 3. eigen vectors e and eigen values omega of this matrix
+    omega, e = force_constants.frequencies_and_eigenvectors(k_point)
+    
+    if calculator is None or relaxation_config is None:
+         # If no calculator/config provided, return step 1 results only (or raise error if strict)
+         return volume, dynamical_matrix, omega, e
+         
+    # Step 2: Optimization at V +/- delta_V
+    
+    # Prepare for optimization
+    work_dir = Path(work_dir)
+    unit_cell_V0 = mbe_automation.storage.views.to_ase(structure)
+    
+    if supercell_matrix is None:
+         supercell_matrix = force_constants.supercell_matrix
+         
+    # Volumes to compute
+    factors = [1.0 + delta_V, 1.0 - delta_V]
+    
+    results_displaced = []
+    
+    for factor in factors:
+        V_new = volume * factor
+        scaling_factor = (V_new / volume) ** (1/3)
+        
+        # Create scaled structure
+        unit_cell_V = unit_cell_V0.copy()
+        unit_cell_V.set_cell(
+            unit_cell_V0.cell * scaling_factor,
+            scale_atoms=True
+        )
+        
+        label = f"gruneisen_V={V_new/volume:.4f}"
+        
+        # Configure optimizer for constant volume
+        optimizer = deepcopy(relaxation_config)
+        optimizer.cell_relaxation = "constant_volume"
+        optimizer._pressure_GPa = 0.0 # Irrelevant for constant volume but good to reset
+        
+        # Optimize
+        unit_cell_optimized, space_group_optimized = mbe_automation.structure.relax.crystal(
+            unit_cell=unit_cell_V,
+            calculator=calculator,
+            config=optimizer,
+            work_dir=work_dir / "relaxation" / label,
+            key=None 
+        )
+        
+        # Compute phonons
+        ph_new = mbe_automation.dynamics.harmonic.core.phonons(
+            unit_cell=unit_cell_optimized,
+            calculator=calculator,
+            supercell_matrix=supercell_matrix,
+            supercell_displacement=supercell_displacement,
+            interp_mesh=1.0, # minimal mesh
+            key=None
+        )
+        
+        # Get dynamical matrix at k_point
+        ph_new.dynamical_matrix.run(k_point)
+        D_q = ph_new.dynamical_matrix.dynamical_matrix # This is the matrix
+        
+        results_displaced.append({
+            "volume": unit_cell_optimized.get_volume(),
+            "dynamical_matrix": D_q,
+            "phonopy_object": ph_new
+        })
+        
+    V_plus = results_displaced[0]["volume"]
+    D_plus = results_displaced[0]["dynamical_matrix"]
+    
+    V_minus = results_displaced[1]["volume"]
+    D_minus = results_displaced[1]["dynamical_matrix"]
+
+    # Step 3: Calculate Gruneisen parameters
+    # Formula: gamma_i = -(V / (2 * omega_i^2)) * (<e_i | (D(V+) - D(V-)) | e_i> / (V_plus - V_minus))
+    
+    delta_D = D_plus - D_minus
+    delta_V_val = V_plus - V_minus
+    
+    # Project delta_D onto eigenvectors e
+    # e is (dim, n_modes), delta_D is (dim, dim)
+    proj_matrix = e.conj().T @ delta_D @ e
+    delta_lambda = np.diagonal(proj_matrix).real 
+    
+    # Avoid division by zero
+    with np.errstate(divide='ignore', invalid='ignore'):
+        numerator = delta_lambda / delta_V_val
+        denominator = 2 * (omega ** 2)
+        
+        gamma = - volume * (numerator / denominator)
+        
+    return gamma, volume, dynamical_matrix, omega, e, V_plus, D_plus, V_minus, D_minus
 
 def _Ejq_eq_3(
         freqs_THz: npt.NDArray[np.floating],
