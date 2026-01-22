@@ -9,17 +9,12 @@ from __future__ import annotations
 import numpy as np
 from typing import Tuple, Dict, Any, Optional
 
-import spglib
-from ase import units as ase_units
+
+import phonopy.physical_units
 from nomore_ase.core.phonon_data import PhononData
 
-import logging
 import mbe_automation.api.classes
-
-logger = logging.getLogger(__name__)
-
-# Constants
-EV_TO_CM1 = 8065.54429
+import mbe_automation.dynamics.harmonic.modes
 
 class NomoreAdapter:
     """
@@ -32,8 +27,6 @@ class NomoreAdapter:
     def get_phonon_data(
         self,
         q_mesh: Tuple[int, int, int],
-        symmetrize: bool = True,
-        symprec: float = 1e-2,
         compute_bands: bool = True
     ) -> PhononData:
         """
@@ -41,50 +34,35 @@ class NomoreAdapter:
         
         Args:
             q_mesh: (Nx, Ny, Nz) grid dimensions.
-            symmetrize: Whether to symmetrize frequencies/eigenvectors (currently unused logic but kept for interface compatibility).
-            symprec: Symmetry precision for finding IBZ.
             compute_bands: Whether to compute band indices (currently unused).
             
         Returns:
             PhononData object with frequencies in cm⁻¹.
         """
-        # 1. Get Geometry from Primitive Structure
-        atoms_ase = self.structure.to_ase_atoms()
-        cell = (
-            atoms_ase.get_cell(),
-            atoms_ase.get_scaled_positions(),
-            atoms_ase.get_atomic_numbers()
+        # 1. Initialize Phonopy and Units
+        units = phonopy.physical_units.get_physical_units()
+        ph = self.fc.to_phonopy()
+        
+        # 2. Get Irreducible Brillouin Zone (IBZ)
+        irr_q_frac, q_weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
+            phonopy_object=ph,
+            k_point_mesh=q_mesh,
+            use_symmetry=True
         )
-        
-        # 2. Get Irreducible Brillouin Zone (IBZ) from spglib
-        mapping, grid = spglib.get_ir_reciprocal_mesh(q_mesh, cell, is_shift=[0, 0, 0], symprec=symprec)
-        unique_indices = np.unique(mapping)
-        n_irr = len(unique_indices)
-        
-        # Weights (multiplicity)
-        q_weights = np.array([np.sum(mapping == idx) for idx in unique_indices])
-        
-        # Fractional q-points
-        mesh_array = np.array(q_mesh)
-        irr_q_frac = grid[unique_indices] / mesh_array
+
+        n_irr = len(irr_q_frac)
         
         # 3. Compute Frequencies and Eigenvectors for each IBZ q-point
-        # ForceConstants.frequencies_and_eigenvectors(q) returns (freqs_THz, eigenvectors)
         all_freqs_cm1 = []
         all_eigenvectors = [] # will be list of (n_modes, n_atoms, 3)
         mode_weights = []
         
-        # Pre-calculate factor for unit conversion if needed.
-        # FC returns THz (usually). nomore_ase expects cm⁻¹.
-        # 1 THz = 33.35641 cm⁻¹
-        THZ_TO_CM1 = 33.35641
-        
         for q_idx, q_point in enumerate(irr_q_frac):
             # Evaluate at q-point
-            freqs_thz, eigenvectors = self.fc.frequencies_and_eigenvectors(q_point)
+            freqs_thz, eigenvectors = mbe_automation.dynamics.harmonic.modes.at_k_point(ph.dynamical_matrix, q_point)
             
             # Convert frequencies to cm⁻¹
-            freqs_cm1 = freqs_thz * THZ_TO_CM1
+            freqs_cm1 = freqs_thz * units.THzToCm
             
             # Ensure eigenvectors are (n_modes, n_atoms, 3)
             # The API returns eigenvectors.
@@ -117,16 +95,6 @@ class NomoreAdapter:
              mode_q_indices.extend([i] * len(q_modes))
         mode_q_indices = np.array(mode_q_indices)
 
-        # Supercell size
-        # We can infer it from the ForceConstants supercell matrix diagonal if simpler
-        # or just pass it through if known. Using definition from FC structure.
-        # ForceConstants usually has supercell matrix.
-        supercell_matrix = self.fc.supercell_matrix
-        if supercell_matrix is not None:
-             supercell = (int(supercell_matrix[0,0]), int(supercell_matrix[1,1]), int(supercell_matrix[2,2]))
-        else:
-             supercell = (1, 1, 1)
-
         return PhononData(
             frequencies_cm1=flat_freqs_cm1,
             eigenvectors=flat_eigenvectors,
@@ -134,12 +102,12 @@ class NomoreAdapter:
             mode_q_indices=mode_q_indices,
             weights=flat_weights,
             degeneracy_groups=degeneracy_groups,
-            positions_frac=atoms_ase.get_scaled_positions(),
-            cell=atoms_ase.get_cell()[:],
-            symbols=list(atoms_ase.get_chemical_symbols()),
-            masses=atoms_ase.get_masses(),
-            supercell=supercell,
-            n_atoms=len(atoms_ase),
+            positions_frac=ph.primitive.scaled_positions,
+            cell=ph.primitive.cell,
+            symbols=ph.primitive.symbols,
+            masses=ph.primitive.masses,
+            supercell=[1, 1, 1],
+            n_atoms=len(ph.primitive),
             band_indices=None  # Can implement band assignment later if needed
         )
 
