@@ -34,3 +34,8 @@ from .api import (
     AnySystem,
     run,
 )
+
+try:
+    from .api import nomore
+except ImportError:
+    pass

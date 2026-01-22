@@ -208,6 +208,40 @@ class ForceConstants(_ForceConstants):
             work_dir=work_dir
         )
 
+    def refined_frequencies(
+        self,
+        cif_path: str,
+        output_dir: str,
+        q_mesh: Tuple[int, int, int] = (1, 1, 1),
+        supercell: typing.Optional[Tuple[int, int, int]] = None,
+        restraint_weight: float = 0.0,
+        **kwargs
+    ) -> typing.Dict[str, typing.Any]:
+        """
+        Refine phonon frequencies against experimental ADPs using NoMoRe.
+        
+        Args:
+            cif_path: Path to experimental CIF with ADPs.
+            output_dir: Directory to save results.
+            q_mesh: Q-point mesh for sampling.
+            supercell: Supercell dimensions (optional, inferred from FC if None).
+            restraint_weight: Weight for restraining to initial frequencies.
+            **kwargs: Additional arguments passed to NoMoReRefinement.run()
+            
+        Returns:
+            Dictionary containing refinement results.
+        """
+        from mbe_automation.api.nomore import run_nomore_refinement
+        return run_nomore_refinement(
+            force_constants=self,
+            cif_path=cif_path,
+            output_dir=output_dir,
+            q_mesh=q_mesh,
+            supercell=supercell,
+            restraint_weight=restraint_weight,
+            **kwargs
+        )
+
 @dataclass(kw_only=True)
 class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
     @classmethod
