@@ -121,12 +121,41 @@ class ForceConstants(_ForceConstants):
             k_point=k_point,
         )
 
+    def k_point_grid(
+            self,
+            k_point_mesh: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+            use_symmetry: bool = False,
+            center_at_gamma: bool = False,
+    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
+        """
+        Generate a k-point mesh for the system.
+        
+        Args:
+            k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
+                - "gamma": Use only the [0, 0, 0] k-point.
+                - A floating point number: Defines a supercell of radius R.
+                - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
+            use_symmetry: Whether to use mesh symmetry (reduces number of k-points).
+            center_at_gamma: Whether to center the mesh at Gamma (shift=0).
 
+        Returns:
+            A tuple containing:
+            - qpoints: Array of q-points in fractional coordinates (N, 3)
+            - weights: Array of weights for each q-point (N,)
+        """
+        ph = mbe_automation.storage.to_phonopy(self)
+        return mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
+            phonopy_object=ph,
+            k_point_mesh=k_point_mesh,
+            use_symmetry=use_symmetry,
+            center_at_gamma=center_at_gamma,
+        )
 
-
-
-
-
+    def to_phonopy(self) -> phonopy.Phonopy:
+        """
+        Convert this ForceConstants object to a Phonopy object.
+        """
+        return mbe_automation.storage.to_phonopy(self)
 
 
     def thermal_displacements(

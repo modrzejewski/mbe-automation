@@ -667,6 +667,55 @@ def _thermal_displacements(
         instantaneous_displacements=instant_disp
     )
 
+def phonopy_k_point_grid(
+        phonopy_object: phonopy.Phonopy,
+        k_point_mesh: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+        use_symmetry: bool = False,
+        center_at_gamma: bool = False,
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
+    """
+    Generate a k-point mesh for a Phonopy object.
+    
+    Args:
+        phonopy_object: The Phonopy object.
+        k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
+            - "gamma": Use only the [0, 0, 0] k-point.
+            - A floating point number: Defines a supercell of radius R,
+              which corresponds to the Mohkhorst-Pack sampling grid.
+            - array of 3 integers: Defines an explicit Monkhorst-Pack
+              mesh for Brillouin zone integration.
+        use_symmetry: Whether to use mesh symmetry (reduces number of k-points).
+        center_at_gamma: Whether to center the mesh at Gamma (shift=0).
+
+    Returns:
+        A tuple containing:
+        - qpoints: Array of q-points in fractional coordinates (N, 3)
+        - weights: Array of weights for each q-point (N,)
+    """
+    if isinstance(k_point_mesh, float):
+        mesh = phonopy.structure.grid_points.length2mesh(
+            length=k_point_mesh,
+            lattice=phonopy_object.primitive.cell,
+            rotations=phonopy_object.primitive_symmetry.pointgroup_operations
+        )
+    elif isinstance(k_point_mesh, str) and k_point_mesh == "gamma":
+        mesh = np.array([1, 1, 1])
+    else:
+        mesh = k_point_mesh
+
+    phonopy_object.init_mesh(
+        mesh=mesh,
+        shift=None,
+        is_time_reversal=True, # will be ignored by phonopy if use_symmetry=False
+        is_mesh_symmetry=use_symmetry,
+        is_gamma_center=center_at_gamma,
+        with_eigenvectors=False, 
+        with_group_velocities=False,
+        use_iter_mesh=True,
+    )
+    
+    return phonopy_object.mesh.qpoints, phonopy_object.mesh.weights
+
 def thermal_displacements(
         force_constants: ForceConstants,
         temperatures_K: npt.NDArray[np.floating],
@@ -727,30 +776,13 @@ def thermal_displacements(
     ph = mbe_automation.storage.to_phonopy(
         force_constants=force_constants
     )
-    if isinstance(phonon_filter.k_point_mesh, float):
-        k_point_mesh = phonopy.structure.grid_points.length2mesh(
-            length=phonon_filter.k_point_mesh,
-            lattice=ph.primitive.cell,
-            rotations=ph.primitive_symmetry.pointgroup_operations
-        )
-        
-    elif isinstance(phonon_filter.k_point_mesh, str) and phonon_filter.k_point_mesh == "gamma":
-        k_point_mesh = np.array([1, 1, 1])
-        
-    else:
-        k_point_mesh = phonon_filter.k_point_mesh
-
-    ph.init_mesh(
-        mesh=k_point_mesh,
-        shift=None,
-        is_time_reversal=True,
-        is_mesh_symmetry=False,
-        with_eigenvectors=True,
-        with_group_velocities=False,
-        is_gamma_center=False,
-        use_iter_mesh=True
+    
+    qpoints, _ = phonopy_k_point_grid(
+        phonopy_object=ph,
+        k_point_mesh=phonon_filter.k_point_mesh,
+        use_symmetry=False,
+        center_at_gamma=False
     )
-    qpoints = ph.mesh.qpoints
 
     mbe_automation.common.display.framed("Thermal displacements")
     print(f"temperatures_K      {np.array2string(temperatures_K,precision=1,separator=',')}")
