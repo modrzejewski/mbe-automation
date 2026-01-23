@@ -730,7 +730,7 @@ def _thermal_displacements(
 
 def phonopy_k_point_grid(
         phonopy_object: phonopy.Phonopy,
-        k_point_mesh: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
         use_symmetry: bool = False,
         center_at_gamma: bool = False,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
@@ -739,7 +739,7 @@ def phonopy_k_point_grid(
     
     Args:
         phonopy_object: The Phonopy object.
-        k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
+        mesh_size: The k-points for sampling the Brillouin zone. Can be:
             - "gamma": Use only the [0, 0, 0] k-point.
             - A floating point number: Defines a supercell of radius R,
               which corresponds to the Mohkhorst-Pack sampling grid.
@@ -753,16 +753,16 @@ def phonopy_k_point_grid(
         - qpoints: Array of q-points in fractional coordinates (N, 3)
         - weights: Array of weights for each q-point (N,)
     """
-    if isinstance(k_point_mesh, float):
+    if isinstance(mesh_size, float):
         mesh = phonopy.structure.grid_points.length2mesh(
-            length=k_point_mesh,
+            length=mesh_size,
             lattice=phonopy_object.primitive.cell,
             rotations=phonopy_object.primitive_symmetry.pointgroup_operations
         )
-    elif isinstance(k_point_mesh, str) and k_point_mesh == "gamma":
+    elif isinstance(mesh_size, str) and mesh_size == "gamma":
         mesh = np.array([1, 1, 1])
     else:
-        mesh = k_point_mesh
+        mesh = mesh_size
 
     phonopy_object.init_mesh(
         mesh=mesh,

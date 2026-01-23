@@ -41,6 +41,7 @@ from mbe_automation.storage.core import (
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE, Minimum
 import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
+import mbe_automation.dynamics.harmonic.thermodynamics
 from copy import deepcopy
 class _TrainingStructure:
     def to_mace_dataset(
@@ -146,7 +147,7 @@ class ForceConstants(_ForceConstants):
         ph = mbe_automation.storage.to_phonopy(self)
         return mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
             phonopy_object=ph,
-            k_point_mesh=k_point_mesh,
+            mesh_size=k_point_mesh,
             use_symmetry=use_symmetry,
             center_at_gamma=center_at_gamma,
         )
@@ -240,10 +241,10 @@ class ForceConstants(_ForceConstants):
     def refined_frequencies(
         self,
         cif_path: str,
-        output_dir: str,
-        q_mesh: Tuple[int, int, int] = (1, 1, 1),
+        output_dir: str = "./",
+        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
         supercell: typing.Optional[Tuple[int, int, int]] = None,
-        restraint_weight: float = 0.0,
+        restraint_weight: float = 0.1,
         **kwargs
     ) -> typing.Dict[str, typing.Any]:
         """
@@ -252,7 +253,10 @@ class ForceConstants(_ForceConstants):
         Args:
             cif_path: Path to experimental CIF with ADPs.
             output_dir: Directory to save results.
-            q_mesh: Q-point mesh for sampling.
+            mesh_size: The accuracy of the FBZ interpolation mesh. Can be:
+                - "gamma": Use only the [0, 0, 0] k-point.
+                - A floating point number: Defines a supercell of radius R (in Angstroms).
+                - array of 3 integers: Defines an explicit Monkhorst-Pack mesh (Nx, Ny, Nz).
             supercell: Supercell dimensions (optional, inferred from FC if None).
             restraint_weight: Weight for restraining to initial frequencies.
             **kwargs: Additional arguments passed to NoMoReRefinement.run()
@@ -265,10 +269,53 @@ class ForceConstants(_ForceConstants):
             force_constants=self,
             cif_path=cif_path,
             output_dir=output_dir,
-            q_mesh=q_mesh,
+            mesh_size=mesh_size,
             supercell=supercell,
             restraint_weight=restraint_weight,
             **kwargs
+        )
+
+    def thermodynamics(
+            self,
+            k_point_mesh: npt.NDArray[np.int64] | Literal["gamma"] | float,
+            temperatures_K: npt.NDArray[np.float64],
+    ) -> pd.DataFrame:
+        """
+        Compute thermodynamic properties (vib energy, entropy, etc.) at given temperatures.
+        
+        Args:
+            k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
+                - "gamma": Use only the [0, 0, 0] k-point.
+                - A floating point number: Defines a supercell of radius R.
+                - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
+            temperatures_K: Array of temperatures in Kelvin.
+            
+        Returns:
+            Pandas DataFrame with thermodynamic properties data.
+        """
+        # 1. Get q-points and weights from Phonopy mesh
+        ph = self.to_phonopy()
+        
+        q_points, weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
+            phonopy_object=ph,
+            mesh_size=k_point_mesh,
+            use_symmetry=True 
+        )
+        
+        # 2. Compute frequencies in THz
+        # We need (n_q, n_bands) array of frequencies.
+        freqs_THz, _ = mbe_automation.dynamics.harmonic.modes.at_k_points(
+            dynamical_matrix=ph.dynamical_matrix,
+            k_points=q_points,
+            compute_eigenvecs=False,
+            freq_units="THz"
+        )
+        
+        # 3. Calculate thermodynamics
+        return mbe_automation.dynamics.harmonic.thermodynamics.run(
+            freqs_THz=freqs_THz,
+            weights=weights,
+            temperatures_K=temperatures_K
         )
 
 @dataclass(kw_only=True)

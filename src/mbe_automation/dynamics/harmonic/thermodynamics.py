@@ -4,7 +4,7 @@ import numpy.typing as npt
 import pandas as pd
 from phonopy.physical_units import get_physical_units
 
-def vibrational_energy_and_entropy(
+def run(
     freqs_THz: npt.NDArray[np.float64],
     weights: npt.NDArray[np.float64],
     temperatures_K: npt.NDArray[np.float64]

@@ -7,7 +7,8 @@ with the nomore_ase refinement library.
 
 from __future__ import annotations
 import numpy as np
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any, Optional, Literal
+import numpy.typing as npt
 
 
 import phonopy.physical_units
@@ -21,7 +22,6 @@ except ImportError:
 
 import mbe_automation.api.classes
 import mbe_automation.dynamics.harmonic.modes
-import mbe_automation.dynamics.harmonic.thermodynamics
 
 class NomoreAdapter:
     """
@@ -33,14 +33,17 @@ class NomoreAdapter:
 
     def get_phonon_data(
         self,
-        q_mesh: Tuple[int, int, int],
+        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
         compute_bands: bool = True
     ) -> PhononData:
         """
         Generate PhononData object required by nomore_ase.
         
         Args:
-            q_mesh: (Nx, Ny, Nz) grid dimensions.
+            mesh_size: The k-points for sampling the Brillouin zone. Can be:
+                - "gamma": Use only the [0, 0, 0] k-point.
+                - A floating point number: Defines a supercell of radius R.
+                - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
             compute_bands: Whether to compute band indices (currently unused).
             
         Returns:
@@ -53,7 +56,7 @@ class NomoreAdapter:
         # 2. Get Irreducible Brillouin Zone (IBZ)
         irr_q_frac, q_weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
             phonopy_object=ph,
-            k_point_mesh=q_mesh,
+            mesh_size=mesh_size,
             use_symmetry=True
         )
         
@@ -96,29 +99,6 @@ class NomoreAdapter:
         # 5. Frequency -> k-point mapping
         # Create mapping of which q-point index each flat mode belongs to
         mode_q_indices = np.repeat(np.arange(len(irr_q_frac)), n_modes)
-
-        # DEBUG: Test thermodynamics
-        try:
-            # Reconstruct (n_q, n_modes) array of frequencies in THz
-            # freqs_cm1_grid is already (n_q, n_modes)
-            freqs_thz_grid = freqs_cm1_grid * units.CmToTHz
-            
-            test_temps = np.array([300.0])
-            thermo_res = mbe_automation.dynamics.harmonic.thermodynamics.vibrational_energy_and_entropy(
-                freqs_THz=freqs_thz_grid,
-                weights=q_weights,
-                temperatures_K=test_temps
-            )
-            
-            print("\n--- Thermodynamics Test Output (nomore.get_phonon_data) ---")
-            print(f"Temperature: {test_temps[0]} K")
-            print(f"Vibrational Internal Energy: {thermo_res['E_vib (kJ∕mol∕unit cell)'][0]:.6f} kJ∕mol∕unit cell")
-            print(f"Vibrational Entropy:         {thermo_res['S_vib (J∕K∕mol∕unit cell)'][0]:.6f} J∕K∕mol∕unit cell")
-            print(f"Vibrational Heat Capacity:   {thermo_res['C_V_vib (J∕K∕mol∕unit cell)'][0]:.6f} J∕K∕mol∕unit cell")
-            print(f"Vibrational Free Energy:     {thermo_res['F_vib (kJ∕mol∕unit cell)'][0]:.6f} kJ∕mol∕unit cell")
-            print("-----------------------------------------------------------\n")
-        except Exception as e:
-            print(f"\n[Warning] Thermodynamics test failed: {e}\n")
 
         return PhononData(
             frequencies_cm1=flat_freqs_cm1,
@@ -175,27 +155,27 @@ class NomoreAdapter:
 
 def to_phonon_data(
     force_constants: 'mbe_automation.api.classes.ForceConstants',
-    q_mesh: Tuple[int, int, int]
+    mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float
 ) -> PhononData:
     """
     Convert ForceConstants to nomore_ase PhononData using a q-point mesh.
     
     Args:
         force_constants: The force constants model.
-        q_mesh: Mesh dimensions (Nx, Ny, Nz).
+        mesh_size: The k-points for sampling the Brillouin zone.
         
     Returns:
         PhononData object ready for refinement.
     """
     adapter = NomoreAdapter(force_constants)
-    return adapter.get_phonon_data(q_mesh=q_mesh)
+    return adapter.get_phonon_data(mesh_size=mesh_size)
 
 
 def run_nomore_refinement(
     force_constants: 'mbe_automation.api.classes.ForceConstants',
     cif_path: str,
     output_dir: str,
-    q_mesh: Tuple[int, int, int] = (1, 1, 1),
+    mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
     supercell: Optional[Tuple[int, int, int]] = None,
     restraint_weight: float = 0.1,
     **kwargs
@@ -207,7 +187,7 @@ def run_nomore_refinement(
         force_constants: The input force constants model.
         cif_path: Path to experimental CIF with ADPs.
         output_dir: Directory to save results.
-        q_mesh: Q-point mesh for sampling.
+        mesh_size: The k-points for sampling the Brillouin zone.
         supercell: Supercell dimensions (optional, inferred from FC if None).
         restraint_weight: Weight for restraining to initial frequencies.
         **kwargs: Additional arguments passed to NoMoReRefinement.run()
@@ -218,7 +198,7 @@ def run_nomore_refinement(
     from nomore_ase.workflows.refinement import NoMoReRefinement
     
     # 1. Convert to PhononData
-    phonon_data = to_phonon_data(force_constants, q_mesh)
+    phonon_data = to_phonon_data(force_constants, mesh_size)
     
     # Ensure supercell is consistent if provided, otherwise use what's in PhononData (from FC)
     if supercell is None:
@@ -232,7 +212,7 @@ def run_nomore_refinement(
     # 3. Run Refinement
     result = workflow.run(
         supercell=supercell,
-        q_mesh=q_mesh,
+        q_mesh=mesh_size,
         restraint_weight=restraint_weight,
         phonon_data=phonon_data,
         output_dir=output_dir,
