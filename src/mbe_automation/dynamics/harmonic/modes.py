@@ -136,8 +136,6 @@ def at_k_points(
     to_THz = physical_units.DefaultToTHz
     
     n_kpoints = len(k_points)
-    # We need to know n_modes to preallocate. 
-    # DynamicalMatrix usually has access to primitive cell.
     n_modes = len(dynamical_matrix.primitive) * 3
     
     all_freqs = np.zeros((n_kpoints, n_modes), dtype=np.float64)
@@ -165,7 +163,6 @@ def at_k_points(
         all_freqs *= physical_units.THzToCm
         
     return all_freqs, all_eigenvecs
-
 
 def gruneisen_parameters(
         force_constants: ForceConstants,
