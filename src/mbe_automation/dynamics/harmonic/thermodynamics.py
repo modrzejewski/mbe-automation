@@ -78,10 +78,10 @@ def run(
             x = valid_hbar_omega * beta
             # Calculate Bose-Einstein distribution
             # For large x, np.exp(x) -> np.inf, bose_factor -> 0, which is correct
-            bose_factor = 1.0 / (np.exp(x) - 1.0)
+            bose_factor = 1.0 / np.expm1(x)
             
             E_modes = valid_hbar_omega * (0.5 + bose_factor)
-            S_modes = kB * (x * bose_factor - np.log(1.0 - np.exp(-x)))
+            S_modes = kB * (x * bose_factor - np.log1p(-np.exp(-x)))
             C_modes = kB * x**2 * bose_factor * (bose_factor + 1.0)
 
         # Weighted sum normalized by total weight
