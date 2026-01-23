@@ -11,10 +11,17 @@ from typing import Tuple, Dict, Any, Optional
 
 
 import phonopy.physical_units
-from nomore_ase.core.phonon_data import PhononData
+try:
+    from nomore_ase.core.phonon_data import PhononData
+except ImportError:
+    raise ImportError(
+        "The `nomore` module requires the `nomore_ase` package. "
+        "Install it in your environment to use this functionality."
+    )
 
 import mbe_automation.api.classes
 import mbe_automation.dynamics.harmonic.modes
+import mbe_automation.dynamics.harmonic.thermodynamics
 
 class NomoreAdapter:
     """
@@ -49,36 +56,35 @@ class NomoreAdapter:
             k_point_mesh=q_mesh,
             use_symmetry=True
         )
-
-        n_irr = len(irr_q_frac)
         
-        # 3. Compute Frequencies and Eigenvectors for each IBZ q-point
-        all_freqs_cm1 = []
-        all_eigenvectors = [] # will be list of (n_modes, n_atoms, 3)
-        mode_weights = []
+        # 3. Compute Frequencies and Eigenvectors for each IBZ q-point using vectorized at_k_points
+        # Note: at_k_points returns frequencies in the requested units (cm⁻¹ here)
+        # and eigenvectors as (n_q, n_modes, n_modes)
+        # We request "rows" storage so that v[q, i, :] is the eigenvector for mode i.
+        freqs_cm1_grid, eigenvectors_grid = mbe_automation.dynamics.harmonic.modes.at_k_points(
+            dynamical_matrix=ph.dynamical_matrix,
+            k_points=irr_q_frac,
+            compute_eigenvecs=True,
+            freq_units="invcm",
+            eigenvectors_storage="rows"
+        )
         
-        for q_idx, q_point in enumerate(irr_q_frac):
-            # Evaluate at q-point
-            freqs_thz, eigenvectors = mbe_automation.dynamics.harmonic.modes.at_k_point(ph.dynamical_matrix, q_point)
-            
-            # Convert frequencies to cm⁻¹
-            freqs_cm1 = freqs_thz * units.THzToCm
-            
-            # Ensure eigenvectors are (n_modes, n_atoms, 3)
-            # The API returns eigenvectors.
-            # We need to verify the shape. Assuming standard phonopy-like return: (n_modes, n_atoms, 3)
-            
-            all_freqs_cm1.append(freqs_cm1)
-            all_eigenvectors.append(eigenvectors)
-            
-            # Weights: each mode at this q-point shares the q-point weight
-            n_modes = len(freqs_cm1)
-            mode_weights.extend([q_weights[q_idx]] * n_modes)
-            
-        # Flatten everything
-        flat_freqs_cm1 = np.concatenate(all_freqs_cm1)
-        flat_eigenvectors = np.concatenate(all_eigenvectors, axis=0) # Shape: (TotalModes, n_atoms, 3)
-        flat_weights = np.array(mode_weights)
+        # Flatten everything to match PhononData requirements
+        # freqs_cm1_grid is (n_q, n_modes) -> flatten to 1D
+        flat_freqs_cm1 = freqs_cm1_grid.flatten()
+        
+        # eigenvectors: (n_q, n_modes, n_modes) -> need (TotalModes, n_atoms, 3) 
+        # TotalModes = n_q * n_modes
+        # n_modes = n_atoms * 3
+        # So we reshape to (-1, n_atoms, 3) because PhononData expects (n_modes_total, n_atoms, 3)
+        # Verify shape first:
+        n_modes = eigenvectors_grid.shape[-1]
+        n_atoms = len(ph.primitive)
+        # Reshape to (n_q * n_modes, n_atoms, 3)
+        flat_eigenvectors = eigenvectors_grid.reshape(-1, n_atoms, 3)
+        
+        # Weights: (n_q, ) -> repeat n_modes times for each q
+        flat_weights = np.repeat(q_weights, n_modes)
         
         # 4. Construct Degeneracy Groups
         # This logic is adapted from ase_adapter.py
@@ -87,13 +93,32 @@ class NomoreAdapter:
         # Average degenerate frequencies
         flat_freqs_cm1 = self._average_degenerate_frequencies(flat_freqs_cm1, degeneracy_groups)
         
-        # 5. Build required metadata for PhononData
-        n_q = len(irr_q_frac)
-        # Actually a safer way for mode_q_indices:
-        mode_q_indices = []
-        for i, q_modes in enumerate(all_freqs_cm1):
-             mode_q_indices.extend([i] * len(q_modes))
-        mode_q_indices = np.array(mode_q_indices)
+        # 5. Frequency -> k-point mapping
+        # Create mapping of which q-point index each flat mode belongs to
+        mode_q_indices = np.repeat(np.arange(len(irr_q_frac)), n_modes)
+
+        # DEBUG: Test thermodynamics
+        try:
+            # Reconstruct (n_q, n_modes) array of frequencies in THz
+            # freqs_cm1_grid is already (n_q, n_modes)
+            freqs_thz_grid = freqs_cm1_grid * units.CmToTHz
+            
+            test_temps = np.array([300.0])
+            thermo_res = mbe_automation.dynamics.harmonic.thermodynamics.vibrational_energy_and_entropy(
+                freqs_THz=freqs_thz_grid,
+                weights=q_weights,
+                temperatures_K=test_temps
+            )
+            
+            print("\n--- Thermodynamics Test Output (nomore.get_phonon_data) ---")
+            print(f"Temperature: {test_temps[0]} K")
+            print(f"Vibrational Internal Energy: {thermo_res['E_vib (kJ∕mol∕unit cell)'][0]:.6f} kJ∕mol∕unit cell")
+            print(f"Vibrational Entropy:         {thermo_res['S_vib (J∕K∕mol∕unit cell)'][0]:.6f} J∕K∕mol∕unit cell")
+            print(f"Vibrational Heat Capacity:   {thermo_res['C_V_vib (J∕K∕mol∕unit cell)'][0]:.6f} J∕K∕mol∕unit cell")
+            print(f"Vibrational Free Energy:     {thermo_res['F_vib (kJ∕mol∕unit cell)'][0]:.6f} kJ∕mol∕unit cell")
+            print("-----------------------------------------------------------\n")
+        except Exception as e:
+            print(f"\n[Warning] Thermodynamics test failed: {e}\n")
 
         return PhononData(
             frequencies_cm1=flat_freqs_cm1,
@@ -172,7 +197,7 @@ def run_nomore_refinement(
     output_dir: str,
     q_mesh: Tuple[int, int, int] = (1, 1, 1),
     supercell: Optional[Tuple[int, int, int]] = None,
-    restraint_weight: float = 0.0,
+    restraint_weight: float = 0.1,
     **kwargs
 ) -> Dict[str, Any]:
     """

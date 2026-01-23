@@ -36,6 +36,10 @@ from .api import (
 )
 
 try:
-    from .api import nomore
+    import nomore_ase
+    _has_nomore = True
 except ImportError:
-    pass
+    _has_nomore = False
+
+if _has_nomore:
+    from .api import nomore

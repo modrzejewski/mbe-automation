@@ -91,7 +91,8 @@ def at_k_point(
     Returns:
     A tuple containing:
     - frequencies (in THz)
-    - eigenvectors stored as columns
+    - eigenvectors (n_modes, n_modes) stored as columns. The column v[:, i] is the
+      normalized eigenvector corresponding to the eigenvalue w[i].
     """
     dynamical_matrix.run(k_point)
     D = dynamical_matrix.dynamical_matrix # mass-weighted dynamical matrix
@@ -101,6 +102,69 @@ def at_k_point(
     ) * phonopy.physical_units.get_physical_units().DefaultToTHz
     
     return freqs_THz, eigenvecs
+
+
+def at_k_points(
+    dynamical_matrix: phonopy.DynamicalMatrix,
+    k_points: npt.NDArray[np.floating],
+    compute_eigenvecs: bool = False,
+    freq_units: Literal["THz", "invcm"] = "THz",
+    eigenvectors_storage: Literal["columns", "rows"] = "columns"
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128] | None]:
+    """
+    Compute phonon frequencies and optionally eigenvectors at specified k-points.
+
+    Args:
+        dynamical_matrix: Phonopy dynamical matrix object.
+        k_points: The k-point coordinates in reciprocal space (fractional coordinates).
+        compute_eigenvecs: Whether to compute and return eigenvectors.
+        freq_units: Units for return frequencies, "THz" or "invcm".
+        eigenvectors_storage: Convention for storing eigenvectors, "columns" or "rows".
+            - "columns": Eigenvectors are stored in columns (n_kpoints, n_bands, n_bands).
+              v[k, :, i] is the eigenvector for the i-th band at k-point k.
+            - "rows": Eigenvectors are stored in rows (n_kpoints, n_bands, n_bands).
+              v[k, i, :] is the eigenvector for the i-th band at k-point k.
+            Default is "columns".
+
+    Returns:
+        A tuple containing:
+        - frequencies: (n_kpoints, n_bands) array of frequencies in specified units.
+        - eigenvectors: (n_kpoints, n_bands, n_bands) array of eigenvectors, or None 
+          if compute_eigenvecs is False.
+    """
+    physical_units = phonopy.physical_units.get_physical_units()
+    to_THz = physical_units.DefaultToTHz
+    
+    n_kpoints = len(k_points)
+    # We need to know n_modes to preallocate. 
+    # DynamicalMatrix usually has access to primitive cell.
+    n_modes = len(dynamical_matrix.primitive) * 3
+    
+    all_freqs = np.zeros((n_kpoints, n_modes), dtype=np.float64)
+    if compute_eigenvecs:
+        all_eigenvecs = np.zeros((n_kpoints, n_modes, n_modes), dtype=np.complex128)
+    else:
+        all_eigenvecs = None
+    
+    for i, k in enumerate(k_points):
+        dynamical_matrix.run(k)
+        D = dynamical_matrix.dynamical_matrix
+        if compute_eigenvecs:
+            evals, evecs = np.linalg.eigh(D)
+            if eigenvectors_storage == "rows":
+                all_eigenvecs[i] = evecs.T
+            else:
+                all_eigenvecs[i] = evecs
+        else:
+            evals = np.linalg.eigvalsh(D)
+            
+        freqs = (np.sqrt(np.abs(evals)) * np.sign(evals)) * to_THz
+        all_freqs[i] = freqs
+        
+    if freq_units == "invcm":
+        all_freqs *= physical_units.THzToCm
+        
+    return all_freqs, all_eigenvecs
 
 
 def gruneisen_parameters(
