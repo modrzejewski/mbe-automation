@@ -171,12 +171,11 @@ def to_phonon_data(
     return adapter.get_phonon_data(mesh_size=mesh_size)
 
 
-def run_nomore_refinement(
+def run(
     force_constants: 'mbe_automation.api.classes.ForceConstants',
     cif_path: str,
     output_dir: str,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
-    supercell: Optional[Tuple[int, int, int]] = None,
     restraint_weight: float = 0.1,
     **kwargs
 ) -> Dict[str, Any]:
@@ -188,7 +187,6 @@ def run_nomore_refinement(
         cif_path: Path to experimental CIF with ADPs.
         output_dir: Directory to save results.
         mesh_size: The k-points for sampling the Brillouin zone.
-        supercell: Supercell dimensions (optional, inferred from FC if None).
         restraint_weight: Weight for restraining to initial frequencies.
         **kwargs: Additional arguments passed to NoMoReRefinement.run()
         
@@ -200,10 +198,6 @@ def run_nomore_refinement(
     # 1. Convert to PhononData
     phonon_data = to_phonon_data(force_constants, mesh_size)
     
-    # Ensure supercell is consistent if provided, otherwise use what's in PhononData (from FC)
-    if supercell is None:
-        supercell = phonon_data.supercell
-    
     # 2. Setup Refinement Workflow
     # We pass the CIF path. NoMoReRefinement loads the CIF for structure/ADPs.
     # We allow it to use its default/mock calculator because we provide phonon_data directly.
@@ -211,7 +205,7 @@ def run_nomore_refinement(
     
     # 3. Run Refinement
     result = workflow.run(
-        supercell=supercell,
+        supercell=phonon_data.supercell,
         q_mesh=mesh_size,
         restraint_weight=restraint_weight,
         phonon_data=phonon_data,

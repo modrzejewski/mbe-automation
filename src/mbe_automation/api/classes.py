@@ -243,7 +243,6 @@ class ForceConstants(_ForceConstants):
         cif_path: str,
         output_dir: str = "./",
         mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
-        supercell: typing.Optional[Tuple[int, int, int]] = None,
         restraint_weight: float = 0.1,
         **kwargs
     ) -> typing.Dict[str, typing.Any]:
@@ -253,24 +252,22 @@ class ForceConstants(_ForceConstants):
         Args:
             cif_path: Path to experimental CIF with ADPs.
             output_dir: Directory to save results.
-            mesh_size: The accuracy of the FBZ interpolation mesh. Can be:
+            mesh_size: Accuracy of the FBZ interpolation mesh. Can be:
                 - "gamma": Use only the [0, 0, 0] k-point.
                 - A floating point number: Defines a supercell of radius R (in Angstroms).
                 - array of 3 integers: Defines an explicit Monkhorst-Pack mesh (Nx, Ny, Nz).
-            supercell: Supercell dimensions (optional, inferred from FC if None).
             restraint_weight: Weight for restraining to initial frequencies.
             **kwargs: Additional arguments passed to NoMoReRefinement.run()
             
         Returns:
             Dictionary containing refinement results.
         """
-        from mbe_automation.api.nomore import run_nomore_refinement
-        return run_nomore_refinement(
+        from mbe_automation.api.nomore import run
+        return run(
             force_constants=self,
             cif_path=cif_path,
             output_dir=output_dir,
             mesh_size=mesh_size,
-            supercell=supercell,
             restraint_weight=restraint_weight,
             **kwargs
         )
