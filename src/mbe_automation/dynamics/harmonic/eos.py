@@ -275,6 +275,21 @@ def fit(V, G, equation_of_state):
         except RuntimeError as e:
             return poly_fit
 
+
+def get_minimum_points_for_eos(equation_of_state: str) -> int:
+    """
+    Return the minimum number of points needed for a given type of equation of state curve.
+
+    For 'polynomial', assumes the default degree of 2.
+    """
+    if equation_of_state == "polynomial":
+        return 3
+    elif equation_of_state in ["spline", "vinet", "birch_murnaghan"]:
+        return 4
+    else:
+        raise ValueError(f"Unknown EOS: {equation_of_state}")
+
+
 def _fit_thermal_expansion_properties_finite_diff(T, V, H, a, b, c):
     """
     Compute thermal expansion properties using finite differences.

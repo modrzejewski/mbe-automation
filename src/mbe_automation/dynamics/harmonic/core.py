@@ -416,6 +416,7 @@ def equilibrium_curve(
     if filter_out_broken_symmetry:
         conditions.append(df_eos["space_group"] == reference_space_group)
 
+    
     if len(conditions) > 0:
         good_points = np.logical_and.reduce(conditions)
     else:
@@ -432,12 +433,43 @@ def equilibrium_curve(
     ]].to_string(index=False), flush=True)
     print("")
     
-    if len(df_eos[good_points]) == 0:
-        raise RuntimeError("No data points left after applying filtering criteria")
+    #
+    # Decision logic for EOS fit
+    #
+    n_total_points = len(df_eos)
+    n_good_points = len(df_eos[good_points])
+    min_points_needed = mbe_automation.dynamics.harmonic.eos.get_minimum_points_for_eos(equation_of_state)
+    min_poly_points = mbe_automation.dynamics.harmonic.eos.get_minimum_points_for_eos("polynomial")
 
-    if len(df_eos[good_points]) < 3:
+    if n_good_points >= min_points_needed:
+        action = "Proceed"
+        final_eos = equation_of_state
+    elif n_good_points >= min_poly_points:
+        action = "Fallback to polynomial"
+        final_eos = "polynomial"
+    else:
+        action = "Stop (Insufficient points)"
+        final_eos = "None"
+
+    summary_data = [
+        ["Total Points", n_total_points],
+        ["Good Points", n_good_points],
+        ["Requested EOS", equation_of_state],
+        ["Required Points", min_points_needed],
+        ["Action", action],
+        ["Final EOS", final_eos]
+    ]
+    df_summary = pd.DataFrame(summary_data, columns=["Property", "Value"])
+    print("\nEOS Fitting Summary:")
+    print(df_summary.to_string(index=False))
+    print("")
+
+    if final_eos == "None":
         raise RuntimeError("Insufficient number of points left after applying filtering criteria")
-    
+
+    if final_eos != equation_of_state:
+        equation_of_state = final_eos
+
     V_eos = np.full(n_temperatures, np.nan)
     G_tot_eos = np.full(n_temperatures, np.nan)
     p_thermal_eos = np.full(n_temperatures, np.nan)
