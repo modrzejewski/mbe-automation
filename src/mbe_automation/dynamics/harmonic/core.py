@@ -32,7 +32,7 @@ import mbe_automation.dynamics.harmonic.eos
 import mbe_automation.dynamics.harmonic.data
 import mbe_automation.dynamics.harmonic.display
 from mbe_automation.configs.structure import Minimum
-from mbe_automation.configs.quasi_harmonic import EOS_SAMPLING_ALGOS, EQUATIONS_OF_STATE
+from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
 
 def _assert_equivalent_cells(
         phonopy_cell: PhonopyAtoms,
@@ -416,7 +416,6 @@ def equilibrium_curve(
     if filter_out_broken_symmetry:
         conditions.append(df_eos["space_group"] == reference_space_group)
 
-    
     if len(conditions) > 0:
         good_points = np.logical_and.reduce(conditions)
     else:
@@ -436,35 +435,35 @@ def equilibrium_curve(
     #
     # Decision logic for EOS fit
     #
-    n_total_points = len(df_eos)
-    n_good_points = len(df_eos[good_points])
+    n_total_points = len(df_eos[select_T[0]])
+    n_good_points = len(df_eos[good_points & select_T[0]])
     min_points_needed = mbe_automation.dynamics.harmonic.eos.get_minimum_points_for_eos(equation_of_state)
     min_poly_points = mbe_automation.dynamics.harmonic.eos.get_minimum_points_for_eos("polynomial")
 
     if n_good_points >= min_points_needed:
-        action = "Proceed"
+        action = "proceed"
         final_eos = equation_of_state
     elif n_good_points >= min_poly_points:
-        action = "Fallback to polynomial"
+        action = "fallback to polynomial"
         final_eos = "polynomial"
     else:
-        action = "Stop (Insufficient points)"
-        final_eos = "None"
+        action = "stop (insufficient points)"
+        final_eos = "none"
 
     summary_data = [
-        ["Total Points", n_total_points],
-        ["Good Points", n_good_points],
-        ["Requested EOS", equation_of_state],
-        ["Required Points", min_points_needed],
-        ["Action", action],
-        ["Final EOS", final_eos]
+        ["total points", n_total_points],
+        ["good points", n_good_points],
+        ["requested EOS", equation_of_state],
+        ["required points", min_points_needed],
+        ["action", action],
+        ["final EOS", final_eos]
     ]
-    df_summary = pd.DataFrame(summary_data, columns=["Property", "Value"])
-    print("\nEOS Fitting Summary:")
-    print(df_summary.to_string(index=False))
+    df_summary = pd.DataFrame(summary_data)
+    print("\nequation of state (EOS) fitting summary:")
+    print(df_summary.to_string(index=False, header=False))
     print("")
 
-    if final_eos == "None":
+    if final_eos == "none":
         raise RuntimeError("Insufficient number of points left after applying filtering criteria")
 
     if final_eos != equation_of_state:

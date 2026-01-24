@@ -10,6 +10,9 @@ import numpy as np
 import pandas as pd
 import ase.units
 
+EQUATIONS_OF_STATE = ["birch_murnaghan", "vinet", "polynomial", "spline"]
+EOS_SAMPLING_ALGOS = ["volume", "pressure", "uniform_scaling"]
+
 @dataclass
 class EOSFitResults:
     G_min: float

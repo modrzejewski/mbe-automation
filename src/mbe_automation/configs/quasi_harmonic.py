@@ -9,11 +9,11 @@ import numpy.typing as npt
 
 from mbe_automation.configs.recommended import KNOWN_MODELS
 from mbe_automation.configs.structure import Minimum
+import mbe_automation.structure.crystal
 import mbe_automation.calculators
 import mbe_automation.storage
 
-EOS_SAMPLING_ALGOS = ["volume", "pressure", "uniform_scaling"]
-EQUATIONS_OF_STATE = ["birch_murnaghan", "vinet", "polynomial", "spline"]
+from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
 
 @dataclass(kw_only=True)
 class FreeEnergy:
@@ -265,6 +265,8 @@ class FreeEnergy:
     save_xyz: bool = True
 
     def __post_init__(self):
+        import mbe_automation.dynamics.harmonic.eos
+
         if isinstance(self.crystal, mbe_automation.storage.Structure):
             self.crystal = mbe_automation.storage.to_ase(self.crystal)
         if isinstance(self.molecule, mbe_automation.storage.Structure):
@@ -286,6 +288,24 @@ class FreeEnergy:
                     f"dftb backend does not support eos_sampling={self.eos_sampling}. "
                     f"Use eos_sampling=uniform_scaling instead."
                 )
+
+        if self.eos_sampling == "pressure":
+            n_points = len(self.thermal_pressures_GPa)
+        else:
+            n_points = len(self.volume_range)
+        
+        min_points = mbe_automation.dynamics.harmonic.eos.get_minimum_points_for_eos(self.equation_of_state)
+        
+        if n_points < min_points:
+            msg = [
+                f"Insufficient number of sampling points ({n_points}) for the requested EOS '{self.equation_of_state}' (requires {min_points}).",
+                "Minimum number of points required for each EOS type:"
+            ]
+            for eos in EQUATIONS_OF_STATE:
+                req = mbe_automation.dynamics.harmonic.eos.get_minimum_points_for_eos(eos)
+                msg.append(f" - {eos}: {req}")
+            
+            raise ValueError("\n".join(msg))
 
     @classmethod
     def recommended(
