@@ -1,5 +1,6 @@
 """
-Integration module for NoMoRe (Normal Mode Refinement).
+Integration module for normal mode refinement using
+the nomore_ase library (https://github.com/ase/nomore_ase) by Paul Niklas Ruth.
 
 This module provides adapters and functions to bridge mbe_automation's ForceConstants
 with the nomore_ase refinement library.
@@ -204,9 +205,15 @@ def run(
     workflow = NoMoReRefinement(cif_path=cif_path)
     
     # 3. Run Refinement
+    # nomore_ase expects q_mesh to be a tuple/array of integers for np.prod
+    if isinstance(mesh_size, str) and mesh_size == "gamma":
+        q_mesh = (1, 1, 1)
+    else:
+        q_mesh = mesh_size
+        
     result = workflow.run(
         supercell=phonon_data.supercell,
-        q_mesh=mesh_size,
+        q_mesh=q_mesh,
         restraint_weight=restraint_weight,
         phonon_data=phonon_data,
         output_dir=output_dir,

@@ -238,7 +238,7 @@ class ForceConstants(_ForceConstants):
             work_dir=work_dir
         )
 
-    def refined_frequencies(
+    def nomore(
         self,
         cif_path: str,
         output_dir: str = "./",
