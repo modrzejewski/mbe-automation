@@ -42,6 +42,7 @@ from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY
 import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.thermodynamics
+from mbe_automation.dynamics.harmonic.nomore import DEFAULT_RESTRAINT_WEIGHT
 from copy import deepcopy
 class _TrainingStructure:
     def to_mace_dataset(
@@ -270,6 +271,37 @@ class ForceConstants(_ForceConstants):
             mesh_size=mesh_size,
             restraint_weight=restraint_weight,
             **kwargs
+        )
+
+    def fit_to_adps(
+        self,
+        cif_path: str,
+        temperature: float,
+        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+        restraint_weight: float = DEFAULT_RESTRAINT_WEIGHT,
+        bounds: tuple[float, float] = (10.0, 1e4)
+    ) -> npt.NDArray:
+        """
+        Refine phonon frequencies by fitting calculated ADPs to experimental ADPs.
+        
+        Args:
+            cif_path: Path to experimental CIF with ADPs.
+            temperature: Temperature in Kelvin.
+            mesh_size: k-point mesh for sampling the Brillouin zone.
+            restraint_weight: Weight for restraining refined frequencies to initial values.
+            bounds: (min, max) frequency bounds in cm⁻¹.
+            
+        Returns:
+            Refined frequencies in cm⁻¹.
+        """
+        import mbe_automation.dynamics.harmonic.nomore
+        return mbe_automation.dynamics.harmonic.nomore.fit_to_adps(
+            fc=self,
+            cif_path=cif_path,
+            temperature=temperature,
+            mesh_size=mesh_size,
+            restraint_weight=restraint_weight,
+            bounds=bounds
         )
 
     def thermodynamics(
