@@ -75,8 +75,10 @@ def _get_mapping_and_transform(
     """
     # Enable primitive_cell and attempt_supercell to handle cases where 
     # CIF is a supercell or conventional cell of the primitive reference.
+    # Note: get_transformation fails if primitive_cell=True, so we set it to False
+    # and rely on attempt_supercell (and explicit P1 expansion) to handle size diffs.
     matcher = StructureMatcher(
-        primitive_cell=True, 
+        primitive_cell=False, 
         scale=False, 
         attempt_supercell=True, 
         comparator=ElementComparator()
