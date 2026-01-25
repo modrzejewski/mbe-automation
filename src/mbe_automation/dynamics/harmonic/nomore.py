@@ -229,7 +229,8 @@ def _extract_u_cart_exp(
         elif matching_algo == "nomore_ase":
             # Use simple position-based matching (legacy behavior)
             cif_pos_cart = adapter.get_atomic_positions()
-            ref_pos_cart = reference_structure.get_positions()
+            # ref_pos_cart = reference_structure.get_positions() # Error
+            ref_pos_cart = reference_structure.to_ase_atoms().get_positions()
             
             # Mapping: indices in CIF corresponding to Reference atoms
             cif_indices = get_atom_mapping_by_position(
