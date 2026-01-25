@@ -12,6 +12,7 @@ from nomore_ase.analysis.atom_matching import get_atom_mapping_by_position
 from pymatgen.analysis.structure_matcher import StructureMatcher, ElementComparator
 from pymatgen.core import Structure as PymatgenStructure, Lattice
 from mbe_automation.storage.views import to_pymatgen
+from mbe_automation.structure.crystal import match as match_structures
 from scipy.spatial.transform import Rotation
 
 DEFAULT_RESTRAINT_WEIGHT = 0.1
@@ -200,6 +201,43 @@ def _extract_u_cart_exp(
     u_cart = adapter.get_cartesian_adps()
     
     if reference_structure is not None:
+        # Pre-check RMSD using independent match function (for debugging/info)
+        try:
+            cif_pos = adapter.get_atomic_positions()
+            cif_cell = np.array(adapter.xray_structure.unit_cell().parameters())
+            # Convert CIF params to matrix for match function?
+            # match function expects cell_vectors as (3,3) matrix.
+            # CIF usually gives params (a,b,c,alpha,beta,gamma).
+            # Need to convert params to matrix.
+            # Pymatgen Lattice does this.
+            cif_lat = Lattice.from_parameters(*cif_cell)
+            cif_matrix = cif_lat.matrix
+            
+            # Map symbols to atomic numbers
+            from ase.data import atomic_numbers
+            cif_syms = adapter.get_chemical_symbols()
+            cif_z = np.array([atomic_numbers[s] for s in cif_syms])
+            
+            # Reference data
+            # Assuming reference_structure has these attributes as per storage.core.Structure
+            ref_z = reference_structure.atomic_numbers
+            ref_matrix = reference_structure.cell_vectors
+            
+            # Reference positions: use ASE adapter for safety (consistent with later usage)
+            ref_positions = reference_structure.to_ase_atoms().get_positions()
+            
+            rmsd_check = match_structures(
+                positions_a=ref_positions,
+                atomic_numbers_a=ref_z,
+                cell_vectors_a=ref_matrix,
+                positions_b=cif_pos,
+                atomic_numbers_b=cif_z,
+                cell_vectors_b=cif_matrix
+            )
+            print(f"Initial RMSD Check (mbe_automation.structure.crystal.match): {rmsd_check}")
+        except Exception as e:
+            print(f"Initial RMSD Check failed: {e}")
+
         if matching_algo == "robust":
             # 1. Convert CIF to Pymatgen Structure
             cif_pos_cart = adapter.get_atomic_positions()
