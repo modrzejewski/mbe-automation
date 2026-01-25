@@ -8,6 +8,7 @@ import mbe_automation.storage
 from nomore_ase.core.calculator import NoMoReCalculator
 from nomore_ase.optimization.engine import RefinementEngine
 from nomore_ase.crystallography.cctbx_adapter import CctbxAdapter
+from nomore_ase.analysis.atom_matching import get_atom_mapping_by_position
 from pymatgen.analysis.structure_matcher import StructureMatcher, ElementComparator
 from pymatgen.core import Structure as PymatgenStructure, Lattice
 from mbe_automation.storage.views import to_pymatgen
@@ -173,7 +174,8 @@ def _check_transformation_quality(
 
 def _extract_u_cart_exp(
     cif_path: str, 
-    reference_structure: mbe_automation.storage.core.Structure | None = None
+    reference_structure: mbe_automation.storage.core.Structure | None = None,
+    matching_algo: Literal["nomore_ase", "robust"] = "nomore_ase",
 ) -> npt.NDArray:
     """
     Extract experimental Cartesian ADPs from a CIF file.
@@ -181,13 +183,15 @@ def _extract_u_cart_exp(
     Uses nomore_ase's CctbxAdapter to parse the CIF.
     
     If 'reference_structure' is provided:
-    1. Matches CIF atoms to Reference atoms (handling PBC/Rotation).
-    2. Reorders ADPs to match Reference.
-    3. Rotates ADPs to match Reference coordinate system.
+    - "robust": Matches CIF atoms to Reference atoms (handling PBC/Rotation/Translation)
+      and rotates ADPs to match Reference frame.
+    - "nomore_ase": Matches atoms by position (assuming already aligned) and reorders ADPs.
+      Does NOT rotate ADPs.
     
     Args:
         cif_path: Path to the CIF file.
         reference_structure: Optional structure to match atom ordering against.
+        matching_algo: Algorithm to use for atom matching ("nomore_ase" or "robust").
         
     Returns:
         npt.NDArray: Array of Cartesian ADPs with shape (N_atoms, 3, 3) in Å².
@@ -196,30 +200,48 @@ def _extract_u_cart_exp(
     u_cart = adapter.get_cartesian_adps()
     
     if reference_structure is not None:
-        # 1. Convert CIF to Pymatgen Structure
-        cif_pos_cart = adapter.get_atomic_positions()
-        cif_symbols = adapter.get_chemical_symbols()
-        cif_cell_par = adapter.xray_structure.unit_cell().parameters()
-        
-        struct_cif = PymatgenStructure(
-            lattice=Lattice.from_parameters(*cif_cell_par),
-            species=cif_symbols,
-            coords=cif_pos_cart,
-            coords_are_cartesian=True
-        )
-
-        # 2. Convert Reference to Pymatgen Structure
-        struct_ref = to_pymatgen(structure=reference_structure)
-        
-        # 3. Get mapping and rotation
-        cif_indices, rot_matrix = _get_mapping_and_transform(struct_target=struct_ref, struct_source=struct_cif)
+        if matching_algo == "robust":
+            # 1. Convert CIF to Pymatgen Structure
+            cif_pos_cart = adapter.get_atomic_positions()
+            cif_symbols = adapter.get_chemical_symbols()
+            cif_cell_par = adapter.xray_structure.unit_cell().parameters()
             
-        # 4. Reorder ADPs
-        u_cart_reordered = u_cart[cif_indices]
-        
-        # 5. Rotate ADPs: U' = R U R^T
-        # Einstein summation: R_ia U_ab R_jb -> U_ij
-        u_cart = np.einsum('ia,kab,jb->kij', rot_matrix, u_cart_reordered, rot_matrix)
+            struct_cif = PymatgenStructure(
+                lattice=Lattice.from_parameters(*cif_cell_par),
+                species=cif_symbols,
+                coords=cif_pos_cart,
+                coords_are_cartesian=True
+            )
+
+            # 2. Convert Reference to Pymatgen Structure
+            struct_ref = to_pymatgen(structure=reference_structure)
+            
+            # 3. Get mapping and rotation
+            cif_indices, rot_matrix = _get_mapping_and_transform(struct_target=struct_ref, struct_source=struct_cif)
+                
+            # 4. Reorder ADPs
+            u_cart_reordered = u_cart[cif_indices]
+            
+            # 5. Rotate ADPs: U' = R U R^T
+            # Einstein summation: R_ia U_ab R_jb -> U_ij
+            u_cart = np.einsum('ia,kab,jb->kij', rot_matrix, u_cart_reordered, rot_matrix)
+            
+        elif matching_algo == "nomore_ase":
+            # Use simple position-based matching (legacy behavior)
+            cif_pos_cart = adapter.get_atomic_positions()
+            ref_pos_cart = reference_structure.get_positions()
+            
+            # Mapping: indices in CIF corresponding to Reference atoms
+            cif_indices = get_atom_mapping_by_position(
+                target_positions=ref_pos_cart,
+                source_positions=cif_pos_cart
+            )
+            
+            # Reorder ADPs only
+            u_cart = u_cart[cif_indices]
+            
+        else:
+            raise ValueError(f"Unknown matching_algo: {matching_algo}")
         
     return u_cart
 
@@ -229,7 +251,8 @@ def fit_to_adps(
     temperature: float,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
     restraint_weight: float = DEFAULT_RESTRAINT_WEIGHT,
-    bounds: tuple[float, float] = (10.0, 1e4) # Default bounds in cm-1
+    bounds: tuple[float, float] = (10.0, 1e4), # Default bounds in cm-1
+    matching_algo: Literal["nomore_ase", "robust"] = "nomore_ase",
 ) -> npt.NDArray:
     """
     Refine phonon frequencies by fitting calculated ADPs to experimental ADPs.
@@ -241,12 +264,17 @@ def fit_to_adps(
         mesh_size: k-point mesh for sampling the Brillouin zone.
         restraint_weight: Weight for restraining refined frequencies to initial values.
         bounds: (min, max) frequency bounds in cm⁻¹.
+        matching_algo: Algorithm to use for atom matching ("nomore_ase" or "robust").
 
     Returns:
         npt.NDArray: Refined frequencies in cm⁻¹.
     """
     # 0. Extract Experimental ADPs
-    u_cart_exp = _extract_u_cart_exp(cif_path, reference_structure=fc.primitive)
+    u_cart_exp = _extract_u_cart_exp(
+        cif_path, 
+        reference_structure=fc.primitive,
+        matching_algo=matching_algo
+    )
 
     # 1. Initialize Phonopy and Units
     ph = mbe_automation.storage.to_phonopy(fc)
