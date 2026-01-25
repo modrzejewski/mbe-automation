@@ -14,6 +14,7 @@ from pymatgen.core import Structure as PymatgenStructure, Lattice
 from mbe_automation.storage.views import to_pymatgen
 from mbe_automation.structure.crystal import match as match_structures
 from scipy.spatial.transform import Rotation
+from cctbx import adptbx
 
 DEFAULT_RESTRAINT_WEIGHT = 0.1
 
@@ -72,10 +73,12 @@ def _get_mapping_and_transform(
             - mapping_indices[i] is index in Source for atom i in Target.
             - rotation_matrix is (3,3) array R such that x_target = R @ x_source.
     """
+    # Enable primitive_cell and attempt_supercell to handle cases where 
+    # CIF is a supercell or conventional cell of the primitive reference.
     matcher = StructureMatcher(
-        primitive_cell=False, 
+        primitive_cell=True, 
         scale=False, 
-        attempt_supercell=False, 
+        attempt_supercell=True, 
         comparator=ElementComparator()
     )
     
@@ -198,25 +201,56 @@ def _extract_u_cart_exp(
         npt.NDArray: Array of Cartesian ADPs with shape (N_atoms, 3, 3) in Å².
     """
     adapter = CctbxAdapter(cif_path)
-    u_cart = adapter.get_cartesian_adps()
+    
+    # Expand to P1 to get full unit cell content (not just asymmetric unit)
+    # This solves atom count mismatch issues.
+    xs_p1 = adapter.xray_structure.expand_to_p1(sites_mod_positive=True)
+    
+    # Extract data from P1 structure
+    cif_pos_cart = xs_p1.sites_cart().as_numpy_array()
+    cif_symbols = [s.element_symbol() for s in xs_p1.scatterers()]
+    cif_cell_par = xs_p1.unit_cell().parameters()
+    
+    # Extract ADPs from P1 structure
+    unit_cell = xs_p1.unit_cell()
+    u_cart_list = []
+    
+    for sc in xs_p1.scatterers():
+        if sc.u_iso != -1.0 and sc.u_star == (-1.0, -1.0, -1.0, -1.0, -1.0, -1.0):
+            # Isotropic atom: Convert U_iso to U_cart (diagonal)
+            u_cart_val = adptbx.u_iso_as_u_cart(sc.u_iso)
+        else:
+            # Anisotropic atom: Convert U_star to U_cart
+            u_cart_val = adptbx.u_star_as_u_cart(unit_cell, sc.u_star)
+        
+        # cctbx u_cart tuple order: u11, u22, u33, u12, u13, u23
+        # Convert to 3x3 symmetric matrix
+        u_tensor = np.array([
+            [u_cart_val[0], u_cart_val[3], u_cart_val[4]],
+            [u_cart_val[3], u_cart_val[1], u_cart_val[5]],
+            [u_cart_val[4], u_cart_val[5], u_cart_val[2]]
+        ])
+        u_cart_list.append(u_tensor)
+        
+    u_cart = np.array(u_cart_list)
     
     if reference_structure is not None:
         # Pre-check RMSD using independent match function (for debugging/info)
         try:
-            cif_pos = adapter.get_atomic_positions()
-            cif_cell = np.array(adapter.xray_structure.unit_cell().parameters())
+            # cif_pos_cart already extracted from P1
+            cif_cell = np.array(cif_cell_par)
             # Convert CIF params to matrix for match function?
             # match function expects cell_vectors as (3,3) matrix.
             # CIF usually gives params (a,b,c,alpha,beta,gamma).
             # Need to convert params to matrix.
             # Pymatgen Lattice does this.
-            cif_lat = Lattice.from_parameters(*cif_cell)
+            cif_lat = Lattice.from_parameters(*cif_cell_par)
             cif_matrix = cif_lat.matrix
             
             # Map symbols to atomic numbers
             from ase.data import atomic_numbers
-            cif_syms = adapter.get_chemical_symbols()
-            cif_z = np.array([atomic_numbers[s] for s in cif_syms])
+            # cif_symbols already extracted
+            cif_z = np.array([atomic_numbers[s] for s in cif_symbols])
             
             # Reference data
             # Assuming reference_structure has these attributes as per storage.core.Structure
@@ -230,7 +264,7 @@ def _extract_u_cart_exp(
                 positions_a=ref_positions,
                 atomic_numbers_a=ref_z,
                 cell_vectors_a=ref_matrix,
-                positions_b=cif_pos,
+                positions_b=cif_pos_cart,
                 atomic_numbers_b=cif_z,
                 cell_vectors_b=cif_matrix
             )
@@ -239,10 +273,8 @@ def _extract_u_cart_exp(
             print(f"Initial RMSD Check failed: {e}")
 
         if matching_algo == "robust":
-            # 1. Convert CIF to Pymatgen Structure
-            cif_pos_cart = adapter.get_atomic_positions()
-            cif_symbols = adapter.get_chemical_symbols()
-            cif_cell_par = adapter.xray_structure.unit_cell().parameters()
+            # 1. Convert CIF to Pymatgen Structure (already have data)
+            # cif_pos_cart, cif_symbols, cif_cell_par
             
             struct_cif = PymatgenStructure(
                 lattice=Lattice.from_parameters(*cif_cell_par),
@@ -253,6 +285,10 @@ def _extract_u_cart_exp(
 
             # 2. Convert Reference to Pymatgen Structure
             struct_ref = to_pymatgen(structure=reference_structure)
+            
+            # Check for atom count mismatch
+            if len(struct_ref) != len(struct_cif):
+                print(f"Warning: Atom counts differ (Ref: {len(struct_ref)}, CIF: {len(struct_cif)}). Attempting simple robust match...")
             
             # 3. Get mapping and rotation
             cif_indices, rot_matrix = _get_mapping_and_transform(struct_target=struct_ref, struct_source=struct_cif)
@@ -266,9 +302,15 @@ def _extract_u_cart_exp(
             
         elif matching_algo == "nomore_ase":
             # Use simple position-based matching (legacy behavior)
-            cif_pos_cart = adapter.get_atomic_positions()
+            # cif_pos_cart already extracted from P1
             # ref_pos_cart = reference_structure.get_positions() # Error
             ref_pos_cart = reference_structure.to_ase_atoms().get_positions()
+            
+            if len(cif_pos_cart) != len(ref_pos_cart):
+                 raise ValueError(
+                    f"Atom count mismatch (CIF: {len(cif_pos_cart)}, Ref: {len(ref_pos_cart)}). "
+                    "Cannot use 'nomore_ase' matching. Try matching_algo='robust'."
+                )
             
             # Mapping: indices in CIF corresponding to Reference atoms
             cif_indices = get_atom_mapping_by_position(
