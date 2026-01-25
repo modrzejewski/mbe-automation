@@ -97,25 +97,41 @@ def _get_mapping_and_transform(
         n_matched = sum(1 for x in match_result if x is not None)
         raise ValueError(f"Incomplete atom mapping. Only {n_matched} atoms matched.")
 
-    # Calculate Rotation using Lattice Matrices
-    # struct_source_aligned has the lattice orientation of struct_target (roughly)
-    struct_source_aligned = matcher.get_s2_like_s1(struct_target, struct_source)
+    # Calculate Rotation using Kabsch algorithm (Align atomic positions)
+    # This is more robust than lattice-based derivation as it directly minimizes RMSD of atoms.
     
-    # A = Source Lattice Matrix (rows are vectors)
-    # A_prime = Aligned Lattice Matrix (rows are vectors)
-    # We want R acting on column vectors: v' = R v
-    # This implies A_prime.T = R @ A.T
-    # So R = A_prime.T @ inv(A.T) = (inv(A) @ A_prime).T
+    # Extract matched coordinates
+    # match_result[i] is index in Source for atom i in Target
+    # We want paired points (Target_i, Source_mapped_i)
     
-    A = struct_source.lattice.matrix
-    A_prime = struct_source_aligned.lattice.matrix
+    # Filter out None if present (though we raise if incomplete earlier)
+    valid_pairs = [(i, idx) for i, idx in enumerate(match_result) if idx is not None]
+    if not valid_pairs:
+         raise ValueError("No valid atom pairs found for rotation calculation.")
+         
+    tgt_indices = [p[0] for p in valid_pairs]
+    src_indices = [p[1] for p in valid_pairs]
     
-    R = (np.linalg.inv(A) @ A_prime).T
+    # Coords shape (N, 3)
+    coords_tgt = struct_target.cart_coords[tgt_indices]
+    coords_src = struct_source.cart_coords[src_indices]
+    
+    # Center coordinates for determining pure rotation
+    center_tgt = np.mean(coords_tgt, axis=0)
+    center_src = np.mean(coords_src, axis=0)
+    
+    vecs_tgt = coords_tgt - center_tgt
+    vecs_src = coords_src - center_src
+    
+    # Calculate optimal rotation to align Source to Target
+    # Rotation.align_vectors(a, b) finds R such that R @ b ~= a
+    # We want R @ src ~= tgt
+    rot, rssd = Rotation.align_vectors(vecs_tgt, vecs_src)
+    R = rot.as_matrix()
     
     # Verification (Determinant should be +1 for pure rotation)
     det = np.linalg.det(R)
-    if not np.isclose(det, 1.0, atol=0.01):
-        print(f"Warning: Transformation determinant is {det:.4f} (expected 1.0 for rotation).")
+    print(f"Kabsch Rotation Determinant: {det:.4f}")
 
     # RMSD Check (StructureMatcher)
     rms_info = matcher.get_rms_dist(struct_target, struct_source)
@@ -426,6 +442,8 @@ def fit_to_adps(
         use_degeneracy_groups=True,
         restraint_weight=restraint_weight
     )
+
+    print(result)
 
     if not result['success']:
         print(f"Warning: ADP fitting result reported failure: {result.get('message', 'Unknown error')}")
