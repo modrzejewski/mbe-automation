@@ -176,7 +176,14 @@ def _check_transformation_quality(
     rmsd = np.sqrt(np.mean(dists_sq))
     max_dist = np.max(dists)
     
+    # 7. Calculate Centered RMSD (Optimal Translation)
+    # Allows verifying Rotation independently of Translation small offsets
+    shift = np.mean(diff_cart_wrapped, axis=0)
+    diff_centered = diff_cart_wrapped - shift
+    rmsd_centered = np.sqrt(np.mean(np.sum(diff_centered**2, axis=1)))
+    
     print(f"Manual Sanity Check RMSD: {rmsd:.4f} Å (Max Dist: {max_dist:.4f} Å)")
+    print(f"Manual Centered RMSD:     {rmsd_centered:.4f} Å (Should match StructureMatcher)")
 
 def _extract_u_cart_exp(
     cif_path: str, 
