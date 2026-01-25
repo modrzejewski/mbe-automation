@@ -9,7 +9,7 @@ from nomore_ase.core.calculator import NoMoReCalculator
 from nomore_ase.optimization.engine import RefinementEngine
 from nomore_ase.crystallography.cctbx_adapter import CctbxAdapter
 from pymatgen.analysis.structure_matcher import StructureMatcher, ElementComparator
-from pymatgen.core import Structure as PymatgenStructure
+from pymatgen.core import Structure as PymatgenStructure, Lattice
 from mbe_automation.storage.views import to_pymatgen
 from scipy.spatial.transform import Rotation
 
@@ -202,7 +202,7 @@ def _extract_u_cart_exp(
         cif_cell_par = adapter.xray_structure.unit_cell().parameters()
         
         struct_cif = PymatgenStructure(
-            lattice=cif_cell_par,
+            lattice=Lattice.from_parameters(*cif_cell_par),
             species=cif_symbols,
             coords=cif_pos_cart,
             coords_are_cartesian=True
