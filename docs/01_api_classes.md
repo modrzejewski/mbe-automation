@@ -56,6 +56,13 @@ The following table summarizes the key methods available across these classes.
 | **`positions`** | Returns positions of specific molecules in the crystal. | `MolecularCrystal` |
 | **`atomic_numbers`** | Returns atomic numbers of specific molecules in the crystal. | `MolecularCrystal` |
 | **`frequencies_and_eigenvectors`** | Calculates phonon frequencies and eigenvectors at a given k-point. | `ForceConstants` |
+| **`k_point_grid`** | Generates a k-point mesh for the system. | `ForceConstants` |
+| **`to_phonopy`** | Converts the object to a Phonopy object. | `ForceConstants` |
+| **`thermal_displacements`** | Computes thermal displacement properties (ADPs). | `ForceConstants` |
+| **`to_cif_file`** | Saves the primitive cell to a CIF file (can include ADPs). | `ForceConstants` |
+| **`gruneisen_parameters`** | Computes Gruneisen parameters at a given k-point. | `ForceConstants` |
+| **`nomore`** | Refines phonon frequencies against experimental ADPs using NoMoRe. | `ForceConstants` |
+| **`thermodynamics`** | Computes thermodynamic properties (vib energy, entropy, etc.) at given temperatures. | `ForceConstants` |
 | **`append`** | Adds a structure or subsystem to the dataset collection. | `Dataset` |
 | **`statistics`** | Prints statistical summaries of the dataset (e.g. mean/std of energies). | `Dataset` |
 | **`display`** | Visualizes properties of the object (e.g. energy fluctuations). | `Trajectory` |
