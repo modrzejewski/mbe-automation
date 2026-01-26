@@ -279,8 +279,7 @@ class ForceConstants(_ForceConstants):
         temperature: float,
         mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
         restraint_weight: float = DEFAULT_RESTRAINT_WEIGHT,
-        bounds: tuple[float, float] = (10.0, 1e4),
-        matching_algo: Literal["nomore_ase", "robust"] = "nomore_ase"
+        bounds: tuple[float, float] = (10.0, 1e4)
     ) -> npt.NDArray:
         """
         Refine phonon frequencies by fitting calculated ADPs to experimental ADPs.
@@ -291,7 +290,6 @@ class ForceConstants(_ForceConstants):
             mesh_size: k-point mesh for sampling the Brillouin zone.
             restraint_weight: Weight for restraining refined frequencies to initial values.
             bounds: (min, max) frequency bounds in cm⁻¹.
-            matching_algo: Algorithm to use for atom matching ("nomore_ase" or "robust").
             
         Returns:
             Refined frequencies in cm⁻¹.
@@ -304,7 +302,6 @@ class ForceConstants(_ForceConstants):
             mesh_size=mesh_size,
             restraint_weight=restraint_weight,
             bounds=bounds,
-            matching_algo=matching_algo
         )
 
     def thermodynamics(

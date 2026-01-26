@@ -8,12 +8,9 @@ import mbe_automation.storage
 from nomore_ase.core.calculator import NoMoReCalculator
 from nomore_ase.optimization.engine import RefinementEngine
 from nomore_ase.crystallography.cctbx_adapter import CctbxAdapter
-from nomore_ase.analysis.atom_matching import get_atom_mapping_by_position
 from pymatgen.analysis.structure_matcher import StructureMatcher, ElementComparator
 from pymatgen.core import Structure as PymatgenStructure, Lattice
 from mbe_automation.storage.views import to_pymatgen
-from mbe_automation.structure.crystal import match as match_structures
-from scipy.spatial.transform import Rotation
 from cctbx import adptbx
 
 DEFAULT_RESTRAINT_WEIGHT = 0.1
@@ -57,178 +54,107 @@ def _average_degenerate_frequencies(freqs: np.ndarray, groups: list[list[int]]) 
             new_freqs[group] = avg
     return new_freqs
 
-def _get_mapping_and_transform(
-    struct_target: PymatgenStructure,
-    struct_source: PymatgenStructure
-) -> tuple[list[int], npt.NDArray]:
+def _map_adps(
+    struct_ref: PymatgenStructure,
+    struct_src: PymatgenStructure,
+    adps_src_cart: npt.NDArray
+) -> tuple[npt.NDArray, npt.NDArray, list[int]]:
     """
-    Get indices and rotation matrix to align Source to Target.
-    
+    Map ADPs and Positions from source to reference using lattice transformation.
+
     Args:
-        struct_target: The reference structure (defining order).
-        struct_source: The structure to reorder (providing data).
-        
+        struct_ref: Reference structure.
+        struct_src: Source structure.
+        adps_src_cart: (N, 3, 3) Cartesian ADPs of the source.
+
     Returns:
-        tuple: (mapping_indices, rotation_matrix)
-            - mapping_indices[i] is index in Source for atom i in Target.
-            - rotation_matrix is (3,3) array R such that x_target = R @ x_source.
+        tuple: (mapped_adps, mapped_positions, indices) where mapped_adps/positions are in 
+        the Reference Cartesian frame and indices map Source to Reference.
     """
-    # Enable primitive_cell and attempt_supercell to handle cases where 
-    # CIF is a supercell or conventional cell of the primitive reference.
-    # Note: get_transformation fails if primitive_cell=True, so we set it to False
-    # and rely on attempt_supercell (and explicit P1 expansion) to handle size diffs.
+    # Use robust matcher settings (no primitive reduction, allow supercells)
     matcher = StructureMatcher(
         primitive_cell=False, 
         scale=False, 
-        attempt_supercell=True, 
+        attempt_supercell=True,
         comparator=ElementComparator()
     )
-    
-    # 1. Get transformations and mapping
-    # Returns: supercell matrix, fractional translation vector, mapping
-    result = matcher.get_transformation(struct_target, struct_source)
-    
-    if result is None:
-        raise ValueError("Could not match CIF structure to Reference structure.")
-        
-    _, translation_frac, match_result = result
-        
-    if any(idx is None for idx in match_result):
-        n_matched = sum(1 for x in match_result if x is not None)
-        raise ValueError(f"Incomplete atom mapping. Only {n_matched} atoms matched.")
+    transform = matcher.get_transformation(struct_src, struct_ref)
 
-    # Calculate Rotation using Kabsch algorithm (Align atomic positions)
-    # This is more robust than lattice-based derivation as it directly minimizes RMSD of atoms.
-    
-    # Extract matched coordinates
-    # match_result[i] is index in Source for atom i in Target
-    # We want paired points (Target_i, Source_mapped_i)
-    
-    # Filter out None if present (though we raise if incomplete earlier)
-    valid_pairs = [(i, idx) for i, idx in enumerate(match_result) if idx is not None]
-    if not valid_pairs:
-         raise ValueError("No valid atom pairs found for rotation calculation.")
-         
-    tgt_indices = [p[0] for p in valid_pairs]
-    src_indices = [p[1] for p in valid_pairs]
-    
-    # Coords shape (N, 3)
-    coords_tgt = struct_target.cart_coords[tgt_indices]
-    coords_src = struct_source.cart_coords[src_indices]
-    
-    # Center coordinates for determining pure rotation
-    center_tgt = np.mean(coords_tgt, axis=0)
-    center_src = np.mean(coords_src, axis=0)
-    
-    vecs_tgt = coords_tgt - center_tgt
-    vecs_src = coords_src - center_src
-    
-    # Calculate optimal rotation to align Source to Target
-    # Rotation.align_vectors(a, b) finds R such that R @ b ~= a
-    # We want R @ src ~= tgt
-    rot, rssd = Rotation.align_vectors(vecs_tgt, vecs_src)
-    R = rot.as_matrix()
-    
-    # Verification (Determinant should be +1 for pure rotation)
-    det = np.linalg.det(R)
-    print(f"Kabsch Rotation Determinant: {det:.4f}")
+    if transform is None:
+        raise ValueError("Structures do not match.")
 
-    # RMSD Check (StructureMatcher)
-    rms_info = matcher.get_rms_dist(struct_target, struct_source)
-    if rms_info is not None:
-        rms_dist, max_dist = rms_info
-        print(f"StructureMatcher RMSD: {rms_dist:.4f} Å")
-        
-    # Manual Sanity Check
-    _check_transformation_quality(struct_target, struct_source, match_result, R, translation_frac)
+    lattice_map, shift, site_map = transform
     
-    return match_result, R
+    # site_map is list of (src_index, ref_index)
+    # We want to reorder Source to match Reference.
+    # So we sort by Reference index and extract Source index.
+    site_map.sort(key=lambda x: x[1])
+    indices = [pair[0] for pair in site_map]
+    
+    # --- ADP Transformation ---
+    # lat_src = struct_src.lattice.matrix
+    # Pymatgen property inv_matrix is (3,3) where rows are reciprocal vectors
+    # This aligns with user's inv_lat definition if used consistently
+    inv_lat_src = struct_src.lattice.inv_matrix
 
-def _check_transformation_quality(
-    target: PymatgenStructure,
-    source: PymatgenStructure,
-    mapping: list[int],
-    rot_matrix: npt.NDArray,
-    translation_frac: npt.NDArray
-) -> None:
-    """
-    Sanity check: Calculate RMSD and Max Dist using the computed rotation and mapping.
-    Ensures the rotation matrix R aligns the atoms correctly.
-    """
-    # 1. Rotate Source positions using Cartesian Rotation R: x' = R x
-    # struct.cart_coords is (N, 3). So we need (R @ x.T).T = x @ R.T
-    pos_source_rotated = source.cart_coords @ rot_matrix.T
+    adps_src_sorted = adps_src_cart[indices]
     
-    # 2. Apply Translation
-    # Translation is fractional in Target lattice
-    lat = target.lattice.matrix
-    translation_cart = translation_frac @ lat
+    # Transform Cartesian -> Fractional (Source Basis)
+    u_frac_src = np.einsum("ia,nab,jb->nij", inv_lat_src, adps_src_sorted, inv_lat_src)
+
+    # Apply Lattice Vector Permutation (Basis Change)
+    # lattice_map (M) maps Source Lattice -> Ref Lattice
+    m_inv = np.linalg.inv(lattice_map)
+    u_frac_aligned = np.einsum("ia,nab,jb->nij", m_inv, u_frac_src, m_inv)
+
+    # Transform Fractional -> Cartesian (Reference Basis)
+    lat_ref = struct_ref.lattice.matrix
+    mapped_adps = np.einsum("ji,nab,bk->niak", lat_ref, u_frac_aligned, lat_ref)
     
-    pos_source_transformed = pos_source_rotated + translation_cart
+    # --- Position Transformation (Verification) ---
+    pos_src_sorted = struct_src.cart_coords[indices]
     
-    # 3. Reorder Source to match Target
-    # mapping is list of source indices for each target index
-    pos_source_ordered = pos_source_transformed[mapping]
-    pos_target = target.cart_coords
+    # Cart -> Frac (Source)
+    # pos_frac = pos @ inv_lat_src (coord vector is row)
+    pos_frac_src = pos_src_sorted @ inv_lat_src
     
-    # 4. Compute differences
-    diff_cart = pos_target - pos_source_ordered
+    # Basis Change
+    # x_frac_new = x_frac_old @ M_inv (as M applies to basis vectors)
+    pos_frac_aligned = pos_frac_src @ m_inv
     
-    # 5. Handle Periodic Boundary Conditions
-    # Convert cartesian diff to fractional diff in Target lattice
-    # diff_frac = diff_cart @ inv_matrix
-    inv_lat = target.lattice.inv_matrix
+    # Apply Shift (from get_transformation)
+    pos_frac_shifted = pos_frac_aligned + shift
     
-    diff_frac = diff_cart @ inv_lat
-    # Wrap to [-0.5, 0.5]
-    diff_frac -= np.round(diff_frac)
-    # Convert back to Cartesian
-    diff_cart_wrapped = diff_frac @ lat
+    # Frac -> Cart (Reference)
+    mapped_coords = pos_frac_shifted @ lat_ref
     
-    # 6. Calculate Stats
-    dists_sq = np.sum(diff_cart_wrapped**2, axis=1)
-    dists = np.sqrt(dists_sq)
-    
-    rmsd = np.sqrt(np.mean(dists_sq))
-    max_dist = np.max(dists)
-    
-    # 7. Calculate Centered RMSD (Optimal Translation)
-    # Allows verifying Rotation independently of Translation small offsets
-    shift = np.mean(diff_cart_wrapped, axis=0)
-    diff_centered = diff_cart_wrapped - shift
-    rmsd_centered = np.sqrt(np.mean(np.sum(diff_centered**2, axis=1)))
-    
+    return mapped_adps, mapped_coords, indices
+
     print(f"Manual Sanity Check RMSD: {rmsd:.4f} Å (Max Dist: {max_dist:.4f} Å)")
     print(f"Manual Centered RMSD:     {rmsd_centered:.4f} Å (Should match StructureMatcher)")
 
 def _extract_u_cart_exp(
     cif_path: str, 
     reference_structure: mbe_automation.storage.core.Structure | None = None,
-    matching_algo: Literal["nomore_ase", "robust"] = "nomore_ase",
 ) -> npt.NDArray:
     """
     Extract experimental Cartesian ADPs from a CIF file.
     
     Uses nomore_ase's CctbxAdapter to parse the CIF.
     
-    If 'reference_structure' is provided:
-    - "robust": Matches CIF atoms to Reference atoms (handling PBC/Rotation/Translation)
-      and rotates ADPs to match Reference frame.
-    - "nomore_ase": Matches atoms by position (assuming already aligned) and reorders ADPs.
-      Does NOT rotate ADPs.
+    If 'reference_structure' is provided, it matches atoms and lattice basis to 
+    Reference Primitive cell using Pymatgen StructureMatcher and transforms ADPs.
     
     Args:
         cif_path: Path to the CIF file.
         reference_structure: Optional structure to match atom ordering against.
-        matching_algo: Algorithm to use for atom matching ("nomore_ase" or "robust").
         
     Returns:
         npt.NDArray: Array of Cartesian ADPs with shape (N_atoms, 3, 3) in Å².
     """
     adapter = CctbxAdapter(cif_path)
     
-    # Expand to P1 to get full unit cell content (not just asymmetric unit)
-    # This solves atom count mismatch issues.
+    # Expand to P1 to get full unit cell content
     xs_p1 = adapter.xray_structure.expand_to_p1(sites_mod_positive=True)
     
     # Extract data from P1 structure
@@ -260,95 +186,42 @@ def _extract_u_cart_exp(
     u_cart = np.array(u_cart_list)
     
     if reference_structure is not None:
-        # Pre-check RMSD using independent match function (for debugging/info)
-        try:
-            # cif_pos_cart already extracted from P1
-            cif_cell = np.array(cif_cell_par)
-            # Convert CIF params to matrix for match function?
-            # match function expects cell_vectors as (3,3) matrix.
-            # CIF usually gives params (a,b,c,alpha,beta,gamma).
-            # Need to convert params to matrix.
-            # Pymatgen Lattice does this.
-            cif_lat = Lattice.from_parameters(*cif_cell_par)
-            cif_matrix = cif_lat.matrix
-            
-            # Map symbols to atomic numbers
-            from ase.data import atomic_numbers
-            # cif_symbols already extracted
-            cif_z = np.array([atomic_numbers[s] for s in cif_symbols])
-            
-            # Reference data
-            # Assuming reference_structure has these attributes as per storage.core.Structure
-            ref_z = reference_structure.atomic_numbers
-            ref_matrix = reference_structure.cell_vectors
-            
-            # Reference positions: use ASE adapter for safety (consistent with later usage)
-            ref_positions = reference_structure.to_ase_atoms().get_positions()
-            
-            rmsd_check = match_structures(
-                positions_a=ref_positions,
-                atomic_numbers_a=ref_z,
-                cell_vectors_a=ref_matrix,
-                positions_b=cif_pos_cart,
-                atomic_numbers_b=cif_z,
-                cell_vectors_b=cif_matrix
-            )
-            print(f"Initial RMSD Check (mbe_automation.structure.crystal.match): {rmsd_check}")
-        except Exception as e:
-            print(f"Initial RMSD Check failed: {e}")
+        # Convert CIF to Pymatgen Structure
+        struct_cif = PymatgenStructure(
+            lattice=Lattice.from_parameters(*cif_cell_par),
+            species=cif_symbols,
+            coords=cif_pos_cart,
+            coords_are_cartesian=True
+        )
 
-        if matching_algo == "robust":
-            # 1. Convert CIF to Pymatgen Structure (already have data)
-            # cif_pos_cart, cif_symbols, cif_cell_par
-            
-            struct_cif = PymatgenStructure(
-                lattice=Lattice.from_parameters(*cif_cell_par),
-                species=cif_symbols,
-                coords=cif_pos_cart,
-                coords_are_cartesian=True
-            )
-
-            # 2. Convert Reference to Pymatgen Structure
-            struct_ref = to_pymatgen(structure=reference_structure)
-            
-            # Check for atom count mismatch
-            if len(struct_ref) != len(struct_cif):
-                print(f"Warning: Atom counts differ (Ref: {len(struct_ref)}, CIF: {len(struct_cif)}). Attempting simple robust match...")
-            
-            # 3. Get mapping and rotation
-            cif_indices, rot_matrix = _get_mapping_and_transform(struct_target=struct_ref, struct_source=struct_cif)
-                
-            # 4. Reorder ADPs
-            u_cart_reordered = u_cart[cif_indices]
-            
-            # 5. Rotate ADPs: U' = R U R^T
-            # Einstein summation: R_ia U_ab R_jb -> U_ij
-            u_cart = np.einsum('ia,kab,jb->kij', rot_matrix, u_cart_reordered, rot_matrix)
-            
-        elif matching_algo == "nomore_ase":
-            # Use simple position-based matching (legacy behavior)
-            # cif_pos_cart already extracted from P1
-            # ref_pos_cart = reference_structure.get_positions() # Error
-            ref_pos_cart = reference_structure.to_ase_atoms().get_positions()
-            
-            if len(cif_pos_cart) != len(ref_pos_cart):
-                 raise ValueError(
-                    f"Atom count mismatch (CIF: {len(cif_pos_cart)}, Ref: {len(ref_pos_cart)}). "
-                    "Cannot use 'nomore_ase' matching. Try matching_algo='robust'."
-                )
-            
-            # Mapping: indices in CIF corresponding to Reference atoms
-            cif_indices = get_atom_mapping_by_position(
-                target_positions=ref_pos_cart,
-                source_positions=cif_pos_cart
-            )
-            
-            # Reorder ADPs only
-            u_cart = u_cart[cif_indices]
-            
-        else:
-            raise ValueError(f"Unknown matching_algo: {matching_algo}")
+        # Convert Reference to Pymatgen Structure
+        struct_ref = to_pymatgen(structure=reference_structure)
         
+        # Map and Transform
+        try:
+            u_cart, mapped_coords, indices = _map_adps(struct_ref, struct_cif, u_cart)
+            
+            # --- Verification ---
+            # Compute RMSD calculation (now very simple as coords are aligned)
+            # Handle PBC wrapping not needed if mapped_coords are already in Target Basis roughly
+            # But StructureMatcher mapping usually aligns them well.
+            ref_coords = struct_ref.cart_coords
+            diff_vecs = mapped_coords - ref_coords
+            
+            # Since mapped_coords includes shift, should be close.
+            # Handle PBC
+            frac_diff = diff_vecs @ struct_ref.lattice.inv_matrix
+            frac_diff -= np.round(frac_diff)
+            cart_diff = frac_diff @ struct_ref.lattice.matrix
+            
+            dists_sq = np.sum(cart_diff**2, axis=1)
+            rmsd = np.sqrt(np.mean(dists_sq))
+            
+            print(f"ADP Mapping Verification RMSD: {rmsd:.4f} Å")
+            
+        except ValueError as e:
+            raise ValueError(f"Robust ADP mapping failed: {e}")
+            
     return u_cart
 
 def fit_to_adps(
@@ -358,7 +231,6 @@ def fit_to_adps(
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
     restraint_weight: float = DEFAULT_RESTRAINT_WEIGHT,
     bounds: tuple[float, float] = (10.0, 1e4), # Default bounds in cm-1
-    matching_algo: Literal["nomore_ase", "robust"] = "nomore_ase",
 ) -> npt.NDArray:
     """
     Refine phonon frequencies by fitting calculated ADPs to experimental ADPs.
@@ -370,7 +242,6 @@ def fit_to_adps(
         mesh_size: k-point mesh for sampling the Brillouin zone.
         restraint_weight: Weight for restraining refined frequencies to initial values.
         bounds: (min, max) frequency bounds in cm⁻¹.
-        matching_algo: Algorithm to use for atom matching ("nomore_ase" or "robust").
 
     Returns:
         npt.NDArray: Refined frequencies in cm⁻¹.
@@ -379,7 +250,6 @@ def fit_to_adps(
     u_cart_exp = _extract_u_cart_exp(
         cif_path, 
         reference_structure=fc.primitive,
-        matching_algo=matching_algo
     )
 
     # 1. Initialize Phonopy and Units
