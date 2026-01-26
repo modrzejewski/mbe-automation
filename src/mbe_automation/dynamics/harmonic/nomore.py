@@ -336,7 +336,16 @@ def fit_to_adps(
         restraint_weight=restraint_weight
     )
 
-    print(result)
+    # print(result) # Raw result is verbose
+    
+    refined_freqs = result['frequencies']
+    print("\nNoMoRe Refinement Results:")
+    print(f"{'Mode':<6} {'Original (cm⁻¹)':<18} {'Corrected (cm⁻¹)':<18} {'Diff':<10}")
+    print("-" * 60)
+    for i, (orig, new) in enumerate(zip(flat_freqs_cm1, refined_freqs)):
+        diff = new - orig
+        print(f"{i:<6d} {orig:<18.4f} {new:<18.4f} {diff:<10.4f}")
+    print("-" * 60)
 
     if not result['success']:
         print(f"Warning: ADP fitting result reported failure: {result.get('message', 'Unknown error')}")
