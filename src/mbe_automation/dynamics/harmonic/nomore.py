@@ -85,11 +85,18 @@ def _map_adps(
 
     lattice_map, shift, site_map = transform
     
-    # site_map is list of (src_index, ref_index)
+    # site_map is list of (ref_index for src_index i)
     # We want to reorder Source to match Reference.
-    # So we sort by Reference index and extract Source index.
-    site_map.sort(key=lambda x: x[1])
-    indices = [pair[0] for pair in site_map]
+    # So we want to find the source index for each reference index 0, 1, 2...
+    # site_map[src_i] = ref_j
+    # Pairs: (src_i, ref_j)
+    pairs = list(enumerate(site_map))
+    
+    # Sort by ref_index (j)
+    pairs.sort(key=lambda x: x[1])
+    
+    # Extract src_index (i) in order
+    indices = [p[0] for p in pairs]
     
     # --- ADP Transformation ---
     # lat_src = struct_src.lattice.matrix
