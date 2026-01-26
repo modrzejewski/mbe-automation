@@ -101,22 +101,35 @@ def _map_adps(
     # --- ADP Transformation ---
     # lat_src = struct_src.lattice.matrix
     # Pymatgen property inv_matrix is (3,3) where rows are reciprocal vectors
-    # This aligns with user's inv_lat definition if used consistently
+    # inv_matrix[i,j]: i=Cartesian, j=Fractional (reciprocal vector i component j?)
+    # Pymatgen: f = x @ inv_matrix <=> f_j = x_i * inv_{ij}
+    # So dim 0 is Cart, dim 1 is Frac.
     inv_lat_src = struct_src.lattice.inv_matrix
 
     adps_src_sorted = adps_src_cart[indices]
     
     # Transform Cartesian -> Fractional (Source Basis)
-    u_frac_src = np.einsum("ia,nab,jb->nij", inv_lat_src, adps_src_sorted, inv_lat_src)
+    # U_frac = A^T U_cart A where A = inv_lat (Cart, Frac)
+    # U_uv = sum_xy (inv[x,u] * U[x,y] * inv[y,v])
+    u_frac_src = np.einsum("xu,nxy,yv->nuv", inv_lat_src, adps_src_sorted, inv_lat_src)
 
     # Apply Lattice Vector Permutation (Basis Change)
-    # lattice_map (M) maps Source Lattice -> Ref Lattice
+    # lattice_map (M) maps Source Lattice -> Ref Lattice (Ref, Src) ???
+    # M maps L_src to L_ref? Pymatgen: "matrix that transforms source to target".
+    # Usually L_tgt = M @ L_src. M is (Ref, Src).
+    # Then U_ref = (M^-1)^T U_src (M^-1).
+    # m_inv = inv(M) is (Src, Ref).
     m_inv = np.linalg.inv(lattice_map)
-    u_frac_aligned = np.einsum("ia,nab,jb->nij", m_inv, u_frac_src, m_inv)
+    
+    # U_ref_ij = sum_kl (m_inv[k,i] * U_src_kl * m_inv[l,j])
+    u_frac_aligned = np.einsum("ki,nkl,lj->nij", m_inv, u_frac_src, m_inv)
 
     # Transform Fractional -> Cartesian (Reference Basis)
+    # lat_ref (M) is (Frac, Cart).
+    # U_cart = M^T U_frac M.
+    # U_cart_ik = sum_ab (lat_ref[a,i] * U_frac_ab * lat_ref[b,k])
     lat_ref = struct_ref.lattice.matrix
-    mapped_adps = np.einsum("ji,nab,bk->niak", lat_ref, u_frac_aligned, lat_ref)
+    mapped_adps = np.einsum("ai,nab,bk->nik", lat_ref, u_frac_aligned, lat_ref)
     
     # --- Position Transformation (Verification) ---
     pos_src_sorted = struct_src.cart_coords[indices]
@@ -126,7 +139,10 @@ def _map_adps(
     pos_frac_src = pos_src_sorted @ inv_lat_src
     
     # Basis Change
-    # x_frac_new = x_frac_old @ M_inv (as M applies to basis vectors)
+    # x_frac_new = x_frac_old @ m_inv ?
+    # x_ref = x_src M^-1 ?
+    # x_ref_i = sum_k x_src_k m_inv_ki
+    # This matches matrix mult x @ m_inv
     pos_frac_aligned = pos_frac_src @ m_inv
     
     # Apply Shift (from get_transformation)
