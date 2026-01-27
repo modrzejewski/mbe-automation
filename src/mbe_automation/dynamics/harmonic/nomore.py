@@ -352,3 +352,119 @@ def fit_to_adps(
 
     return result['frequencies']
 
+
+def _validate_nomore_calculator(
+    force_constants: mbe_automation.storage.core.ForceConstants,
+    mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
+    temperature_K: float
+) -> None:
+    """
+    Validate the NoMoReCalculator by comparing calculated ADPs with 
+    mbe_automation.dynamics.harmonic.modes.thermal_displacements.
+    
+    Args:
+        force_constants: The force constants model.
+        mesh_size: k-point mesh or "gamma" or radius.
+        temperature_K: Temperature to validate at.
+    """
+    print(f"\n--- Validating NoMoReCalculator at {temperature_K} K ---")
+    
+    # --- 1. Calculate using NoMoReCalculator ---
+    ph = mbe_automation.storage.to_phonopy(force_constants)
+    
+    # Use symmetry for NoMoRe (standard usage)
+    irr_q_frac, q_weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
+        phonopy_object=ph,
+        mesh_size=mesh_size,
+        use_symmetry=True
+    )
+    
+    # Compute frequencies and eigenvectors
+    freqs_cm1_grid, eigenvectors_grid = mbe_automation.dynamics.harmonic.modes.at_k_points(
+        dynamical_matrix=ph.dynamical_matrix,
+        k_points=irr_q_frac,
+        compute_eigenvecs=True,
+        freq_units="invcm",
+        eigenvectors_storage="rows"
+    )
+    
+    # Prepare data for NoMoReCalculator
+    n_qpoints, n_modes = freqs_cm1_grid.shape
+    n_atoms = len(ph.primitive)
+    
+    # Flatten frequencies
+    flat_freqs_cm1 = freqs_cm1_grid.flatten()
+    
+    # Reshape eigenvectors: (n_q, n_modes, n_atoms*3) -> (n_q * n_modes, n_atoms, 3)
+    flat_eigenvectors = eigenvectors_grid.reshape(n_qpoints * n_modes, n_atoms, 3)
+    
+    # Expand weights: each mode at q gets weight of q
+    flat_weights = np.repeat(q_weights, n_modes)
+    
+    # Check normalization
+    total_weight = np.sum(q_weights)
+    
+    # Find degeneracy groups (using flattening logic)
+    degeneracy_groups = _find_degeneracy_groups(flat_freqs_cm1)
+    
+    # Create Calculator
+    calculator = NoMoReCalculator(
+        eigenvectors=flat_eigenvectors,
+        masses=ph.primitive.masses,
+        temperature=temperature_K,
+        normalization_factor=total_weight,
+        weights=flat_weights,
+        degeneracy_groups=degeneracy_groups
+    )
+    
+    # Compute ADPs
+    u_cart_nomore = calculator.calculate_u_cart(flat_freqs_cm1)
+    
+    # --- 2. Calculate using mbe_automation.dynamics.harmonic.modes.thermal_displacements ---
+    # This uses brute force summation over FBZ (use_symmetry=False internal to thermal_displacements)
+    
+    phonon_filter = mbe_automation.dynamics.harmonic.modes.PhononFilter(
+        freq_max_THz=None,
+        k_point_mesh=mesh_size,
+    )
+    
+    disp = mbe_automation.dynamics.harmonic.modes.thermal_displacements(
+        force_constants=force_constants,
+        temperatures_K=np.array([temperature_K]),
+        phonon_filter=phonon_filter,
+        cell_type="primitive"
+    )
+    
+    # Extract u_cart (diagonal blocks) for the first (and only) temperature
+    u_cart_mbe = disp.mean_square_displacements_matrix_diagonal[0]
+    
+    # --- 3. Compare ---
+    
+    print(f"\nComparing ADPs (Ang^2):")
+    print(f"Max Absolute Difference: {np.max(np.abs(u_cart_nomore - u_cart_mbe)):.6e}")
+    
+    diff = u_cart_nomore - u_cart_mbe
+    rmsd = np.sqrt(np.mean(diff**2))
+    print(f"RMSD: {rmsd:.6e}")
+    
+    # Print per-atom comparison (Trace of U)
+    print("\nTrace(U) Comparison (Å²):")
+    print(f"{'Atom':<5} {'NoMoRe':<12} {'MBE':<12} {'Diff':<12} {'% Diff':<10}")
+    print("-" * 55)
+    
+    symbols = ph.primitive.symbols
+    for i in range(n_atoms):
+        trace_nomore = np.trace(u_cart_nomore[i])
+        trace_mbe = np.trace(u_cart_mbe[i])
+        trace_diff = trace_nomore - trace_mbe
+        pct_diff = (trace_diff / trace_mbe * 100) if abs(trace_mbe) > 1e-6 else 0.0
+        
+        print(f"{symbols[i]:<2}{i:<3} {trace_nomore:<12.6f} {trace_mbe:<12.6f} {trace_diff:<12.6e} {pct_diff:<9.4f}%")
+        
+    print("-" * 55)
+    
+    # Assert close enough
+    if rmsd < 1e-4:
+        print("\n✅ VALIDATION PASSED: Reuslts match within tolerance.")
+    else:
+        print("\n❌ VALIDATION FAILED: Results differ significantly.")
