@@ -17,6 +17,7 @@ DEFAULT_RESTRAINT_WEIGHT = 0.1
 
 import phonopy.physical_units
 import mbe_automation.dynamics.harmonic.modes
+from mbe_automation.dynamics.harmonic.modes import PhononFilter
 
 def _find_degeneracy_groups(freqs: np.ndarray, tol: float = 1e-4) -> list[list[int]]:
     """Find index groups of degenerate modes."""
@@ -251,7 +252,7 @@ def fit_to_adps(
     fc: mbe_automation.storage.core.ForceConstants,
     cif_path: str,
     temperature: float,
-    mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+    phonon_filter: PhononFilter | None = None,
     restraint_weight: float = DEFAULT_RESTRAINT_WEIGHT,
     bounds: tuple[float, float] = (10.0, 1e4), # Default bounds in cm-1
 ) -> npt.NDArray:
@@ -262,13 +263,21 @@ def fit_to_adps(
         fc: The force constants model. # storage class
         cif_path: Path to the CIF file containing experimental ADPs.
         temperature: Temperature in Kelvin.
-        mesh_size: k-point mesh for sampling the Brillouin zone.
+        phonon_filter: A PhononFilter object defining k-point mesh and frequency limits.
+                       If None, defaults to Gamma point and 0.1 THz min freq.
         restraint_weight: Weight for restraining refined frequencies to initial values.
         bounds: (min, max) frequency bounds in cm⁻¹.
 
     Returns:
         npt.NDArray: Refined frequencies in cm⁻¹.
     """
+    if phonon_filter is None:
+        phonon_filter = PhononFilter(
+            k_point_mesh="gamma",
+            freq_min_THz=0.1,
+            freq_max_THz=None
+        )
+
     # 0. Extract Experimental ADPs
     u_cart_exp = _extract_u_cart_exp(
         cif_path, 
@@ -281,7 +290,7 @@ def fit_to_adps(
     # 2. Get Irreducible Brillouin Zone (IBZ)
     irr_q_frac, q_weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
         phonopy_object=ph,
-        mesh_size=mesh_size,
+        mesh_size=phonon_filter.k_point_mesh,
         use_symmetry=True
     )
     
@@ -306,14 +315,32 @@ def fit_to_adps(
     # Weights: (n_q, ) -> repeat n_modes times for each q
     flat_weights = np.repeat(q_weights, n_modes)
     
+    # --- Check Normalization (Before Filtering) ---
+    total_weight = np.sum(q_weights)
+
+    # --- Apply Frequency Filter ---
+    # Convert limits to cm-1
+    thz_to_cm1 = phonopy.physical_units.get_physical_units().THzToCm
+    freq_min_cm1 = phonon_filter.freq_min_THz * thz_to_cm1
+    
+    # Zero out weights for filtered modes
+    mask_filter = np.ones(len(flat_freqs_cm1), dtype=bool)
+    
+    if phonon_filter.freq_min_THz is not None:
+        mask_filter &= (flat_freqs_cm1 >= freq_min_cm1)
+        
+    if phonon_filter.freq_max_THz is not None:
+        freq_max_cm1 = phonon_filter.freq_max_THz * thz_to_cm1
+        mask_filter &= (flat_freqs_cm1 <= freq_max_cm1)
+        
+    # Apply filter to weights (effectively excluding them from ADP sum)
+    flat_weights[~mask_filter] = 0.0
+
     # 4. Construct Degeneracy Groups
     degeneracy_groups = _find_degeneracy_groups(flat_freqs_cm1, tol=1e-4) # 1e-4 cm-1 tolerance
     
     # Average degenerate frequencies
     flat_freqs_cm1 = _average_degenerate_frequencies(flat_freqs_cm1, degeneracy_groups)
-    
-    # 5. Initialize NoMoRe Calculator
-    total_weight = np.sum(q_weights)
     
     calculator = NoMoReCalculator(
         eigenvectors=flat_eigenvectors,

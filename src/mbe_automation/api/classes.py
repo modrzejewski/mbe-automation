@@ -277,7 +277,7 @@ class ForceConstants(_ForceConstants):
         self,
         cif_path: str,
         temperature: float,
-        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+        phonon_filter: PhononFilter | None = None,
         restraint_weight: float = DEFAULT_RESTRAINT_WEIGHT,
         bounds: tuple[float, float] = (10.0, 1e4)
     ) -> npt.NDArray:
@@ -287,7 +287,7 @@ class ForceConstants(_ForceConstants):
         Args:
             cif_path: Path to experimental CIF with ADPs.
             temperature: Temperature in Kelvin.
-            mesh_size: k-point mesh for sampling the Brillouin zone.
+            phonon_filter: Optional filter for phonons (defines mesh and freq limits).
             restraint_weight: Weight for restraining refined frequencies to initial values.
             bounds: (min, max) frequency bounds in cm⁻¹.
             
@@ -299,7 +299,7 @@ class ForceConstants(_ForceConstants):
             fc=self,
             cif_path=cif_path,
             temperature=temperature,
-            mesh_size=mesh_size,
+            phonon_filter=phonon_filter,
             restraint_weight=restraint_weight,
             bounds=bounds,
         )
