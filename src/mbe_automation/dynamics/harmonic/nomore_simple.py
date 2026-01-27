@@ -1,0 +1,444 @@
+import numpy as np
+import numpy.typing as npt
+from typing import Literal, Tuple, Dict, Any, List
+from scipy.optimize import minimize # type: ignore
+import mbe_automation.storage
+from mbe_automation.api.classes import ForceConstants
+from mbe_automation.dynamics.harmonic.modes import (
+    phonopy_k_point_grid,
+    at_k_points,
+    _absolute_amplitude_eq_2,
+    _to_cif
+)
+import phonopy.physical_units
+import mbe_automation.storage.core
+from pymatgen.analysis.structure_matcher import StructureMatcher, ElementComparator
+from pymatgen.core import Structure as PymatgenStructure, Lattice
+from mbe_automation.storage.views import to_pymatgen
+from nomore_ase.crystallography.cctbx_adapter import CctbxAdapter
+from cctbx import adptbx
+
+import scipy.sparse.csgraph
+
+def _group_degenerate_bands(
+    initial_freqs_q_THz: npt.NDArray[np.float64],
+    tolerance: float
+) -> Tuple[npt.NDArray[np.int64], int]:
+    """
+    Group bands that are degenerate at any q-point.
+    
+    If |freq[q, i] - freq[q, j]| < tolerance for ANY q, bands i and j are linked.
+    Transitive closure is applied to find disconnected groups.
+    
+    Returns:
+        - band_to_group_map: (n_bands,) integers group index for each band.
+        - n_groups: Total number of unique groups.
+    """
+    n_bands = initial_freqs_q_THz.shape[1]
+    n_qpoints = initial_freqs_q_THz.shape[0]
+    
+    adj = np.zeros((n_bands, n_bands), dtype=int)
+    
+    for i in range(n_bands):
+        for j in range(i + 1, n_bands):
+            diffs = np.abs(initial_freqs_q_THz[:, i] - initial_freqs_q_THz[:, j])
+            if np.any(diffs < tolerance):
+                adj[i, j] = 1
+                adj[j, i] = 1 
+                
+    n_groups, labels = scipy.sparse.csgraph.connected_components(adj, directed=False)
+    
+    return labels, n_groups
+
+def _map_adps(
+    struct_ref: PymatgenStructure,
+    struct_src: PymatgenStructure,
+    adps_src_cart: npt.NDArray
+) -> tuple[npt.NDArray, npt.NDArray, list[int]]:
+    """
+    Map ADPs and Positions from source to reference using lattice transformation.
+    """
+    # Use robust matcher settings (no primitive reduction, allow supercells)
+    matcher = StructureMatcher(
+        primitive_cell=False, 
+        scale=False, 
+        attempt_supercell=True,
+        comparator=ElementComparator()
+    )
+    transform = matcher.get_transformation(struct_src, struct_ref)
+
+    if transform is None:
+        raise ValueError("Structures do not match.")
+
+    lattice_map, shift, site_map = transform
+    
+    # site_map is list of (ref_index for src_index i)
+    # Pair: (src_i, ref_j)
+    pairs = list(enumerate(site_map))
+    pairs.sort(key=lambda x: x[1])
+    indices = [p[0] for p in pairs]
+    
+    # --- ADP Transformation ---
+    inv_lat_src = struct_src.lattice.inv_matrix
+    adps_src_sorted = adps_src_cart[indices]
+    
+    # Transform Cartesian -> Fractional (Source Basis)
+    u_frac_src = np.einsum("xu,nxy,yv->nuv", inv_lat_src, adps_src_sorted, inv_lat_src)
+
+    # Apply Lattice Vector Permutation (Basis Change)
+    m_inv = np.linalg.inv(lattice_map)
+    u_frac_aligned = np.einsum("ki,nkl,lj->nij", m_inv, u_frac_src, m_inv)
+
+    # Transform Fractional -> Cartesian (Reference Basis)
+    lat_ref = struct_ref.lattice.matrix
+    mapped_adps = np.einsum("ai,nab,bk->nik", lat_ref, u_frac_aligned, lat_ref)
+    
+    # --- Position Transformation (Verification) ---
+    pos_src_sorted = struct_src.cart_coords[indices]
+    pos_frac_src = pos_src_sorted @ inv_lat_src
+    pos_frac_aligned = pos_frac_src @ m_inv
+    pos_frac_shifted = pos_frac_aligned + shift
+    mapped_coords = pos_frac_shifted @ lat_ref
+    
+    return mapped_adps, mapped_coords, indices
+
+def _extract_u_cart_exp(
+    cif_path: str, 
+    reference_structure: mbe_automation.storage.core.Structure | None = None,
+) -> npt.NDArray:
+    """Extract experimental Cartesian ADPs from a CIF file."""
+    adapter = CctbxAdapter(cif_path)
+    
+    # Expand to P1 to get full unit cell content
+    xs_p1 = adapter.xray_structure.expand_to_p1(sites_mod_positive=True)
+    
+    cif_pos_cart = xs_p1.sites_cart().as_numpy_array()
+    cif_symbols = [s.element_symbol() for s in xs_p1.scatterers()]
+    cif_cell_par = xs_p1.unit_cell().parameters()
+    
+    # Extract ADPs
+    unit_cell = xs_p1.unit_cell()
+    u_cart_list = []
+    
+    for sc in xs_p1.scatterers():
+        if sc.u_iso != -1.0 and sc.u_star == (-1.0, -1.0, -1.0, -1.0, -1.0, -1.0):
+            u_cart_val = adptbx.u_iso_as_u_cart(sc.u_iso)
+        else:
+            u_cart_val = adptbx.u_star_as_u_cart(unit_cell, sc.u_star)
+        
+        u_tensor = np.array([
+            [u_cart_val[0], u_cart_val[3], u_cart_val[4]],
+            [u_cart_val[3], u_cart_val[1], u_cart_val[5]],
+            [u_cart_val[4], u_cart_val[5], u_cart_val[2]]
+        ])
+        u_cart_list.append(u_tensor)
+        
+    u_cart = np.array(u_cart_list)
+    
+    if reference_structure is not None:
+        struct_cif = PymatgenStructure(
+            lattice=Lattice.from_parameters(*cif_cell_par),
+            species=cif_symbols,
+            coords=cif_pos_cart,
+            coords_are_cartesian=True
+        )
+
+        struct_ref = to_pymatgen(structure=reference_structure)
+        
+        try:
+            u_cart, mapped_coords, indices = _map_adps(struct_ref, struct_cif, u_cart)
+        except ValueError as e:
+            raise ValueError(f"Robust ADP mapping failed: {e}")
+            
+    return u_cart
+
+    return u_cart
+
+def _flatten_u(u: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    """
+    Flatten (N, 3, 3) ADPs into (N*6,) array of unique components.
+    Upper triangle: xx, yy, zz, xy, xz, yz
+    """
+    flat = []
+    for i in range(len(u)):
+        # xx, yy, zz, xy, xz, yz
+        flat.extend([
+            u[i, 0, 0], u[i, 1, 1], u[i, 2, 2],
+            u[i, 0, 1], u[i, 0, 2], u[i, 1, 2]
+        ])
+    return np.array(flat)
+
+def _compute_adps(
+    frequencies_q: npt.NDArray[np.float64],
+    eigenvectors_q: npt.NDArray[np.complex128],
+    masses_AMU: npt.NDArray[np.float64],
+    temperature_K: float
+) -> npt.NDArray[np.float64]:
+    """
+    Compute Cartesian ADPs from frequencies and eigenvectors.
+    
+    Args:
+        frequencies_q: (n_q, n_modes) frequencies in THz.
+        eigenvectors_q: (n_q, n_modes, 3*n_atoms) eigenvectors stored as rows.
+        masses_AMU: (n_atoms,) atomic masses in AMU.
+        temperature_K: Temperature in Kelvin.
+        
+    Returns:
+        (n_atoms, 3, 3) Cartesian ADPs (U_cart).
+    """
+    n_qpoints = len(frequencies_q)
+    n_atoms = len(masses_AMU)
+    
+    mean_sq_disp = np.zeros((n_atoms * 3, n_atoms * 3), dtype=np.float64)
+    
+    for i_q in range(n_qpoints):
+        freqs = frequencies_q[i_q]
+        # Filter low-frequency modes (e.g. acoustic modes at Gamma) to avoid divergence
+        mask = freqs > 1e-4
+        
+        if not np.any(mask):
+            continue
+            
+        freqs_masked = freqs[mask]
+        ejk_masked = eigenvectors_q[i_q][mask]
+        
+        # Amplitude
+        Ajk_primitive = _absolute_amplitude_eq_2(freqs_masked, temperature_K, masses_AMU)
+        
+        # Combine with eigenvectors
+        # Ajk_primitive is (n_masked, 1) broadcasted over (n_masked, 3*n_atoms)
+        Ajk_ejk = Ajk_primitive * ejk_masked
+        
+        U_q_local = np.einsum("jk,jl->kl", Ajk_ejk, Ajk_ejk.conj()).real
+        mean_sq_disp += U_q_local
+        
+    mean_sq_disp /= n_qpoints
+    
+    # Extract diagonal blocks (ADPs are 3x3 per atom)
+    msd_reshaped = mean_sq_disp.reshape(n_atoms, 3, n_atoms, 3)
+    mean_sq_disp_diagonal = np.einsum('kikj->kij', msd_reshaped)
+    
+    return mean_sq_disp_diagonal
+
+def fit_to_adps(
+        force_constants: ForceConstants,
+        cif_path: str,
+        temperature_K: float,
+        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+        optimize_mask: npt.NDArray[np.bool_] | None = None,
+        degeneracy_tolerance: float = 1e-4,
+        bounds: Tuple[float, float] = (1e-6, np.inf),
+        max_iterations: int = 200,
+) -> Dict[str, Any]:
+    """
+    Fit phonon frequencies to experimental ADPs from a CIF file.
+    
+    See _fit_to_adps for implementation details.
+    """
+    # Extract ADPs from CIF
+    u_exp = _extract_u_cart_exp(
+        cif_path, 
+        reference_structure=force_constants.primitive
+    )
+    
+    return _fit_to_adps(
+        force_constants=force_constants,
+        u_exp=u_exp,
+        temperature_K=temperature_K,
+        mesh_size=mesh_size,
+        optimize_mask=optimize_mask,
+        degeneracy_tolerance=degeneracy_tolerance,
+        bounds=bounds,
+        max_iterations=max_iterations
+    )
+
+def _fit_to_adps(
+        force_constants: ForceConstants,
+        u_exp: npt.NDArray[np.float64],
+        temperature_K: float,
+        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+        optimize_mask: npt.NDArray[np.bool_] | None = None,
+        degeneracy_tolerance: float = 1e-4,
+        bounds: Tuple[float, float] = (1e-6, np.inf),
+        max_iterations: int = 200,
+) -> Dict[str, Any]:
+    """
+    Fit phonon frequencies to experimental ADPs using band shifts with degeneracy handling.
+
+    This function optimizes a constant frequency shift for each phonon BAND GROUP.
+    Bands are grouped if they are degenerate (within tolerance) at ANY k-point.
+    Degenerate bands share the same shift parameter to preserve symmetry/couplings.
+    
+    The optimization assumes that the eigenvectors (normal modes) are rigid and do not
+    change during the frequency refinement (Rigid Mode Approximation).
+    
+    Args:
+        force_constants: The harmonic force constants model.
+        u_exp: (N_atoms, 3, 3) Experimental Cartesian ADPs.
+        temperature_K: Temperature (K). 
+        mesh_size: k-point sampling mesh.
+        optimize_mask: (n_bands,) Boolean mask. If True, the band is allowed to shift.
+                       If any band in a degenerate group is masked True, the group is optimized.
+        degeneracy_tolerance: Tolerance (THz) for linking degenerate bands.
+        bounds: (min, max) allowed frequencies in THz (checked approximately or via penalties).
+        max_iterations: Maximum iterations for the optimizer.
+        
+    Returns:
+        Dictionary containing optimization results:
+            - success: (bool) Whether optimization succeeded.
+            - original_frequencies: (N_q, N_bands) Initial frequencies in THz.
+            - refined_frequencies: (N_q, N_bands) Refined frequencies in THz.
+            - message: (str) Optimizer message.
+            - residual: (float) Final objective function value.
+            - shifts: (N_bands,) Applied frequency shifts (reconstructed).
+    """
+    
+    # 1. Setup Phonopy and Grid
+    ph = mbe_automation.storage.to_phonopy(force_constants)
+    qpoints, weights = phonopy_k_point_grid(
+        phonopy_object=ph,
+        mesh_size=mesh_size,
+        use_symmetry=False,
+        center_at_gamma=False
+    )
+    
+    n_qpoints = len(qpoints)
+    
+    # 2. Pre-calculate Eigenvectors and Initial Frequencies
+    initial_freqs_q_THz, eigenvectors_q = at_k_points(
+        dynamical_matrix=ph.dynamical_matrix,
+        k_points=qpoints,
+        compute_eigenvecs=True,
+        eigenvectors_storage="rows"
+    )
+    
+    if eigenvectors_q is None:
+        raise ValueError("Failed to compute eigenvectors.") 
+        
+    n_bands = initial_freqs_q_THz.shape[1]
+    n_atoms = len(ph.primitive.masses)
+    masses_AMU = ph.primitive.masses
+
+    # 3. Identify Degeneracy Groups
+    band_group_labels, n_groups = _group_degenerate_bands(initial_freqs_q_THz, degeneracy_tolerance)
+    
+    # Setup Optimization Parameters (Group Shifts)
+    if optimize_mask is None:
+        # Default: Optimize all EXCEPT the first 3 bands (Acoustic)
+        # We assume bands are sorted by frequency (standard Phonopy behavior)
+        # Acoustic bands (indices 0, 1, 2) correspond to translation at Gamma.
+        optimize_mask = np.ones(n_bands, dtype=bool)
+        if n_bands >= 3:
+            optimize_mask[:3] = False
+    
+    if len(optimize_mask) != n_bands:
+        raise ValueError(f"optimize_mask length {len(optimize_mask)} must match number of bands {n_bands}")
+    
+    # Identify which groups to optimize
+    # If any band in group G is masked True, then group G is optimized.
+    group_optimize_mask = np.zeros(n_groups, dtype=bool)
+    for band_idx, group_idx in enumerate(band_group_labels):
+        if optimize_mask[band_idx]:
+            group_optimize_mask[group_idx] = True
+            
+    n_params = np.sum(group_optimize_mask)
+    initial_group_shifts = np.zeros(n_params, dtype=np.float64)
+    
+    # Pre-calculate derived data for objective function
+    target_u_flat = _flatten_u(u_exp) if u_exp.ndim > 1 else u_exp
+    
+    # Bounds logic (approximate per group constraints)
+    # We set bounds on the shift such that the LOWEST frequency in the group stays above min_bound
+    
+    param_to_group_map = np.where(group_optimize_mask)[0]
+    shift_bounds = []
+    min_freq_allowed, max_freq_allowed = bounds
+    
+    for i_param in range(n_params):
+        group_idx = param_to_group_map[i_param]
+        # Find all bands in this group
+        bands_in_group = np.where(band_group_labels == group_idx)[0]
+        
+        # Get min/max freq across ALL bands in this group and ALL q-points
+        # Because shift is applied equally to all bands in group
+        bands_freqs = initial_freqs_q_THz[:, bands_in_group]
+        
+        lower_bound = min_freq_allowed - np.min(bands_freqs)
+        upper_bound = max_freq_allowed - np.max(bands_freqs)
+        
+        shift_bounds.append((lower_bound, upper_bound))
+    
+    # 4. Objective Function
+    def objective(group_shift_params):
+        # 1. Map parameters to full group shifts
+        full_group_shifts = np.zeros(n_groups, dtype=np.float64)
+        full_group_shifts[group_optimize_mask] = group_shift_params
+        
+        # 2. Map group shifts to band shifts
+        # full_shifts[band] = full_group_shifts[band_group_labels[band]]
+        full_band_shifts = full_group_shifts[band_group_labels]
+        
+        # 3. Apply shifts
+        current_freqs_q = initial_freqs_q_THz + full_band_shifts
+        
+        
+        # 4. Calculate ADPs
+        T = temperature_K
+        calc_u_3x3 = _compute_adps(current_freqs_q, eigenvectors_q, masses_AMU, T)
+        calc_u_flat = _flatten_u(calc_u_3x3)
+        
+        diff = calc_u_flat - target_u_flat
+        obj = np.sum(diff**2) * 1e6 # Scale
+        
+        return obj
+
+    # 5. Run Optimization
+    if n_params > 0:
+        res = minimize(
+            objective,
+            initial_group_shifts,
+            method='L-BFGS-B',
+            bounds=shift_bounds,
+            options={'maxiter': max_iterations, 'disp': False, 'gtol': 1e-10, 'eps': 1e-6}
+        )
+        
+        # 6. Final Results
+        final_group_params = res.x
+        final_full_group_shifts = np.zeros(n_groups, dtype=np.float64)
+        final_full_group_shifts[group_optimize_mask] = final_group_params
+        
+        final_band_shifts = final_full_group_shifts[band_group_labels]
+        final_freqs_q = initial_freqs_q_THz + final_band_shifts
+        
+        success = res.success
+        message = res.message
+        residual = res.fun / 1e6
+        
+    else:
+        # No optimization requested/needed
+        final_band_shifts = np.zeros(n_bands)
+        final_freqs_q = initial_freqs_q_THz
+        success = True
+        message = "No parameters to optimize."
+        
+        # Calculate residual for initial state
+        T = temperature_K
+        calc_u_3x3 = _compute_adps(final_freqs_q, eigenvectors_q, masses_AMU, T)
+        calc_u_flat = _flatten_u(calc_u_3x3)
+        diff = calc_u_flat - target_u_flat
+        residual = np.sum(diff**2)
+
+    # Recalculate u_calc (or reuse if available, but cheap to recalc)
+    T = temperature_K
+    final_u_3x3 = _compute_adps(final_freqs_q, eigenvectors_q, masses_AMU, T)
+    final_u_calc = _flatten_u(final_u_3x3)
+
+    return {
+        "success": success,
+        "original_frequencies": initial_freqs_q_THz,
+        "refined_frequencies": final_freqs_q,
+        "shifts": final_band_shifts,
+        "message": message,
+        "residual": residual,
+        "u_calc": final_u_calc
+    }
