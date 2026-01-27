@@ -840,7 +840,7 @@ def thermal_displacements(
     
     qpoints, _ = phonopy_k_point_grid(
         phonopy_object=ph,
-        k_point_mesh=phonon_filter.k_point_mesh,
+        mesh_size=phonon_filter.k_point_mesh,
         use_symmetry=False,
         center_at_gamma=False
     )
