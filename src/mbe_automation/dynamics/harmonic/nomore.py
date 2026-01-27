@@ -335,7 +335,7 @@ def fit_to_adps(
         
     # Apply filter to weights (effectively excluding them from ADP sum)
     flat_weights[~mask_filter] = 0.0
-
+    
     # 4. Construct Degeneracy Groups
     degeneracy_groups = _find_degeneracy_groups(flat_freqs_cm1, tol=1e-4) # 1e-4 cm-1 tolerance
     

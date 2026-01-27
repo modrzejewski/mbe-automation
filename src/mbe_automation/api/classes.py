@@ -279,7 +279,7 @@ class ForceConstants(_ForceConstants):
         temperature: float,
         phonon_filter: PhononFilter | None = None,
         restraint_weight: float = DEFAULT_RESTRAINT_WEIGHT,
-        bounds: tuple[float, float] = (10.0, 1e4)
+        bounds: tuple[float, float] = (0.1, 1e4)
     ) -> npt.NDArray:
         """
         Refine phonon frequencies by fitting calculated ADPs to experimental ADPs.
@@ -302,6 +302,43 @@ class ForceConstants(_ForceConstants):
             phonon_filter=phonon_filter,
             restraint_weight=restraint_weight,
             bounds=bounds,
+        )
+
+    def fit_to_adps_simple(
+        self,
+        cif_path: str,
+        temperature_K: float,
+        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+        optimize_mask: npt.NDArray[np.bool_] | None = None,
+        degeneracy_tolerance: float = 1e-4,
+        bounds: tuple[float, float] = (1e-6, np.inf),
+        max_iterations: int = 200,
+    ) -> typing.Dict[str, typing.Any]:
+        """
+        Refine phonon frequencies using simplified band shift optimization (nomore_simple).
+        
+        Args:
+            cif_path: Path to experimental CIF with ADPs.
+            temperature_K: Temperature (K). 
+            mesh_size: k-point sampling mesh.
+            optimize_mask: (n_bands,) Boolean mask. If True, the band is allowed to shift.
+            degeneracy_tolerance: Tolerance (THz) for linking degenerate bands.
+            bounds: (min, max) allowed frequencies in THz (checked approximately or via penalties).
+            max_iterations: Maximum iterations for the optimizer.
+            
+        Returns:
+            Dictionary containing optimization results.
+        """
+        import mbe_automation.dynamics.harmonic.nomore_simple
+        return mbe_automation.dynamics.harmonic.nomore_simple.fit_to_adps(
+            force_constants=self,
+            cif_path=cif_path,
+            temperature_K=temperature_K,
+            mesh_size=mesh_size,
+            optimize_mask=optimize_mask,
+            degeneracy_tolerance=degeneracy_tolerance,
+            bounds=bounds,
+            max_iterations=max_iterations
         )
 
     def thermodynamics(
