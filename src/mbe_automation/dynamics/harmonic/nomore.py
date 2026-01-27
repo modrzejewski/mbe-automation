@@ -401,6 +401,13 @@ def _validate_nomore_calculator(
     # Expand weights: each mode at q gets weight of q
     flat_weights = np.repeat(q_weights, n_modes)
     
+    # Filter out acoustic modes / low freq modes to match thermal_displacements cutoff (0.1 THz)
+    # 0.1 THz approx 3.34 cm-1
+    # NoMoRe defaults to clamping < 5 cm-1 to 10 cm-1, which adds artificial ADP.
+    cutoff_cm1 = 0.1 * phonopy.physical_units.get_physical_units().THzToCm
+    mask_low_freq = flat_freqs_cm1 < cutoff_cm1
+    flat_weights[mask_low_freq] = 0.0
+    
     # Check normalization
     total_weight = np.sum(q_weights)
     
