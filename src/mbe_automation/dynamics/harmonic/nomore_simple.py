@@ -443,6 +443,31 @@ def _fit_to_adps(
         "u_calc": final_u_calc
     }
 
+def _print_adp_comparison(
+    u_ref: npt.NDArray[np.float64],
+    u_approx: npt.NDArray[np.float64],
+    masses: npt.NDArray[np.float64],
+    title: str = "Comparison of ADPs",
+    label_ref: str = "Ref U_iso",
+    label_approx: str = "Approx U_iso"
+) -> None:
+    """unique helper to print ADP comparison table."""
+    diff = u_approx - u_ref
+    norm_diff = np.linalg.norm(diff, axis=(1, 2))  # Frobenius norm per atom
+    
+    print(f"\n{title}:")
+    print(f"{'Atom':<6} {label_ref + ' (A^2)':<20} {label_approx + ' (A^2)':<20} {'Diff Norm (A^2)':<20}")
+    print("-" * 75)
+    
+    for i in range(len(masses)):
+        # Calculate U_iso = trace(U) / 3
+        u_iso_ref = np.trace(u_ref[i]) / 3.0
+        u_iso_approx = np.trace(u_approx[i]) / 3.0
+        print(f"{i:<6} {u_iso_ref:<20.6f} {u_iso_approx:<20.6f} {norm_diff[i]:<20.6f}")
+
+    avg_diff = np.mean(norm_diff)
+    print(f"\nAverage difference (Frobenius norm) per atom: {avg_diff:.6f} A^2")
+
 def _self_fit(
     force_constants: ForceConstants,
     temperature_K: float,
@@ -513,22 +538,15 @@ def _self_fit(
 
     u_gamma_cart = _compute_adps(freqs_gamma, evecs_gamma, masses, temperature_K)
     
-    # 3. Compare
-    diff = u_gamma_cart - u_ref_cart
-    norm_diff = np.linalg.norm(diff, axis=(1, 2))  # Frobenius norm per atom
-    
-    print("\nComparison of ADPs [Gamma vs Reference (k-points)]:")
-    print(f"{'Atom':<6} {'Ref U_iso (A^2)':<20} {'Gamma U_iso (A^2)':<20} {'Diff Norm (A^2)':<20}")
-    print("-" * 70)
-    
-    for i in range(len(masses)):
-        # Calculate U_iso = trace(U) / 3
-        u_iso_ref = np.trace(u_ref_cart[i]) / 3.0
-        u_iso_gamma = np.trace(u_gamma_cart[i]) / 3.0
-        print(f"{i:<6} {u_iso_ref:<20.6f} {u_iso_gamma:<20.6f} {norm_diff[i]:<20.6f}")
-
-    avg_diff = np.mean(norm_diff)
-    print(f"\nAverage difference (Frobenius norm) per atom: {avg_diff:.6f} A^2")
+    # 3. Compare (Before Optimization)
+    _print_adp_comparison(
+        u_ref=u_ref_cart,
+        u_approx=u_gamma_cart,
+        masses=masses,
+        title="Comparison of ADPs [Gamma (Initial) vs Reference (k-points)]",
+        label_ref="Ref U_iso",
+        label_approx="Gamma U_iso"
+    )
     
     # 4. Run Fit
     print("\nRunning optimization to find effective Gamma-point frequencies...")
@@ -546,14 +564,18 @@ def _self_fit(
     print(f"Optimization finished. Success: {result['success']}")
     print(f"Final Residual: {result['residual']:.6f}")
     
-    if result['success']:
-        # Recalculate u_3x3 from refined frequencies to verify
-        # We use the Gamma eigenvectors which are assumed fixed
-        u_final_cart = _compute_adps(result['refined_frequencies'], evecs_gamma, masses, temperature_K)
-        
-        final_diff = u_final_cart - u_ref_cart
-        final_norm_diff = np.linalg.norm(final_diff, axis=(1, 2))
-        avg_final_diff = np.mean(final_norm_diff)
-        print(f"Post-optimization Average difference per atom: {avg_final_diff:.6f} A^2")
+    # 5. Compare (After Optimization)
+    # Recalculate u_3x3 from refined frequencies to verify
+    # We use the Gamma eigenvectors which are assumed fixed
+    u_final_cart = _compute_adps(result['refined_frequencies'], evecs_gamma, masses, temperature_K)
+    
+    _print_adp_comparison(
+        u_ref=u_ref_cart,
+        u_approx=u_final_cart,
+        masses=masses,
+        title="Comparison of ADPs [Gamma (Optimized) vs Reference (k-points)]",
+        label_ref="Ref U_iso",
+        label_approx="Opt. Gamma U_iso"
+    )
         
     return result
