@@ -471,6 +471,7 @@ def _print_adp_comparison(
 def _print_frequency_comparison(
     freqs_initial_THz: npt.NDArray[np.float64],
     freqs_refined_THz: npt.NDArray[np.float64],
+    optimize_mask: npt.NDArray[np.bool_] | None = None
 ) -> None:
     """Helper to print starting vs refined frequencies in cm^-1."""
     
@@ -484,8 +485,8 @@ def _print_frequency_comparison(
     to_cm = phonopy.physical_units.get_physical_units().THzToCm
     
     print("\nComparison of Frequencies (Gamma point):")
-    print(f"{'Mode':<6} {'Initial (cm^-1)':<20} {'Refined (cm^-1)':<20} {'Shift (cm^-1)':<20}")
-    print("-" * 70)
+    print(f"{'Mode':<6} {'Initial (cm^-1)':<20} {'Refined (cm^-1)':<20} {'Shift (cm^-1)':<20} {'Opt?':<6}")
+    print("-" * 76)
     
     # Assuming q=0 is what we care about (since we fit Gamma)
     # If the optimization was done on multiple q-points (which _fit_to_adps supports), we might want to iterate.
@@ -500,12 +501,16 @@ def _print_frequency_comparison(
         diff_cm = freqs_refined_cm - freqs_init_cm
         
         for band_idx in range(n_bands):
-            print(f"{band_idx:<6} {freqs_init_cm[band_idx]:<20.2f} {freqs_refined_cm[band_idx]:<20.2f} {diff_cm[band_idx]:<20.2f}")
+            is_opt = ""
+            if optimize_mask is not None and optimize_mask[band_idx]:
+                is_opt = "*"
+            print(f"{band_idx:<6} {freqs_init_cm[band_idx]:<20.2f} {freqs_refined_cm[band_idx]:<20.2f} {diff_cm[band_idx]:<20.2f} {is_opt:<6}")
 
 def _self_fit(
     force_constants: ForceConstants,
     temperature_K: float,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
+    max_optimized_freq_THz: float | None = None
 ) -> Dict[str, Any]:
     """
     Fit Gamma-point frequencies to match ADPs computed from a full k-point mesh.
@@ -521,6 +526,9 @@ def _self_fit(
         force_constants: The harmonic force constants model.
         temperature_K: Temperature in Kelvin.
         mesh_size: The k-point mesh for the reference calculation (e.g. [4, 4, 4]).
+        max_optimized_freq_THz: Maximum frequency (in THz) for modes to be optimized.
+                                Modes above this frequency will be fixed.
+                                Acoustic modes are always fixed.
 
     Returns:
         Result dictionary from `_fit_to_adps`.
@@ -528,6 +536,8 @@ def _self_fit(
     print(f"--- _self_fit: effective Gamma-point approximation ---")
     print(f"Temperature: {temperature_K} K")
     print(f"Reference mesh: {mesh_size}")
+    if max_optimized_freq_THz is not None:
+        print(f"Max optimized frequency: {max_optimized_freq_THz} THz")
     
     # 1. Reference ADPs (k-point mesh)
     ph = mbe_automation.storage.to_phonopy(force_constants)
@@ -582,6 +592,25 @@ def _self_fit(
         label_approx="Gamma U_iso"
     )
     
+    # Create optimize_mask
+    n_bands = freqs_gamma.shape[1]
+    if max_optimized_freq_THz is not None:
+        # freqs_gamma[0] are the Gamma-point frequencies
+        optimize_mask = freqs_gamma[0] <= max_optimized_freq_THz
+        
+        # Ensure acoustic modes (first 3) are strictly False, although they should be low freq
+        # typically acoustic modes are at ~0 THz, so they would be True if only checking <= max
+        # BUT we explicitely want to exclude them as per standard practice.
+        # However, _fit_to_adps's default logic excludes first 3 if mask is None.
+        # But here mask is NOT None, so we must manually exclude them.
+        if n_bands >= 3:
+            optimize_mask[:3] = False
+    else:
+        # Default behavior: optimize all optical modes (skip first 3)
+        optimize_mask = np.ones(n_bands, dtype=bool)
+        if n_bands >= 3:
+            optimize_mask[:3] = False
+            
     # 4. Run Fit
     print("\nRunning optimization to find effective Gamma-point frequencies...")
     
@@ -592,7 +621,8 @@ def _self_fit(
         u_exp=u_ref_cart,
         temperature_K=temperature_K,
         mesh_size="gamma",
-        degeneracy_tolerance=1e-4
+        degeneracy_tolerance=1e-4,
+        optimize_mask=optimize_mask
     )
     
     print(f"Optimization finished. Success: {result['success']}")
@@ -601,7 +631,8 @@ def _self_fit(
     # 5. Print Frequency Comparison
     _print_frequency_comparison(
         freqs_initial_THz=result['original_frequencies'],
-        freqs_refined_THz=result['refined_frequencies']
+        freqs_refined_THz=result['refined_frequencies'],
+        optimize_mask=optimize_mask
     )
     
     # 6. Compare ADPs (After Optimization)
