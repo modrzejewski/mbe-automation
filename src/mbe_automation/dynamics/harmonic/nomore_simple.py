@@ -506,6 +506,161 @@ def _print_frequency_comparison(
                 is_opt = "*"
             print(f"{band_idx:<6} {freqs_init_cm[band_idx]:<20.2f} {freqs_refined_cm[band_idx]:<20.2f} {diff_cm[band_idx]:<20.2f} {is_opt:<6}")
 
+def _fit_gamma_point_model(
+    force_constants: ForceConstants,
+    u_exp: npt.NDArray[np.float64],
+    temperature_K: float,
+    optimize_mask: npt.NDArray[np.bool_] | None = None,
+    degeneracy_tolerance: float = 1e-4,
+    bounds: Tuple[float, float] = (1e-6, np.inf),
+    max_iterations: int = 200,
+) -> Dict[str, Any]:
+    """
+    Simplified frequency fitter designed specifically for Gamma-point models.
+    
+    This function optimizes random offsets to the Gamma-point frequencies
+    to match the target ADPs (u_exp). It is a specialized version of
+    _fit_to_adps restricted to a single q-point (Gamma).
+    
+    Args:
+        force_constants: The harmonic force constants model.
+        u_exp: (N_atoms, 3, 3) Experimental/Target Cartesian ADPs in Å².
+        temperature_K: Temperature (K).
+        optimize_mask: (n_bands,) Boolean mask. If True, the band is allowed to shift.
+        degeneracy_tolerance: Tolerance (THz) for linking degenerate bands.
+        bounds: (min, max) allowed frequencies in THz.
+        max_iterations: Maximum iterations for the optimizer.
+        
+    Returns:
+        Dictionary containing optimization results.
+    """
+    # 1. Setup Phonopy (Gamma point only)
+    # We don't need phonopy_k_point_grid heavily here, just get Gamma point data.
+    ph = mbe_automation.storage.to_phonopy(force_constants)
+    
+    # 2. Calculate Eigenvectors and Initial Frequencies at Gamma
+    # Direct calculation at Gamma (q=[0,0,0])
+    q_gamma = np.array([[0., 0., 0.]])
+    
+    initial_freqs_q_THz, eigenvectors_q = at_k_points(
+        dynamical_matrix=ph.dynamical_matrix,
+        k_points=q_gamma,
+        compute_eigenvecs=True,
+        eigenvectors_storage="rows"
+    )
+    
+    if eigenvectors_q is None:
+        raise ValueError("Failed to compute eigenvectors.")
+        
+    n_bands = initial_freqs_q_THz.shape[1]
+    masses_AMU = ph.primitive.masses
+    
+    # 3. Identify Degeneracy Groups (at Gamma)
+    # _group_degenerate_bands handles (n_q, n_bands), here n_q=1
+    band_group_labels, n_groups = _group_degenerate_bands(initial_freqs_q_THz, degeneracy_tolerance)
+    
+    # Setup Optimization Parameters
+    if optimize_mask is None:
+        optimize_mask = np.ones(n_bands, dtype=bool)
+        if n_bands >= 3:
+            optimize_mask[:3] = False # exclude acoustic
+            
+    if len(optimize_mask) != n_bands:
+        raise ValueError(f"optimize_mask length {len(optimize_mask)} must match n_bands {n_bands}")
+        
+    group_optimize_mask = np.zeros(n_groups, dtype=bool)
+    for band_idx, group_idx in enumerate(band_group_labels):
+        if optimize_mask[band_idx]:
+            group_optimize_mask[group_idx] = True
+            
+    n_params = np.sum(group_optimize_mask)
+    initial_group_shifts = np.zeros(n_params, dtype=np.float64)
+    
+    target_u_flat = _flatten_u(u_exp)
+    
+    # Bounds
+    param_to_group_map = np.where(group_optimize_mask)[0]
+    shift_bounds = []
+    min_freq_allowed, max_freq_allowed = bounds
+    
+    # Since n_q=1, simplification:
+    freqs_gamma = initial_freqs_q_THz[0] # (n_bands,)
+    
+    for i_param in range(n_params):
+        group_idx = param_to_group_map[i_param]
+        bands_in_group = np.where(band_group_labels == group_idx)[0]
+        
+        group_freqs = freqs_gamma[bands_in_group]
+        
+        # Shift limits constrained by ALL bands in the group
+        lower_bound = min_freq_allowed - np.min(group_freqs)
+        upper_bound = max_freq_allowed - np.max(group_freqs)
+        shift_bounds.append((lower_bound, upper_bound))
+        
+    # 4. Objective Function
+    def objective(group_shift_params):
+        full_group_shifts = np.zeros(n_groups, dtype=np.float64)
+        full_group_shifts[group_optimize_mask] = group_shift_params
+        
+        full_band_shifts = full_group_shifts[band_group_labels]
+        
+        # Apply shifts (broadcast to (1, n_bands))
+        current_freqs_q = initial_freqs_q_THz + full_band_shifts
+        
+        # Calc ADPs
+        # _compute_adps expects (n_q, n_modes) and (n_q, n_modes, dof)
+        calc_u_3x3 = _compute_adps(current_freqs_q, eigenvectors_q, masses_AMU, temperature_K)
+        calc_u_flat = _flatten_u(calc_u_3x3)
+        
+        diff = calc_u_flat - target_u_flat
+        return np.sum(diff**2) * 1e6
+        
+    # 5. Run Optimization
+    if n_params > 0:
+        res = minimize(
+            objective,
+            initial_group_shifts,
+            method='L-BFGS-B',
+            bounds=shift_bounds,
+            options={'maxiter': max_iterations, 'disp': False, 'gtol': 1e-10, 'eps': 1e-6}
+        )
+        
+        final_group_params = res.x
+        final_full_group_shifts = np.zeros(n_groups, dtype=np.float64)
+        final_full_group_shifts[group_optimize_mask] = final_group_params
+        
+        final_band_shifts = final_full_group_shifts[band_group_labels]
+        final_freqs_q = initial_freqs_q_THz + final_band_shifts
+        
+        success = res.success
+        message = res.message
+        residual = res.fun / 1e6
+        
+    else:
+        final_band_shifts = np.zeros(n_bands)
+        final_freqs_q = initial_freqs_q_THz
+        success = True
+        message = "No parameters to optimize."
+        
+        # Initial residual
+        calc_u_3x3 = _compute_adps(final_freqs_q, eigenvectors_q, masses_AMU, temperature_K)
+        calc_u_flat = _flatten_u(calc_u_3x3)
+        diff = calc_u_flat - target_u_flat
+        residual = np.sum(diff**2)
+
+    final_u_3x3 = _compute_adps(final_freqs_q, eigenvectors_q, masses_AMU, temperature_K)
+    final_u_calc = _flatten_u(final_u_3x3)
+    
+    return {
+        "success": success,
+        "original_frequencies": initial_freqs_q_THz,
+        "refined_frequencies": final_freqs_q,
+        "shifts": final_band_shifts,
+        "message": message,
+        "residual": residual,
+        "u_calc": final_u_calc
+    }
+
 def _self_fit(
     force_constants: ForceConstants,
     temperature_K: float,
@@ -519,8 +674,8 @@ def _self_fit(
     1. Computes ADPs using the specified k-point `mesh_size`.
     2. Computes ADPs using the Gamma point approximation.
     3. Prints a comparison of the two.
-    4. Runs `_fit_to_adps` to optimize Gamma-point frequencies such that the
-       resulting Gamma-point ADPs match the k-point ADPs.
+    4. Runs `_fit_gamma_point_model` to optimize Gamma-point frequencies such that the
+       resulting Gamma-point ADPs match the k-point ADPs as closely as possible.
     
     Args:
         force_constants: The harmonic force constants model.
@@ -531,7 +686,7 @@ def _self_fit(
                                 Acoustic modes are always fixed.
 
     Returns:
-        Result dictionary from `_fit_to_adps`.
+        Result dictionary from `_fit_gamma_point_model`.
     """
     print(f"--- _self_fit: effective Gamma-point approximation ---")
     print(f"Temperature: {temperature_K} K")
@@ -616,11 +771,10 @@ def _self_fit(
     
     # We use u_ref_cart (the k-point result) as the target 'experimental' data
     # We perform the fit using ONLY the Gamma point (mesh_size="gamma")
-    result = _fit_to_adps(
+    result = _fit_gamma_point_model(
         force_constants=force_constants,
         u_exp=u_ref_cart,
         temperature_K=temperature_K,
-        mesh_size="gamma",
         degeneracy_tolerance=1e-4,
         optimize_mask=optimize_mask
     )
