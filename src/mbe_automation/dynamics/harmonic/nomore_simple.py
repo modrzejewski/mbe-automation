@@ -20,6 +20,9 @@ from cctbx import adptbx
 
 import scipy.sparse.csgraph
 
+DEFAULT_ACOUSTIC_FREQ = 50.0 / phonopy.physical_units.get_physical_units().THzToCm
+
+
 def _group_degenerate_bands(
     initial_freqs_q_THz: npt.NDArray[np.float64],
     tolerance: float
@@ -514,6 +517,7 @@ def _fit_gamma_point_model(
     degeneracy_tolerance: float = 1e-4,
     max_shift_cm1: float = 200.0,
     max_iterations: int = 200,
+    acoustic_initial_freq_THz: float | None = None
 ) -> Dict[str, Any]:
     """
     Simplified frequency fitter designed specifically for Gamma-point models.
@@ -530,6 +534,7 @@ def _fit_gamma_point_model(
         degeneracy_tolerance: Tolerance (THz) for linking degenerate bands.
         max_shift_cm1: Maximum allowed frequency shift in cm^-1. Default is 200.0.
         max_iterations: Maximum iterations for the optimizer.
+        acoustic_initial_freq_THz: If set, overrides the frequency of the first 3 modes (acoustic).
         
     Returns:
         Dictionary containing optimization results.
@@ -553,6 +558,11 @@ def _fit_gamma_point_model(
         raise ValueError("Failed to compute eigenvectors.")
         
     n_bands = initial_freqs_q_THz.shape[1]
+    
+    # Override acoustic frequencies if requested
+    if acoustic_initial_freq_THz is not None and n_bands >= 3:
+        initial_freqs_q_THz[0, :3] = acoustic_initial_freq_THz
+
     masses_AMU = ph.primitive.masses
     
     # 3. Identify Degeneracy Groups (at Gamma)
@@ -562,8 +572,9 @@ def _fit_gamma_point_model(
     # Setup Optimization Parameters
     if optimize_mask is None:
         optimize_mask = np.ones(n_bands, dtype=bool)
-        if n_bands >= 3:
-            optimize_mask[:3] = False # exclude acoustic
+        # Only exclude acoustic if we are NOT manually setting them (standard behavior)
+        if n_bands >= 3 and acoustic_initial_freq_THz is None:
+            optimize_mask[:3] = False 
             
     if len(optimize_mask) != n_bands:
         raise ValueError(f"optimize_mask length {len(optimize_mask)} must match n_bands {n_bands}")
@@ -691,7 +702,8 @@ def _self_fit(
     temperature_K: float,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
     max_optimized_freq_THz: float | None = None,
-    max_shift_cm1: float = 200.0
+    max_shift_cm1: float = 200.0,
+    acoustic_initial_freq_THz: float | None = DEFAULT_ACOUSTIC_FREQ
 ) -> Dict[str, Any]:
     """
     Fit Gamma-point frequencies to match ADPs computed from a full k-point mesh.
@@ -712,6 +724,8 @@ def _self_fit(
                                 Acoustic modes are always fixed.
         max_shift_cm1: Maximum allowed frequency shift in cm^-1. Default is 200.0.
                        to prevent unphysical hardening of frequencies.
+        acoustic_initial_freq_THz: Initial frequency for acoustic modes. If set,
+                                   acoustic modes are included in optimization.
 
     Returns:
         Result dictionary from `_fit_gamma_point_model`.
@@ -722,6 +736,8 @@ def _self_fit(
     if max_optimized_freq_THz is not None:
         print(f"Max optimized frequency: {max_optimized_freq_THz} THz")
     print(f"Max frequency shift (cm^-1): {max_shift_cm1}")
+    if acoustic_initial_freq_THz is not None:
+        print(f"Acoustic init freq (THz): {acoustic_initial_freq_THz:.4f}")
     
     # 1. Reference ADPs (k-point mesh)
     ph = mbe_automation.storage.to_phonopy(force_constants)
@@ -778,21 +794,23 @@ def _self_fit(
     
     # Create optimize_mask
     n_bands = freqs_gamma.shape[1]
+    optimize_mask = np.ones(n_bands, dtype=bool)
+    
     if max_optimized_freq_THz is not None:
         # freqs_gamma[0] are the Gamma-point frequencies
         optimize_mask = freqs_gamma[0] <= max_optimized_freq_THz
         
-        # Ensure acoustic modes (first 3) are strictly False, although they should be low freq
-        # typically acoustic modes are at ~0 THz, so they would be True if only checking <= max
-        # BUT we explicitely want to exclude them as per standard practice.
-        # However, _fit_to_adps's default logic excludes first 3 if mask is None.
-        # But here mask is NOT None, so we must manually exclude them.
-        if n_bands >= 3:
+        # Only exclude acoustic if max_freq is set AND acoustic_initial_freq_THz is None.
+        # But _self_fit defaults acoustic_initial_freq_THz to DEFAULT_ACOUSTIC_FREQ (not None).
+        # So acoustic modes are included unless explicity unwanted.
+        # If user wants to exclude, they should probably pass acoustic_initial_freq_THz=None?
+        # But for now, let's follow standard behavior: if acoustic freq is set, optimize it.
+        if n_bands >= 3 and acoustic_initial_freq_THz is None:
             optimize_mask[:3] = False
     else:
-        # Default behavior: optimize all optical modes (skip first 3)
-        optimize_mask = np.ones(n_bands, dtype=bool)
-        if n_bands >= 3:
+        # Default behavior: optimize all optical modes.
+        # If acoustic_initial_freq_THz is set, include them too.
+        if n_bands >= 3 and acoustic_initial_freq_THz is None:
             optimize_mask[:3] = False
             
     # 4. Run Fit
@@ -806,7 +824,8 @@ def _self_fit(
         temperature_K=temperature_K,
         degeneracy_tolerance=1e-4,
         optimize_mask=optimize_mask,
-        max_shift_cm1=max_shift_cm1
+        max_shift_cm1=max_shift_cm1,
+        acoustic_initial_freq_THz=acoustic_initial_freq_THz
     )
     
     print(f"Optimization finished. Success: {result['success']}")
