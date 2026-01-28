@@ -665,7 +665,8 @@ def _self_fit(
     force_constants: ForceConstants,
     temperature_K: float,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
-    max_optimized_freq_THz: float | None = None
+    max_optimized_freq_THz: float | None = None,
+    bounds: Tuple[float, float] = (1e-6, 500.0)
 ) -> Dict[str, Any]:
     """
     Fit Gamma-point frequencies to match ADPs computed from a full k-point mesh.
@@ -684,6 +685,8 @@ def _self_fit(
         max_optimized_freq_THz: Maximum frequency (in THz) for modes to be optimized.
                                 Modes above this frequency will be fixed.
                                 Acoustic modes are always fixed.
+        bounds: (min, max) allowed frequencies in THz. Default is (1e-6, 500.0)
+                to prevent unphysical hardening of frequencies.
 
     Returns:
         Result dictionary from `_fit_gamma_point_model`.
@@ -693,6 +696,7 @@ def _self_fit(
     print(f"Reference mesh: {mesh_size}")
     if max_optimized_freq_THz is not None:
         print(f"Max optimized frequency: {max_optimized_freq_THz} THz")
+    print(f"Frequency bounds (THz): {bounds}")
     
     # 1. Reference ADPs (k-point mesh)
     ph = mbe_automation.storage.to_phonopy(force_constants)
@@ -776,7 +780,8 @@ def _self_fit(
         u_exp=u_ref_cart,
         temperature_K=temperature_K,
         degeneracy_tolerance=1e-4,
-        optimize_mask=optimize_mask
+        optimize_mask=optimize_mask,
+        bounds=bounds
     )
     
     print(f"Optimization finished. Success: {result['success']}")
