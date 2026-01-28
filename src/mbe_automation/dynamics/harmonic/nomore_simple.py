@@ -468,6 +468,40 @@ def _print_adp_comparison(
     avg_diff = np.mean(norm_diff)
     print(f"\nAverage difference (Frobenius norm) per atom: {avg_diff:.6f} A^2")
 
+def _print_frequency_comparison(
+    freqs_initial_THz: npt.NDArray[np.float64],
+    freqs_refined_THz: npt.NDArray[np.float64],
+) -> None:
+    """Helper to print starting vs refined frequencies in cm^-1."""
+    
+    # Check if we have multiple q-points; usually _self_fit uses this for Gamma point only (1 q-point)
+    # If multiple q-points, we only print the first one (Gamma) or loop if needed.
+    # The _self_fit calls _fit_to_adps with mesh_size="gamma", so we expect 1 q-point.
+    
+    n_q = freqs_initial_THz.shape[0]
+    n_bands = freqs_initial_THz.shape[1]
+    
+    to_cm = phonopy.physical_units.THzToCm
+    
+    print("\nComparison of Frequencies (Gamma point):")
+    print(f"{'Mode':<6} {'Initial (cm^-1)':<20} {'Refined (cm^-1)':<20} {'Shift (cm^-1)':<20}")
+    print("-" * 70)
+    
+    # Assuming q=0 is what we care about (since we fit Gamma)
+    # If the optimization was done on multiple q-points (which _fit_to_adps supports), we might want to iterate.
+    # But here we know it is for Gamma approximation.
+    
+    for i in range(n_q):
+        if n_q > 1:
+            print(f"--- q-point index {i} ---")
+            
+        freqs_init_cm = freqs_initial_THz[i] * to_cm
+        freqs_refined_cm = freqs_refined_THz[i] * to_cm
+        diff_cm = freqs_refined_cm - freqs_init_cm
+        
+        for band_idx in range(n_bands):
+            print(f"{band_idx:<6} {freqs_init_cm[band_idx]:<20.2f} {freqs_refined_cm[band_idx]:<20.2f} {diff_cm[band_idx]:<20.2f}")
+
 def _self_fit(
     force_constants: ForceConstants,
     temperature_K: float,
@@ -564,7 +598,13 @@ def _self_fit(
     print(f"Optimization finished. Success: {result['success']}")
     print(f"Final Residual: {result['residual']:.6f}")
     
-    # 5. Compare (After Optimization)
+    # 5. Print Frequency Comparison
+    _print_frequency_comparison(
+        freqs_initial_THz=result['original_frequencies'],
+        freqs_refined_THz=result['refined_frequencies']
+    )
+    
+    # 6. Compare ADPs (After Optimization)
     # Recalculate u_3x3 from refined frequencies to verify
     # We use the Gamma eigenvectors which are assumed fixed
     u_final_cart = _compute_adps(result['refined_frequencies'], evecs_gamma, masses, temperature_K)
