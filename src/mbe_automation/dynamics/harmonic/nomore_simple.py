@@ -481,7 +481,7 @@ def _print_frequency_comparison(
     n_q = freqs_initial_THz.shape[0]
     n_bands = freqs_initial_THz.shape[1]
     
-    to_cm = phonopy.physical_units.THzToCm
+    to_cm = phonopy.physical_units.get_physical_units().THzToCm
     
     print("\nComparison of Frequencies (Gamma point):")
     print(f"{'Mode':<6} {'Initial (cm^-1)':<20} {'Refined (cm^-1)':<20} {'Shift (cm^-1)':<20}")
