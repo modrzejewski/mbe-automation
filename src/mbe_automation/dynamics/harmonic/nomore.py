@@ -66,7 +66,7 @@ def _map_adps(
     Args:
         struct_ref: Reference structure.
         struct_src: Source structure.
-        adps_src_cart: (N, 3, 3) Cartesian ADPs of the source.
+        adps_src_cart: (N, 3, 3) Cartesian ADPs of the source in Å².
 
     Returns:
         tuple: (mapped_adps, mapped_positions, indices) where mapped_adps/positions are in 
@@ -154,8 +154,8 @@ def _map_adps(
     
     return mapped_adps, mapped_coords, indices
 
-    print(f"Manual Sanity Check RMSD: {rmsd:.4f} Å (Max Dist: {max_dist:.4f} Å)")
-    print(f"Manual Centered RMSD:     {rmsd_centered:.4f} Å (Should match StructureMatcher)")
+    print(f"Manual Sanity Check RMSD: {rmsd:.4f} Å (Max Dist: {max_dist:.4f} Å)")
+    print(f"Manual Centered RMSD:     {rmsd_centered:.4f} Å (Should match StructureMatcher)")
 
 def _extract_u_cart_exp(
     cif_path: str, 
@@ -174,7 +174,7 @@ def _extract_u_cart_exp(
         reference_structure: Optional structure to match atom ordering against.
         
     Returns:
-        npt.NDArray: Array of Cartesian ADPs with shape (N_atoms, 3, 3) in Å².
+        npt.NDArray: Array of Cartesian ADPs with shape (N_atoms, 3, 3) in Å².
     """
     adapter = CctbxAdapter(cif_path)
     
@@ -241,7 +241,7 @@ def _extract_u_cart_exp(
             dists_sq = np.sum(cart_diff**2, axis=1)
             rmsd = np.sqrt(np.mean(dists_sq))
             
-            print(f"ADP Mapping Verification RMSD: {rmsd:.4f} Å")
+            print(f"ADP Mapping Verification RMSD: {rmsd:.4f} Å")
             
         except ValueError as e:
             raise ValueError(f"Robust ADP mapping failed: {e}")
@@ -387,7 +387,7 @@ def _validate_nomore_calculator(
 ) -> None:
     """
     Validate the NoMoReCalculator by comparing calculated ADPs with 
-    mbe_automation.dynamics.harmonic.modes.thermal_displacements.
+    mbe_automation.dynamics.harmonic.modes.thermal_displacements (which computes ADPs in Å²).
     
     Args:
         force_constants: The force constants model.
@@ -474,7 +474,7 @@ def _validate_nomore_calculator(
     
     # --- 3. Compare ---
     
-    print(f"\nComparing ADPs (Ang^2):")
+    print(f"\nComparing ADPs (Å²):")
     print(f"Max Absolute Difference: {np.max(np.abs(u_cart_nomore - u_cart_mbe)):.6e}")
     
     diff = u_cart_nomore - u_cart_mbe
@@ -482,7 +482,7 @@ def _validate_nomore_calculator(
     print(f"RMSD: {rmsd:.6e}")
     
     # Print per-atom comparison (Trace of U)
-    print("\nTrace(U) Comparison (Å²):")
+    print("\nTrace(U) Comparison (Å²):")
     print(f"{'Atom':<5} {'NoMoRe':<12} {'MBE':<12} {'Diff':<12} {'% Diff':<10}")
     print("-" * 55)
     

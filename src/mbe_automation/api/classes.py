@@ -282,7 +282,7 @@ class ForceConstants(_ForceConstants):
         bounds: tuple[float, float] = (0.1, 1e4)
     ) -> npt.NDArray:
         """
-        Refine phonon frequencies by fitting calculated ADPs to experimental ADPs.
+        Refine phonon frequencies by fitting calculated ADPs to experimental ADPs (in Å²).
         
         Args:
             cif_path: Path to experimental CIF with ADPs.
@@ -315,7 +315,7 @@ class ForceConstants(_ForceConstants):
         max_iterations: int = 200,
     ) -> typing.Dict[str, typing.Any]:
         """
-        Refine phonon frequencies using simplified band shift optimization (nomore_simple).
+        Refine phonon frequencies using simplified band shift optimization (nomore_simple) using ADPs in Å².
         
         Args:
             cif_path: Path to experimental CIF with ADPs.

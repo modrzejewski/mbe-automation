@@ -106,7 +106,7 @@ def _extract_u_cart_exp(
     cif_path: str, 
     reference_structure: mbe_automation.storage.core.Structure | None = None,
 ) -> npt.NDArray:
-    """Extract experimental Cartesian ADPs from a CIF file."""
+    """Extract experimental Cartesian ADPs from a CIF file. Returns ADPs in Å²."""
     adapter = CctbxAdapter(cif_path)
     
     # Expand to P1 to get full unit cell content
@@ -184,7 +184,7 @@ def _compute_adps(
         temperature_K: Temperature in Kelvin.
         
     Returns:
-        (n_atoms, 3, 3) Cartesian ADPs (U_cart).
+        (n_atoms, 3, 3) Cartesian ADPs (U_cart) in Å².
     """
     n_qpoints = len(frequencies_q)
     n_atoms = len(masses_AMU)
@@ -274,7 +274,7 @@ def _fit_to_adps(
     
     Args:
         force_constants: The harmonic force constants model.
-        u_exp: (N_atoms, 3, 3) Experimental Cartesian ADPs.
+        u_exp: (N_atoms, 3, 3) Experimental Cartesian ADPs in Å².
         temperature_K: Temperature (K). 
         mesh_size: k-point sampling mesh.
         optimize_mask: (n_bands,) Boolean mask. If True, the band is allowed to shift.

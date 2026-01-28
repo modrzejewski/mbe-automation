@@ -417,7 +417,7 @@ def _absolute_amplitude_eq_2(
     the definition of A_jq, but should be incuded later depending on
     the definition of e_jq.
 
-    The result is in the units of Angstrom.
+    The result is in the units of Å.
 
     1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
        multi-temperature anisotropic displacement parameters. I. Theory
@@ -895,7 +895,7 @@ def symmetrize_adps(
         symprec: Symmetry precision
         
     Returns:
-        symmetrized_adps: Matrix (N_atoms, 3, 3) with correctly averaged tensors.
+        symmetrized_adps: Matrix (N_atoms, 3, 3) with correctly averaged tensors in Å².
     """
     sga = SpacegroupAnalyzer(structure, symprec=symprec)
     symmetrized_structure = sga.get_symmetrized_structure()
