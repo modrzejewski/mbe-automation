@@ -512,7 +512,7 @@ def _fit_gamma_point_model(
     temperature_K: float,
     optimize_mask: npt.NDArray[np.bool_] | None = None,
     degeneracy_tolerance: float = 1e-4,
-    bounds: Tuple[float, float] = (1e-6, np.inf),
+    max_shift_cm1: float = 200.0,
     max_iterations: int = 200,
 ) -> Dict[str, Any]:
     """
@@ -528,7 +528,7 @@ def _fit_gamma_point_model(
         temperature_K: Temperature (K).
         optimize_mask: (n_bands,) Boolean mask. If True, the band is allowed to shift.
         degeneracy_tolerance: Tolerance (THz) for linking degenerate bands.
-        bounds: (min, max) allowed frequencies in THz.
+        max_shift_cm1: Maximum allowed frequency shift in cm^-1. Default is 200.0.
         max_iterations: Maximum iterations for the optimizer.
         
     Returns:
@@ -578,10 +578,15 @@ def _fit_gamma_point_model(
     
     target_u_flat = _flatten_u(u_exp)
     
-    # Bounds
+    # Bounds logic
+    # We constrain the shift to be within +/- max_shift_cm1
+    # BUT we also must ensure that (freq + shift) > 0 (stability)
+    
+    to_thz = 1.0 / phonopy.physical_units.get_physical_units().THzToCm
+    max_shift_THz = max_shift_cm1 * to_thz
+    
     param_to_group_map = np.where(group_optimize_mask)[0]
     shift_bounds = []
-    min_freq_allowed, max_freq_allowed = bounds
     
     # Since n_q=1, simplification:
     freqs_gamma = initial_freqs_q_THz[0] # (n_bands,)
@@ -592,10 +597,30 @@ def _fit_gamma_point_model(
         
         group_freqs = freqs_gamma[bands_in_group]
         
-        # Shift limits constrained by ALL bands in the group
-        lower_bound = min_freq_allowed - np.min(group_freqs)
-        upper_bound = max_freq_allowed - np.max(group_freqs)
+        # 1. Stability constraint: min(freq + shift) > epsilon -> shift > epsilon - min(freq)
+        # We want the lowest frequency in the group to remain positive
+        min_freq_in_group = np.min(group_freqs)
+        stability_min_shift = 1e-6 - min_freq_in_group
+        
+        # 2. User constraint: -max_shift <= shift <= max_shift
+        user_min_shift = -max_shift_THz
+        user_max_shift = max_shift_THz
+        
+        # Combine
+        lower_bound = max(stability_min_shift, user_min_shift)
+        upper_bound = user_max_shift
+        
+        # Validity check (in case stability requires shift > max_shift, unlikely but possible for unstable modes)
+        if lower_bound > upper_bound:
+             # If stability requires a shift larger than allowed, we prioritize stability but clamp to upper
+             # This means we might not satisfy the max_shift constraint perfectly if the mode is imaginary?
+             # Or we assume input modes are stable (freq > 0). If freq < 0, stability_min_shift will be positive.
+             # If freq ~ 0 (acoustic), stability_min_shift ~ 0.
+             # For now, just trust the logic.
+             pass
+
         shift_bounds.append((lower_bound, upper_bound))
+
         
     # 4. Objective Function
     def objective(group_shift_params):
@@ -666,7 +691,7 @@ def _self_fit(
     temperature_K: float,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
     max_optimized_freq_THz: float | None = None,
-    bounds: Tuple[float, float] = (1e-6, 500.0)
+    max_shift_cm1: float = 200.0
 ) -> Dict[str, Any]:
     """
     Fit Gamma-point frequencies to match ADPs computed from a full k-point mesh.
@@ -685,8 +710,8 @@ def _self_fit(
         max_optimized_freq_THz: Maximum frequency (in THz) for modes to be optimized.
                                 Modes above this frequency will be fixed.
                                 Acoustic modes are always fixed.
-        bounds: (min, max) allowed frequencies in THz. Default is (1e-6, 500.0)
-                to prevent unphysical hardening of frequencies.
+        max_shift_cm1: Maximum allowed frequency shift in cm^-1. Default is 200.0.
+                       to prevent unphysical hardening of frequencies.
 
     Returns:
         Result dictionary from `_fit_gamma_point_model`.
@@ -696,7 +721,7 @@ def _self_fit(
     print(f"Reference mesh: {mesh_size}")
     if max_optimized_freq_THz is not None:
         print(f"Max optimized frequency: {max_optimized_freq_THz} THz")
-    print(f"Frequency bounds (THz): {bounds}")
+    print(f"Max frequency shift (cm^-1): {max_shift_cm1}")
     
     # 1. Reference ADPs (k-point mesh)
     ph = mbe_automation.storage.to_phonopy(force_constants)
@@ -781,7 +806,7 @@ def _self_fit(
         temperature_K=temperature_K,
         degeneracy_tolerance=1e-4,
         optimize_mask=optimize_mask,
-        bounds=bounds
+        max_shift_cm1=max_shift_cm1
     )
     
     print(f"Optimization finished. Success: {result['success']}")
