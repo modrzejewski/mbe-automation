@@ -442,3 +442,118 @@ def _fit_to_adps(
         "residual": residual,
         "u_calc": final_u_calc
     }
+
+def _self_fit(
+    force_constants: ForceConstants,
+    temperature_K: float,
+    mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
+) -> Dict[str, Any]:
+    """
+    Fit Gamma-point frequencies to match ADPs computed from a full k-point mesh.
+
+    This function:
+    1. Computes ADPs using the specified k-point `mesh_size`.
+    2. Computes ADPs using the Gamma point approximation.
+    3. Prints a comparison of the two.
+    4. Runs `_fit_to_adps` to optimize Gamma-point frequencies such that the
+       resulting Gamma-point ADPs match the k-point ADPs.
+    
+    Args:
+        force_constants: The harmonic force constants model.
+        temperature_K: Temperature in Kelvin.
+        mesh_size: The k-point mesh for the reference calculation (e.g. [4, 4, 4]).
+
+    Returns:
+        Result dictionary from `_fit_to_adps`.
+    """
+    print(f"--- _self_fit: effective Gamma-point approximation ---")
+    print(f"Temperature: {temperature_K} K")
+    print(f"Reference mesh: {mesh_size}")
+    
+    # 1. Reference ADPs (k-point mesh)
+    ph = mbe_automation.storage.to_phonopy(force_constants)
+    qpoints_ref, _ = phonopy_k_point_grid(
+        phonopy_object=ph,
+        mesh_size=mesh_size,
+        use_symmetry=False,
+        center_at_gamma=False
+    )
+    
+    # Note: We must use rows storage for compatibility with _compute_adps which expects (n_q, n_modes, n_dof)
+    freqs_ref, evecs_ref = at_k_points(
+        dynamical_matrix=ph.dynamical_matrix,
+        k_points=qpoints_ref,
+        compute_eigenvecs=True,
+        eigenvectors_storage="rows"
+    )
+    
+    if evecs_ref is None:
+        raise RuntimeError("Failed to compute eigenvectors for reference mesh.")
+
+    masses = ph.primitive.masses
+    u_ref_cart = _compute_adps(freqs_ref, evecs_ref, masses, temperature_K)
+    
+    # 2. Approximate ADPs (Gamma)
+    qpoints_gamma, _ = phonopy_k_point_grid(
+        phonopy_object=ph,
+        mesh_size="gamma",
+        use_symmetry=False,
+        center_at_gamma=False
+    )
+    
+    freqs_gamma, evecs_gamma = at_k_points(
+        dynamical_matrix=ph.dynamical_matrix,
+        k_points=qpoints_gamma,
+        compute_eigenvecs=True,
+        eigenvectors_storage="rows"
+    )
+    
+    if evecs_gamma is None:
+        raise RuntimeError("Failed to compute eigenvectors for Gamma point.")
+
+    u_gamma_cart = _compute_adps(freqs_gamma, evecs_gamma, masses, temperature_K)
+    
+    # 3. Compare
+    diff = u_gamma_cart - u_ref_cart
+    norm_diff = np.linalg.norm(diff, axis=(1, 2))  # Frobenius norm per atom
+    
+    print("\nComparison of ADPs [Gamma vs Reference (k-points)]:")
+    print(f"{'Atom':<6} {'Ref U_iso (A^2)':<20} {'Gamma U_iso (A^2)':<20} {'Diff Norm (A^2)':<20}")
+    print("-" * 70)
+    
+    for i in range(len(masses)):
+        # Calculate U_iso = trace(U) / 3
+        u_iso_ref = np.trace(u_ref_cart[i]) / 3.0
+        u_iso_gamma = np.trace(u_gamma_cart[i]) / 3.0
+        print(f"{i:<6} {u_iso_ref:<20.6f} {u_iso_gamma:<20.6f} {norm_diff[i]:<20.6f}")
+
+    avg_diff = np.mean(norm_diff)
+    print(f"\nAverage difference (Frobenius norm) per atom: {avg_diff:.6f} A^2")
+    
+    # 4. Run Fit
+    print("\nRunning optimization to find effective Gamma-point frequencies...")
+    
+    # We use u_ref_cart (the k-point result) as the target 'experimental' data
+    # We perform the fit using ONLY the Gamma point (mesh_size="gamma")
+    result = _fit_to_adps(
+        force_constants=force_constants,
+        u_exp=u_ref_cart,
+        temperature_K=temperature_K,
+        mesh_size="gamma",
+        degeneracy_tolerance=1e-4
+    )
+    
+    print(f"Optimization finished. Success: {result['success']}")
+    print(f"Final Residual: {result['residual']:.6f}")
+    
+    if result['success']:
+        # Recalculate u_3x3 from refined frequencies to verify
+        # We use the Gamma eigenvectors which are assumed fixed
+        u_final_cart = _compute_adps(result['refined_frequencies'], evecs_gamma, masses, temperature_K)
+        
+        final_diff = u_final_cart - u_ref_cart
+        final_norm_diff = np.linalg.norm(final_diff, axis=(1, 2))
+        avg_final_diff = np.mean(final_norm_diff)
+        print(f"Post-optimization Average difference per atom: {avg_final_diff:.6f} A^2")
+        
+    return result
