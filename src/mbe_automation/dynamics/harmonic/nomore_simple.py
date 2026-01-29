@@ -488,11 +488,11 @@ def _fit_gamma_point_model(
     force_constants: ForceConstants,
     u_exp: npt.NDArray[np.float64],
     temperature_K: float,
+    acoustic_initial_freq_THz: float, # Mandated argument
     optimize_mask: npt.NDArray[np.bool_] | None = None,
     degeneracy_tolerance: float = 1e-4,
     max_shift_cm1: float = 200.0,
     max_iterations: int = 200,
-    acoustic_initial_freq_THz: float | None = None
 ) -> Dict[str, Any]:
     """
     Simplified frequency fitter designed specifically for Gamma-point models.
@@ -535,7 +535,7 @@ def _fit_gamma_point_model(
     n_bands = initial_freqs_q_THz.shape[1]
     
     # Override acoustic frequencies if requested
-    if acoustic_initial_freq_THz is not None and n_bands >= 3:
+    if n_bands >= 3:
         initial_freqs_q_THz[0, :3] = acoustic_initial_freq_THz
 
     masses_AMU = ph.primitive.masses
@@ -796,9 +796,9 @@ def _self_fit(
         u_exp=u_ref_cart,
         temperature_K=temperature_K,
         degeneracy_tolerance=1e-4,
+        acoustic_initial_freq_THz=acoustic_initial_freq_THz,
         optimize_mask=optimize_mask,
-        max_shift_cm1=max_shift_cm1,
-        acoustic_initial_freq_THz=acoustic_initial_freq_THz
+        max_shift_cm1=max_shift_cm1
     )
     
     print(f"Optimization finished. Success: {result['success']}")
@@ -816,13 +816,11 @@ def _self_fit(
     # We use the Gamma eigenvectors which are assumed fixed
     u_final_cart = _compute_adps(result['refined_frequencies'], evecs_gamma, masses, temperature_K)
     
-    _print_adp_comparison(
-        u_ref=u_ref_cart,
-        u_approx=u_final_cart,
-        masses=masses,
-        title="Comparison of ADPs [Gamma (Optimized) vs Reference (k-points)]",
-        label_ref="Ref U_iso",
-        label_approx="Opt. Gamma U_iso"
+    compare_adps(
+        adps_1=u_final_cart,
+        adps_2=u_ref_cart,
+        labels=["Opt. Gamma", "Ref (k)"],
+        symbols=ph.primitive.symbols
     )
         
     return result

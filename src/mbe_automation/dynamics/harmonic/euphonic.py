@@ -22,7 +22,7 @@ def _convert_weights(weights: npt.NDArray) -> npt.NDArray[np.float64]:
     total_weight = weights.sum()
     return weights.astype(np.float64) / total_weight
 
-def _to_euphonic_modes(
+def to_euphonic_modes(
     force_constants: ForceConstants,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
 ) -> "euphonic.QpointPhononModes":
@@ -124,8 +124,10 @@ def ordered_modes(
               Shape: (n_qpts, n_modes)
             - eigenvectors: Phonon eigenvectors.
               Shape: (n_qpts, n_modes, n_atoms, 3)
+              Note: The eigenvectors have the spatial phase factor consistent with the
+              convention of the Euphonic library, NOT Phonopy.
     """
-    modes = _to_euphonic_modes(force_constants, mesh_size)
+    modes = to_euphonic_modes(force_constants, mesh_size)
     modes.reorder_frequencies(reorder_gamma=True)
     
     # Extract frequencies in THz
@@ -171,7 +173,7 @@ def _validate_adps(
     
     # 2. Euphonic Calculation
     t2 = time.time()
-    modes = _to_euphonic_modes(force_constants, mesh_size)
+    modes = to_euphonic_modes(force_constants, mesh_size)
     
     # Calculate Debye-Waller exponent W.
     dw = modes.calculate_debye_waller(

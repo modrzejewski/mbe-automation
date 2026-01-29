@@ -42,7 +42,6 @@ from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY
 import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.thermodynamics
-from mbe_automation.dynamics.harmonic.nomore import DEFAULT_RESTRAINT_WEIGHT
 from copy import deepcopy
 
 class _TrainingStructure:
@@ -278,7 +277,7 @@ class ForceConstants(_ForceConstants):
         cif_path: str,
         temperature: float,
         phonon_filter: PhononFilter | None = None,
-        restraint_weight: float = DEFAULT_RESTRAINT_WEIGHT,
+        restraint_weight: float = 0.0,
         bounds: tuple[float, float] = (0.1, 1e4)
     ) -> npt.NDArray:
         """
