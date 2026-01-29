@@ -277,7 +277,7 @@ def fit_fbz_model(
     }
 
 
-def _self_fit_fbz(
+def _self_fit(
     force_constants: ForceConstants,
     temperature_K: float,
     mesh_size_large: npt.NDArray[np.int64] | float,
