@@ -311,3 +311,58 @@ def eos_curves(
         return fig
 
 
+def compare_adps(
+    adps_1: npt.NDArray[np.float64],
+    adps_2: npt.NDArray[np.float64],
+    labels: list[str],
+    symbols: list[str] | None = None,
+) -> None:
+    """
+    Compare two sets of Anisotropic Displacement Parameters (ADPs) and print a report.
+
+    Args:
+        adps_1: First set of ADPs (N, 3, 3).
+        adps_2: Second set of ADPs (N, 3, 3).
+        labels: List of two strings identifying the datasets (e.g., ["Calc", "Ref"]).
+        symbols: Optional list of atom symbols (N,). If None, indices are used.
+    """
+    if adps_1.shape != adps_2.shape:
+        raise ValueError(f"Shape mismatch: {adps_1.shape} vs {adps_2.shape}")
+        
+    n_atoms = adps_1.shape[0]
+    if symbols is None:
+        symbols = [""] * n_atoms
+        
+    diff = adps_1 - adps_2
+    abs_diff = np.abs(diff)
+    max_diff = np.max(abs_diff)
+    rmsd = np.sqrt(np.mean(diff**2))
+    
+    label1, label2 = labels
+    
+    print(f"\nComparing ADPs: {label1} vs {label2}")
+    print(f"RMSD: {rmsd:.6e}")
+    print(f"Max Absolute Diff: {max_diff:.6e}")
+    
+    print("\nIsotropic U (Trace(U)/3) Comparison:")
+    header = f"{'Atom':<6} {label1:<12} {label2:<12} {'Diff':<12} {'% Diff':<10}"
+    print(header)
+    print("-" * len(header))
+    
+    for i in range(n_atoms):
+        u_iso_1 = np.trace(adps_1[i]) / 3.0
+        u_iso_2 = np.trace(adps_2[i]) / 3.0
+        
+        diff_iso = u_iso_1 - u_iso_2
+        pct_diff = 0.0
+        if abs(u_iso_2) > 1e-9:
+            pct_diff = (diff_iso / u_iso_2) * 100
+        elif abs(u_iso_1) > 1e-9:
+            pct_diff = (diff_iso / u_iso_1) * 100
+            
+        atom_label = f"{symbols[i]}{i}"
+        print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {diff_iso:<12.6e} {pct_diff:<9.4f}%")
+        
+    print("-" * len(header))
+
+

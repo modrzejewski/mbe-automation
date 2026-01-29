@@ -44,6 +44,7 @@ import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.thermodynamics
 from mbe_automation.dynamics.harmonic.nomore import DEFAULT_RESTRAINT_WEIGHT
 from copy import deepcopy
+
 class _TrainingStructure:
     def to_mace_dataset(
             self,
@@ -158,7 +159,6 @@ class ForceConstants(_ForceConstants):
         Convert this ForceConstants object to a Phonopy object.
         """
         return mbe_automation.storage.to_phonopy(self)
-
 
     def thermal_displacements(
             self,
