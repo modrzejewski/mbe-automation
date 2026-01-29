@@ -354,14 +354,13 @@ def compare_adps(
         u_iso_2 = np.trace(adps_2[i]) / 3.0
         
         diff_iso = u_iso_1 - u_iso_2
-        pct_diff = 0.0
+        
+        atom_label = f"{symbols[i]}{i}"
         if abs(u_iso_2) > 1e-9:
             pct_diff = (diff_iso / u_iso_2) * 100
-        elif abs(u_iso_1) > 1e-9:
-            pct_diff = (diff_iso / u_iso_1) * 100
-            
-        atom_label = f"{symbols[i]}{i}"
-        print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {diff_iso:<12.6e} {pct_diff:<9.4f}%")
+            print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {diff_iso:<12.6e} {pct_diff:<9.4f}%")
+        else:
+            print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {diff_iso:<12.6e} {'N/A':<10}")
         
     print("-" * len(header))
 
