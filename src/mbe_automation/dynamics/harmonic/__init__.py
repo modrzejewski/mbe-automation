@@ -3,6 +3,7 @@ from . import data
 from . import eos
 from . import modes
 from . import display
+from . import euphonic
 
 __all__ = [
     "core",
@@ -10,4 +11,5 @@ __all__ = [
     "eos",
     "modes",
     "display",
+    "euphonic",
 ]

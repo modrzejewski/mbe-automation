@@ -21,6 +21,7 @@ dependencies = [
   "scikit-learn",
   "spglib",
   "seekpath",
+  "euphonic",
   "phonopy>=2.43.1",
   "tqdm",
   "joblib",
