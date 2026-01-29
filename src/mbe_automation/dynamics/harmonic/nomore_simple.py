@@ -155,8 +155,6 @@ def _extract_u_cart_exp(
             
     return u_cart
 
-    return u_cart
-
 def _flatten_u(u: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """
     Flatten (N, 3, 3) ADPs into (N*6,) array of unique components.
