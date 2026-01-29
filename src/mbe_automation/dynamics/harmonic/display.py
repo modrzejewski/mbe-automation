@@ -349,14 +349,17 @@ def compare_adps(
     label1 = labels[0]
     label2 = labels[1]
     
-    print(f"\nComparing ADPs: {label1} vs {label2}")
-    print(f"RMSD: {rmsd:.6e}")
-    print(f"Max Absolute Diff: {max_diff:.6e}")
-    
-    if adps_3 is not None:
+    if adps_3 is None:
+        print(f"\nComparing ADPs: {label1} vs {label2}")
+        print(f"RMSD: {rmsd:.6e}")
+        print(f"Max Absolute Diff: {max_diff:.6e}")
+    else:
+        label3 = labels[2]
+        print(f"\nComparing ADPs: {label1} vs {label2} and {label3}")
+        print(f"RMSD ({label1} vs {label2}): {rmsd:.6e}")
+
         diff_3 = adps_1 - adps_3
         rmsd_3 = np.sqrt(np.mean(diff_3**2))
-        label3 = labels[2]
         print(f"RMSD ({label1} vs {label3}): {rmsd_3:.6e}")
 
     print("\nIsotropic U (Trace(U)/3) Comparison:")
