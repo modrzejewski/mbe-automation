@@ -60,7 +60,7 @@ The `volume_range` parameter defines the set of scaling factors applied to the e
 *   **Polynomial**: 3 points
 *   **Spline, Vinet, Birch-Murnaghan**: 4 points
 
-While these are the minimums required to run the calculation, a denser sampling (e.g. 7 or more points) is recommended for robust numerical computation of second-order thermodynamic derivatives, such as the coefficient of thermal expansion ($\alpha_V$) and the heat capacity at constant pressure ($C_p$).
+While these are the minimums required to run the calculation, a denser sampling is recommended for robust numerical computation of second-order thermodynamic derivatives, such as the coefficient of thermal expansion ($\alpha_V$) and the heat capacity at constant pressure ($C_p$).
 
 The workflow is executed by passing the configuration object to the `run` function.
 
