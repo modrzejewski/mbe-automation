@@ -488,7 +488,7 @@ def _fit_gamma_point_model(
     force_constants: ForceConstants,
     u_exp: npt.NDArray[np.float64],
     temperature_K: float,
-    acoustic_initial_freq_THz: float, # Mandated argument
+    acoustic_initial_freq_THz: float,
     optimize_mask: npt.NDArray[np.bool_] | None = None,
     degeneracy_tolerance: float = 1e-4,
     max_shift_cm1: float = 200.0,

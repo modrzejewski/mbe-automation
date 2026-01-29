@@ -25,6 +25,7 @@ def _convert_weights(weights: npt.NDArray) -> npt.NDArray[np.float64]:
 def to_euphonic_modes(
     force_constants: ForceConstants,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
+    odd_numbers: bool = False,
 ) -> "euphonic.QpointPhononModes":
     """
     Helper function to convert ForceConstants to Euphonic QpointPhononModes.
@@ -32,6 +33,9 @@ def to_euphonic_modes(
     Args:
         force_constants: The force constants object.
         mesh_size: The mesh size for q-point sampling.
+        odd_numbers: If True, ensure the k-point mesh has odd dimensions. 
+                     This is useful to guarantee the Gamma point is included.
+                     For integer arrays, raises ValueError if even. For floats, rounds up.
 
     Returns:
         A Euphonic QpointPhononModes object.
@@ -60,7 +64,8 @@ def to_euphonic_modes(
     qpoints, weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
         phonopy_object=ph,
         mesh_size=mesh_size,
-        use_symmetry=True
+        use_symmetry=True,
+        odd_numbers=odd_numbers
     )
     
     # Normalize weights

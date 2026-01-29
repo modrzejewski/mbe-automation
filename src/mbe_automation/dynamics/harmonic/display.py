@@ -316,19 +316,27 @@ def compare_adps(
     adps_2: npt.NDArray[np.float64],
     labels: list[str],
     symbols: list[str] | None = None,
+    adps_3: npt.NDArray[np.float64] | None = None,
 ) -> None:
     """
-    Compare two sets of Anisotropic Displacement Parameters (ADPs) and print a report.
+    Compare sets of Anisotropic Displacement Parameters (ADPs) and print a report.
 
     Args:
         adps_1: First set of ADPs (N, 3, 3).
         adps_2: Second set of ADPs (N, 3, 3).
-        labels: List of two strings identifying the datasets (e.g., ["Calc", "Ref"]).
+        labels: List of strings identifying the datasets. Should match number of ADP sets.
         symbols: Optional list of atom symbols (N,). If None, indices are used.
+        adps_3: Optional third set of ADPs (N, 3, 3).
     """
     if adps_1.shape != adps_2.shape:
-        raise ValueError(f"Shape mismatch: {adps_1.shape} vs {adps_2.shape}")
-        
+        raise ValueError(f"Shape mismatch 1 vs 2: {adps_1.shape} vs {adps_2.shape}")
+    
+    if adps_3 is not None:
+        if adps_3.shape != adps_1.shape:
+             raise ValueError(f"Shape mismatch 1 vs 3: {adps_1.shape} vs {adps_3.shape}")
+        if len(labels) != 3:
+            raise ValueError("Insufficient labels for 3 ADP sets.")
+
     n_atoms = adps_1.shape[0]
     if symbols is None:
         symbols = [""] * n_atoms
@@ -338,30 +346,58 @@ def compare_adps(
     max_diff = np.max(abs_diff)
     rmsd = np.sqrt(np.mean(diff**2))
     
-    label1, label2 = labels
+    label1 = labels[0]
+    label2 = labels[1]
     
     print(f"\nComparing ADPs: {label1} vs {label2}")
     print(f"RMSD: {rmsd:.6e}")
     print(f"Max Absolute Diff: {max_diff:.6e}")
     
+    if adps_3 is not None:
+        diff_3 = adps_1 - adps_3
+        rmsd_3 = np.sqrt(np.mean(diff_3**2))
+        label3 = labels[2]
+        print(f"RMSD ({label1} vs {label3}): {rmsd_3:.6e}")
+
     print("\nIsotropic U (Trace(U)/3) Comparison:")
-    header = f"{'Atom':<6} {label1:<12} {label2:<12} {'Diff':<12} {'% Diff':<10}"
-    print(header)
-    print("-" * len(header))
     
-    for i in range(n_atoms):
-        u_iso_1 = np.trace(adps_1[i]) / 3.0
-        u_iso_2 = np.trace(adps_2[i]) / 3.0
+    if adps_3 is None:
+        header = f"{'Atom':<6} {label1:<12} {label2:<12} {'Diff':<12} {'% Diff':<10}"
+        print(header)
+        print("-" * len(header))
         
-        diff_iso = u_iso_1 - u_iso_2
+        for i in range(n_atoms):
+            u_iso_1 = np.trace(adps_1[i]) / 3.0
+            u_iso_2 = np.trace(adps_2[i]) / 3.0
+            
+            diff_iso = u_iso_1 - u_iso_2
+            
+            atom_label = f"{symbols[i]}{i}"
+            if abs(u_iso_2) > 1e-9:
+                pct_diff = (diff_iso / u_iso_2) * 100
+                print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {diff_iso:<12.6e} {pct_diff:<9.4f}%")
+            else:
+                print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {diff_iso:<12.6e} {'N/A':<10}")
+        print("-" * len(header))
+
+    else:
+        # 3-column output
+        label3 = labels[2]
+        header = f"{'Atom':<6} {label1:<12} {label2:<12} {label3:<12} {'Diff(1-2)':<12} {'Diff(1-3)':<12}"
+        print(header)
+        print("-" * len(header))
+
+        for i in range(n_atoms):
+            u_iso_1 = np.trace(adps_1[i]) / 3.0
+            u_iso_2 = np.trace(adps_2[i]) / 3.0
+            u_iso_3 = np.trace(adps_3[i]) / 3.0
+            
+            diff_12 = u_iso_1 - u_iso_2
+            diff_13 = u_iso_1 - u_iso_3
+            
+            atom_label = f"{symbols[i]}{i}"
+            print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {u_iso_3:<12.6f} {diff_12:<12.6e} {diff_13:<12.6e}")
         
-        atom_label = f"{symbols[i]}{i}"
-        if abs(u_iso_2) > 1e-9:
-            pct_diff = (diff_iso / u_iso_2) * 100
-            print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {diff_iso:<12.6e} {pct_diff:<9.4f}%")
-        else:
-            print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {diff_iso:<12.6e} {'N/A':<10}")
-        
-    print("-" * len(header))
+        print("-" * len(header))
 
 
