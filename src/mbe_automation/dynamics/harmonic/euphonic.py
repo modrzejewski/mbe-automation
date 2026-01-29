@@ -2,8 +2,14 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 from typing import Literal
-import euphonic
-from euphonic.readers.phonopy import convert_eigenvector_phases
+try:
+    import euphonic
+    from euphonic.readers.phonopy import convert_eigenvector_phases
+except ImportError:
+    raise ImportError(
+        "The 'euphonic' library is required but not found. "
+        "Please install 'euphonic' in your environment."
+    ) from None
 
 import mbe_automation.storage
 from mbe_automation.storage import ForceConstants
