@@ -733,6 +733,7 @@ def phonopy_k_point_grid(
         mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
         use_symmetry: bool = False,
         center_at_gamma: bool = False,
+        odd_numbers: bool = False,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
     """
     Generate a k-point mesh for a Phonopy object.
@@ -747,6 +748,9 @@ def phonopy_k_point_grid(
               mesh for Brillouin zone integration.
         use_symmetry: Whether to use mesh symmetry (reduces number of k-points).
         center_at_gamma: Whether to center the mesh at Gamma (shift=0).
+        odd_numbers: Whether to enforce odd numbers in the mesh dimensions.
+                     If mesh_size is a float, dimensions are rounded up to the nearest odd number.
+                     If mesh_size is an array, raises ValueError if any dimension is even.
 
     Returns:
         A tuple containing:
@@ -759,10 +763,19 @@ def phonopy_k_point_grid(
             lattice=phonopy_object.primitive.cell,
             rotations=phonopy_object.primitive_symmetry.pointgroup_operations
         )
+        if odd_numbers:
+             # Ensure all dimensions are odd. Increment even numbers by 1.
+             mesh = np.where(mesh % 2 == 0, mesh + 1, mesh)
     elif isinstance(mesh_size, str) and mesh_size == "gamma":
         mesh = np.array([1, 1, 1])
     else:
         mesh = mesh_size
+        if odd_numbers:
+            if np.any(mesh % 2 == 0):
+                raise ValueError(
+                    f"odd_numbers=True was requested, but the supplied mesh {mesh} "
+                    f"contains even numbers."
+                )
 
     phonopy_object.init_mesh(
         mesh=mesh,
