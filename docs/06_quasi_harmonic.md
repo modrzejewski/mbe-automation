@@ -55,10 +55,12 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 
 ### Volume Range
 
-The `volume_range` parameter defines the set of scaling factors applied to the equilibrium volume $V_0$ to sample the equation of state (EOS).
+The `volume_range` parameter defines the set of scaling factors applied to the equilibrium volume $V_0$ to sample the equation of state (EOS). The code enforces a minimum number of points depending on the selected `equation_of_state`:
 
-*   **Number of points**: A minimum of **5 to 7 points** is recommended to reliably fit standard EOS models (such as Birch-Murnaghan or Vinet).
-*   **Thermodynamic derivatives**: A dense sampling (e.g. 7 points) is particularly important for the numerical computation of second-order thermodynamic derivatives, such as the coefficient of thermal expansion ($\alpha_V$) and the heat capacity at constant pressure ($C_p$). These quantities depend on the curvature of the free energy surface, which requires a well-defined EOS fit.
+*   **Polynomial**: 3 points
+*   **Spline, Vinet, Birch-Murnaghan**: 4 points
+
+While these are the minimums required to run the calculation, a denser sampling (e.g. 7 or more points) is recommended for robust numerical computation of second-order thermodynamic derivatives, such as the coefficient of thermal expansion ($\alpha_V$) and the heat capacity at constant pressure ($C_p$).
 
 The workflow is executed by passing the configuration object to the `run` function.
 
