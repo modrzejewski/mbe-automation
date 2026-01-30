@@ -295,7 +295,6 @@ def gruneisen_parameters(
             calculator=calculator,
             supercell_matrix=supercell_matrix,
             supercell_displacement=supercell_displacement,
-            interp_mesh=1.0, # minimal mesh
             key=None
         )
         
