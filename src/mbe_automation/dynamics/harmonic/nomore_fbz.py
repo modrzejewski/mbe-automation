@@ -293,17 +293,22 @@ def fit_fbz_model(
         raise ValueError("No parameters to optimize.")
 
     # L-BFGS-B optimization without explicit bounds.
+    # We define a wrapper function to pass all arguments via kwargs, avoiding positional argument issues.
+    def objective_wrapper(shifts: npt.NDArray[np.float64]) -> float:
+        return _objective_fbz_model(
+            group_shift_params=shifts,
+            n_groups=n_groups,
+            group_optimize_mask=group_optimize_mask,
+            band_group_labels=band_group_labels,
+            initial_freqs_q_THz=initial_freqs_q_THz,
+            modes=modes,
+            temperature_K=temperature_K,
+            target_u_flat=target_u_flat
+        )
+
     res = minimize(
-        _objective_fbz_model,
+        objective_wrapper,
         initial_group_shifts,
-        args=(
-            n_groups,
-            group_optimize_mask,
-            band_group_labels,
-            initial_freqs_q_THz,
-            modes,
-            target_u_flat,
-        ),
         method='L-BFGS-B',
         options={'maxiter': max_iterations, 'gtol': 1e-8}
     )
