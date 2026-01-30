@@ -13,7 +13,7 @@ from mbe_automation.dynamics.harmonic.modes import (
 )
 import phonopy.physical_units
 import mbe_automation.storage.core
-from mbe_automation.dynamics.harmonic.display import compare_adps, print_frequency_comparison
+from mbe_automation.dynamics.harmonic.display import print_adps_comparison, print_frequency_comparison
 from pymatgen.analysis.structure_matcher import StructureMatcher, ElementComparator
 from pymatgen.core import Structure as PymatgenStructure, Lattice
 from mbe_automation.storage.views import to_pymatgen
@@ -722,7 +722,7 @@ def _self_fit(
     u_gamma_cart = _compute_adps(freqs_gamma, evecs_gamma, masses, temperature_K)
     
     # 3. Compare (Before Optimization)
-    compare_adps(
+    print_adps_comparison(
         adps_1=u_gamma_cart,
         adps_2=u_ref_cart,
         labels=["Gamma", "Ref (k)"],
@@ -780,7 +780,7 @@ def _self_fit(
     # We use the Gamma eigenvectors which are assumed fixed
     u_final_cart = _compute_adps(result['refined_frequencies'], evecs_gamma, masses, temperature_K)
     
-    compare_adps(
+    print_adps_comparison(
         adps_1=u_final_cart,
         adps_2=u_ref_cart,
         labels=["Opt. Gamma", "Ref (k)"],

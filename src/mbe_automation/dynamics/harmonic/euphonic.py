@@ -190,7 +190,7 @@ def _validate_adps(
     u_euphonic = 2.0 * dw.debye_waller.to("angstrom**2").magnitude
     
     # 3. Compare
-    display.compare_adps(
+    display.print_adps_comparison(
         adps_1=u_euphonic,
         adps_2=u_mbe,
         labels=["Euphonic", "MBE"],

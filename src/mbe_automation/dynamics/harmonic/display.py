@@ -311,7 +311,7 @@ def eos_curves(
         return fig
 
 
-def compare_adps(
+def print_adps_comparison(
     adps_1: npt.NDArray[np.float64],
     adps_2: npt.NDArray[np.float64],
     labels: list[str],

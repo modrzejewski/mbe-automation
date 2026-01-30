@@ -5,7 +5,7 @@ from scipy.optimize import minimize # type: ignore
 
 
 from .euphonic import to_euphonic_modes
-from mbe_automation.dynamics.harmonic.display import compare_adps, print_frequency_comparison
+from mbe_automation.dynamics.harmonic.display import print_adps_comparison, print_frequency_comparison
 from mbe_automation.dynamics.harmonic.modes import (
     at_k_points
 )
@@ -258,7 +258,7 @@ def fit_fbz_model(
     final_u_3x3 = 2.0 * dw.debye_waller.to("angstrom**2").magnitude
     final_u_calc = _flatten_u(final_u_3x3)
     
-    compare_adps(
+    print_adps_comparison(
         adps_1=u_exp,
         adps_2=initial_u_3x3,
         labels=["reference", "initial", "refined"],
