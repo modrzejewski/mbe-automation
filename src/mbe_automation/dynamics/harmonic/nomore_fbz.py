@@ -5,7 +5,7 @@ from scipy.optimize import minimize # type: ignore
 
 
 from .euphonic import to_euphonic_modes
-from mbe_automation.dynamics.harmonic.display import compare_adps
+from mbe_automation.dynamics.harmonic.display import compare_adps, print_frequency_comparison
 from mbe_automation.dynamics.harmonic.modes import (
     at_k_points
 )
@@ -264,6 +264,12 @@ def fit_fbz_model(
         labels=["reference", "initial", "refined"],
         symbols=modes.crystal.atom_type,
         adps_3=final_u_3x3
+    )
+
+    print_frequency_comparison(
+        freqs_initial_THz=initial_freqs_q_THz[gamma_idx : gamma_idx + 1],
+        freqs_refined_THz=final_freqs_q_THz[gamma_idx : gamma_idx + 1],
+        optimize_mask=optimize_mask
     )
 
     return {

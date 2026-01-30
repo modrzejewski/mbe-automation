@@ -404,3 +404,39 @@ def compare_adps(
         print("-" * len(header))
 
 
+def print_frequency_comparison(
+    freqs_initial_THz: npt.NDArray[np.float64],
+    freqs_refined_THz: npt.NDArray[np.float64],
+    optimize_mask: npt.NDArray[np.bool_] | None = None
+) -> None:
+    """Helper to print starting vs refined frequencies in cm^-1."""
+    
+    # Check if we have multiple q-points; usually _self_fit uses this for Gamma point only (1 q-point)
+    # If multiple q-points, we only print the first one (Gamma) or loop if needed.
+    # The _self_fit calls _fit_to_adps with mesh_size="gamma", so we expect 1 q-point.
+    
+    n_q = freqs_initial_THz.shape[0]
+    n_bands = freqs_initial_THz.shape[1]
+    
+    to_cm = phonopy.physical_units.get_physical_units().THzToCm
+    
+    print("\\nComparison of Frequencies (Gamma point):")
+    print(f"{'Mode':<6} {'Initial (cm^-1)':<20} {'Refined (cm^-1)':<20} {'Shift (cm^-1)':<20} {'Opt?':<6}")
+    print("-" * 76)
+    
+    for i in range(n_q):
+        if n_q > 1:
+            print(f"--- q-point index {i} ---")
+            
+        freqs_init_cm = freqs_initial_THz[i] * to_cm
+        freqs_refined_cm = freqs_refined_THz[i] * to_cm
+        diff_cm = freqs_refined_cm - freqs_init_cm
+        
+        for band_idx in range(n_bands):
+            is_opt = ""
+            if optimize_mask is not None and optimize_mask[band_idx]:
+                is_opt = "*"
+            print(f"{band_idx:<6} {freqs_init_cm[band_idx]:<20.2f} {freqs_refined_cm[band_idx]:<20.2f} {diff_cm[band_idx]:<20.2f} {is_opt:<6}")
+
+
+
