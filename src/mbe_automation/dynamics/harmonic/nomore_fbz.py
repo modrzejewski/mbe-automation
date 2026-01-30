@@ -15,6 +15,8 @@ import mbe_automation.storage
 
 import euphonic
 
+INITIAL_ACOUSTIC_FREQ_CM1 = 50.0
+
 def _group_degenerate_bands(
     freqs_THz: npt.NDArray[np.float64],
     tolerance_THz: float
@@ -49,7 +51,6 @@ def _group_degenerate_bands(
     n_groups = len(groups_indices)
     
     return labels, n_groups
-
 
 def _flatten_u(u: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """
@@ -268,6 +269,13 @@ def fit_fbz_model(
         # Ensure Einstein approximation is applied to ALL acoustic modes
         if einstein_approximation is None or not np.all(einstein_approximation[:3]):
              raise ValueError("Optimization of acoustic modes requires Einstein approximation for all 3 acoustic modes.")
+
+    # If using Einstein approximation for acoustic modes, set their initial frequency.
+    # This provides a reasonable starting point for optimization (avoiding 0.0).
+    if np.any(optimize_mask[:3]):
+        # Convert 50 cm^-1 to THz
+        init_freq_THz = (INITIAL_ACOUSTIC_FREQ_CM1 * euphonic.ureg("cm^-1")).to("THz").magnitude
+        initial_freqs_q_THz[gamma_idx, :3] = init_freq_THz
 
     # Map bands to parameter groups.
     group_optimize_mask = np.zeros(n_groups, dtype=bool)
