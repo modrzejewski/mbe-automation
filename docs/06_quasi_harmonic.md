@@ -48,9 +48,19 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     calculator=mace_calc,
     supercell_radius=25.0,
     dataset="properties.hdf5",
-    relaxation=relaxation_config
+    relaxation=relaxation_config,
+    volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 )
 ```
+
+### Volume Range
+
+The `volume_range` parameter defines the set of scaling factors applied to the equilibrium volume $V_0$ to sample the equation of state (EOS). The code enforces a minimum number of points depending on the selected `equation_of_state`:
+
+*   **Polynomial**: 3 points
+*   **Spline, Vinet, Birch-Murnaghan**: 4 points
+
+While these are the minimums required to run the calculation, a denser sampling is recommended for robust numerical computation of second-order thermodynamic derivatives, such as the coefficient of thermal expansion ($\alpha_V$) and the heat capacity at constant pressure ($C_p$).
 
 The workflow is executed by passing the configuration object to the `run` function.
 
@@ -245,7 +255,8 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     calculator=mace_calc,
     supercell_radius=25.0,
     dataset="properties.hdf5",
-    relaxation=relaxation_config
+    relaxation=relaxation_config,
+    volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 )
 
 mbe_automation.run(properties_config)
