@@ -54,3 +54,5 @@ from mbe_automation.storage.xyz_formats import from_xyz_file
 from mbe_automation.storage.xyz_formats import to_xyz_file
 from mbe_automation.storage.xyz_formats import to_cif_file
 
+from mbe_automation.storage.cif import read_cif_with_apds
+

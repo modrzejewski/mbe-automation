@@ -66,6 +66,21 @@ def _flatten_u(u: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     return np.array(flat)
 
 
+def _get_valid_atoms_mask(u_exp: npt.NDArray[np.float64]) -> npt.NDArray[np.bool_]:
+    """
+    Identify atoms with valid (available) ADPs.
+    
+    Args:
+        u_exp: (N_atoms, 3, 3) Experimental ADPs.
+        
+    Returns:
+        (N_atoms,) Boolean mask. True if atom has valid ADPs (no NaNs).
+    """
+    # Reshape to (N, 9) to check for NaNs in any component
+    u_flat_check = u_exp.reshape(u_exp.shape[0], -1)
+    return ~np.any(np.isnan(u_flat_check), axis=1)
+
+
 def _apply_einstein_approximation(
     initial_freqs_q_THz: npt.NDArray[np.float64],
     gamma_idx: int,
@@ -119,6 +134,7 @@ def _objective_fbz_model(
     modes: "euphonic.QpointPhononModes",
     temperature_K: float,
     target_u_flat: npt.NDArray[np.float64],
+    valid_atoms_mask: npt.NDArray[np.bool_] | None = None,
 ) -> float:
     """
     Objective function for fit_fbz_model.
@@ -140,6 +156,10 @@ def _objective_fbz_model(
     )
     u_cart_3x3 = 2.0 * dw.debye_waller.to("angstrom**2").magnitude
     
+    # Filter valid atoms if mask is provided
+    if valid_atoms_mask is not None:
+        u_cart_3x3 = u_cart_3x3[valid_atoms_mask]
+        
     calc_u_flat = _flatten_u(u_cart_3x3)
     
     diff = calc_u_flat - target_u_flat
@@ -174,6 +194,9 @@ def fit_fbz_model(
     Args:
         force_constants: The force constants object.
         u_exp: (N_atoms, 3, 3) Experimental Cartesian ADPs in Å².
+               If ADPs for some atoms are missing (e.g. Hydrogens in X-ray CIFs), 
+               the corresponding matrices (3x3) are expected to be populated with NaNs.
+               If NaN is detected for an atom, that ADP is skipped during the optimization.
         temperature_K: Temperature in Kelvin.
         mesh_size: k-point mesh dimensions (should be array-like of 3 integers).
                    Will be forced to be odd if not already.
@@ -286,7 +309,18 @@ def fit_fbz_model(
     n_params = np.sum(group_optimize_mask)
     initial_group_shifts = np.zeros(n_params, dtype=np.float64)
     
-    target_u_flat = _flatten_u(u_exp)
+    
+    # 4a. Partial ADP Handling
+    # Identify valid atoms (non-NaN ADPs)
+    valid_atoms_mask = _get_valid_atoms_mask(u_exp)
+    
+    # Filter experimental ADPs
+    u_exp_valid = u_exp[valid_atoms_mask]
+    
+    if len(u_exp_valid) == 0:
+        raise ValueError("No valid ADPs found (all are NaN). Cannot fit.")
+
+    target_u_flat = _flatten_u(u_exp_valid)
 
     # 4b. Apply Einstein Approximation if requested (Preprocessing)
     _apply_einstein_approximation(
@@ -311,7 +345,8 @@ def fit_fbz_model(
             initial_freqs_q_THz=initial_freqs_q_THz,
             modes=modes,
             temperature_K=temperature_K,
-            target_u_flat=target_u_flat
+            target_u_flat=target_u_flat,
+            valid_atoms_mask=valid_atoms_mask
         )
 
     res = minimize(
