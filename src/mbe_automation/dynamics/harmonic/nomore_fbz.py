@@ -10,7 +10,7 @@ from mbe_automation.dynamics.harmonic.modes import (
     at_k_points
 )
 
-from mbe_automation.storage.core import ForceConstants
+from mbe_automation.storage.core import ForceConstants, Structure
 import mbe_automation.storage
 
 import euphonic
@@ -22,14 +22,14 @@ def _group_degenerate_bands(
     tolerance_THz: float
 ) -> Tuple[npt.NDArray[np.int64], int]:
     """
-    Group bands that are degenerate.
-    
+    Group degenerate bands.
+
     Sort freqs_THz internally.
     Use numpy.diff and numpy.split to find gaps larger than tolerance_THz.
-    
+
     Returns:
-        - band_to_group_map: (n_bands,) integers group index for each band.
-        - n_groups: Total number of unique groups.
+        band_to_group_map: (n_bands,) integers group index for each band.
+        n_groups: Total number of unique groups.
     """
     # Identify degeneracies by sorting frequencies.
     sorted_indices = np.argsort(freqs_THz)
@@ -54,7 +54,7 @@ def _group_degenerate_bands(
 
 def _flatten_u(u: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """
-    Flatten (N, 3, 3) ADPs to unique components (N * 6).
+    Flatten ADPs to unique components.
     Order: xx, yy, zz, xy, xz, yz
     """
     flat = []
@@ -66,19 +66,32 @@ def _flatten_u(u: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     return np.array(flat)
 
 
-def _get_valid_atoms_mask(u_exp: npt.NDArray[np.float64]) -> npt.NDArray[np.bool_]:
+def _get_valid_atoms_mask(
+    u_exp: npt.NDArray[np.float64],
+    structure: Structure,
+    ignore_hydrogen: bool = False
+) -> npt.NDArray[np.bool_]:
     """
-    Identify atoms with valid (available) ADPs.
-    
+    Identify atoms with valid ADPs.
+
     Args:
         u_exp: (N_atoms, 3, 3) Experimental ADPs.
-        
+        structure: Structure object with atomic_numbers attribute.
+        ignore_hydrogen: If True, mask out Hydrogen atoms (Z=1).
+
     Returns:
-        (N_atoms,) Boolean mask. True if atom has valid ADPs (no NaNs).
+        (N_atoms,) Boolean mask. True if atom has valid ADPs.
     """
     # Reshape to (N, 9) to check for NaNs in any component
     u_flat_check = u_exp.reshape(u_exp.shape[0], -1)
-    return ~np.any(np.isnan(u_flat_check), axis=1)
+    mask = ~np.any(np.isnan(u_flat_check), axis=1)
+
+    if ignore_hydrogen:
+         # User specified force_constants.primitive has atomic_numbers
+         is_hydrogen = (structure.atomic_numbers == 1)
+         mask = mask & (~is_hydrogen)
+
+    return mask
 
 
 def _apply_einstein_approximation(
@@ -88,10 +101,10 @@ def _apply_einstein_approximation(
     optimize_mask: npt.NDArray[np.bool_] | None,
 ) -> None:
     """
-    Apply Einstein approximation to selected bands in place.
-    
+    Apply Einstein approximation in place.
+
     If a band is selected (optimize_mask=True AND einstein_approximation=True),
-    its frequency dispersion is removed, and it is set to the Gamma-point frequency 
+    remove its frequency dispersion and set to the Gamma-point frequency 
     across the entire Brillouin zone.
     """
     if einstein_approximation is not None and optimize_mask is not None:
@@ -110,7 +123,7 @@ def _apply_scaling(
     initial_freqs_q_THz: npt.NDArray[np.float64],
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
-    Calculate scaled frequencies and band scalings from optimization parameters.
+    Calculate scaled frequencies.
     """
     # Map optimization parameters to full group scalings.
     # Initialize with 1.0 (identity scaling) for all groups.
@@ -138,7 +151,7 @@ def _objective_fbz_model(
     valid_atoms_mask: npt.NDArray[np.bool_] | None = None,
 ) -> float:
     """
-    Objective function for fit_fbz_model.
+    Calculate objective function value.
     """
     current_freqs_THz, _ = _apply_scaling(
         group_scaling_params=group_scaling_params,
@@ -178,59 +191,54 @@ def fit_fbz_model(
     einstein_approximation: npt.NDArray[np.bool_] | None = None,
     degeneracy_tolerance: float | None = None,
     max_iterations: int = 200,
+    ignore_hydrogen_adps: bool = True,
 ) -> Dict[str, Any]:
     """
-    Fit phonon frequencies to match experimental ADPs using a Full Brillouin Zone model.
-    1.  Generate a k-point mesh with ODD numbers of points (ensuring Gamma point inclusion).
-    2.  Use Euphonic to calculate frequencies and eigenvectors.
-    3.  Reorder frequencies using Euphonic's ``reorder_frequencies``.
-    4.  Identify band degeneracies at the Gamma point.
-    5.  Optimize frequency SCALING factors (one parameter per degenerate band group).
+    Fit phonon frequencies to experimental ADPs.
 
-    If optimize_mask is None, it defaults to optimizing ONLY acoustic bands.
-    If einstein_approximation is None, it defaults to applied ONLY on acoustic bands.
+    1. Generate a k-point mesh with ODD numbers of points.
+    2. Calculate frequencies and eigenvectors with Euphonic.
+    3. Reorder frequencies.
+    4. Identify band degeneracies at the Gamma point.
+    5. Optimize frequency scaling factors.
+
+    If optimize_mask is None, optimize ONLY acoustic bands.
+    If einstein_approximation is None, apply Einstein approximation ONLY on acoustic bands.
 
     Args:
-        force_constants: The force constants object.
-        u_exp: (N_atoms, 3, 3) Experimental Cartesian ADPs in Å².
-               If ADPs for some atoms are missing (e.g. Hydrogens in X-ray CIFs), 
-               the corresponding matrices (3x3) are expected to be populated with NaNs.
-               If NaN is detected for an atom, that ADP is skipped during the optimization.
+        force_constants: Force constants object.
+        u_exp: (N_atoms, 3, 3) Experimental Cartesian ADPs in "angstrom**2".
+               ADPs with NaNs are skipped.
         temperature_K: Temperature in Kelvin.
-        mesh_size: k-point mesh dimensions (should be array-like of 3 integers).
-                   Will be forced to be odd if not already.
-        optimize_mask: (n_bands,) Boolean mask. If True, the band is allowed to shift.
-                       If provided, it MUST correspond to sorted bands at Gamma.
-                       If len(optimize_mask) < n_bands, it is padded with False (not optimized).
-                       Acoustic modes (indices 0, 1, 2) MUST be False, unless Einstein approximation is active.
-        einstein_approximation: (n_bands,) Boolean mask. If True AND the band is optimized,
-                                the Einstein approximation (flat dispersion = Gamma freq) is used.
-                                If len(einstein_approximation) < n_bands, it is padded with False.
-                                If the band is not optimized, this flag is ignored.
+        mesh_size: k-point mesh dimensions (3 integers).
+                   Forced to be odd.
+        optimize_mask: (n_bands,) Boolean mask. True allows band scaling.
+                       Must correspond to sorted bands at Gamma.
+        einstein_approximation: (n_bands,) Boolean mask. True enables Einstein approximation
+                                (flat dispersion).
         degeneracy_tolerance: Tolerance (THz) for linking degenerate bands at Gamma.
-                              If None, bands are optimized independently (one parameter per band).
         max_iterations: Maximum iterations for the optimizer.
+        ignore_hydrogen_adps: If True, ignore ADPs on Hydrogen atoms (Z=1).
 
     Returns:
-        Dictionary containing optimization results, including 'scalings'.
+        Dictionary containing optimization results.
     """
-    # 1. Initialize Euphonic object with odd-numbered mesh to ensure Gamma point inclusion.
+    # Initialize Euphonic object.
     modes = to_euphonic_modes(
         force_constants=force_constants, 
         mesh_size=mesh_size, 
         odd_numbers=True
     )
     
-    # 2. Reorder frequencies to ensure consistent band tracing.
+    # 2. Reorder frequencies.
     modes.reorder_frequencies(reorder_gamma=True)
     
-    # Extract initial frequencies in THz,
-    # with bands tracked across the Brillouin zone.
+    # Extract initial frequencies in THz.
     initial_freqs_q_THz = modes.frequencies.to("THz").magnitude
     n_q, n_bands = initial_freqs_q_THz.shape
     assert n_bands == force_constants.primitive.n_atoms * 3
 
-    # Compute initial ADPs for comparison.
+    # Compute initial ADPs.
     dw_init = modes.calculate_debye_waller(temperature=euphonic.ureg.Quantity(temperature_K, "K"))
     initial_u_3x3 = 2.0 * dw_init.debye_waller.to("angstrom**2").magnitude
     
@@ -281,19 +289,12 @@ def fit_fbz_model(
             constant_values=False
         )
 
-    # Validation: Gamma-only mesh requires Einstein approximation for acoustic modes.
-    # Otherwise, acoustic modes are exactly zero and contribute nothing to ADPs, which is unphysical.
     if n_q == 1 and not np.all(einstein_approximation[:3]):
         raise ValueError(
-            "Gamma-only sampling (n_q=1) is detected, but Einstein approximation is disabled "
-            "for acoustic modes. This will result in zero contribution from acoustic modes "
-            "to ADPs, which is unphysical. Enable Einstein approximation for acoustic modes, "
-            "or use a larger k-point mesh."
+            "Gamma-only sampling requires Einstein approximation for acoustic modes."
         )
 
-    # If using Einstein approximation for acoustic modes, set their initial frequency.
-    # This provides a reasonable starting point for optimization (avoiding 0.0).
-    # We apply this if ANY acoustic mode is optimized using Einstein approximation.
+    # If using Einstein approximation for acoustic modes, set initial frequency.
     if np.any(optimize_mask[:3] & einstein_approximation[:3]):
         # Convert 50 cm^-1 to THz
         init_freq_THz = (INITIAL_ACOUSTIC_FREQ_CM1 * euphonic.ureg("cm^-1")).to("THz").magnitude
@@ -315,11 +316,13 @@ def fit_fbz_model(
     # Initialize scalings to 1.0
     initial_group_scalings = np.ones(n_params, dtype=np.float64)
     
-    
-    # 4a. Partial ADP Handling
-    # Identify valid atoms (non-NaN ADPs)
-    valid_atoms_mask = _get_valid_atoms_mask(u_exp)
-    
+    # 4a. Identify valid atoms.
+    valid_atoms_mask = _get_valid_atoms_mask(
+        u_exp, 
+        force_constants.primitive, 
+        ignore_hydrogen_adps
+    )
+
     # Filter experimental ADPs
     u_exp_valid = u_exp[valid_atoms_mask]
     
@@ -328,7 +331,7 @@ def fit_fbz_model(
 
     target_u_flat = _flatten_u(u_exp_valid)
 
-    # 4b. Apply Einstein Approximation if requested (Preprocessing)
+    # 4b. Apply Einstein Approximation.
     _apply_einstein_approximation(
         initial_freqs_q_THz,
         gamma_idx,
@@ -340,7 +343,7 @@ def fit_fbz_model(
     if n_params == 0:
         raise ValueError("No parameters to optimize.")
 
-    # L-BFGS-B optimization with bounds > 0.
+    # L-BFGS-B optimization.
     # We define a wrapper function to pass all arguments via kwargs, avoiding positional argument issues.
     def objective_wrapper(scalings: npt.NDArray[np.float64]) -> float:
         return _objective_fbz_model(
@@ -419,25 +422,21 @@ def _self_fit(
     degeneracy_tolerance: float | None = None,
 ) -> Dict[str, Any]:
     """
-    Fit frequencies of a small k-point mesh model to match ADPs from a large reference mesh.
+    Fit frequencies of a small k-point mesh model to match reference ADPs.
 
-    This function:
-    1. Compute ADPs using the `mesh_size_large` (reference).
-    2. Run `fit_fbz_model` using `mesh_size_small` to optimize frequencies such that the
-       resulting ADPs match the reference ADPs.
-    3. Print a comparison of the ADPs.
+    1. Calculate ADPs using `mesh_size_large`.
+    2. Optimize `mesh_size_small` model to match reference ADPs.
+    3. Print comparison.
 
     Args:
-        force_constants: The harmonic force constants model.
+        force_constants: Harmonic force constants model.
         temperature_K: Temperature in Kelvin.
-        mesh_size_large: The k-point mesh for the reference calculation (e.g. [10, 10, 10] or float density).
-        mesh_size_small: The k-point mesh for the model to be optimized (e.g. [3, 3, 3] or float density).
-                         Ideally should be odd-numbered to include Gamma.
-        max_optimized_freq_THz: Maximum frequency (in THz) for modes to be optimized.
-                                Modes above this frequency will be fixed.
+        mesh_size_large: Reference k-point mesh.
+        mesh_size_small: Model k-point mesh.
+        max_optimized_freq_THz: Maximum frequency (THz) for optimization.
 
     Returns:
-        Result dictionary from `fit_fbz_model`.
+        Result dictionary.
     """
     print(f"--- _self_fit_fbz: Small Mesh fitting to Large Mesh ADPs ---")
     print(f"Temperature: {temperature_K} K")
