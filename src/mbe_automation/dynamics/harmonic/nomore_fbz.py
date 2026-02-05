@@ -102,31 +102,32 @@ def _apply_einstein_approximation(
              initial_freqs_q_THz[:, mask_flatten] = initial_freqs_q_THz[gamma_idx, mask_flatten]
 
 
-def _apply_shifts(
-    group_shift_params: npt.NDArray[np.float64],
+def _apply_scaling(
+    group_scaling_params: npt.NDArray[np.float64],
     n_groups: int,
     group_optimize_mask: npt.NDArray[np.bool_],
     band_group_labels: npt.NDArray[np.int64],
     initial_freqs_q_THz: npt.NDArray[np.float64],
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
-    Calculate shifted frequencies and band shifts from optimization parameters.
+    Calculate scaled frequencies and band scalings from optimization parameters.
     """
-    # Map optimization parameters to full group shifts.
-    full_group_shifts = np.zeros(n_groups, dtype=np.float64)
-    full_group_shifts[group_optimize_mask] = group_shift_params
+    # Map optimization parameters to full group scalings.
+    # Initialize with 1.0 (identity scaling) for all groups.
+    full_group_scalings = np.ones(n_groups, dtype=np.float64)
+    full_group_scalings[group_optimize_mask] = group_scaling_params
     
-    # Broadcast group shifts to individual bands.
-    full_band_shifts = full_group_shifts[band_group_labels]
+    # Broadcast group scalings to individual bands.
+    full_band_scalings = full_group_scalings[band_group_labels]
     
-    # Apply shifts to all q-points (broadcasting).
-    current_freqs_THz = initial_freqs_q_THz + full_band_shifts
+    # Apply scalings to all q-points (broadcasting).
+    current_freqs_THz = initial_freqs_q_THz * full_band_scalings
     
-    return current_freqs_THz, full_band_shifts
+    return current_freqs_THz, full_band_scalings
 
 
 def _objective_fbz_model(
-    group_shift_params: npt.NDArray[np.float64],
+    group_scaling_params: npt.NDArray[np.float64],
     n_groups: int,
     group_optimize_mask: npt.NDArray[np.bool_],
     band_group_labels: npt.NDArray[np.int64],
@@ -139,8 +140,8 @@ def _objective_fbz_model(
     """
     Objective function for fit_fbz_model.
     """
-    current_freqs_THz, _ = _apply_shifts(
-        group_shift_params=group_shift_params,
+    current_freqs_THz, _ = _apply_scaling(
+        group_scaling_params=group_scaling_params,
         n_groups=n_groups,
         group_optimize_mask=group_optimize_mask,
         band_group_labels=band_group_labels,
@@ -184,9 +185,7 @@ def fit_fbz_model(
     2.  Use Euphonic to calculate frequencies and eigenvectors.
     3.  Reorder frequencies using Euphonic's ``reorder_frequencies``.
     4.  Identify band degeneracies at the Gamma point.
-    5.  Optimize frequency shifts (one parameter per degenerate band group).
-    5.  Optimize frequency shifts (one parameter per degenerate band group).
-        Exclude acoustic bands (lowest 3 at Gamma) from optimization unless Einstein approximation is applied.
+    5.  Optimize frequency SCALING factors (one parameter per degenerate band group).
 
     If optimize_mask is None, it defaults to optimizing ONLY acoustic bands.
     If einstein_approximation is None, it defaults to applied ONLY on acoustic bands.
@@ -213,7 +212,7 @@ def fit_fbz_model(
         max_iterations: Maximum iterations for the optimizer.
 
     Returns:
-        Dictionary containing optimization results.
+        Dictionary containing optimization results, including 'scalings'.
     """
     # 1. Initialize Euphonic object with odd-numbered mesh to ensure Gamma point inclusion.
     modes = to_euphonic_modes(
@@ -282,23 +281,29 @@ def fit_fbz_model(
             constant_values=False
         )
 
-    # Validation: Acoustic modes must be excluded from optimization unless Einstein approximation is applied.
+    # Validation: Gamma-only mesh requires Einstein approximation for acoustic modes.
+    # Otherwise, acoustic modes are exactly zero and contribute nothing to ADPs, which is unphysical.
+    if n_q == 1 and not np.all(einstein_approximation[:3]):
+        raise ValueError(
+            "Gamma-only sampling (n_q=1) is detected, but Einstein approximation is disabled "
+            "for acoustic modes. This will result in zero contribution from acoustic modes "
+            "to ADPs, which is unphysical. Enable Einstein approximation for acoustic modes, "
+            "or use a larger k-point mesh."
+        )
+
+    # If using Einstein approximation for acoustic modes, set their initial frequency.
+    # This provides a reasonable starting point for optimization (avoiding 0.0).
+    # We apply this if ANY acoustic mode is optimized using Einstein approximation.
+    if np.any(optimize_mask[:3] & einstein_approximation[:3]):
+        # Convert 50 cm^-1 to THz
+        init_freq_THz = (INITIAL_ACOUSTIC_FREQ_CM1 * euphonic.ureg("cm^-1")).to("THz").magnitude
+        initial_freqs_q_THz[gamma_idx, :3] = init_freq_THz
+
     # Assumption: Either all acoustic modes are optimized, or none.
     if np.any(optimize_mask[:3]):
         # Ensure all acoustic modes are optimized if any are
         if not np.all(optimize_mask[:3]):
              raise ValueError("Partial optimization of acoustic modes is not supported. Optimize all 3 (indices 0-2) or none.")
-             
-        # Ensure Einstein approximation is applied to ALL acoustic modes
-        if einstein_approximation is None or not np.all(einstein_approximation[:3]):
-             raise ValueError("Optimization of acoustic modes requires Einstein approximation for all 3 acoustic modes.")
-
-    # If using Einstein approximation for acoustic modes, set their initial frequency.
-    # This provides a reasonable starting point for optimization (avoiding 0.0).
-    if np.any(optimize_mask[:3]):
-        # Convert 50 cm^-1 to THz
-        init_freq_THz = (INITIAL_ACOUSTIC_FREQ_CM1 * euphonic.ureg("cm^-1")).to("THz").magnitude
-        initial_freqs_q_THz[gamma_idx, :3] = init_freq_THz
 
     # Map bands to parameter groups.
     group_optimize_mask = np.zeros(n_groups, dtype=bool)
@@ -307,7 +312,8 @@ def fit_fbz_model(
             group_optimize_mask[group_idx] = True
             
     n_params = np.sum(group_optimize_mask)
-    initial_group_shifts = np.zeros(n_params, dtype=np.float64)
+    # Initialize scalings to 1.0
+    initial_group_scalings = np.ones(n_params, dtype=np.float64)
     
     
     # 4a. Partial ADP Handling
@@ -334,11 +340,11 @@ def fit_fbz_model(
     if n_params == 0:
         raise ValueError("No parameters to optimize.")
 
-    # L-BFGS-B optimization without explicit bounds.
+    # L-BFGS-B optimization with bounds > 0.
     # We define a wrapper function to pass all arguments via kwargs, avoiding positional argument issues.
-    def objective_wrapper(shifts: npt.NDArray[np.float64]) -> float:
+    def objective_wrapper(scalings: npt.NDArray[np.float64]) -> float:
         return _objective_fbz_model(
-            group_shift_params=shifts,
+            group_scaling_params=scalings,
             n_groups=n_groups,
             group_optimize_mask=group_optimize_mask,
             band_group_labels=band_group_labels,
@@ -348,17 +354,21 @@ def fit_fbz_model(
             target_u_flat=target_u_flat,
             valid_atoms_mask=valid_atoms_mask
         )
+    
+    # Bound scalings to be positive.
+    bounds = [(1e-6, None) for _ in range(n_params)]
 
     res = minimize(
         objective_wrapper,
-        initial_group_shifts,
+        initial_group_scalings,
         method='L-BFGS-B',
+        bounds=bounds,
         options={'maxiter': max_iterations, 'gtol': 1e-8}
     )
     
     final_group_params = res.x
-    final_freqs_q_THz, final_band_shifts = _apply_shifts(
-        group_shift_params=final_group_params,
+    final_freqs_q_THz, final_band_scalings = _apply_scaling(
+        group_scaling_params=final_group_params,
         n_groups=n_groups,
         group_optimize_mask=group_optimize_mask,
         band_group_labels=band_group_labels,
@@ -393,7 +403,7 @@ def fit_fbz_model(
         "success": success,
         "original_frequencies": initial_freqs_q_THz,
         "refined_frequencies": final_freqs_q_THz,
-        "shifts": final_band_shifts,
+        "scalings": final_band_scalings,
         "message": message,
         "residual": residual,
         "u_calc": final_u_calc
