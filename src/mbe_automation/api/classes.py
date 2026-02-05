@@ -243,7 +243,7 @@ class ForceConstants(_ForceConstants):
         cif_path: str,
         output_dir: str = "./",
         mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
-        restraint_weight: float = 0.1,
+        restraint_weight: float | None = None,
         **kwargs
     ) -> typing.Dict[str, typing.Any]:
         """
@@ -262,7 +262,7 @@ class ForceConstants(_ForceConstants):
         Returns:
             Dictionary containing refinement results.
         """
-        from mbe_automation.api.nomore import run
+        from mbe_automation.dynamics.harmonic.nomore import run
         return run(
             force_constants=self,
             cif_path=cif_path,
