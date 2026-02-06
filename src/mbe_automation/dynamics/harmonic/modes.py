@@ -174,35 +174,12 @@ def gruneisen_parameters(
         supercell_displacement: float = 0.01,
         work_dir: Path | str = Path("./"),
 ):
-    """
-    Compute Gruneisen parameters over a k-point mesh.
-    
-    Args:
-        force_constants: The harmonic force constants model.
-        mesh: The k-point mesh definition. Can be:
-            - "gamma": Use only the [0, 0, 0] k-point.
-            - A floating point number: Defines a supercell of radius R.
-            - array of 3 integers: Defines an explicit Monkhorst-Pack
-              mesh for Brillouin zone integration.
-        calculator: Calculator for optimization and phonon calculations.
-        relaxation_config: Configuration for structure relaxation.
-        delta_V: Fractional volume change for numerical differentiation (e.g. 0.01 for 1%).
-        supercell_matrix: Supercell matrix for phonon calculations.
-        supercell_displacement: Displacement distance for phonon calculations.
-        work_dir: Working directory for intermediate files.
-            
-    Returns:
-        tuple containing:
-        - gammas: Gruneisen parameters for each mode at each q-point (n_q, n_modes)
-        - qpoints: Array of q-points (n_q, 3)
-        - omegas: Frequencies at each q-point (n_q, n_modes)
-        - volume: Equilibrium volume V0
-        - V_plus: Volume V+
-        - V_minus: Volume V-
-    """
     # 1. crystal structure and its volume
     structure = force_constants.primitive
     volume = structure.lattice().volume
+    
+    physical_units = phonopy.physical_units.get_physical_units()
+    to_THz = physical_units.DefaultToTHz
     
     # 2. Dynamic matrix
     ph = mbe_automation.storage.to_phonopy(force_constants)
@@ -233,40 +210,26 @@ def gruneisen_parameters(
     
     # Check if we can proceed with optimization
     if calculator is None or relaxation_config is None:
-         # If no calculator/config provided, return equilibrium data only
-         # We need to loop over qpoints to get omegas
          all_omegas = []
-         ph.dynamical_matrix.run(qpoints) # Can run for all qpoints if supported or loop
-         
-         # Phonopy's run(qpoints) might not support array, let's loop to be safe and consistent with below
-         # Actually phonopy.dynamical_matrix.run accepts a single q-point usually. 
-         # But ph.mesh is already initialized, so we can access frequencies/eigenvectors from there?
-         # ph.mesh.frequencies and ph.mesh.eigenvectors are available if run() was called internally by init_mesh with with_eigenvectors=True
-         # Let's check init_mesh arguments. We set with_eigenvectors=True.
-         # However, for Gruneisen we need eigenvectors e_i.
-         
+         ph.dynamical_matrix.run(qpoints) 
          return None, qpoints, ph.mesh.frequencies, volume, None, None
 
 
     # Step 2: Optimization at V +/- delta_V
     
-    # Prepare for optimization
     work_dir = Path(work_dir)
     unit_cell_V0 = mbe_automation.storage.views.to_ase(structure)
     
     if supercell_matrix is None:
          supercell_matrix = force_constants.supercell_matrix
          
-    # Volumes to compute
     factors = [1.0 + delta_V, 1.0 - delta_V]
-    
     results_displaced = []
     
     for factor in factors:
         V_new = volume * factor
         scaling_factor = (V_new / volume) ** (1/3)
         
-        # Create scaled structure
         unit_cell_V = unit_cell_V0.copy()
         unit_cell_V.set_cell(
             unit_cell_V0.cell * scaling_factor,
@@ -275,12 +238,10 @@ def gruneisen_parameters(
         
         label = f"gruneisen_V={V_new/volume:.4f}"
         
-        # Configure optimizer for constant volume
         optimizer = deepcopy(relaxation_config)
         optimizer.cell_relaxation = "constant_volume"
-        optimizer._pressure_GPa = 0.0 # Irrelevant for constant volume but good to reset
+        optimizer._pressure_GPa = 0.0
         
-        # Optimize
         unit_cell_optimized, space_group_optimized = mbe_automation.structure.relax.crystal(
             unit_cell=unit_cell_V,
             calculator=calculator,
@@ -289,7 +250,6 @@ def gruneisen_parameters(
             key=None 
         )
         
-        # Compute phonons
         ph_new = mbe_automation.dynamics.harmonic.core.phonons(
             unit_cell=unit_cell_optimized,
             calculator=calculator,
@@ -310,41 +270,35 @@ def gruneisen_parameters(
     ph_minus = results_displaced[1]["phonopy_object"]
 
     # Step 3: Calculate Gruneisen parameters for each q-point
-    # Formula: gamma_i = -(V / (2 * omega_i^2)) * (<e_i | (D(V+) - D(V-)) | e_i> / (V_plus - V_minus))
     
     delta_V_val = V_plus - V_minus
     all_gammas = []
     all_omegas = []
-    
-    # Iterate over q-points
-    # We use the qpoints from the equilibrium mesh
-    
-    # We need equilibrium eigenvectors and frequencies.
-    # We can get them from ph.mesh if we trust it, or recompute per q to be sure.
-    # Recomputing per q is safer to ensure we have the exact eigenvectors corresponding to D0(q)
-    
-    dynamical_matrix = ph.dynamical_matrix
+   
+    # dynamical_matrix = ph.dynamical_matrix # (Unused variable removed for clarity)
     
     for i, q in enumerate(qpoints):
         # 3a. Equilibrium properties at q
+        # Assuming this returns frequency in THz (consistent with at_k_point)
         omega, e = force_constants.frequencies_and_eigenvectors(q)
         all_omegas.append(omega)
         
         # 3b. Perturbed dynamical matrices at q
         ph_plus.dynamical_matrix.run(q)
-        D_plus = ph_plus.dynamical_matrix.dynamical_matrix
+        D_plus = ph_plus.dynamical_matrix.dynamical_matrix # Internal units
         
         ph_minus.dynamical_matrix.run(q)
-        D_minus = ph_minus.dynamical_matrix.dynamical_matrix
+        D_minus = ph_minus.dynamical_matrix.dynamical_matrix # Internal units
         
         delta_D = D_plus - D_minus
         
-        # Project delta_D onto eigenvectors e
-        # e is (dim, n_modes), delta_D is (dim, dim)
+        # Project the change in dynamical matrix onto the equilibrium eigenvectors
         proj_matrix = e.conj().T @ delta_D @ e
-        delta_lambda = np.diagonal(proj_matrix).real 
         
-        # Avoid division by zero
+        # delta_lambda is now in internal units (e.g. squared freq without factor)
+        # We must multiply by to_THz**2 so it matches the units of omega**2 (THz^2)
+        delta_lambda = np.diagonal(proj_matrix).real * (to_THz ** 2)
+        
         with np.errstate(divide='ignore', invalid='ignore'):
             numerator = delta_lambda / delta_V_val
             denominator = 2 * (omega ** 2)
