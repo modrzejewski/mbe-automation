@@ -368,6 +368,27 @@ def _get_refined_bands_mask(
     return refined_mask
 
 
+def _clamp_acoustic_frequencies(
+    frequencies_cm1: npt.NDArray[np.float64],
+    min_freq_cm1: float = 10.0
+) -> npt.NDArray[np.float64]:
+    """
+    Clamp low/imaginary frequencies across all q-points.
+    
+    Args:
+        frequencies_cm1: Flat array of frequencies in cm⁻¹ (n_q * n_modes).
+        min_freq_cm1: Minimum frequency threshold in cm⁻¹.
+        
+    Returns:
+        Array with clamped frequencies.
+    """
+    n_low = np.sum(frequencies_cm1 < min_freq_cm1)
+    if n_low > 0:
+        print(f"  Clamping {n_low} modes below {min_freq_cm1} cm⁻¹")
+        return np.where(frequencies_cm1 < min_freq_cm1, min_freq_cm1, frequencies_cm1)
+    return frequencies_cm1
+
+
 def _compute_band_averages(
     frequencies: npt.NDArray[np.float64],
     band_indices: npt.NDArray[np.int64],
@@ -546,6 +567,9 @@ def run(
         
     # We need initial frequencies from phonons
     initial_freqs = phonons.frequencies_cm1
+    
+    # Clamp low/imaginary frequencies (degeneracy groups are already determined)
+    initial_freqs = _clamp_acoustic_frequencies(initial_freqs)
     
     # Create restraint object if weight is positive
     restraint_instance = None
