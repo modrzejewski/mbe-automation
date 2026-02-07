@@ -397,8 +397,8 @@ def fit_fbz_model(
     )
 
     print_frequency_comparison(
-        freqs_initial_THz=initial_freqs_q_THz[gamma_idx : gamma_idx + 1],
-        freqs_refined_THz=final_freqs_q_THz[gamma_idx : gamma_idx + 1],
+        freqs_initial_THz=initial_freqs_q_THz[gamma_idx],
+        freqs_refined_THz=final_freqs_q_THz[gamma_idx],
         optimize_mask=optimize_mask
     )
 

@@ -11,6 +11,8 @@ from typing import Dict, Any, Optional, Literal, List, TYPE_CHECKING
 import phonopy.physical_units
 import mbe_automation.dynamics.harmonic.modes
 from scipy.spatial.distance import cdist
+from mbe_automation.dynamics.harmonic.bands import reorder_frequencies
+from mbe_automation.dynamics.harmonic.display import print_frequency_comparison
 
 if TYPE_CHECKING:
     from mbe_automation.api.classes import ForceConstants
@@ -317,6 +319,120 @@ def _compute_atom_permutation(phonopy_primitive: Any, cif_adapter: "CctbxAdapter
          
     return source_to_target_indices
 
+def _get_refined_bands_mask(
+    groups: "RefinementGroups", 
+    band_indices: npt.NDArray[np.int64]
+) -> npt.NDArray[np.bool_]:
+    """
+    Identify which bands have been refined.
+    
+    A band is considered refined if ANY of its modes are assigned to a refinement group (group_id >= 0).
+    Ideally, refinement strategies should refine either the whole band or none of it.
+    
+    Args:
+        groups: RefinementGroups object from nomore_ase.
+        band_indices: Array of band indices for each mode (n_modes,).
+        
+    Returns:
+        Boolean array (n_unique_bands,) where True indicates the band was refined.
+    """
+    unique_bands = np.unique(band_indices[band_indices >= 0])
+    # Assuming bands are 0-indexed and contiguous up to max(band_indices)
+    # But unique_bands might not cover all if some are filtered out? 
+    # Usually band indices cover 0 to n_bands-1.
+    
+    n_bands_total = np.max(band_indices) + 1 if len(band_indices) > 0 else 0
+    refined_mask = np.zeros(n_bands_total, dtype=bool)
+    
+    refined_mode_indices = groups.get_refined_modes()
+    
+    # We can check intersection.
+    # For each band, check if any mode in it is in refined_mode_indices.
+    # Mask of all refined modes
+    mode_is_refined = np.zeros(len(band_indices), dtype=bool)
+    mode_is_refined[refined_mode_indices] = True
+    
+    for band_idx in unique_bands:
+        modes_in_band = (band_indices == band_idx)
+        # Check consistency: all or nothing
+        refined_in_band = mode_is_refined[modes_in_band]
+        
+        if np.any(refined_in_band) and not np.all(refined_in_band):
+            # This violates the "all or nothing" assumption, but we mark as refined anyway 
+            # and maybe log a warning if we had a logger.
+            pass
+            
+        if np.any(refined_in_band):
+            refined_mask[band_idx] = True
+            
+    return refined_mask
+
+
+def _compute_band_averages(
+    frequencies: npt.NDArray[np.float64],
+    band_indices: npt.NDArray[np.int64],
+    q_weights: npt.NDArray[np.float64]
+) -> npt.NDArray[np.float64]:
+    """
+    Compute weighted average frequency for each band.
+    
+    Args:
+        frequencies: (n_q, n_bands) array of frequencies.
+        band_indices: (n_q, n_bands) array of band indices.
+        q_weights: (n_q,) array of q-point weights.
+        
+    Returns:
+        (n_bands,) array of average frequencies.
+    """
+    reordered = reorder_frequencies(frequencies, band_indices)
+    return np.average(reordered, axis=0, weights=q_weights)
+
+
+def _display_frequency_comparison(
+    initial_freqs_cm1: npt.NDArray[np.float64],
+    refined_freqs_cm1: npt.NDArray[np.float64],
+    band_indices: npt.NDArray[np.int64] | None,
+    q_weights: npt.NDArray[np.float64],
+    groups: "RefinementGroups"
+) -> None:
+    """
+    Display frequency comparison between initial and refined frequencies.
+    
+    Computes band-averaged frequencies and prints a comparison table.
+    
+    Args:
+        initial_freqs_cm1: Flat array of initial frequencies in cm⁻¹ (n_q * n_bands).
+        refined_freqs_cm1: Flat array of refined frequencies in cm⁻¹ (n_q * n_bands).
+        band_indices: Flat array of band indices (n_q * n_bands).
+        q_weights: (n_q,) array of q-point weights.
+        groups: Refinement groups from the optimization.
+    """
+    if band_indices is None:
+        print("Warning: Band indices not available, skipping frequency comparison display.")
+        return
+    
+    n_q = len(q_weights)
+    n_bands = len(initial_freqs_cm1) // n_q
+    shape = (n_q, n_bands)
+    
+    initial_band_avg_cm1 = _compute_band_averages(
+        frequencies=initial_freqs_cm1.reshape(shape),
+        band_indices=band_indices.reshape(shape),
+        q_weights=q_weights
+    )
+    refined_band_avg_cm1 = _compute_band_averages(
+        frequencies=refined_freqs_cm1.reshape(shape),
+        band_indices=band_indices.reshape(shape),
+        q_weights=q_weights
+    )
+    
+    print_frequency_comparison(
+        freqs_initial=initial_band_avg_cm1,
+        freqs_refined=refined_band_avg_cm1,
+        optimize_mask=_get_refined_bands_mask(groups, band_indices),
+        unit="cm1"
+    )
+
 
 def run(
     force_constants,
@@ -451,4 +567,13 @@ def run(
         exclude_hydrogen_positions=exclude_hydrogen_positions
     )
     
+    # 8. Display Frequency Comparison
+    _display_frequency_comparison(
+        initial_freqs_cm1=initial_freqs,
+        refined_freqs_cm1=result['frequencies'],
+        band_indices=phonons.band_indices,
+        q_weights=q_weights,
+        groups=groups
+    )
+
     return result

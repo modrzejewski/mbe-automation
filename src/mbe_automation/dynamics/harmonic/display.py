@@ -405,38 +405,45 @@ def print_adps_comparison(
 
 
 def print_frequency_comparison(
-    freqs_initial_THz: npt.NDArray[np.float64],
-    freqs_refined_THz: npt.NDArray[np.float64],
-    optimize_mask: npt.NDArray[np.bool_] | None = None
+    freqs_initial: npt.NDArray[np.float64],
+    freqs_refined: npt.NDArray[np.float64],
+    optimize_mask: npt.NDArray[np.bool_] | None = None,
+    unit: Literal["THz", "cm1"] = "THz"
 ) -> None:
-    """Helper to print starting vs refined frequencies in cm^-1."""
+    """
+    Helper to print starting vs refined frequencies.
     
-    # Check if we have multiple q-points; usually _self_fit uses this for Gamma point only (1 q-point)
-    # If multiple q-points, we only print the first one (Gamma) or loop if needed.
-    # The _self_fit calls _fit_to_adps with mesh_size="gamma", so we expect 1 q-point.
-    
-    n_q = freqs_initial_THz.shape[0]
-    n_bands = freqs_initial_THz.shape[1]
-    
-    to_cm = phonopy.physical_units.get_physical_units().THzToCm
-    
-    print("\nComparison of Frequencies (Gamma point):")
+    Args:
+        freqs_initial: Initial frequencies, shape (n_bands,).
+        freqs_refined: Refined frequencies, shape (n_bands,).
+        optimize_mask: Boolean mask indicating which bands/modes were refined.
+        unit: Unit of input frequencies ("THz" or "cm1").
+    """
+    if freqs_initial.ndim != 1 or freqs_refined.ndim != 1:
+        raise ValueError("print_frequency_comparison expects 1D arrays of frequencies (shape (n_bands,)).")
+
+    # Conversion factor
+    if unit == "THz":
+        to_cm = phonopy.physical_units.get_physical_units().THzToCm
+    else:
+        to_cm = 1.0
+        
+    print("\nComparison of Frequencies (Gamma point / Average):")
     print(f"{'Mode':<6} {'Initial (cm^-1)':<20} {'Refined (cm^-1)':<20} {'Shift (cm^-1)':<20} {'Opt?':<6}")
     print("-" * 76)
-    
-    for i in range(n_q):
-        if n_q > 1:
-            print(f"--- q-point index {i} ---")
             
-        freqs_init_cm = freqs_initial_THz[i] * to_cm
-        freqs_refined_cm = freqs_refined_THz[i] * to_cm
-        diff_cm = freqs_refined_cm - freqs_init_cm
-        
-        for band_idx in range(n_bands):
-            is_opt = ""
-            if optimize_mask is not None and optimize_mask[band_idx]:
+    n_bands = len(freqs_initial)
+    freqs_init_cm = freqs_initial * to_cm
+    freqs_refined_cm = freqs_refined * to_cm
+    diff_cm = freqs_refined_cm - freqs_init_cm
+    
+    for band_idx in range(n_bands):
+        is_opt = ""
+        if optimize_mask is not None:
+            if optimize_mask[band_idx]:
                 is_opt = "*"
-            print(f"{band_idx:<6} {freqs_init_cm[band_idx]:<20.2f} {freqs_refined_cm[band_idx]:<20.2f} {diff_cm[band_idx]:<20.2f} {is_opt:<6}")
+
+        print(f"{band_idx:<6} {freqs_init_cm[band_idx]:<20.2f} {freqs_refined_cm[band_idx]:<20.2f} {diff_cm[band_idx]:<20.2f} {is_opt:<6}")
 
 
 

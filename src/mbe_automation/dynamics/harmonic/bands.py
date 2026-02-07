@@ -105,3 +105,25 @@ def compute_band_indices(
     
     return flat_indices.reshape(n_q, n_modes)
 
+
+def reorder_frequencies(
+    frequencies: npt.NDArray[np.float64],
+    band_indices: npt.NDArray[np.int64]
+) -> npt.NDArray[np.float64]:
+    """
+    Reorder frequencies so that column j contains frequencies of band j.
+    
+    Args:
+        frequencies: (n_q, n_bands) array of frequencies.
+        band_indices: (n_q, n_bands) array of band indices from compute_band_indices.
+        
+    Returns:
+        (n_q, n_bands) array where reordered[k, b] is the frequency of band b at q-point k.
+    """
+    n_q, n_bands = frequencies.shape
+    
+    reordered = np.empty((n_q, n_bands), dtype=np.float64)
+    for k in range(n_q):
+        reordered[k, band_indices[k]] = frequencies[k]
+    
+    return reordered
