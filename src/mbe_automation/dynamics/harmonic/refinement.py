@@ -1,7 +1,7 @@
 """
-Integration module for specialized normal mode refinement using
-RefinementEngine and direct CCTBX/SMTBX adapters.
-
+Integration module for normal mode refinement using
+the NoMoRe library of Paul Niklas Ruth
+https://github.com/Niolon
 """
 
 from __future__ import annotations
