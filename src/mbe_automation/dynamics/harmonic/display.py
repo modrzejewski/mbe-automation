@@ -420,7 +420,7 @@ def print_frequency_comparison(
     
     to_cm = phonopy.physical_units.get_physical_units().THzToCm
     
-    print("\\nComparison of Frequencies (Gamma point):")
+    print("\nComparison of Frequencies (Gamma point):")
     print(f"{'Mode':<6} {'Initial (cm^-1)':<20} {'Refined (cm^-1)':<20} {'Shift (cm^-1)':<20} {'Opt?':<6}")
     print("-" * 76)
     
