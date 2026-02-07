@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 import typing
-from typing import Tuple, Literal, Sequence, List
+from typing import Tuple, Literal, Sequence, List, TYPE_CHECKING, Optional
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -43,6 +43,10 @@ import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.thermodynamics
 from copy import deepcopy
+
+
+if TYPE_CHECKING:
+    from nomore_ase.core.frequency_partition import FrequencyPartitionStrategy
 
 class _TrainingStructure:
     def to_mace_dataset(
@@ -244,7 +248,6 @@ class ForceConstants(_ForceConstants):
         output_dir: str = "./",
         mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
         restraint_weight: float | None = None,
-        **kwargs
     ) -> typing.Dict[str, typing.Any]:
         """
         Refine phonon frequencies against experimental ADPs using NoMoRe.
@@ -269,7 +272,49 @@ class ForceConstants(_ForceConstants):
             output_dir=output_dir,
             mesh_size=mesh_size,
             restraint_weight=restraint_weight,
-            **kwargs
+        )
+
+    def refine(
+        self,
+        cif_path: str,
+        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+        restraint_weight: float | None = None,
+        strategy: FrequencyPartitionStrategy | None = None,
+        max_iter: int = 100,
+        optimizer_method: str = "SLSQP",
+        weighting_scheme: Literal["sigma", "unit"] = "sigma",
+        fix_positions: bool = True,
+        exclude_hydrogen_positions: bool = True,
+    ) -> typing.Dict[str, typing.Any]:
+        """
+        Refine phonon frequencies using the NoMoRe refinement API.
+        
+        Args:
+            cif_path: Path to experimental CIF.
+            mesh_size: k-point mesh size ("gamma", float radius, or [Nx, Ny, Nz]).
+            restraint_weight: Weight for restraining to initial frequencies.
+            strategy: Frequency partitioning strategy object (or None for default).
+            max_iter: Maximum optimization iterations.
+            optimizer_method: Optimizer method (e.g., 'SLSQP', 'L-BFGS-B').
+            weighting_scheme: Weighting scheme ('sigma' or 'unit').
+            fix_positions: Whether to fix atomic positions during refinement.
+            exclude_hydrogen_positions: Whether to exclude hydrogens from position refinement.
+            
+        Returns:
+            Dictionary containing refinement results.
+        """
+        from mbe_automation.dynamics.harmonic import refinement
+        return refinement.run(
+            force_constants=self,
+            cif_path=cif_path,
+            mesh_size=mesh_size,
+            restraint_weight=restraint_weight,
+            strategy=strategy,
+            max_iter=max_iter,
+            optimizer_method=optimizer_method,
+            weighting_scheme=weighting_scheme,
+            fix_positions=fix_positions,
+            exclude_hydrogen_positions=exclude_hydrogen_positions
         )
 
     def fit_to_adps(
