@@ -442,6 +442,17 @@ def run(
         Dictionary with refinement results.
     """
     
+    if isinstance(mesh_size, (list, tuple, np.ndarray)):
+        mesh_size = np.array(mesh_size)
+
+    # Validate explicit mesh size (must be odd integers to include Gamma point)
+    if isinstance(mesh_size, np.ndarray):
+        if np.any(mesh_size % 2 == 0):
+            raise ValueError(
+                f"Mesh size must consist of odd integers to ensure Gamma point inclusion.\n"
+                f"Received: {mesh_size}. Please use odd numbers (e.g., [3, 3, 3])."
+            )
+    
     # 1. Initialize CctbxAdapter (loads CIF)
     print(f"Loading experimental data from {cif_path}")
     cctbx_adapter = CctbxAdapter(cif_path)
