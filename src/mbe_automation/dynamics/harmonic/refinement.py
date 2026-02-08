@@ -11,8 +11,9 @@ from typing import Dict, Any, Optional, Literal, List, TYPE_CHECKING
 import phonopy.physical_units
 import mbe_automation.dynamics.harmonic.modes
 from scipy.spatial.distance import cdist
-from mbe_automation.dynamics.harmonic.bands import reorder_frequencies
+from mbe_automation.dynamics.harmonic.bands import compute_band_indices, determine_degenerate_bands
 from mbe_automation.dynamics.harmonic.display import print_frequency_comparison
+from phonopy.structure.atoms import symbol_map
 
 if TYPE_CHECKING:
     from mbe_automation.api.classes import ForceConstants
@@ -29,6 +30,7 @@ try:
         FrequencyPartitionStrategy,
         SensitivityBasedStrategy
     )
+    from nomore_ase.optimization.restraints import BayesianFrequencyRestraint
 
     from mbe_automation.dynamics.harmonic.bands import compute_band_indices
 except ImportError:
@@ -41,8 +43,7 @@ def _to_phonon_data(
     phonopy_object,
     irr_q_frac: npt.NDArray[np.floating],
     q_weights: npt.NDArray[np.integer],
-    cif_adapter: "CctbxAdapter",
-    compute_bands: bool = True
+    cif_adapter: "CctbxAdapter"
 ) -> PhononData:
     """
     Create PhononData object from computed phonopy data, matching atoms to CIF.
@@ -52,7 +53,6 @@ def _to_phonon_data(
         irr_q_frac: Irreducible q-points (fractional).
         q_weights: Weights of irreducible q-points.
         cif_adapter: Adapter containing the experimental structure (CIF).
-        compute_bands: Whether to compute band indices.
 
     Returns:
         PhononData object ready for refinement.
@@ -111,20 +111,18 @@ def _to_phonon_data(
         final_symbols = ph.primitive.symbols
         final_masses = ph.primitive.masses
 
-
     flat_weights = np.repeat(q_weights, n_modes_total)
 
-    degeneracy_groups = _find_degeneracy_groups(flat_freqs_cm1, tolerance=1.0)
-    flat_freqs_cm1 = _average_degenerate_frequencies(flat_freqs_cm1, degeneracy_groups)
+    print(f"Computing band assignment for {len(irr_q_frac)} q-points...")
+    band_indices = compute_band_indices(
+        phonopy_object=ph,
+        q_points=irr_q_frac
+    )
+    # band_indices: (n_q, n_modes)
+        
+    gamma_index = np.argmin(np.linalg.norm(irr_q_frac, axis=1))
+    degeneracy_groups = determine_degenerate_bands(ph, band_indices, gamma_index)
 
-    band_indices = None
-    if compute_bands:
-        print(f"Computing band assignment for {len(irr_q_frac)} q-points...")
-        band_indices = compute_band_indices(
-            phonopy_object=ph,
-            q_points=irr_q_frac
-        )
-        band_indices = band_indices.flatten()
     mode_q_indices = np.repeat(np.arange(len(irr_q_frac)), n_modes_total)
 
     return PhononData(
@@ -138,9 +136,12 @@ def _to_phonon_data(
         cell=ph.primitive.cell,
         symbols=final_symbols,
         masses=final_masses,
+        # Since Phonopy handles the supercell folding/unfolding internally and provides
+        # us with frequencies and eigenvectors on a specific q-mesh, the supercell
+        # attribute is effectively metadata and can be set to [1, 1, 1].
         supercell=[1, 1, 1],
         n_atoms=n_target,
-        band_indices=band_indices
+        band_indices=band_indices.flatten()
     )
 
 
@@ -160,7 +161,7 @@ def _validate_atomic_numbers(
     Raises:
         ValueError: If atomic numbers do not match after permutation.
     """
-    from phonopy.structure.atoms import symbol_map
+    
     
     try:
          target_numbers = np.array([symbol_map[s] for s in target_symbols])
@@ -208,49 +209,6 @@ def _permute_atoms(
     indexer[axis] = source_to_target_indices
     new_data[tuple(indexer)] = data
     return new_data
-
-
-def _find_degeneracy_groups(freqs: np.ndarray, tolerance: float) -> List[List[int]]:
-    """
-    Find index groups of degenerate modes.
-    
-    Args:
-        freqs: Array of frequencies.
-        tolerance: Tolerance for degeneracy (same units as freqs).
-    """
-    n_modes = len(freqs)
-    visited = np.zeros(n_modes, dtype=bool)
-    groups = []
-    
-    argsort = np.argsort(freqs)
-    
-    current_group = [argsort[0]]
-    visited[argsort[0]] = True
-    
-    for i in range(1, n_modes):
-        idx = argsort[i]
-        prev_idx = argsort[i-1]
-        
-        if np.abs(freqs[idx] - freqs[prev_idx]) < tolerance:
-            current_group.append(idx)
-        else:
-            groups.append(current_group)
-            current_group = [idx]
-        visited[idx] = True
-    groups.append(current_group)
-    
-    return groups
-
-
-def _average_degenerate_frequencies(freqs: np.ndarray, groups: List[List[int]]) -> np.ndarray:
-    """Enforce exact degeneracy by averaging."""
-    new_freqs = freqs.copy()
-    for group in groups:
-        if len(group) > 1:
-            avg = np.mean(freqs[group])
-            new_freqs[group] = avg
-    return new_freqs
-
 
 def _assert_equal_cells(fc_cell_matrix: np.ndarray, cif_unit_cell: Any, tolerance: float = 1e-3) -> None:
     """
@@ -574,7 +532,6 @@ def run(
     # Create restraint object if weight is positive
     restraint_instance = None
     if restraint_weight > 0.0:
-        from nomore_ase.optimization.restraints import BayesianFrequencyRestraint
         restraint_instance = BayesianFrequencyRestraint(
             initial_frequencies=initial_freqs,
             temperature=temperature

@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import numpy as np
 import numpy.typing as npt
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, List
 import phonopy
 from mbe_automation.storage.core import ForceConstants
 from nomore_ase.optimization.band_assignment import assign_bands
 from mbe_automation.storage import views
+from nomore_ase.core.symmetric_phonons import SymmetricPhonons
+from mbe_automation.dynamics.harmonic.modes import at_k_points
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT
 
 class PhonopyASEAdapter:
     """
@@ -32,7 +35,6 @@ class PhonopyASEAdapter:
     
     def __init__(self, ph: phonopy.Phonopy):
         self.ph = ph
-        # Pre-compute ASE atoms wrapper for accessing cell/reciprocal cell
         self.atoms = views.to_ase(ph.primitive)
         
     def get_force_constant(self) -> npt.NDArray[np.float64]:
@@ -127,3 +129,125 @@ def reorder_frequencies(
         reordered[k, band_indices[k]] = frequencies[k]
     
     return reordered
+
+
+def find_degenerate_frequencies(freqs: npt.NDArray[np.float64], tolerance: float = 1e-4) -> List[List[int]]:
+    """
+    Find index groups of degenerate modes.
+
+    Args:
+        freqs: Array of frequencies (should be 1D).
+        tolerance: Tolerance for degeneracy (same units as freqs).
+
+    Returns:
+        List of lists, where each inner list contains indices of degenerate modes.
+        Indices refer to the position in the original `freqs` array.
+
+    Example:
+        >>> freqs = np.array([10.0, 10.05, 20.0, 30.0, 30.01, 30.02])
+        >>> groups = find_degenerate_frequencies(freqs, tolerance=0.1)
+        >>> print(groups)
+        [[0, 1], [2], [3, 4, 5]]
+        
+        In this example:
+        - Modes 0 and 1 are degenerate (diff < 0.1).
+        - Mode 2 is non-degenerate.
+        - Modes 3, 4, and 5 are degenerate.
+    """
+    n_modes = len(freqs)
+    if n_modes == 0:
+        return []
+
+    visited = np.zeros(n_modes, dtype=bool)
+    groups = []
+    
+    argsort = np.argsort(freqs)
+    
+    current_group = [argsort[0]]
+    visited[argsort[0]] = True
+    
+    for i in range(1, n_modes):
+        idx = argsort[i]
+        prev_idx = argsort[i-1]
+        
+        if np.abs(freqs[idx] - freqs[prev_idx]) < tolerance:
+            current_group.append(idx)
+        else:
+            groups.append(current_group)
+            current_group = [idx]
+        visited[idx] = True
+    groups.append(current_group)
+    
+    return groups
+
+
+def determine_degenerate_bands(
+    phonopy_object: phonopy.Phonopy,
+    band_indices: npt.NDArray[np.int64],
+    gamma_index: int
+) -> List[List[int]]:
+    """
+    Compute degeneracy groups using nomore_ase's rigorous symmetry analysis.
+    
+    This replaces the native Phonopy Irreps approach to correctly handle
+    acoustic mode splitting at Gamma (and other subtle symmetry cases).
+    
+    1. Extracts Eigenvectors at Gamma ([0, 0, 0]).
+    2. Uses nomore_ase.SymmetricPhonons to find degenerate groups by checking
+       eigenvector mixing under symmetry operations.
+    3. Maps these Gamma-point groups to all q-points via band indices.
+    
+    Args:
+        phonopy_object: Phonopy object with initialized structure and supercell.
+        band_indices: (n_q * n_bands,) or (n_q, n_bands) array of band indices.
+                      Values must be in range [0, n_bands-1].
+        gamma_index: Index of the Gamma point in the q-point list corresponding to band_indices.
+        
+    Returns:
+        List of lists, where each inner list contains mode indices (into the flattened frequency array)
+        that form a degenerate group.
+        
+        Example:
+            Consider a system with 3 bands and 2 q-points (q0, q1), where q0 is Gamma.
+            Modes at q0 are indices 0, 1, 2. Modes at q1 are indices 3, 4, 5.
+            
+            Suppose modes 0 and 1 are degenerate at Gamma (e.g. formed by bands 0 and 1).
+            All modes belonging to bands 0 and 1 across the Brillouin zone will be grouped together.
+            
+            Result:
+            [[0, 1, 3, 4], [2, 5]]
+            
+            - Group 0: Modes from bands 0 and 1 (indices 0, 1 at q0; 3, 4 at q1)
+            - Group 1: Modes from band 2 (index 2 at q0; 5 at q1)
+    """
+    sym_calc = SymmetricPhonons(
+        atoms=views.to_ase(phonopy_object.primitive), 
+        calculator=None, 
+        supercell=None, 
+        symprec=SYMMETRY_TOLERANCE_STRICT,
+    )
+
+    _, eigenvecs_all = at_k_points(
+        phonopy_object.dynamical_matrix, 
+        [[0, 0, 0]], 
+        compute_eigenvecs=True, 
+        eigenvectors_storage="rows"
+    )
+    
+    eigenvecs_gamma = eigenvecs_all[0]
+    n_atoms = len(phonopy_object.primitive)
+    n_modes = n_atoms * 3
+    
+    eigenvectors = eigenvecs_gamma.reshape(n_modes, n_atoms, 3)
+    gamma_mode_groups = sym_calc.find_degeneracy_groups_by_symmetry(eigenvectors, q_point=(0,0,0))
+    
+    bands_at_gamma = band_indices[gamma_index]    
+    flat_band_indices = band_indices.flatten()
+    full_groups = []
+    
+    for group in gamma_mode_groups:
+        degenerate_band_ids = bands_at_gamma[group]
+        mask = np.isin(flat_band_indices, degenerate_band_ids)
+        full_groups.append(np.flatnonzero(mask).tolist())
+        
+    return full_groups
