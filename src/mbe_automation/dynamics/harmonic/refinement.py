@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional, Literal, List, TYPE_CHECKING
 import phonopy.physical_units
 import mbe_automation.dynamics.harmonic.modes
 from scipy.spatial.distance import cdist
-from mbe_automation.dynamics.harmonic.bands import compute_band_indices, determine_degenerate_bands
+from mbe_automation.dynamics.harmonic.bands import compute_band_indices, determine_degenerate_bands, reorder_frequencies
 from mbe_automation.dynamics.harmonic.display import print_frequency_comparison
 from phonopy.structure.atoms import symbol_map
 
