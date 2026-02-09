@@ -63,8 +63,8 @@ class NormalModeRefinement:
     asu_atoms: npt.NDArray[np.int64]
     similarity_s12_initial: npt.NDArray[np.float64]
     similarity_s12_final: npt.NDArray[np.float64]
-    chi_sq_initial: float
-    chi_sq_final: float
+    chi_sq_initial: npt.NDArray[np.float64]
+    chi_sq_final: npt.NDArray[np.float64]
 
 def to_phonon_data(
     phonopy_object,
@@ -382,6 +382,37 @@ def _compute_s12_per_atom(
     return s12
 
 
+def _compute_chi_sq_per_atom(
+    u_comp: npt.NDArray[np.float64],
+    u_exp: npt.NDArray[np.float64],
+    symbols: list[str],
+    exclude_hydrogen: bool
+) -> npt.NDArray[np.float64]:
+    """
+    Compute per-atom χ², with NaN for excluded atoms.
+
+    χ²_i = Σ_jk (U_comp_ijk - U_exp_ijk)²
+
+    Args:
+        u_comp: Computed ADPs (n_atoms, 3, 3).
+        u_exp: Experimental ADPs (n_atoms, 3, 3).
+        symbols: Element symbols for each atom.
+        exclude_hydrogen: If True, set χ² to NaN for H atoms.
+
+    Returns:
+        Per-atom χ² array (n_atoms,). H atoms are NaN if excluded.
+    """
+    n = len(symbols)
+    chi_sq = np.full(n, np.nan)
+    if exclude_hydrogen:
+        mask = np.array([s != "H" for s in symbols])
+    else:
+        mask = np.ones(n, dtype=bool)
+    diff = u_comp[mask] - u_exp[mask]
+    chi_sq[mask] = np.sum(diff**2, axis=(1, 2))
+    return chi_sq
+
+
 def _clamp_acoustic_frequencies(
     frequencies_cm1: npt.NDArray[np.float64],
     min_freq_cm1: float = 10.0
@@ -439,7 +470,7 @@ def _display_refinement_summary(
         asu_symbols: Element symbols for ASU atoms.
     """
     # Convert THz to cm⁻¹ for display
-    THz_to_cm1 = 1.0 / (phonopy.physical_units.THzToCm**(-1))
+    THz_to_cm1 = 1.0 / (phonopy.physical_units.get_physical_units().THzToCm**(-1))
     initial_freqs_cm1 = refinement.freqs_initial_THz * THz_to_cm1
     refined_freqs_cm1 = refinement.freqs_final_THz * THz_to_cm1
     
@@ -666,7 +697,7 @@ def run(
     n_bands = n_modes // len(irr_q_frac)
     
     # Convert frequencies from cm⁻¹ to THz
-    cm1_to_THz = phonopy.physical_units.THzToCm**(-1)
+    cm1_to_THz = phonopy.physical_units.get_physical_units().THzToCm**(-1)
     freqs_initial_THz = initial_freqs * cm1_to_THz
     freqs_final_THz = result["frequencies"] * cm1_to_THz
     
@@ -683,16 +714,10 @@ def run(
     # This allows extracting ASU quantities from P1 arrays via U_cart[asu_atoms].
     asu_atoms = _get_asu_atoms(smtbx_adapter)
 
-    # Compute per-atom S12 similarity over ASU atoms.
-    # H atoms get NaN if their positions are not refined.
     asu_symbols = [sc.element_symbol() for sc in smtbx_adapter.structure.scatterers()]
-    asu_exp = U_cart_exp_p1[asu_atoms]
-    s12_initial = _compute_s12_per_atom(
-        U_cart_comp_initial[asu_atoms], asu_exp, asu_symbols, exclude_hydrogen_positions
-    )
-    s12_final = _compute_s12_per_atom(
-        U_cart_comp_final[asu_atoms], asu_exp, asu_symbols, exclude_hydrogen_positions
-    )
+    U_asu_exp = U_cart_exp_p1[asu_atoms]
+    U_asu_comp_initial = U_cart_comp_initial[asu_atoms]
+    U_asu_comp_final = U_cart_comp_final[asu_atoms]
 
     refinement = NormalModeRefinement(
         n_bands=n_bands,
@@ -705,10 +730,18 @@ def run(
         U_cart_comp_initial_Angs2=U_cart_comp_initial,
         U_cart_comp_final_Angs2=U_cart_comp_final,
         asu_atoms=asu_atoms,
-        similarity_s12_initial=s12_initial,
-        similarity_s12_final=s12_final,
-        chi_sq_initial=float(result["chi_sq_initial"]),
-        chi_sq_final=float(result["chi_sq_final"]),
+        similarity_s12_initial=_compute_s12_per_atom(
+            U_asu_comp_initial, U_asu_exp, asu_symbols, exclude_hydrogen_positions
+        ),
+        similarity_s12_final=_compute_s12_per_atom(
+            U_asu_comp_final, U_asu_exp, asu_symbols, exclude_hydrogen_positions
+        ),
+        chi_sq_initial=_compute_chi_sq_per_atom(
+            U_asu_comp_initial, U_asu_exp, asu_symbols, exclude_hydrogen_positions
+        ),
+        chi_sq_final=_compute_chi_sq_per_atom(
+            U_asu_comp_final, U_asu_exp, asu_symbols, exclude_hydrogen_positions
+        ),
     )
 
     # 9. Display refinement summary
