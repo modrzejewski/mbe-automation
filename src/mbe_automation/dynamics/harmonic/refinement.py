@@ -509,10 +509,10 @@ def _display_refinement_summary(
         labels=["experimental", "initial", "refined"],
         symbols=asu_symbols,
         adps_3=refinement.U_cart_comp_final_Angs2[refinement.asu_atoms],
-        similarity_s12_12=float(np.nanmean(refinement.similarity_s12_initial)),
-        similarity_s12_13=float(np.nanmean(refinement.similarity_s12_final)),
-        chi_sq_12=float(np.nanmean(refinement.chi_sq_initial)),
-        chi_sq_13=float(np.nanmean(refinement.chi_sq_final)),
+        similarity_s12_12=np.nanmean(refinement.similarity_s12_initial),
+        similarity_s12_13=np.nanmean(refinement.similarity_s12_final),
+        chi_sq_12=np.sqrt(np.nanmean(refinement.chi_sq_initial)),
+        chi_sq_13=np.sqrt(np.nanmean(refinement.chi_sq_final)),
         exclude_hydrogen=exclude_hydrogen
     )
 

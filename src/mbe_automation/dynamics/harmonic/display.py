@@ -404,13 +404,13 @@ def print_adps_comparison(
         print(f"Mean S12({label1}-{label2}): {similarity_s12_12:.3f}%")
     
     if chi_sq_12 is not None:
-        print(f"Mean Chi^2({label1}-{label2}): {chi_sq_12:.5f}")
+        print(f"mean √(χ²)({label1}-{label2}): {chi_sq_12:.5f}")
     
     if adps_3 is not None:
         if similarity_s12_13 is not None:
-            print(f"Mean S12({label1}-{label3}): {similarity_s12_13:.3f}%")
+            print(f"mean s12({label1}-{label3}): {similarity_s12_13:.3f}%")
         if chi_sq_13 is not None:
-            print(f"Mean Chi^2({label1}-{label3}): {chi_sq_13:.5f}")
+            print(f"mean √(χ²)({label1}-{label3}): {chi_sq_13:.5f}")
     
     print("=" * 100)
 
