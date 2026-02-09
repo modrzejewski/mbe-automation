@@ -39,7 +39,7 @@ except ImportError:
         "Install it in your environment to use this functionality."
     )
 
-def _to_phonon_data(
+def to_phonon_data(
     phonopy_object,
     irr_q_frac: npt.NDArray[np.floating],
     q_weights: npt.NDArray[np.integer],
@@ -70,7 +70,7 @@ def _to_phonon_data(
     flat_freqs_cm1 = freqs_cm1_grid.flatten()
     n_atoms_fc = len(ph.primitive)
     
-    source_to_target_indices = _compute_atom_permutation(ph.primitive, cif_adapter)
+    source_to_target_indices = compute_atom_permutation(ph.primitive, cif_adapter)
     
     reordering_needed = not np.all(source_to_target_indices == np.arange(n_atoms_fc))
     
@@ -232,7 +232,7 @@ def _assert_equal_cells(fc_cell_matrix: np.ndarray, cif_unit_cell: Any, toleranc
         )
 
 
-def _compute_atom_permutation(phonopy_primitive: Any, cif_adapter: "CctbxAdapter") -> npt.NDArray[np.int64]:
+def compute_atom_permutation(phonopy_primitive: Any, cif_adapter: "CctbxAdapter") -> npt.NDArray[np.int64]:
     """
     Compute permutation array to map ForceConstants atoms to CIF atoms.
     
@@ -424,6 +424,7 @@ def run(
     weighting_scheme: Literal["sigma", "unit"] = "sigma",
     fix_positions: bool = True,
     exclude_hydrogen_positions: bool = True,
+    use_irreducible_fbz: bool = False
 ) -> Dict[str, Any]:
     """
     Run NoMoRe refinement using the v2 API (RefinementEngine + Adapter).
@@ -445,7 +446,6 @@ def run(
     if isinstance(mesh_size, (list, tuple, np.ndarray)):
         mesh_size = np.array(mesh_size)
 
-    # Validate explicit mesh size (must be odd integers to include Gamma point)
     if isinstance(mesh_size, np.ndarray):
         if np.any(mesh_size % 2 == 0):
             raise ValueError(
@@ -467,12 +467,12 @@ def run(
     irr_q_frac, q_weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
         phonopy_object=ph,
         mesh_size=mesh_size,
-        use_symmetry=True,
+        use_symmetry=use_irreducible_fbz,
         odd_numbers=True  # Enforce odd mesh to guarantee Gamma point (0,0,0) is included
     )
     
     # 2b. Build PhononData
-    phonons = _to_phonon_data(
+    phonons = to_phonon_data(
         phonopy_object=ph,
         irr_q_frac=irr_q_frac,
         q_weights=q_weights,

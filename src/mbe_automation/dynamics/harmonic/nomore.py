@@ -56,11 +56,12 @@ class NomoreAdapter:
         units = phonopy.physical_units.get_physical_units()
         ph = self.fc.to_phonopy()
         
-        # 2. Get Irreducible Brillouin Zone (IBZ)
+        # 2. Get Full Brillouin Zone (FBZ) to ensure correct tensor summation
+        # NoMoRe does not inherently symmetrize tensors from IBZ, so we must sum over all q-points.
         irr_q_frac, q_weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
             phonopy_object=ph,
             mesh_size=mesh_size,
-            use_symmetry=True
+            use_symmetry=False
         )
         
         # 3. Compute Frequencies and Eigenvectors for each IBZ q-point using vectorized at_k_points
