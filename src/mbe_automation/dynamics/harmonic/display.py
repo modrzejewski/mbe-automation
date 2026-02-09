@@ -364,12 +364,14 @@ def print_adps_comparison(
     label3 = labels[2] if adps_3 is not None else None
     
     def format_matrix_row(m: np.ndarray, row: int) -> str:
-        """Format a single row of a 3x3 matrix."""
-        return f"[{m[row, 0]:8.5f} {m[row, 1]:8.5f} {m[row, 2]:8.5f}]"
+        """Format a single row of a 3x3 matrix with spanning brackets."""
+        left = ["┌", "│", "└"][row]
+        right = ["┐", "│", "┘"][row]
+        return f"{left} {m[row, 0]:8.5f} {m[row, 1]:8.5f} {m[row, 2]:8.5f} {right}"
     
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 100)
     print("ADP Comparison (3×3 Cartesian U tensors, Å²)")
-    print("=" * 80)
+    print("=" * 100)
     
     for i in range(n_atoms):
         u1 = adps_1[i]
@@ -377,12 +379,12 @@ def print_adps_comparison(
         u3 = adps_3[i] if adps_3 is not None else None
         
         print(f"\n{symbols[i]}")
-        print("-" * 80)
+        print("-" * 100)
         
         if u3 is not None:
-            print(f"{'':4} {label1:^28} {label2:^28} {label3:^28}")
+            print(f"{'':4} {label1:^30} {label2:^30} {label3:^30}")
         else:
-            print(f"{'':4} {label1:^28} {label2:^28}")
+            print(f"{'':4} {label1:^30} {label2:^30}")
         
         for row in range(3):
             row1 = format_matrix_row(u1, row)
@@ -394,23 +396,23 @@ def print_adps_comparison(
                 print(f"    {row1}  {row2}")
     
     # Summary statistics
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 100)
     print("Summary")
-    print("=" * 80)
+    print("=" * 100)
     
     if similarity_s12_12 is not None:
         print(f"Mean S12({label1}-{label2}): {similarity_s12_12:.3f}%")
     
     if chi_sq_12 is not None:
-        print(f"Mean Chi^2({label1}-{label2}): {chi_sq_12:.6f}")
+        print(f"Mean Chi^2({label1}-{label2}): {chi_sq_12:.5f}")
     
     if adps_3 is not None:
         if similarity_s12_13 is not None:
             print(f"Mean S12({label1}-{label3}): {similarity_s12_13:.3f}%")
         if chi_sq_13 is not None:
-            print(f"Mean Chi^2({label1}-{label3}): {chi_sq_13:.6f}")
+            print(f"Mean Chi^2({label1}-{label3}): {chi_sq_13:.5f}")
     
-    print("=" * 80)
+    print("=" * 100)
 
 
 def print_frequency_comparison(
@@ -438,7 +440,7 @@ def print_frequency_comparison(
         to_cm = 1.0
         
     print("\nComparison of Frequencies (Gamma point / Average):")
-    print(f"{'Mode':<6} {'Initial (cm^-1)':<20} {'Refined (cm^-1)':<20} {'Shift (cm^-1)':<20} {'Opt?':<6}")
+    print(f"{'mode':<6} {'initial (cm^-1)':<20} {'refined (cm^-1)':<20} {'shift (cm^-1)':<20} {'opt?':<6}")
     print("-" * 76)
             
     n_bands = len(freqs_initial)

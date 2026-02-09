@@ -506,7 +506,7 @@ def _display_refinement_summary(
     print_adps_comparison(
         adps_1=refinement.U_cart_exp_Angs2[refinement.asu_atoms],
         adps_2=refinement.U_cart_comp_initial_Angs2[refinement.asu_atoms],
-        labels=["Exp", "Initial", "Refined"],
+        labels=["experimental", "computed (initial)", "computed (refined)"],
         symbols=asu_symbols,
         adps_3=refinement.U_cart_comp_final_Angs2[refinement.asu_atoms],
         similarity_s12_12=float(np.nanmean(refinement.similarity_s12_initial)),
