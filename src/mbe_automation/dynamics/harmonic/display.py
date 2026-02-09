@@ -365,8 +365,8 @@ def print_adps_comparison(
     
     def format_matrix_row(m: np.ndarray, row: int) -> str:
         """Format a single row of a 3x3 matrix with spanning brackets."""
-        left = ["┌", "│", "└"][row]
-        right = ["┐", "│", "┘"][row]
+        left = ["⎛", "⎜", "⎝"][row]
+        right = ["⎞", "⎟", "⎠"][row]
         return f"{left} {m[row, 0]:8.5f} {m[row, 1]:8.5f} {m[row, 2]:8.5f} {right}"
     
     print("\n" + "=" * 100)
