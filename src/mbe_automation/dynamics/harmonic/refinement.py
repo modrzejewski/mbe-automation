@@ -458,7 +458,8 @@ def _display_refinement_summary(
     refinement: NormalModeRefinement,
     band_indices: npt.NDArray[np.int64] | None,
     groups: "RefinementGroups",
-    asu_symbols: list[str] | None = None
+    asu_symbols: list[str] | None = None,
+    exclude_hydrogen: bool = False
 ) -> None:
     """
     Display refinement summary: frequency comparison and ADP comparison.
@@ -468,6 +469,7 @@ def _display_refinement_summary(
         band_indices: Flat array of band indices.
         groups: Refinement groups from the optimization.
         asu_symbols: Element symbols for ASU atoms.
+        exclude_hydrogen: If True, exclude H atoms from ADP display.
     """
     # Convert THz to cm⁻¹ for display
     THz_to_cm1 = 1.0 / (phonopy.physical_units.get_physical_units().THzToCm**(-1))
@@ -509,6 +511,9 @@ def _display_refinement_summary(
         adps_3=refinement.U_cart_comp_final_Angs2[refinement.asu_atoms],
         similarity_s12_12=float(np.nanmean(refinement.similarity_s12_initial)),
         similarity_s12_13=float(np.nanmean(refinement.similarity_s12_final)),
+        chi_sq_12=float(np.nanmean(refinement.chi_sq_initial)),
+        chi_sq_13=float(np.nanmean(refinement.chi_sq_final)),
+        exclude_hydrogen=exclude_hydrogen
     )
 
 
@@ -749,7 +754,8 @@ def run(
         refinement=refinement,
         band_indices=phonons.band_indices,
         groups=groups,
-        asu_symbols=asu_symbols
+        asu_symbols=asu_symbols,
+        exclude_hydrogen=exclude_hydrogen_positions
     )
 
     return refinement
