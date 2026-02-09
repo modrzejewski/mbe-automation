@@ -242,38 +242,6 @@ class ForceConstants(_ForceConstants):
             work_dir=work_dir
         )
 
-    def nomore(
-        self,
-        cif_path: str,
-        output_dir: str = "./",
-        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
-        restraint_weight: float | None = None,
-    ) -> typing.Dict[str, typing.Any]:
-        """
-        Refine phonon frequencies against experimental ADPs using NoMoRe.
-        
-        Args:
-            cif_path: Path to experimental CIF with ADPs.
-            output_dir: Directory to save results.
-            mesh_size: Accuracy of the FBZ interpolation mesh. Can be:
-                - "gamma": Use only the [0, 0, 0] k-point.
-                - A floating point number: Defines a supercell of radius R (in Angstroms).
-                - array of 3 integers: Defines an explicit Monkhorst-Pack mesh (Nx, Ny, Nz).
-            restraint_weight: Weight for restraining to initial frequencies.
-            **kwargs: Additional arguments passed to NoMoReRefinement.run()
-            
-        Returns:
-            Dictionary containing refinement results.
-        """
-        from mbe_automation.dynamics.harmonic.nomore import run
-        return run(
-            force_constants=self,
-            cif_path=cif_path,
-            output_dir=output_dir,
-            mesh_size=mesh_size,
-            restraint_weight=restraint_weight,
-        )
-
     def refine(
         self,
         cif_path: str,
@@ -303,7 +271,12 @@ class ForceConstants(_ForceConstants):
         Returns:
             Dictionary containing refinement results.
         """
-        from mbe_automation.dynamics.harmonic import refinement
+        try:
+            from mbe_automation.dynamics.harmonic import refinement
+        except ImportError:
+            raise ImportError("nomore_ase library is required to use this method")
+        if isinstance(mesh_size, list):
+            mesh_size = np.array(mesh_size, dtype=np.int64)
         return refinement.run(
             force_constants=self,
             cif_path=cif_path,
@@ -315,74 +288,6 @@ class ForceConstants(_ForceConstants):
             weighting_scheme=weighting_scheme,
             fix_positions=fix_positions,
             exclude_hydrogen_positions=exclude_hydrogen_positions
-        )
-
-    def fit_to_adps(
-        self,
-        cif_path: str,
-        temperature: float,
-        phonon_filter: PhononFilter | None = None,
-        restraint_weight: float = 0.0,
-        bounds: tuple[float, float] = (0.1, 1e4)
-    ) -> npt.NDArray:
-        """
-        Refine phonon frequencies by fitting calculated ADPs to experimental ADPs (in Å²).
-        
-        Args:
-            cif_path: Path to experimental CIF with ADPs.
-            temperature: Temperature in Kelvin.
-            phonon_filter: Optional filter for phonons (defines mesh and freq limits).
-            restraint_weight: Weight for restraining refined frequencies to initial values.
-            bounds: (min, max) frequency bounds in cm⁻¹.
-            
-        Returns:
-            Refined frequencies in cm⁻¹.
-        """
-        import mbe_automation.dynamics.harmonic.nomore
-        return mbe_automation.dynamics.harmonic.nomore.fit_to_adps(
-            fc=self,
-            cif_path=cif_path,
-            temperature=temperature,
-            phonon_filter=phonon_filter,
-            restraint_weight=restraint_weight,
-            bounds=bounds,
-        )
-
-    def fit_to_adps_simple(
-        self,
-        cif_path: str,
-        temperature_K: float,
-        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
-        optimize_mask: npt.NDArray[np.bool_] | None = None,
-        degeneracy_tolerance: float = 1e-4,
-        bounds: tuple[float, float] = (1e-6, np.inf),
-        max_iterations: int = 200,
-    ) -> typing.Dict[str, typing.Any]:
-        """
-        Refine phonon frequencies using simplified band shift optimization (nomore_simple) using ADPs in Å².
-        
-        Args:
-            cif_path: Path to experimental CIF with ADPs.
-            temperature_K: Temperature (K). 
-            mesh_size: k-point sampling mesh.
-            optimize_mask: (n_bands,) Boolean mask. If True, the band is allowed to shift.
-            degeneracy_tolerance: Tolerance (THz) for linking degenerate bands.
-            bounds: (min, max) allowed frequencies in THz (checked approximately or via penalties).
-            max_iterations: Maximum iterations for the optimizer.
-            
-        Returns:
-            Dictionary containing optimization results.
-        """
-        import mbe_automation.dynamics.harmonic.nomore_simple
-        return mbe_automation.dynamics.harmonic.nomore_simple.fit_to_adps(
-            force_constants=self,
-            cif_path=cif_path,
-            temperature_K=temperature_K,
-            mesh_size=mesh_size,
-            optimize_mask=optimize_mask,
-            degeneracy_tolerance=degeneracy_tolerance,
-            bounds=bounds,
-            max_iterations=max_iterations
         )
 
     def thermodynamics(

@@ -5,6 +5,7 @@ https://github.com/Niolon
 """
 
 from __future__ import annotations
+from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 from typing import Dict, Any, Optional, Literal, List, TYPE_CHECKING
@@ -12,7 +13,7 @@ import phonopy.physical_units
 import mbe_automation.dynamics.harmonic.modes
 from scipy.spatial.distance import cdist
 from mbe_automation.dynamics.harmonic.bands import compute_band_indices, determine_degenerate_bands, reorder_frequencies
-from mbe_automation.dynamics.harmonic.display import print_frequency_comparison
+from mbe_automation.dynamics.harmonic.display import print_frequency_comparison, print_adps_comparison
 from phonopy.structure.atoms import symbol_map
 
 if TYPE_CHECKING:
@@ -31,6 +32,8 @@ try:
         SensitivityBasedStrategy
     )
     from nomore_ase.optimization.restraints import BayesianFrequencyRestraint
+    from nomore_ase.analysis.validation import extract_adps_from_structure
+    from nomore_ase.analysis.s12_similarity import calculate_s12_per_atom
 
     from mbe_automation.dynamics.harmonic.bands import compute_band_indices
 except ImportError:
@@ -38,6 +41,30 @@ except ImportError:
         "The `dynamics.harmonic.refinement` module requires the `nomore_ase` package. "
         "Install it in your environment to use this functionality."
     )
+
+
+@dataclass
+class NormalModeRefinement:
+    """
+    Result of normal mode refinement against experimental ADPs.
+    
+    All U_cart arrays are in P1 (full primitive cell) with shape (n_atoms, 3, 3).
+    Use asu_atoms to extract asymmetric unit quantities.
+    """
+    n_bands: int
+    n_q_points: int
+    irr_q_frac: npt.NDArray[np.float64]
+    q_weights: npt.NDArray[np.int64]
+    freqs_initial_THz: npt.NDArray[np.float64]
+    freqs_final_THz: npt.NDArray[np.float64]
+    U_cart_exp_Angs2: npt.NDArray[np.float64]
+    U_cart_comp_initial_Angs2: npt.NDArray[np.float64]
+    U_cart_comp_final_Angs2: npt.NDArray[np.float64]
+    asu_atoms: npt.NDArray[np.int64]
+    similarity_s12_initial: npt.NDArray[np.float64]
+    similarity_s12_final: npt.NDArray[np.float64]
+    chi_sq_initial: float
+    chi_sq_final: float
 
 def to_phonon_data(
     phonopy_object,
@@ -326,6 +353,35 @@ def _get_refined_bands_mask(
     return refined_mask
 
 
+def _compute_s12_per_atom(
+    u_comp: npt.NDArray[np.float64],
+    u_exp: npt.NDArray[np.float64],
+    symbols: list[str],
+    exclude_hydrogen: bool
+) -> npt.NDArray[np.float64]:
+    """
+    Compute per-atom S12 similarity, with NaN for excluded atoms.
+
+    Args:
+        u_comp: Computed ADPs (n_atoms, 3, 3).
+        u_exp: Experimental ADPs (n_atoms, 3, 3).
+        symbols: Element symbols for each atom.
+        exclude_hydrogen: If True, set S12 to NaN for H atoms.
+
+    Returns:
+        Per-atom S12 array (n_atoms,). H atoms are NaN if excluded.
+    """
+    n = len(symbols)
+    s12 = np.full(n, np.nan)
+    if exclude_hydrogen:
+        mask = np.array([s != "H" for s in symbols])
+    else:
+        mask = np.ones(n, dtype=bool)
+    vals, _ = calculate_s12_per_atom(u_comp[mask], u_exp[mask])
+    s12[mask] = vals
+    return s12
+
+
 def _clamp_acoustic_frequencies(
     frequencies_cm1: npt.NDArray[np.float64],
     min_freq_cm1: float = 10.0
@@ -367,50 +423,95 @@ def _compute_band_averages(
     return np.average(reordered, axis=0, weights=q_weights)
 
 
-def _display_frequency_comparison(
-    initial_freqs_cm1: npt.NDArray[np.float64],
-    refined_freqs_cm1: npt.NDArray[np.float64],
+def _display_refinement_summary(
+    refinement: NormalModeRefinement,
     band_indices: npt.NDArray[np.int64] | None,
-    q_weights: npt.NDArray[np.float64],
-    groups: "RefinementGroups"
+    groups: "RefinementGroups",
+    asu_symbols: list[str] | None = None
 ) -> None:
     """
-    Display frequency comparison between initial and refined frequencies.
-    
-    Computes band-averaged frequencies and prints a comparison table.
+    Display refinement summary: frequency comparison and ADP comparison.
     
     Args:
-        initial_freqs_cm1: Flat array of initial frequencies in cm⁻¹ (n_q * n_bands).
-        refined_freqs_cm1: Flat array of refined frequencies in cm⁻¹ (n_q * n_bands).
-        band_indices: Flat array of band indices (n_q * n_bands).
-        q_weights: (n_q,) array of q-point weights.
+        refinement: NormalModeRefinement result object.
+        band_indices: Flat array of band indices.
         groups: Refinement groups from the optimization.
+        asu_symbols: Element symbols for ASU atoms.
     """
-    if band_indices is None:
-        print("Warning: Band indices not available, skipping frequency comparison display.")
-        return
+    # Convert THz to cm⁻¹ for display
+    THz_to_cm1 = 1.0 / (phonopy.physical_units.THzToCm**(-1))
+    initial_freqs_cm1 = refinement.freqs_initial_THz * THz_to_cm1
+    refined_freqs_cm1 = refinement.freqs_final_THz * THz_to_cm1
     
-    n_q = len(q_weights)
-    n_bands = len(initial_freqs_cm1) // n_q
-    shape = (n_q, n_bands)
-    
-    initial_band_avg_cm1 = _compute_band_averages(
-        frequencies=initial_freqs_cm1.reshape(shape),
-        band_indices=band_indices.reshape(shape),
-        q_weights=q_weights
+    # Frequency comparison
+    if band_indices is not None:
+        n_q = refinement.n_q_points
+        n_bands = refinement.n_bands
+        shape = (n_q, n_bands)
+        
+        initial_band_avg_cm1 = _compute_band_averages(
+            frequencies=initial_freqs_cm1.reshape(shape),
+            band_indices=band_indices.reshape(shape),
+            q_weights=refinement.q_weights
+        )
+        refined_band_avg_cm1 = _compute_band_averages(
+            frequencies=refined_freqs_cm1.reshape(shape),
+            band_indices=band_indices.reshape(shape),
+            q_weights=refinement.q_weights
+        )
+        
+        print_frequency_comparison(
+            freqs_initial=initial_band_avg_cm1,
+            freqs_refined=refined_band_avg_cm1,
+            optimize_mask=_get_refined_bands_mask(groups, band_indices),
+            unit="cm1"
+        )
+    else:
+        print("Warning: Band indices not available, skipping frequency comparison.")
+
+    # ADP comparison (ASU Cartesian ADPs)
+    print_adps_comparison(
+        adps_1=refinement.U_cart_exp_Angs2[refinement.asu_atoms],
+        adps_2=refinement.U_cart_comp_initial_Angs2[refinement.asu_atoms],
+        labels=["Exp", "Initial", "Refined"],
+        symbols=asu_symbols,
+        adps_3=refinement.U_cart_comp_final_Angs2[refinement.asu_atoms],
+        similarity_s12_12=float(np.nanmean(refinement.similarity_s12_initial)),
+        similarity_s12_13=float(np.nanmean(refinement.similarity_s12_final)),
     )
-    refined_band_avg_cm1 = _compute_band_averages(
-        frequencies=refined_freqs_cm1.reshape(shape),
-        band_indices=band_indices.reshape(shape),
-        q_weights=q_weights
-    )
-    
-    print_frequency_comparison(
-        freqs_initial=initial_band_avg_cm1,
-        freqs_refined=refined_band_avg_cm1,
-        optimize_mask=_get_refined_bands_mask(groups, band_indices),
-        unit="cm1"
-    )
+
+
+def _get_asu_atoms(smtbx_adapter) -> npt.NDArray[np.int64]:
+    """
+    Get P1 indices of atoms that map to ASU via identity transformation.
+
+    For each ASU atom, find the P1 atom that maps to it via the identity
+    rotation matrix (i.e., the ASU atom itself in the P1 expansion).
+
+    Args:
+        smtbx_adapter: SmtbxAdapter instance containing p1_to_asu mapping.
+
+    Returns:
+        np.ndarray: Indices of ASU atoms in P1 (one per ASU atom).
+
+    Raises:
+        RuntimeError: If any ASU atom lacks an identity-mapped representative.
+    """
+    n_asu = smtbx_adapter.n_asu_atoms
+    indices = np.full(n_asu, -1, dtype=np.int64)
+
+    for p1_idx, (asu_idx, r_cart) in enumerate(smtbx_adapter.p1_to_asu):
+        if np.allclose(r_cart, np.eye(3), atol=1e-6):
+            indices[asu_idx] = p1_idx
+
+    if np.any(indices == -1):
+        missing = np.where(indices == -1)[0]
+        raise RuntimeError(
+            f"Failed to find identity-mapped P1 atoms for ASU atoms {missing.tolist()}. "
+            "This indicates a missing identity operation in the P1 expansion."
+        )
+
+    return indices
 
 
 def run(
@@ -425,9 +526,9 @@ def run(
     fix_positions: bool = True,
     exclude_hydrogen_positions: bool = True,
     use_irreducible_fbz: bool = False
-) -> Dict[str, Any]:
+) -> NormalModeRefinement:
     """
-    Run NoMoRe refinement using the v2 API (RefinementEngine + Adapter).
+    Run normal mode refinement.
     
     Args:
         force_constants: mbe_automation ForceConstants object.
@@ -440,7 +541,7 @@ def run(
         weighting_scheme: Weighting scheme for refinement ('sigma' or 'unit').
         
     Returns:
-        Dictionary with refinement results.
+        NormalModeRefinement object with frequencies, ADPs, and mesh data.
     """
     
     if isinstance(mesh_size, (list, tuple, np.ndarray)):
@@ -558,14 +659,64 @@ def run(
         fix_positions=fix_positions,
         exclude_hydrogen_positions=exclude_hydrogen_positions
     )
+
+    # 8. Build NormalModeRefinement result
+    n_atoms_p1 = phonons.n_atoms
+    n_modes = len(initial_freqs)
+    n_bands = n_modes // len(irr_q_frac)
     
-    # 8. Display Frequency Comparison
-    _display_frequency_comparison(
-        initial_freqs_cm1=initial_freqs,
-        refined_freqs_cm1=result['frequencies'],
-        band_indices=phonons.band_indices,
-        q_weights=q_weights,
-        groups=groups
+    # Convert frequencies from cm⁻¹ to THz
+    cm1_to_THz = phonopy.physical_units.THzToCm**(-1)
+    freqs_initial_THz = initial_freqs * cm1_to_THz
+    freqs_final_THz = result["frequencies"] * cm1_to_THz
+    
+    # Compute P1 ADPs
+    U_cart_comp_initial = calculator.calculate_u_cart(initial_freqs)
+    U_cart_comp_final = calculator.calculate_u_cart(result["frequencies"])
+    U_cart_exp_p1 = extract_adps_from_structure(
+        cctbx_adapter.xray_structure.expand_to_p1(
+            sites_mod_positive=True
+        )
+    )
+    
+    # Get P1 indices of first representative atom for each ASU atom.
+    # This allows extracting ASU quantities from P1 arrays via U_cart[asu_atoms].
+    asu_atoms = _get_asu_atoms(smtbx_adapter)
+
+    # Compute per-atom S12 similarity over ASU atoms.
+    # H atoms get NaN if their positions are not refined.
+    asu_symbols = [sc.element_symbol() for sc in smtbx_adapter.structure.scatterers()]
+    asu_exp = U_cart_exp_p1[asu_atoms]
+    s12_initial = _compute_s12_per_atom(
+        U_cart_comp_initial[asu_atoms], asu_exp, asu_symbols, exclude_hydrogen_positions
+    )
+    s12_final = _compute_s12_per_atom(
+        U_cart_comp_final[asu_atoms], asu_exp, asu_symbols, exclude_hydrogen_positions
     )
 
-    return result
+    refinement = NormalModeRefinement(
+        n_bands=n_bands,
+        n_q_points=len(irr_q_frac),
+        irr_q_frac=irr_q_frac,
+        q_weights=q_weights.astype(np.float64),
+        freqs_initial_THz=freqs_initial_THz,
+        freqs_final_THz=freqs_final_THz,
+        U_cart_exp_Angs2=U_cart_exp_p1,
+        U_cart_comp_initial_Angs2=U_cart_comp_initial,
+        U_cart_comp_final_Angs2=U_cart_comp_final,
+        asu_atoms=asu_atoms,
+        similarity_s12_initial=s12_initial,
+        similarity_s12_final=s12_final,
+        chi_sq_initial=float(result["chi_sq_initial"]),
+        chi_sq_final=float(result["chi_sq_final"]),
+    )
+
+    # 9. Display refinement summary
+    _display_refinement_summary(
+        refinement=refinement,
+        band_indices=phonons.band_indices,
+        groups=groups,
+        asu_symbols=asu_symbols
+    )
+
+    return refinement

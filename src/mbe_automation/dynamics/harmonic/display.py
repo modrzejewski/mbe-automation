@@ -317,91 +317,79 @@ def print_adps_comparison(
     labels: list[str],
     symbols: list[str] | None = None,
     adps_3: npt.NDArray[np.float64] | None = None,
+    similarity_s12_12: float | None = None,
+    similarity_s12_13: float | None = None,
 ) -> None:
     """
-    Compare sets of Anisotropic Displacement Parameters (ADPs) and print a report.
+    Compare sets of ADPs and display 3x3 matrices side-by-side.
 
     Args:
         adps_1: First set of ADPs (N, 3, 3).
         adps_2: Second set of ADPs (N, 3, 3).
-        labels: List of strings identifying the datasets. Should match number of ADP sets.
-        symbols: Optional list of atom symbols (N,). If None, indices are used.
+        labels: List of strings identifying the datasets.
+        symbols: Optional list of atom symbols (N,).
         adps_3: Optional third set of ADPs (N, 3, 3).
+        similarity_s12_12: Pre-computed mean S12 for adps_1 vs adps_2.
+        similarity_s12_13: Pre-computed mean S12 for adps_1 vs adps_3.
     """
     if adps_1.shape != adps_2.shape:
         raise ValueError(f"Shape mismatch 1 vs 2: {adps_1.shape} vs {adps_2.shape}")
     
     if adps_3 is not None:
         if adps_3.shape != adps_1.shape:
-             raise ValueError(f"Shape mismatch 1 vs 3: {adps_1.shape} vs {adps_3.shape}")
+            raise ValueError(f"Shape mismatch 1 vs 3: {adps_1.shape} vs {adps_3.shape}")
         if len(labels) != 3:
             raise ValueError("Insufficient labels for 3 ADP sets.")
 
     n_atoms = adps_1.shape[0]
     if symbols is None:
-        symbols = [""] * n_atoms
-        
-    diff = adps_1 - adps_2
-    abs_diff = np.abs(diff)
-    max_diff = np.max(abs_diff)
-    rmsd = np.sqrt(np.mean(diff**2))
-    
-    label1 = labels[0]
-    label2 = labels[1]
-    
-    if adps_3 is None:
-        print(f"\nComparing ADPs: {label1} vs {label2}")
-        print(f"RMSD: {rmsd:.6e}")
-        print(f"Max Absolute Diff: {max_diff:.6e}")
-    else:
-        label3 = labels[2]
-        print(f"\nComparing ADPs: {label1} vs {label2} and {label3}")
-        print(f"RMSD ({label1} vs {label2}): {rmsd:.6e}")
+        symbols = [f"Atom{i}" for i in range(n_atoms)]
 
-        diff_3 = adps_1 - adps_3
-        rmsd_3 = np.sqrt(np.mean(diff_3**2))
-        print(f"RMSD ({label1} vs {label3}): {rmsd_3:.6e}")
-
-    print("\nIsotropic U (Trace(U)/3) Comparison:")
+    label1, label2 = labels[0], labels[1]
+    label3 = labels[2] if adps_3 is not None else None
     
-    if adps_3 is None:
-        header = f"{'Atom':<6} {label1:<12} {label2:<12} {'Diff':<12} {'% Diff':<10}"
-        print(header)
-        print("-" * len(header))
+    def format_matrix_row(m: np.ndarray, row: int) -> str:
+        """Format a single row of a 3x3 matrix."""
+        return f"[{m[row, 0]:8.5f} {m[row, 1]:8.5f} {m[row, 2]:8.5f}]"
+    
+    print("\n" + "=" * 80)
+    print("ADP Comparison (3×3 Cartesian U tensors, Å²)")
+    print("=" * 80)
+    
+    for i in range(n_atoms):
+        u1 = adps_1[i]
+        u2 = adps_2[i]
+        u3 = adps_3[i] if adps_3 is not None else None
         
-        for i in range(n_atoms):
-            u_iso_1 = np.trace(adps_1[i]) / 3.0
-            u_iso_2 = np.trace(adps_2[i]) / 3.0
-            
-            diff_iso = u_iso_1 - u_iso_2
-            
-            atom_label = f"{symbols[i]}{i}"
-            if abs(u_iso_2) > 1e-9:
-                pct_diff = (diff_iso / u_iso_2) * 100
-                print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {diff_iso:<12.6e} {pct_diff:<9.4f}%")
+        print(f"\n{symbols[i]}")
+        print("-" * 80)
+        
+        if u3 is not None:
+            print(f"{'':4} {label1:^28} {label2:^28} {label3:^28}")
+        else:
+            print(f"{'':4} {label1:^28} {label2:^28}")
+        
+        for row in range(3):
+            row1 = format_matrix_row(u1, row)
+            row2 = format_matrix_row(u2, row)
+            if u3 is not None:
+                row3 = format_matrix_row(u3, row)
+                print(f"    {row1}  {row2}  {row3}")
             else:
-                print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {diff_iso:<12.6e} {'N/A':<10}")
-        print("-" * len(header))
-
-    else:
-        # 3-column output
-        label3 = labels[2]
-        header = f"{'Atom':<6} {label1:<12} {label2:<12} {label3:<12} {'Diff(1-2)':<12} {'Diff(1-3)':<12}"
-        print(header)
-        print("-" * len(header))
-
-        for i in range(n_atoms):
-            u_iso_1 = np.trace(adps_1[i]) / 3.0
-            u_iso_2 = np.trace(adps_2[i]) / 3.0
-            u_iso_3 = np.trace(adps_3[i]) / 3.0
-            
-            diff_12 = u_iso_1 - u_iso_2
-            diff_13 = u_iso_1 - u_iso_3
-            
-            atom_label = f"{symbols[i]}{i}"
-            print(f"{atom_label:<6} {u_iso_1:<12.6f} {u_iso_2:<12.6f} {u_iso_3:<12.6f} {diff_12:<12.6e} {diff_13:<12.6e}")
-        
-        print("-" * len(header))
+                print(f"    {row1}  {row2}")
+    
+    # Summary statistics
+    print("\n" + "=" * 80)
+    print("Summary")
+    print("=" * 80)
+    
+    if similarity_s12_12 is not None:
+        print(f"Mean S12({label1}-{label2}): {similarity_s12_12:.3f}%")
+    
+    if adps_3 is not None and similarity_s12_13 is not None:
+        print(f"Mean S12({label1}-{label3}): {similarity_s12_13:.3f}%")
+    
+    print("=" * 80)
 
 
 def print_frequency_comparison(
