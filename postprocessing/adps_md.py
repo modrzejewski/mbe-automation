@@ -59,7 +59,7 @@ def main(
 
     # The symmetrized 3x3 ADP per atom:
     adps = md_td.mean_square_displacements_matrix_diagonal
-    print("Computed ADPs (shape = {}):".format(adps.shape))
+    print(f"Computed ADPs (shape = {adps.shape}):")
     # Print a concise summary
     for i, U in enumerate(adps):
         # print first few atoms only to avoid huge output
