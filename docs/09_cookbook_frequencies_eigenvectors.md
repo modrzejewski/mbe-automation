@@ -105,7 +105,7 @@ import numpy as np
 from mbe_automation import ForceConstants
 
 dataset_path = "properties.hdf5"
-key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]"
+key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
 cif_path = "experiment.cif"
 
 fc = ForceConstants.read(dataset=dataset_path, key=key)
