@@ -12,10 +12,14 @@ from mbe_automation.calculators import MACE
 
 import mbe_automation
 from mbe_automation import Structure
+from mbe_automation.configs.structure import Minimum
 
 cif_path = "experiment.cif"
 
 mace_calc = MACE(model_path="mace.model")
+
+# Use "only_atoms" cell relaxation to keep the experimental cell parameters
+relaxation_config = Minimum.recommended(model_name="mace", cell_relaxation="only_atoms")
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
@@ -24,7 +28,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     calculator=mace_calc,
     supercell_radius=24.0,
     thermal_expansion=False,
-    cell_relaxation="only_atoms",
+    relaxation=relaxation_config,
     dataset="properties.hdf5"
 )
 
