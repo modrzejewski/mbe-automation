@@ -23,7 +23,7 @@ relaxation_config = Minimum.recommended(model_name="mace", cell_relaxation="only
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file(cif_path),
+    crystal=Structure.from_xyz_file(cif_path, transform_to_symmetrized_primitive=False),
     temperatures_K=np.array([300.0]),
     calculator=mace_calc,
     supercell_radius=24.0,
