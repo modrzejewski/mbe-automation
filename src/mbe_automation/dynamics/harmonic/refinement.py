@@ -82,7 +82,13 @@ def _band_scaling_factors(
     gamma_group_ids = groups.group_ids.reshape(n_q, n_bands)[gamma_idx]
     band_scaling_factors = np.ones(n_bands)
     valid_mask = gamma_group_ids >= 0  # Skip fixed modes (ID -1)
-    band_scaling_factors[valid_mask] = scale_factors[gamma_group_ids[valid_mask]]
+
+    # nomore_ase RefinementEngine maps params to sorted unique group IDs >= 0
+    unique_gids = np.sort(np.unique(groups.group_ids[groups.group_ids >= 0]))
+    gid_to_param = {gid: i for i, gid in enumerate(unique_gids)}
+    param_indices = np.array([gid_to_param[gid] for gid in gamma_group_ids[valid_mask]])
+    band_scaling_factors[valid_mask] = scale_factors[param_indices]
+
     return band_scaling_factors, valid_mask
 
 
