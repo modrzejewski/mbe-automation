@@ -69,6 +69,7 @@ class NormalModeRefinement:
     chi_sq_initial: npt.NDArray[np.float64]
     chi_sq_final: npt.NDArray[np.float64]
     band_scaling_factors: npt.NDArray[np.float64]
+    optimized_bands: npt.NDArray[np.bool_]
 
 def _band_scaling_factors(
     scale_factors: npt.NDArray[np.float64],
@@ -76,13 +77,13 @@ def _band_scaling_factors(
     n_q: int,
     n_bands: int,
     gamma_idx: int
-) -> npt.NDArray[np.float64]:
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.bool_]]:
     """Map group scaling factors to bands using Gamma-point group IDs."""
     gamma_group_ids = groups.group_ids.reshape(n_q, n_bands)[gamma_idx]
     band_scaling_factors = np.ones(n_bands)
     valid_mask = gamma_group_ids >= 0  # Skip fixed modes (ID -1)
     band_scaling_factors[valid_mask] = scale_factors[gamma_group_ids[valid_mask]]
-    return band_scaling_factors
+    return band_scaling_factors, valid_mask
 
 
 def _validate_scaling_factors(
@@ -335,55 +336,6 @@ def compute_atom_permutation(phonopy_primitive: Any, cif_adapter: "CctbxAdapter"
 
     return source_to_target_indices
 
-def _get_refined_bands_mask(
-    groups: "RefinementGroups", 
-    band_indices: npt.NDArray[np.int64]
-) -> npt.NDArray[np.bool_]:
-    """
-    Identify which bands have been refined.
-    
-    A band is considered refined if ANY of its modes are assigned to a refinement group (group_id >= 0).
-    Ideally, refinement strategies should refine either the whole band or none of it.
-    
-    Args:
-        groups: RefinementGroups object from nomore_ase.
-        band_indices: Array of band indices for each mode (n_modes,).
-        
-    Returns:
-        Boolean array (n_unique_bands,) where True indicates the band was refined.
-    """
-    unique_bands = np.unique(band_indices[band_indices >= 0])
-    # Assuming bands are 0-indexed and contiguous up to max(band_indices)
-    # But unique_bands might not cover all if some are filtered out? 
-    # Usually band indices cover 0 to n_bands-1.
-    
-    n_bands_total = np.max(band_indices) + 1 if len(band_indices) > 0 else 0
-    refined_mask = np.zeros(n_bands_total, dtype=bool)
-    
-    refined_mode_indices = groups.get_refined_modes()
-    
-    # We can check intersection.
-    # For each band, check if any mode in it is in refined_mode_indices.
-    # Mask of all refined modes
-    mode_is_refined = np.zeros(len(band_indices), dtype=bool)
-    mode_is_refined[refined_mode_indices] = True
-    
-    for band_idx in unique_bands:
-        modes_in_band = (band_indices == band_idx)
-        # Check consistency: all or nothing
-        refined_in_band = mode_is_refined[modes_in_band]
-        
-        if np.any(refined_in_band) and not np.all(refined_in_band):
-            # This violates the "all or nothing" assumption, but we mark as refined anyway 
-            # and maybe log a warning if we had a logger.
-            pass
-            
-        if np.any(refined_in_band):
-            refined_mask[band_idx] = True
-            
-    return refined_mask
-
-
 def _s12_per_atom(
     u_comp: npt.NDArray[np.float64],
     u_exp: npt.NDArray[np.float64],
@@ -466,8 +418,6 @@ def _clamp_acoustic_frequencies(
 
 def _display_refinement_summary(
     refinement: NormalModeRefinement,
-    band_indices: npt.NDArray[np.int64] | None,
-    groups: "RefinementGroups",
     asu_symbols: list[str] | None = None,
     exclude_hydrogen: bool = False
 ) -> None:
@@ -476,8 +426,6 @@ def _display_refinement_summary(
     
     Args:
         refinement: NormalModeRefinement result object.
-        band_indices: Flat array of band indices.
-        groups: Refinement groups from the optimization.
         asu_symbols: Element symbols for ASU atoms.
         exclude_hydrogen: If True, exclude H atoms from ADP display.
     """
@@ -485,31 +433,28 @@ def _display_refinement_summary(
     initial_freqs_cm1 = refinement.freqs_initial_reordered_THz * THz_to_cm1
     refined_freqs_cm1 = refinement.freqs_final_reordered_THz * THz_to_cm1
     
-    if band_indices is not None:
-        gamma_idx = np.argmin(np.linalg.norm(refinement.irr_q_frac, axis=1))
-        
-        initial_band_avg_cm1 = np.average(
-            initial_freqs_cm1, 
-            axis=0, 
-            weights=refinement.q_weights
-        )
-        refined_band_avg_cm1 = np.average(
-            refined_freqs_cm1, 
-            axis=0, 
-            weights=refinement.q_weights
-        )
-        
-        print_frequency_comparison(
-            freqs_initial_gamma=initial_freqs_cm1[gamma_idx],
-            freqs_refined_gamma=refined_freqs_cm1[gamma_idx],
-            freqs_initial_avg=initial_band_avg_cm1,
-            freqs_refined_avg=refined_band_avg_cm1,
-            scaling_factors=refinement.band_scaling_factors,
-            optimize_mask=_get_refined_bands_mask(groups=groups, band_indices=band_indices),
-            unit="cm1"
-        )
-    else:
-        print("Warning: Band indices not available, skipping frequency comparison.")
+    gamma_idx = np.argmin(np.linalg.norm(refinement.irr_q_frac, axis=1))
+    
+    initial_band_avg_cm1 = np.average(
+        initial_freqs_cm1, 
+        axis=0, 
+        weights=refinement.q_weights
+    )
+    refined_band_avg_cm1 = np.average(
+        refined_freqs_cm1, 
+        axis=0, 
+        weights=refinement.q_weights
+    )
+    
+    print_frequency_comparison(
+        freqs_initial_gamma=initial_freqs_cm1[gamma_idx],
+        freqs_refined_gamma=refined_freqs_cm1[gamma_idx],
+        freqs_initial_avg=initial_band_avg_cm1,
+        freqs_refined_avg=refined_band_avg_cm1,
+        scaling_factors=refinement.band_scaling_factors,
+        optimize_mask=refinement.optimized_bands,
+        unit="cm1"
+    )
 
     print_adps_comparison(
         adps_1=refinement.U_cart_exp_Angs2[refinement.asu_atoms],
@@ -723,7 +668,7 @@ def run(
     )
 
     gamma_idx = np.argmin(np.linalg.norm(irr_q_frac, axis=1))
-    band_scaling_factors = _band_scaling_factors(
+    band_scaling_factors, optimized_bands = _band_scaling_factors(
         scale_factors=result["scale_factors"],
         groups=result["groups"],
         n_q=n_q,
@@ -765,6 +710,8 @@ def run(
         U_cart_comp_initial_Angs2=U_cart_comp_initial_p1,
         U_cart_comp_final_Angs2=U_cart_comp_final_p1,
         asu_atoms=asu_atoms,
+        band_scaling_factors=band_scaling_factors,
+        optimized_bands=optimized_bands,
         s12_initial=_s12_per_atom(
             U_cart_comp_initial_asu, 
             U_cart_exp_asu, 
@@ -788,14 +735,11 @@ def run(
             U_cart_exp_asu, 
             asu_symbols, 
             exclude_hydrogen_positions
-        ),
-        band_scaling_factors=band_scaling_factors
+        )
     )
 
     _display_refinement_summary(
         refinement=refinement,
-        band_indices=phonons.band_indices,
-        groups=groups,
         asu_symbols=asu_symbols,
         exclude_hydrogen=exclude_hydrogen_positions
     )

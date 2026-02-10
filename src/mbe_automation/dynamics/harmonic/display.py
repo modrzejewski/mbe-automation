@@ -434,9 +434,9 @@ def print_frequency_comparison(
         
     print("\nComparison of Frequencies (cm⁻¹):")
     header = (
-        f"{'band':<6} {'initial (Γ)':<15} {'refined (Γ)':<15} "
-        f"{'initial (avg)':<15} {'refined (avg)':<15} "
-        f"{'scaling':<10} {'shift (Γ)':<10} {'opt?':<6}"
+        f"{'band':<7} {'initial (Γ)':>14} {'refined (Γ)':>14} "
+        f"{'initial (avg)':>14} {'refined (avg)':>14} "
+        f"{'scaling':>10} {'shift (Γ)':>10}"
     )
     print(header)
     print("-" * len(header))
@@ -449,16 +449,16 @@ def print_frequency_comparison(
     shift_g = f_ref_g - f_init_g
     
     for b in range(n_bands):
-        is_opt = "*" if optimize_mask is not None and optimize_mask[b] else ""
+        opt_mark = "*" if optimize_mask is not None and optimize_mask[b] else " "
+        band_str = f"{b}{opt_mark}"
         print(
-            f"{b:<6} "
-            f"{f_init_g[b]:<15.1f} "
-            f"{f_ref_g[b]:<15.1f} "
-            f"{f_init_a[b]:<15.1f} "
-            f"{f_ref_a[b]:<15.1f} "
-            f"{scaling_factors[b]:<10.3f} "
-            f"{shift_g[b]:<10.1f} "
-            f"{is_opt:<6}"
+            f"{band_str:<7} "
+            f"{f_init_g[b]:>14.1f} "
+            f"{f_ref_g[b]:>14.1f} "
+            f"{f_init_a[b]:>14.1f} "
+            f"{f_ref_a[b]:>14.1f} "
+            f"{scaling_factors[b]:>10.3f} "
+            f"{shift_g[b]:>10.1f}"
         )
 
 
