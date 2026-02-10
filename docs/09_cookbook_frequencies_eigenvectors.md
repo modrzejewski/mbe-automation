@@ -85,7 +85,11 @@ print(f"\nEigenvectors are orthonormal: {is_orthonormal}")
 
 ### Step 3: Normal Mode Refinement
 
-If you have experimental anisotropic displacement parameters (ADPs) available from a CIF file, you can refine the calculated phonon frequencies to better match the experimental data. This is done using the `refine` method, which utilizes the NoMoRe library.
+You can refine the calculated phonon frequencies to better match the experimental data using the `refine` method, which utilizes the NoMoRe library.
+
+This is possible if:
+1.  You have a CIF file containing the experimental data (anisotropic displacement parameters and structure factors).
+2.  The corresponding structure was optimized without changing the lattice vectors and cell volume (i.e., using the `only_atoms` variant in the configuration class).
 
 ```python
 import numpy as np
@@ -99,10 +103,10 @@ fc = ForceConstants.read(dataset=dataset_path, key=key)
 
 # Run refinement
 # mesh_size should be a list of 3 odd integers
+# temperature is extracted automatically from the CIF file
 refinement_result = fc.refine(
     cif_path=cif_path,
     mesh_size=[3, 3, 3],
-    temperature_K=298.0  # Optional, overrides temperature in CIF
 )
 
 # The refinement_result object contains initial and final frequencies,
