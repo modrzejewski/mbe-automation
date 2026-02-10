@@ -553,9 +553,7 @@ def run(
     cif_path: str,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
     restraint_weight: float | None = None,
-    strategy: Optional["FrequencyPartitionStrategy"] = None,
-    max_iter: int = 200,
-    optimizer_method: str = "SLSQP",
+    band_selection_strategy: Optional["FrequencyPartitionStrategy"] = None,
     weighting_scheme: Literal["sigma", "unit"] = "sigma",
     fix_positions: bool = True,
     exclude_hydrogen_positions: bool = True,
@@ -570,18 +568,18 @@ def run(
         cif_path: Path to experimental CIF.
         mesh_size: k-point mesh size.
         restraint_weight: Weight for restraining to initial frequencies.
-        strategy: Strategy for frequency partitioning. Defaults to SensitivityBased(0.6, 0.9).
-        max_iter: Maximum optimization iterations.
-        optimizer_method: Optimizer method (e.g., 'SLSQP', 'L-BFGS-B').
+        mode_selection_strategy: Strategy for frequency partitioning. Defaults to SensitivityBased(0.6, 0.9).
         weighting_scheme: Weighting scheme for refinement ('sigma' or 'unit').
         
     Returns:
         NormalModeRefinement object with frequencies, ADPs, and mesh data.
     """
+    optimizer_options = {"maxiter": 300, "ftol": 1e-9}
+    optimizer_method = "SLSQP"
 
     # Strategy applied to determine which frequencies to refine
-    if strategy is None:
-        strategy = SensitivityBasedStrategy(low_threshold=0.75, high_threshold=0.90)
+    if band_selection_strategy is None:
+        band_selection_strategy = SensitivityBasedStrategy(low_threshold=0.75, high_threshold=0.90)
 
     mbe_automation.common.display.framed([
         "Normal mode refinement",
@@ -589,8 +587,8 @@ def run(
     
     print(f"mesh_size            {mesh_size}")
     print(f"restraint_weight     {restraint_weight}")
-    print(f"strategy             {strategy.__class__.__name__}")
-    print(f"max_iter             {max_iter}")
+    print(f"strategy             {band_selection_strategy.__class__.__name__}")
+    print(f"max_iter             {optimizer_options['maxiter']}")
     print(f"optimizer_method     {optimizer_method}")
     print(f"weighting_scheme     {weighting_scheme}")
     print(f"fix_positions        {fix_positions}")
@@ -671,7 +669,7 @@ def run(
     
     # Create mode groups to handle degeneracies and bands
     pre_groups = create_pre_groups(phonons)
-    groups = strategy.compute_groups(phonons, pre_groups)
+    groups = band_selection_strategy.compute_groups(phonons, pre_groups)
     
     engine = RefinementEngine(calculator, smtbx_adapter)
     
@@ -694,7 +692,7 @@ def run(
         restraint=restraint_instance,
         restraint_weight=restraint_weight,
         groups=groups,
-        max_iter=max_iter,
+        optimizer_options=optimizer_options,
         optimizer_method=optimizer_method,
         fix_positions=fix_positions,
         exclude_hydrogen_positions=exclude_hydrogen_positions
@@ -718,7 +716,7 @@ def run(
         )
     )
     
-    # Get P1 indices of first representative atom for each ASU atom.
+    # Get P1 indices for each ASU atom.
     # This allows extracting ASU quantities from P1 arrays via U_cart[asu_atoms].
     asu_atoms = _get_asu_atoms(smtbx_adapter)
 

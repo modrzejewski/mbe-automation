@@ -248,9 +248,7 @@ class ForceConstants(_ForceConstants):
         cif_path: str,
         mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
         restraint_weight: float | None = None,
-        strategy: FrequencyPartitionStrategy | None = None,
-        max_iter: int = 100,
-        optimizer_method: str = "SLSQP",
+        band_selection_strategy: FrequencyPartitionStrategy | None = None,
         weighting_scheme: Literal["sigma", "unit"] = "sigma",
         fix_positions: bool = True,
         exclude_hydrogen_positions: bool = True,
@@ -263,9 +261,7 @@ class ForceConstants(_ForceConstants):
             cif_path: Path to experimental CIF.
             mesh_size: k-point mesh size ("gamma", float radius, or [Nx, Ny, Nz]).
             restraint_weight: Weight for restraining to initial frequencies.
-            strategy: Frequency partitioning strategy object (or None for default).
-            max_iter: Maximum optimization iterations.
-            optimizer_method: Optimizer method (e.g., 'SLSQP', 'L-BFGS-B').
+            band_selection_strategy: Frequency partitioning strategy object (or None for default).
             weighting_scheme: Weighting scheme ('sigma' or 'unit').
             fix_positions: Whether to fix atomic positions during refinement.
             exclude_hydrogen_positions: Whether to exclude hydrogens from position 
@@ -291,9 +287,7 @@ class ForceConstants(_ForceConstants):
             cif_path=cif_path,
             mesh_size=mesh_size,
             restraint_weight=restraint_weight,
-            strategy=strategy,
-            max_iter=max_iter,
-            optimizer_method=optimizer_method,
+            band_selection_strategy=band_selection_strategy,
             weighting_scheme=weighting_scheme,
             fix_positions=fix_positions,
             exclude_hydrogen_positions=exclude_hydrogen_positions,
