@@ -12,18 +12,27 @@ from mbe_automation.calculators import MACE
 
 import mbe_automation
 from mbe_automation import Structure
+from mbe_automation.configs.structure import Minimum
 
-xyz_solid = "solid.xyz"
+cif_path = "experiment.cif"
 
 mace_calc = MACE(model_path="mace.model")
 
+# Use "only_atoms" cell relaxation to keep the experimental cell parameters
+relaxation_config = Minimum(
+    cell_relaxation="only_atoms",
+    max_force_on_atom_eV_A=1.0E-4,
+    symmetrize_final_structure=False
+)
+
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file(xyz_solid),
+    crystal=Structure.from_xyz_file(cif_path, transform_to_symmetrized_primitive=False),
     temperatures_K=np.array([300.0]),
     calculator=mace_calc,
     supercell_radius=24.0,
     thermal_expansion=False,
+    relaxation=relaxation_config,
     dataset="properties.hdf5"
 )
 
@@ -50,7 +59,7 @@ properties.hdf5
 └── quasi_harmonic
     ├── phonons
     │   └── force_constants
-    │       └── crystal[opt:atoms,shape]  <-- This group contains the data
+    │       └── crystal[opt:atoms]  <-- This group contains the data
     │           ├── force_constants (eV∕Å²)
     │           └── supercell_matrix
     ├── structures
@@ -67,7 +76,7 @@ import numpy as np
 from mbe_automation import ForceConstants
 
 dataset_path = "properties.hdf5"
-key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]"
+key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
 
 fc = ForceConstants.read(dataset=dataset_path, key=key)
 freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_point=np.array([0.0, 0.0, 0.0]))
@@ -82,6 +91,40 @@ identity_check = np.dot(eigenvecs.conj().T, eigenvecs)
 is_orthonormal = np.allclose(identity_check, np.eye(len(freqs_THz)))
 print(f"\nEigenvectors are orthonormal: {is_orthonormal}")
 ```
+
+### Step 3: Normal Mode Refinement
+
+You can refine the calculated phonon frequencies to better match the experimental data using the `refine` method, which utilizes the NoMoRe library.
+
+This is possible if:
+1.  You have a CIF file containing the experimental data (anisotropic displacement parameters and structure factors).
+2.  The corresponding structure was optimized without changing the lattice vectors and cell volume (i.e., using the `cell_relaxation="only_atoms"` in the [Minimum](03_configuration_classes.md#minimum-configuration) configuration class).
+
+```python
+import numpy as np
+from mbe_automation import ForceConstants
+
+dataset_path = "properties.hdf5"
+key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
+cif_path = "experiment.cif"
+
+fc = ForceConstants.read(dataset=dataset_path, key=key)
+
+# Run refinement
+# mesh_size should be a list of 3 odd integers
+# temperature is extracted automatically from the CIF file
+refinement_result = fc.refine(
+    cif_path=cif_path,
+    mesh_size=[3, 3, 3],
+)
+
+# The refinement_result object contains initial and final frequencies,
+# as well as initial and final ADPs.
+print("Initial Frequencies (THz):", refinement_result.freqs_initial_THz)
+print("Refined Frequencies (THz):", refinement_result.freqs_final_THz)
+```
+
+The `refine` method will also print a summary table comparing the initial and refined frequencies, as well as the agreement with experimental ADPs.
 
 ## Output Explanation
 
