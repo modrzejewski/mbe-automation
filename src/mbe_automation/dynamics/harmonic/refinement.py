@@ -57,9 +57,9 @@ class NormalModeRefinement:
     n_bands: int
     n_q_points: int
     irr_q_frac: npt.NDArray[np.float64]
-    q_weights: npt.NDArray[np.int64]
-    freqs_initial_THz: npt.NDArray[np.float64]
-    freqs_final_THz: npt.NDArray[np.float64]
+    q_weights: npt.NDArray[np.float64]
+    freqs_initial_reordered_THz: npt.NDArray[np.float64] # Shape (n_q, n_bands) reordered by band tracing
+    freqs_final_reordered_THz: npt.NDArray[np.float64]   # Shape (n_q, n_bands) reordered by band tracing
     U_cart_exp_Angs2: npt.NDArray[np.float64]
     U_cart_comp_initial_Angs2: npt.NDArray[np.float64]
     U_cart_comp_final_Angs2: npt.NDArray[np.float64]
@@ -68,6 +68,38 @@ class NormalModeRefinement:
     s12_final: npt.NDArray[np.float64]
     chi_sq_initial: npt.NDArray[np.float64]
     chi_sq_final: npt.NDArray[np.float64]
+    band_scaling_factors: npt.NDArray[np.float64]
+
+def _map_group_scales_to_modes(
+    scale_factors: npt.NDArray[np.float64],
+    groups: "RefinementGroups"
+) -> npt.NDArray[np.float64]:
+    """Map group scaling factors back to individual modes."""
+    group_ids = groups.group_ids
+    n_modes = len(group_ids)
+    mode_scaling_factors = np.ones(n_modes)
+    unique_gids = sorted(np.unique(group_ids[group_ids >= 0]))
+    for i, gid in enumerate(unique_gids):
+        mode_scaling_factors[group_ids == gid] = scale_factors[i]
+    return mode_scaling_factors
+
+
+def _validate_scaling_factors(
+    band_scaling_factors: npt.NDArray[np.float64],
+    freqs_initial_reordered_cm1: npt.NDArray[np.float64],
+    freqs_final_reordered_cm1: npt.NDArray[np.float64],
+    atol: float = 1e-3
+) -> None:
+    """Verify that final frequencies are recovered from initial frequencies and scaling factors."""
+    freqs_recovered = freqs_initial_reordered_cm1 * band_scaling_factors
+    if not np.allclose(freqs_final_reordered_cm1, freqs_recovered, atol=atol):
+        diff = np.abs(freqs_final_reordered_cm1 - freqs_recovered)
+        max_diff_idx = np.unravel_index(np.argmax(diff), diff.shape)
+        raise ValueError(
+            f"Final frequency recovery failed for band {max_diff_idx[1]} at q-point {max_diff_idx[0]}. "
+            f"Expected {freqs_final_reordered_cm1[max_diff_idx]:.6f}, "
+            f"recovered {freqs_recovered[max_diff_idx]:.6f}."
+        )
 
 def to_phonon_data(
     phonopy_object,
@@ -431,27 +463,6 @@ def _clamp_acoustic_frequencies(
         return np.where(frequencies_cm1 < min_freq_cm1, min_freq_cm1, frequencies_cm1)
     return frequencies_cm1
 
-
-def _band_averages(
-    frequencies: npt.NDArray[np.float64],
-    band_indices: npt.NDArray[np.int64],
-    q_weights: npt.NDArray[np.float64]
-) -> npt.NDArray[np.float64]:
-    """
-    Compute weighted average frequency for each band.
-    
-    Args:
-        frequencies: (n_q, n_bands) array of frequencies.
-        band_indices: (n_q, n_bands) array of band indices.
-        q_weights: (n_q,) array of q-point weights.
-        
-    Returns:
-        (n_bands,) array of average frequencies.
-    """
-    reordered = reorder_frequencies(frequencies, band_indices)
-    return np.average(reordered, axis=0, weights=q_weights)
-
-
 def _display_refinement_summary(
     refinement: NormalModeRefinement,
     band_indices: npt.NDArray[np.int64] | None,
@@ -469,26 +480,20 @@ def _display_refinement_summary(
         asu_symbols: Element symbols for ASU atoms.
         exclude_hydrogen: If True, exclude H atoms from ADP display.
     """
-    # Convert THz to cm⁻¹ for display
-    THz_to_cm1 = 1.0 / (phonopy.physical_units.get_physical_units().THzToCm**(-1))
-    initial_freqs_cm1 = refinement.freqs_initial_THz * THz_to_cm1
-    refined_freqs_cm1 = refinement.freqs_final_THz * THz_to_cm1
+    THz_to_cm1 = phonopy.physical_units.get_physical_units().THzToCm
+    initial_freqs_cm1 = refinement.freqs_initial_reordered_THz * THz_to_cm1
+    refined_freqs_cm1 = refinement.freqs_final_reordered_THz * THz_to_cm1
     
-    # Frequency comparison
     if band_indices is not None:
-        n_q = refinement.n_q_points
-        n_bands = refinement.n_bands
-        shape = (n_q, n_bands)
-        
-        initial_band_avg_cm1 = _band_averages(
-            frequencies=initial_freqs_cm1.reshape(shape),
-            band_indices=band_indices.reshape(shape),
-            q_weights=refinement.q_weights
+        initial_band_avg_cm1 = np.average(
+            initial_freqs_cm1, 
+            axis=0, 
+            weights=refinement.q_weights
         )
-        refined_band_avg_cm1 = _band_averages(
-            frequencies=refined_freqs_cm1.reshape(shape),
-            band_indices=band_indices.reshape(shape),
-            q_weights=refinement.q_weights
+        refined_band_avg_cm1 = np.average(
+            refined_freqs_cm1, 
+            axis=0, 
+            weights=refinement.q_weights
         )
         
         print_frequency_comparison(
@@ -500,7 +505,6 @@ def _display_refinement_summary(
     else:
         print("Warning: Band indices not available, skipping frequency comparison.")
 
-    # ADP comparison (ASU Cartesian ADPs)
     print_adps_comparison(
         adps_1=refinement.U_cart_exp_Angs2[refinement.asu_atoms],
         adps_2=refinement.U_cart_comp_initial_Angs2[refinement.asu_atoms],
@@ -699,15 +703,38 @@ def run(
     )
 
     n_atoms_p1 = phonons.n_atoms
-    n_modes = len(initial_freqs)
-    n_bands = n_modes // len(irr_q_frac)
+    n_modes_flat = len(initial_freqs)
+    n_q = len(irr_q_frac)
+    n_bands = n_modes_flat // n_q
+    assert n_bands == force_constants.primitive.n_atoms * 3
     
-    # Convert frequencies from cm⁻¹ to THz
-    cm1_to_THz = phonopy.physical_units.get_physical_units().THzToCm**(-1)
-    freqs_initial_THz = initial_freqs * cm1_to_THz
-    freqs_final_THz = result["frequencies"] * cm1_to_THz
+    freqs_initial_reordered_cm1 = reorder_frequencies(
+        frequencies=initial_freqs.reshape(n_q, n_bands),
+        band_indices=phonons.band_indices.reshape(n_q, n_bands)
+    )
+    freqs_final_reordered_cm1 = reorder_frequencies(
+        frequencies=result["frequencies"].reshape(n_q, n_bands),
+        band_indices=phonons.band_indices.reshape(n_q, n_bands)
+    )
+
+    mode_scaling_factors = _map_group_scales_to_modes(result["scale_factors"], result["groups"])
     
-    # Compute P1 ADPs
+    band_scaling_factors = np.zeros(n_bands)
+    for b in range(n_bands):
+        band_scaling_factors[b] = np.mean(mode_scaling_factors[phonons.band_indices == b])
+        
+    # Validation assumes all modes in a band share
+    # the same scaling factor.
+    _validate_scaling_factors(
+        band_scaling_factors, 
+        freqs_initial_reordered_cm1, 
+        freqs_final_reordered_cm1
+    )
+
+    cm1_to_THz = 1.0 / phonopy.physical_units.get_physical_units().THzToCm
+    freqs_initial_reordered_THz = freqs_initial_reordered_cm1 * cm1_to_THz
+    freqs_final_reordered_THz = freqs_final_reordered_cm1 * cm1_to_THz
+    
     U_cart_comp_initial_p1 = calculator.calculate_u_cart(initial_freqs)
     U_cart_comp_final_p1 = calculator.calculate_u_cart(result["frequencies"])
     U_cart_exp_p1 = extract_adps_from_structure(
@@ -716,10 +743,7 @@ def run(
         )
     )
     
-    # Get P1 indices for each ASU atom.
-    # This allows extracting ASU quantities from P1 arrays via U_cart[asu_atoms].
     asu_atoms = _get_asu_atoms(smtbx_adapter)
-
     asu_symbols = [sc.element_symbol() for sc in smtbx_adapter.structure.scatterers()]
     U_cart_exp_asu = U_cart_exp_p1[asu_atoms]
     U_cart_comp_initial_asu = U_cart_comp_initial_p1[asu_atoms]
@@ -727,11 +751,11 @@ def run(
 
     refinement = NormalModeRefinement(
         n_bands=n_bands,
-        n_q_points=len(irr_q_frac),
+        n_q_points=n_q,
         irr_q_frac=irr_q_frac,
         q_weights=q_weights.astype(np.float64),
-        freqs_initial_THz=freqs_initial_THz,
-        freqs_final_THz=freqs_final_THz,
+        freqs_initial_reordered_THz=freqs_initial_reordered_THz,
+        freqs_final_reordered_THz=freqs_final_reordered_THz,
         U_cart_exp_Angs2=U_cart_exp_p1,
         U_cart_comp_initial_Angs2=U_cart_comp_initial_p1,
         U_cart_comp_final_Angs2=U_cart_comp_final_p1,
@@ -760,6 +784,7 @@ def run(
             asu_symbols, 
             exclude_hydrogen_positions
         ),
+        band_scaling_factors=band_scaling_factors
     )
 
     _display_refinement_summary(
