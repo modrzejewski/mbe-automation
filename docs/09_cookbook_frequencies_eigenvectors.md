@@ -83,6 +83,36 @@ is_orthonormal = np.allclose(identity_check, np.eye(len(freqs_THz)))
 print(f"\nEigenvectors are orthonormal: {is_orthonormal}")
 ```
 
+### Step 3: Normal Mode Refinement
+
+If you have experimental anisotropic displacement parameters (ADPs) available from a CIF file, you can refine the calculated phonon frequencies to better match the experimental data. This is done using the `refine` method, which utilizes the NoMoRe library.
+
+```python
+import numpy as np
+from mbe_automation import ForceConstants
+
+dataset_path = "properties.hdf5"
+key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]"
+cif_path = "experiment.cif"
+
+fc = ForceConstants.read(dataset=dataset_path, key=key)
+
+# Run refinement
+# mesh_size should be a list of 3 odd integers
+refinement_result = fc.refine(
+    cif_path=cif_path,
+    mesh_size=[3, 3, 3],
+    temperature_K=298.0  # Optional, overrides temperature in CIF
+)
+
+# The refinement_result object contains initial and final frequencies,
+# as well as initial and final ADPs.
+print("Initial Frequencies (THz):", refinement_result.freqs_initial_THz)
+print("Refined Frequencies (THz):", refinement_result.freqs_final_THz)
+```
+
+The `refine` method will also print a summary table comparing the initial and refined frequencies, as well as the agreement with experimental ADPs.
+
 ## Output Explanation
 
 *   **`freqs_THz`**: A 1D NumPy array containing the phonon frequencies (THz).
