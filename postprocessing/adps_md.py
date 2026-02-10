@@ -15,7 +15,7 @@ import torch  # Now safe to import torch
 from mace.calculators import MACECalculator
 try:
     from mbe_automation.storage.xyz_formats import _cif_with_adps
-except Exception:
+except ImportError:
     _cif_with_adps = None
 
 # Restore original load (optional, but good practice if we want normal behavior later)
