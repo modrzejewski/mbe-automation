@@ -707,8 +707,8 @@ def run(
     freqs_final_THz = result["frequencies"] * cm1_to_THz
     
     # Compute P1 ADPs
-    U_cart_comp_initial = calculator.calculate_u_cart(initial_freqs)
-    U_cart_comp_final = calculator.calculate_u_cart(result["frequencies"])
+    U_cart_comp_initial_p1 = calculator.calculate_u_cart(initial_freqs)
+    U_cart_comp_final_p1 = calculator.calculate_u_cart(result["frequencies"])
     U_cart_exp_p1 = extract_adps_from_structure(
         cctbx_adapter.xray_structure.expand_to_p1(
             sites_mod_positive=True
@@ -720,9 +720,9 @@ def run(
     asu_atoms = _get_asu_atoms(smtbx_adapter)
 
     asu_symbols = [sc.element_symbol() for sc in smtbx_adapter.structure.scatterers()]
-    U_asu_exp = U_cart_exp_p1[asu_atoms]
-    U_asu_comp_initial = U_cart_comp_initial[asu_atoms]
-    U_asu_comp_final = U_cart_comp_final[asu_atoms]
+    U_cart_exp_asu = U_cart_exp_p1[asu_atoms]
+    U_cart_comp_initial_asu = U_cart_comp_initial_p1[asu_atoms]
+    U_cart_comp_final_asu = U_cart_comp_final_p1[asu_atoms]
 
     refinement = NormalModeRefinement(
         n_bands=n_bands,
@@ -732,20 +732,32 @@ def run(
         freqs_initial_THz=freqs_initial_THz,
         freqs_final_THz=freqs_final_THz,
         U_cart_exp_Angs2=U_cart_exp_p1,
-        U_cart_comp_initial_Angs2=U_cart_comp_initial,
-        U_cart_comp_final_Angs2=U_cart_comp_final,
+        U_cart_comp_initial_Angs2=U_cart_comp_initial_p1,
+        U_cart_comp_final_Angs2=U_cart_comp_final_p1,
         asu_atoms=asu_atoms,
         s12_initial=_s12_per_atom(
-            U_asu_comp_initial, U_asu_exp, asu_symbols, exclude_hydrogen_positions
+            U_cart_comp_initial_asu, 
+            U_cart_exp_asu, 
+            asu_symbols, 
+            exclude_hydrogen_positions
         ),
         s12_final=_s12_per_atom(
-            U_asu_comp_final, U_asu_exp, asu_symbols, exclude_hydrogen_positions
+            U_cart_comp_final_asu, 
+            U_cart_exp_asu, 
+            asu_symbols, 
+            exclude_hydrogen_positions
         ),
         chi_sq_initial=_chi_sq_per_atom(
-            U_asu_comp_initial, U_asu_exp, asu_symbols, exclude_hydrogen_positions
+            U_cart_comp_initial_asu, 
+            U_cart_exp_asu, 
+            asu_symbols, 
+            exclude_hydrogen_positions
         ),
         chi_sq_final=_chi_sq_per_atom(
-            U_asu_comp_final, U_asu_exp, asu_symbols, exclude_hydrogen_positions
+            U_cart_comp_final_asu, 
+            U_cart_exp_asu, 
+            asu_symbols, 
+            exclude_hydrogen_positions
         ),
     )
 
