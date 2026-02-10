@@ -579,13 +579,17 @@ def run(
         NormalModeRefinement object with frequencies, ADPs, and mesh data.
     """
 
+    # Strategy applied to determine which frequencies to refine
+    if strategy is None:
+        strategy = SensitivityBasedStrategy(low_threshold=0.75, high_threshold=0.90)
+
     mbe_automation.common.display.framed([
         "Normal mode refinement",
     ])
     
     print(f"mesh_size            {mesh_size}")
     print(f"restraint_weight     {restraint_weight}")
-    print(f"strategy             {strategy if strategy is not None else 'SensitivityBased'}")
+    print(f"strategy             {strategy.__class__.__name__}")
     print(f"max_iter             {max_iter}")
     print(f"optimizer_method     {optimizer_method}")
     print(f"weighting_scheme     {weighting_scheme}")
@@ -664,13 +668,6 @@ def run(
     )
     
     print(f"  Reflections: {smtbx_adapter.observations.size()} observations")
-
-    # Strategy for selecting frequencies to refine
-    if strategy is None:
-        print("  Strategy: Default (SensitivityBasedStrategy 0.60 - 0.90)")
-        strategy = SensitivityBasedStrategy(low_threshold=0.60, high_threshold=0.90)
-    else:
-         print(f"  Strategy: Provided {strategy}")
     
     # Create mode groups to handle degeneracies and bands
     pre_groups = create_pre_groups(phonons)
