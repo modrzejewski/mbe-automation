@@ -317,8 +317,8 @@ def print_adps_comparison(
     labels: list[str],
     symbols: list[str] | None = None,
     adps_3: npt.NDArray[np.float64] | None = None,
-    similarity_s12_12: float | None = None,
-    similarity_s12_13: float | None = None,
+    s12_12: float | None = None,
+    s12_13: float | None = None,
     chi_sq_12: float | None = None,
     chi_sq_13: float | None = None,
     exclude_hydrogen: bool = False,
@@ -332,8 +332,8 @@ def print_adps_comparison(
         labels: List of strings identifying the datasets.
         symbols: Optional list of atom symbols (N,).
         adps_3: Optional third set of ADPs (N, 3, 3).
-        similarity_s12_12: Pre-computed mean S12 for adps_1 vs adps_2.
-        similarity_s12_13: Pre-computed mean S12 for adps_1 vs adps_3.
+        s12_12: Pre-computed mean S12 for adps_1 vs adps_2.
+        s12_13: Pre-computed mean S12 for adps_1 vs adps_3.
         chi_sq_12: Pre-computed mean Chi-squared for adps_1 vs adps_2.
         chi_sq_13: Pre-computed mean Chi-squared for adps_1 vs adps_3.
         exclude_hydrogen: If True, filter out H atoms from display and stats.
@@ -400,15 +400,15 @@ def print_adps_comparison(
     print("Summary")
     print("=" * 100)
     
-    if similarity_s12_12 is not None:
-        print(f"Mean S12({label1}-{label2}): {similarity_s12_12:.3f}%")
+    if s12_12 is not None:
+        print(f"Mean S12({label1}-{label2}): {s12_12:.3f}%")
     
     if chi_sq_12 is not None:
         print(f"mean √(χ²)({label1}-{label2}): {chi_sq_12:.5f}")
     
     if adps_3 is not None:
-        if similarity_s12_13 is not None:
-            print(f"mean s12({label1}-{label3}): {similarity_s12_13:.3f}%")
+        if s12_13 is not None:
+            print(f"mean s12({label1}-{label3}): {s12_13:.3f}%")
         if chi_sq_13 is not None:
             print(f"mean √(χ²)({label1}-{label3}): {chi_sq_13:.5f}")
     

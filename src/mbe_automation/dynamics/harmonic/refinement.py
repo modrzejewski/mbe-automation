@@ -61,8 +61,8 @@ class NormalModeRefinement:
     U_cart_comp_initial_Angs2: npt.NDArray[np.float64]
     U_cart_comp_final_Angs2: npt.NDArray[np.float64]
     asu_atoms: npt.NDArray[np.int64]
-    similarity_s12_initial: npt.NDArray[np.float64]
-    similarity_s12_final: npt.NDArray[np.float64]
+    s12_initial: npt.NDArray[np.float64]
+    s12_final: npt.NDArray[np.float64]
     chi_sq_initial: npt.NDArray[np.float64]
     chi_sq_final: npt.NDArray[np.float64]
 
@@ -353,7 +353,7 @@ def _get_refined_bands_mask(
     return refined_mask
 
 
-def _compute_s12_per_atom(
+def _s12_per_atom(
     u_comp: npt.NDArray[np.float64],
     u_exp: npt.NDArray[np.float64],
     symbols: list[str],
@@ -382,7 +382,7 @@ def _compute_s12_per_atom(
     return s12
 
 
-def _compute_chi_sq_per_atom(
+def _chi_sq_per_atom(
     u_comp: npt.NDArray[np.float64],
     u_exp: npt.NDArray[np.float64],
     symbols: list[str],
@@ -434,7 +434,7 @@ def _clamp_acoustic_frequencies(
     return frequencies_cm1
 
 
-def _compute_band_averages(
+def _band_averages(
     frequencies: npt.NDArray[np.float64],
     band_indices: npt.NDArray[np.int64],
     q_weights: npt.NDArray[np.float64]
@@ -482,12 +482,12 @@ def _display_refinement_summary(
         n_bands = refinement.n_bands
         shape = (n_q, n_bands)
         
-        initial_band_avg_cm1 = _compute_band_averages(
+        initial_band_avg_cm1 = _band_averages(
             frequencies=initial_freqs_cm1.reshape(shape),
             band_indices=band_indices.reshape(shape),
             q_weights=refinement.q_weights
         )
-        refined_band_avg_cm1 = _compute_band_averages(
+        refined_band_avg_cm1 = _band_averages(
             frequencies=refined_freqs_cm1.reshape(shape),
             band_indices=band_indices.reshape(shape),
             q_weights=refinement.q_weights
@@ -509,8 +509,8 @@ def _display_refinement_summary(
         labels=["experimental", "initial", "refined"],
         symbols=asu_symbols,
         adps_3=refinement.U_cart_comp_final_Angs2[refinement.asu_atoms],
-        similarity_s12_12=np.nanmean(refinement.similarity_s12_initial),
-        similarity_s12_13=np.nanmean(refinement.similarity_s12_final),
+        s12_12=np.nanmean(refinement.s12_initial),
+        s12_13=np.nanmean(refinement.s12_final),
         chi_sq_12=np.sqrt(np.nanmean(refinement.chi_sq_initial)),
         chi_sq_13=np.sqrt(np.nanmean(refinement.chi_sq_final)),
         exclude_hydrogen=exclude_hydrogen
@@ -735,16 +735,16 @@ def run(
         U_cart_comp_initial_Angs2=U_cart_comp_initial,
         U_cart_comp_final_Angs2=U_cart_comp_final,
         asu_atoms=asu_atoms,
-        similarity_s12_initial=_compute_s12_per_atom(
+        s12_initial=_s12_per_atom(
             U_asu_comp_initial, U_asu_exp, asu_symbols, exclude_hydrogen_positions
         ),
-        similarity_s12_final=_compute_s12_per_atom(
+        s12_final=_s12_per_atom(
             U_asu_comp_final, U_asu_exp, asu_symbols, exclude_hydrogen_positions
         ),
-        chi_sq_initial=_compute_chi_sq_per_atom(
+        chi_sq_initial=_chi_sq_per_atom(
             U_asu_comp_initial, U_asu_exp, asu_symbols, exclude_hydrogen_positions
         ),
-        chi_sq_final=_compute_chi_sq_per_atom(
+        chi_sq_final=_chi_sq_per_atom(
             U_asu_comp_final, U_asu_exp, asu_symbols, exclude_hydrogen_positions
         ),
     )
