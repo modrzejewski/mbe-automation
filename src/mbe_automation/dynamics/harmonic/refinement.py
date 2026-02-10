@@ -70,18 +70,19 @@ class NormalModeRefinement:
     chi_sq_final: npt.NDArray[np.float64]
     band_scaling_factors: npt.NDArray[np.float64]
 
-def _map_group_scales_to_modes(
+def _band_scaling_factors(
     scale_factors: npt.NDArray[np.float64],
-    groups: "RefinementGroups"
+    groups: "RefinementGroups",
+    n_q: int,
+    n_bands: int,
+    gamma_idx: int
 ) -> npt.NDArray[np.float64]:
-    """Map group scaling factors back to individual modes."""
-    group_ids = groups.group_ids
-    n_modes = len(group_ids)
-    mode_scaling_factors = np.ones(n_modes)
-    unique_gids = sorted(np.unique(group_ids[group_ids >= 0]))
-    for i, gid in enumerate(unique_gids):
-        mode_scaling_factors[group_ids == gid] = scale_factors[i]
-    return mode_scaling_factors
+    """Map group scaling factors to bands using Gamma-point group IDs."""
+    gamma_group_ids = groups.group_ids.reshape(n_q, n_bands)[gamma_idx]
+    band_scaling_factors = np.ones(n_bands)
+    valid_mask = gamma_group_ids >= 0  # Skip fixed modes (ID -1)
+    band_scaling_factors[valid_mask] = scale_factors[gamma_group_ids[valid_mask]]
+    return band_scaling_factors
 
 
 def _validate_scaling_factors(
@@ -681,7 +682,6 @@ def run(
         restraint_weight = 0.0
         
     initial_freqs = phonons.frequencies_cm1
-    # Clamp low/imaginary frequencies (degeneracy groups are already determined)
     initial_freqs = _clamp_acoustic_frequencies(initial_freqs)
     
     restraint_instance = None
@@ -717,18 +717,18 @@ def run(
         band_indices=phonons.band_indices.reshape(n_q, n_bands)
     )
 
-    mode_scaling_factors = _map_group_scales_to_modes(result["scale_factors"], result["groups"])
-    
-    band_scaling_factors = np.zeros(n_bands)
-    for b in range(n_bands):
-        band_scaling_factors[b] = np.mean(mode_scaling_factors[phonons.band_indices == b])
-        
-    # Validation assumes all modes in a band share
-    # the same scaling factor.
+    gamma_idx = np.argmin(np.linalg.norm(irr_q_frac, axis=1))
+    band_scaling_factors = _band_scaling_factors(
+        scale_factors=result["scale_factors"],
+        groups=result["groups"],
+        n_q=n_q,
+        n_bands=n_bands,
+        gamma_idx=gamma_idx
+    )
     _validate_scaling_factors(
-        band_scaling_factors, 
-        freqs_initial_reordered_cm1, 
-        freqs_final_reordered_cm1
+        band_scaling_factors=band_scaling_factors,
+        freqs_initial_reordered_cm1=freqs_initial_reordered_cm1,
+        freqs_final_reordered_cm1=freqs_final_reordered_cm1
     )
 
     cm1_to_THz = 1.0 / phonopy.physical_units.get_physical_units().THzToCm
