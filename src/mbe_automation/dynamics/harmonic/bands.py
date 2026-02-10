@@ -13,11 +13,18 @@ import numpy.typing as npt
 from typing import TYPE_CHECKING, Any, List
 import phonopy
 from mbe_automation.storage.core import ForceConstants
-from nomore_ase.optimization.band_assignment import assign_bands
 from mbe_automation.storage import views
-from nomore_ase.core.symmetric_phonons import SymmetricPhonons
-from mbe_automation.dynamics.harmonic.modes import at_k_points
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT
+from mbe_automation.dynamics.harmonic.modes import at_k_points
+
+try:
+    from nomore_ase.optimization.band_assignment import assign_bands
+    from nomore_ase.core.symmetric_phonons import SymmetricPhonons
+except ImportError:
+    raise ImportError(
+        "The `dynamics.harmonic.bands` module requires the `nomore_ase` package. "
+        "Install it in your environment to use this functionality."
+    )
 
 class PhonopyASEAdapter:
     """

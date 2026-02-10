@@ -3,7 +3,6 @@ Integration module for normal mode refinement using
 the NoMoRe library of Paul Niklas Ruth
 https://github.com/Niolon
 """
-
 from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
@@ -12,7 +11,7 @@ from typing import Dict, Any, Optional, Literal, List, TYPE_CHECKING
 import phonopy.physical_units
 import mbe_automation.dynamics.harmonic.modes
 from scipy.spatial.distance import cdist
-from mbe_automation.dynamics.harmonic.bands import compute_band_indices, determine_degenerate_bands, reorder_frequencies
+import mbe_automation.common.display
 from mbe_automation.dynamics.harmonic.display import print_frequency_comparison, print_adps_comparison
 from phonopy.structure.atoms import symbol_map
 
@@ -35,7 +34,11 @@ try:
     from nomore_ase.analysis.validation import extract_adps_from_structure
     from nomore_ase.analysis.s12_similarity import calculate_s12_per_atom
 
-    from mbe_automation.dynamics.harmonic.bands import compute_band_indices
+    from mbe_automation.dynamics.harmonic.bands import (
+        compute_band_indices,
+        determine_degenerate_bands,
+        reorder_frequencies
+    )
 except ImportError:
     raise ImportError(
         "The `dynamics.harmonic.refinement` module requires the `nomore_ase` package. "
@@ -146,7 +149,6 @@ def to_phonon_data(
         q_points=irr_q_frac
     )
     # band_indices: (n_q, n_modes)
-        
     gamma_index = np.argmin(np.linalg.norm(irr_q_frac, axis=1))
     degeneracy_groups = determine_degenerate_bands(ph, band_indices, gamma_index)
 
@@ -170,26 +172,23 @@ def to_phonon_data(
         n_atoms=n_target,
         band_indices=band_indices.flatten()
     )
-
-
+    
 def _validate_atomic_numbers(
     source_numbers: npt.NDArray[np.int64],
     target_symbols: List[str],
     source_to_target_indices: npt.NDArray[np.int64]
 ) -> None:
     """
-    Validate that permuted source atomic numbers match target symbols.
+    Validate that permuted source atomic numbers match target elements.
     
     Args:
         source_numbers: Atomic numbers from source (e.g. Phonopy primitive).
         target_symbols: Element symbols from target (e.g. CIF).
         source_to_target_indices: Permutation mapping source -> target.
-        
+
     Raises:
         ValueError: If atomic numbers do not match after permutation.
     """
-    
-    
     try:
          target_numbers = np.array([symbol_map[s] for s in target_symbols])
     except KeyError as e:
@@ -258,7 +257,6 @@ def _assert_equal_cells(fc_cell_matrix: np.ndarray, cif_unit_cell: Any, toleranc
             f"Tolerance: {tolerance}"
         )
 
-
 def compute_atom_permutation(phonopy_primitive: Any, cif_adapter: "CctbxAdapter") -> npt.NDArray[np.int64]:
     """
     Compute permutation array to map ForceConstants atoms to CIF atoms.
@@ -298,10 +296,10 @@ def compute_atom_permutation(phonopy_primitive: Any, cif_adapter: "CctbxAdapter"
             print(f"WARNING: Duplicate matching for target atom {i_target}. Check if atoms are overlapping or tolerance issue.")
         used_targets.add(i_target)
         source_to_target_indices[i_fc] = i_target
-            
+
     if len(used_targets) != n_target:
-          print(f"WARNING: Not all target atoms matched! Used {len(used_targets)} of {n_target}")
-         
+        print(f"WARNING: Not all target atoms matched! Used {len(used_targets)} of {n_target}")
+
     return source_to_target_indices
 
 def _get_refined_bands_mask(
@@ -561,10 +559,11 @@ def run(
     weighting_scheme: Literal["sigma", "unit"] = "sigma",
     fix_positions: bool = True,
     exclude_hydrogen_positions: bool = True,
-    use_irreducible_fbz: bool = False
+    use_irreducible_fbz: bool = False,
+    temperature_K: float | None = None
 ) -> NormalModeRefinement:
     """
-    Run normal mode refinement.
+    Perform normal mode refinement.
     
     Args:
         force_constants: mbe_automation ForceConstants object.
@@ -579,7 +578,22 @@ def run(
     Returns:
         NormalModeRefinement object with frequencies, ADPs, and mesh data.
     """
+
+    mbe_automation.common.display.framed([
+        "Normal mode refinement",
+    ])
     
+    print(f"mesh_size            {mesh_size}")
+    print(f"restraint_weight     {restraint_weight}")
+    print(f"strategy             {strategy if strategy is not None else 'SensitivityBased'}")
+    print(f"max_iter             {max_iter}")
+    print(f"optimizer_method     {optimizer_method}")
+    print(f"weighting_scheme     {weighting_scheme}")
+    print(f"fix_positions        {fix_positions}")
+    print(f"exclude_hydrogen     {exclude_hydrogen_positions}")
+    print(f"use_irreducible_fbz  {use_irreducible_fbz}")
+    print(f"temperature_K        {temperature_K if temperature_K is not None else 'from CIF'}")
+
     if isinstance(mesh_size, (list, tuple, np.ndarray)):
         mesh_size = np.array(mesh_size)
 
@@ -590,16 +604,13 @@ def run(
                 f"Received: {mesh_size}. Please use odd numbers (e.g., [3, 3, 3])."
             )
     
-    # 1. Initialize CctbxAdapter (loads CIF)
     print(f"Loading experimental data from {cif_path}")
     cctbx_adapter = CctbxAdapter(cif_path)
     
     print(f"  Space Group: {cctbx_adapter.space_group_symbol}")
     
-    # 2. Prepare Phonons (computes freqs/eigenvectors on mesh)
     print("Computing phonon data on mesh...")
     
-    # 2a. Initialize Phonopy and get mesh
     ph = force_constants.to_phonopy()
     irr_q_frac, q_weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
         phonopy_object=ph,
@@ -608,7 +619,6 @@ def run(
         odd_numbers=True  # Enforce odd mesh to guarantee Gamma point (0,0,0) is included
     )
     
-    # 2b. Build PhononData
     phonons = to_phonon_data(
         phonopy_object=ph,
         irr_q_frac=irr_q_frac,
@@ -616,15 +626,19 @@ def run(
         cif_adapter=cctbx_adapter
     )
     
-    # Extract temperature from CIF or set default
-    temperature = cctbx_adapter.get_temperature()
+    if temperature_K is not None:
+        temperature = temperature_K
+    else:
+        temperature = cctbx_adapter.get_temperature()
+
     if temperature is None:
-        print("WARNING: Temperature not found in CIF. Defaulting to 298.15 K.")
-        temperature = 298.15
+        raise ValueError(
+            "Temperature must be provided either as an argument (`temperature_K`) "
+            "or be present in the CIF file metadata."
+        )
         
     phonons.temperature = temperature
     
-    # 3. Create NoMoReCalculator
     # Calculate normalization factor (total weight of q-points in BZ)
     total_q = np.sum(q_weights)
     
@@ -640,7 +654,7 @@ def run(
         degeneracy_groups=phonons.degeneracy_groups
     )
 
-    # 4. Initialize SmtbxAdapter
+    # Initialize SmtbxAdapter
     # Requires xray_structure, reflections, phonons (for mapping)
     smtbx_adapter = SmtbxAdapter(
         xray_structure=cctbx_adapter.xray_structure,
@@ -651,33 +665,26 @@ def run(
     
     print(f"  Reflections: {smtbx_adapter.observations.size()} observations")
 
-    # 5. Frequency Partition Strategy
+    # Strategy for selecting frequencies to refine
     if strategy is None:
         print("  Strategy: Default (SensitivityBasedStrategy 0.60 - 0.90)")
         strategy = SensitivityBasedStrategy(low_threshold=0.60, high_threshold=0.90)
     else:
          print(f"  Strategy: Provided {strategy}")
     
-    # Create pre-groups (handles degeneracies and bands)
+    # Create mode groups to handle degeneracies and bands
     pre_groups = create_pre_groups(phonons)
-    
-    # Compute refinement groups
     groups = strategy.compute_groups(phonons, pre_groups)
     
-    # 6. Initialize Refinement Engine
     engine = RefinementEngine(calculator, smtbx_adapter)
     
-    # 7. Run Refinement
     if restraint_weight is None:
         restraint_weight = 0.0
         
-    # We need initial frequencies from phonons
     initial_freqs = phonons.frequencies_cm1
-    
     # Clamp low/imaginary frequencies (degeneracy groups are already determined)
     initial_freqs = _clamp_acoustic_frequencies(initial_freqs)
     
-    # Create restraint object if weight is positive
     restraint_instance = None
     if restraint_weight > 0.0:
         restraint_instance = BayesianFrequencyRestraint(
@@ -696,7 +703,6 @@ def run(
         exclude_hydrogen_positions=exclude_hydrogen_positions
     )
 
-    # 8. Build NormalModeRefinement result
     n_atoms_p1 = phonons.n_atoms
     n_modes = len(initial_freqs)
     n_bands = n_modes // len(irr_q_frac)
@@ -761,7 +767,6 @@ def run(
         ),
     )
 
-    # 9. Display refinement summary
     _display_refinement_summary(
         refinement=refinement,
         band_indices=phonons.band_indices,

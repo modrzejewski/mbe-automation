@@ -47,6 +47,7 @@ from copy import deepcopy
 
 if TYPE_CHECKING:
     from nomore_ase.core.frequency_partition import FrequencyPartitionStrategy
+    from mbe_automation.dynamics.harmonic.refinement import NormalModeRefinement
 
 class _TrainingStructure:
     def to_mace_dataset(
@@ -253,7 +254,8 @@ class ForceConstants(_ForceConstants):
         weighting_scheme: Literal["sigma", "unit"] = "sigma",
         fix_positions: bool = True,
         exclude_hydrogen_positions: bool = True,
-    ) -> typing.Dict[str, typing.Any]:
+        temperature_K: float | None = None,
+    ) -> NormalModeRefinement:
         """
         Refine phonon frequencies using the NoMoRe refinement API.
         
@@ -266,15 +268,22 @@ class ForceConstants(_ForceConstants):
             optimizer_method: Optimizer method (e.g., 'SLSQP', 'L-BFGS-B').
             weighting_scheme: Weighting scheme ('sigma' or 'unit').
             fix_positions: Whether to fix atomic positions during refinement.
-            exclude_hydrogen_positions: Whether to exclude hydrogens from position refinement.
-            
+            exclude_hydrogen_positions: Whether to exclude hydrogens from position 
+                refinement.
+            temperature_K: Temperature in Kelvin used to compute ADPs.
+                If provided, overrides CIF metadata.
+        
         Returns:
-            Dictionary containing refinement results.
+            NormalModeRefinement object with frequencies, ADPs, and mesh data.
         """
         try:
+            import nomore_ase
             from mbe_automation.dynamics.harmonic import refinement
         except ImportError:
-            raise ImportError("nomore_ase library is required to use this method")
+            raise ImportError(
+                "The `ForceConstants.refine` method requires the `nomore_ase` package. "
+                "Install it in your environment to use this functionality."
+            )
         if isinstance(mesh_size, list):
             mesh_size = np.array(mesh_size, dtype=np.int64)
         return refinement.run(
@@ -287,7 +296,8 @@ class ForceConstants(_ForceConstants):
             optimizer_method=optimizer_method,
             weighting_scheme=weighting_scheme,
             fix_positions=fix_positions,
-            exclude_hydrogen_positions=exclude_hydrogen_positions
+            exclude_hydrogen_positions=exclude_hydrogen_positions,
+            temperature_K=temperature_K
         )
 
     def thermodynamics(
