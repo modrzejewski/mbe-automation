@@ -19,7 +19,11 @@ cif_path = "experiment.cif"
 mace_calc = MACE(model_path="mace.model")
 
 # Use "only_atoms" cell relaxation to keep the experimental cell parameters
-relaxation_config = Minimum.recommended(model_name="mace", cell_relaxation="only_atoms")
+relaxation_config = Minimum(
+    cell_relaxation="only_atoms",
+    max_force_on_atom_eV_A=1.0E-4,
+    symmetrize_final_structure=False
+)
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
@@ -55,7 +59,7 @@ properties.hdf5
 └── quasi_harmonic
     ├── phonons
     │   └── force_constants
-    │       └── crystal[opt:atoms,shape]  <-- This group contains the data
+    │       └── crystal[opt:atoms]  <-- This group contains the data
     │           ├── force_constants (eV∕Å²)
     │           └── supercell_matrix
     ├── structures
@@ -72,7 +76,7 @@ import numpy as np
 from mbe_automation import ForceConstants
 
 dataset_path = "properties.hdf5"
-key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]"
+key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
 
 fc = ForceConstants.read(dataset=dataset_path, key=key)
 freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_point=np.array([0.0, 0.0, 0.0]))
