@@ -486,6 +486,8 @@ def _display_refinement_summary(
     refined_freqs_cm1 = refinement.freqs_final_reordered_THz * THz_to_cm1
     
     if band_indices is not None:
+        gamma_idx = np.argmin(np.linalg.norm(refinement.irr_q_frac, axis=1))
+        
         initial_band_avg_cm1 = np.average(
             initial_freqs_cm1, 
             axis=0, 
@@ -498,9 +500,12 @@ def _display_refinement_summary(
         )
         
         print_frequency_comparison(
-            freqs_initial=initial_band_avg_cm1,
-            freqs_refined=refined_band_avg_cm1,
-            optimize_mask=_get_refined_bands_mask(groups, band_indices),
+            freqs_initial_gamma=initial_freqs_cm1[gamma_idx],
+            freqs_refined_gamma=refined_freqs_cm1[gamma_idx],
+            freqs_initial_avg=initial_band_avg_cm1,
+            freqs_refined_avg=refined_band_avg_cm1,
+            scaling_factors=refinement.band_scaling_factors,
+            optimize_mask=_get_refined_bands_mask(groups=groups, band_indices=band_indices),
             unit="cm1"
         )
     else:

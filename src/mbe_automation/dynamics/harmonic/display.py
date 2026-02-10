@@ -416,45 +416,50 @@ def print_adps_comparison(
 
 
 def print_frequency_comparison(
-    freqs_initial: npt.NDArray[np.float64],
-    freqs_refined: npt.NDArray[np.float64],
+    freqs_initial_gamma: npt.NDArray[np.float64],
+    freqs_refined_gamma: npt.NDArray[np.float64],
+    freqs_initial_avg: npt.NDArray[np.float64],
+    freqs_refined_avg: npt.NDArray[np.float64],
+    scaling_factors: npt.NDArray[np.float64],
     optimize_mask: npt.NDArray[np.bool_] | None = None,
     unit: Literal["THz", "cm1"] = "THz"
 ) -> None:
-    """
-    Helper to print starting vs refined frequencies.
-    
-    Args:
-        freqs_initial: Initial frequencies, shape (n_bands,).
-        freqs_refined: Refined frequencies, shape (n_bands,).
-        optimize_mask: Boolean mask indicating which bands/modes were refined.
-        unit: Unit of input frequencies ("THz" or "cm1").
-    """
-    if freqs_initial.ndim != 1 or freqs_refined.ndim != 1:
-        raise ValueError("print_frequency_comparison expects 1D arrays of frequencies (shape (n_bands,)).")
+    """Helper to print starting vs refined frequencies with Gamma and average metrics."""
+    if freqs_initial_gamma.ndim != 1 or freqs_refined_gamma.ndim != 1:
+        raise ValueError("Frequencies must be 1D arrays.")
 
-    # Conversion factor
+    to_cm = 1.0
     if unit == "THz":
         to_cm = phonopy.physical_units.get_physical_units().THzToCm
-    else:
-        to_cm = 1.0
         
-    print("\nComparison of Frequencies (Gamma point / Average):")
-    print(f"{'mode':<6} {'initial (cm^-1)':<20} {'refined (cm^-1)':<20} {'shift (cm^-1)':<20} {'opt?':<6}")
-    print("-" * 76)
+    print("\nComparison of Frequencies (cm⁻¹):")
+    header = (
+        f"{'band':<6} {'initial (Γ)':<15} {'refined (Γ)':<15} "
+        f"{'initial (avg)':<15} {'refined (avg)':<15} "
+        f"{'scaling':<10} {'shift (Γ)':<10} {'opt?':<6}"
+    )
+    print(header)
+    print("-" * len(header))
             
-    n_bands = len(freqs_initial)
-    freqs_init_cm = freqs_initial * to_cm
-    freqs_refined_cm = freqs_refined * to_cm
-    diff_cm = freqs_refined_cm - freqs_init_cm
+    n_bands = len(freqs_initial_gamma)
+    f_init_g = freqs_initial_gamma * to_cm
+    f_ref_g = freqs_refined_gamma * to_cm
+    f_init_a = freqs_initial_avg * to_cm
+    f_ref_a = freqs_refined_avg * to_cm
+    shift_g = f_ref_g - f_init_g
     
-    for band_idx in range(n_bands):
-        is_opt = ""
-        if optimize_mask is not None:
-            if optimize_mask[band_idx]:
-                is_opt = "*"
-
-        print(f"{band_idx:<6} {freqs_init_cm[band_idx]:<20.2f} {freqs_refined_cm[band_idx]:<20.2f} {diff_cm[band_idx]:<20.2f} {is_opt:<6}")
+    for b in range(n_bands):
+        is_opt = "*" if optimize_mask is not None and optimize_mask[b] else ""
+        print(
+            f"{b:<6} "
+            f"{f_init_g[b]:<15.1f} "
+            f"{f_ref_g[b]:<15.1f} "
+            f"{f_init_a[b]:<15.1f} "
+            f"{f_ref_a[b]:<15.1f} "
+            f"{scaling_factors[b]:<10.3f} "
+            f"{shift_g[b]:<10.1f} "
+            f"{is_opt:<6}"
+        )
 
 
 
