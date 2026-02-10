@@ -66,7 +66,7 @@ def main(
         if i < 10:
             print(f" atom {i:3d} U_cart (3x3):\n{U}")
         elif i == 10:
-            print(" ... (t3 aruncated listing) ...")
+            print(" ... (truncated listing) ...")
             break
 
     if out_npy:
