@@ -319,8 +319,8 @@ def print_adps_comparison(
     adps_3: npt.NDArray[np.float64] | None = None,
     s12_12: float | None = None,
     s12_13: float | None = None,
-    chi_sq_12: float | None = None,
-    chi_sq_13: float | None = None,
+    rmsd_12: float | None = None,
+    rmsd_13: float | None = None,
     exclude_hydrogen: bool = False,
 ) -> None:
     """
@@ -334,8 +334,8 @@ def print_adps_comparison(
         adps_3: Optional third set of ADPs (N, 3, 3).
         s12_12: Pre-computed mean S12 for adps_1 vs adps_2.
         s12_13: Pre-computed mean S12 for adps_1 vs adps_3.
-        chi_sq_12: Pre-computed mean Chi-squared for adps_1 vs adps_2.
-        chi_sq_13: Pre-computed mean Chi-squared for adps_1 vs adps_3.
+        rmsd_12: Pre-computed RMSD for adps_1 vs adps_2.
+        rmsd_13: Pre-computed RMSD for adps_1 vs adps_3.
         exclude_hydrogen: If True, filter out H atoms from display and stats.
     """
     if adps_1.shape != adps_2.shape:
@@ -403,14 +403,14 @@ def print_adps_comparison(
     if s12_12 is not None:
         print(f"Mean S12({label1}-{label2}): {s12_12:.3f}%")
     
-    if chi_sq_12 is not None:
-        print(f"mean √(χ²)({label1}-{label2}): {chi_sq_12:.5f}")
+    if rmsd_12 is not None:
+        print(f"RMSD({label1}-{label2}): {rmsd_12:.5f}")
     
     if adps_3 is not None:
         if s12_13 is not None:
-            print(f"mean s12({label1}-{label3}): {s12_13:.3f}%")
-        if chi_sq_13 is not None:
-            print(f"mean √(χ²)({label1}-{label3}): {chi_sq_13:.5f}")
+            print(f"Mean S12({label1}-{label3}): {s12_13:.3f}%")
+        if rmsd_13 is not None:
+            print(f"RMSD({label1}-{label3}): {rmsd_13:.5f}")
     
     print("=" * 100)
 
@@ -432,7 +432,7 @@ def print_frequency_comparison(
     if unit == "THz":
         to_cm = phonopy.physical_units.get_physical_units().THzToCm
         
-    print("\nComparison of Frequencies (cm⁻¹):")
+    print("\nComparison of Frequencies (cm⁻¹)\n")
     header = (
         f"{'band':<7} {'initial (Γ)':>14} {'refined (Γ)':>14} "
         f"{'initial (avg)':>14} {'refined (avg)':>14} "

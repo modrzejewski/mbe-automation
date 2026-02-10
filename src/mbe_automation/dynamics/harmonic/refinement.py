@@ -66,8 +66,8 @@ class NormalModeRefinement:
     asu_atoms: npt.NDArray[np.int64]
     s12_initial: npt.NDArray[np.float64]
     s12_final: npt.NDArray[np.float64]
-    chi_sq_initial: npt.NDArray[np.float64]
-    chi_sq_final: npt.NDArray[np.float64]
+    U_diff_squared_initial: npt.NDArray[np.float64]
+    U_diff_squared_final: npt.NDArray[np.float64]
     band_scaling_factors: npt.NDArray[np.float64]
     optimized_bands: npt.NDArray[np.bool_]
 
@@ -371,35 +371,36 @@ def _s12_per_atom(
     return s12
 
 
-def _chi_sq_per_atom(
+def _u_diff_squared_per_atom(
     u_comp: npt.NDArray[np.float64],
     u_exp: npt.NDArray[np.float64],
     symbols: list[str],
     exclude_hydrogen: bool
 ) -> npt.NDArray[np.float64]:
     """
-    Compute per-atom χ², with NaN for excluded atoms.
+    Compute per-atom squared Euclidean distance between U matrices.
 
-    χ²_i = Σ_jk (U_comp_ijk - U_exp_ijk)²
+    The squared distance for atom i is Σ_jk (U_comp_ijk - U_exp_ijk)².
+    Returns NaN for excluded atoms.
 
     Args:
         u_comp: Computed ADPs (n_atoms, 3, 3).
         u_exp: Experimental ADPs (n_atoms, 3, 3).
         symbols: Element symbols for each atom.
-        exclude_hydrogen: If True, set χ² to NaN for H atoms.
+        exclude_hydrogen: If True, set result to NaN for H atoms.
 
     Returns:
-        Per-atom χ² array (n_atoms,). H atoms are NaN if excluded.
+        Per-atom squared distance array (n_atoms,).
     """
     n = len(symbols)
-    chi_sq = np.full(n, np.nan)
+    u_diff_sq = np.full(n, np.nan)
     if exclude_hydrogen:
         mask = np.array([s != "H" for s in symbols])
     else:
         mask = np.ones(n, dtype=bool)
     diff = u_comp[mask] - u_exp[mask]
-    chi_sq[mask] = np.sum(diff**2, axis=(1, 2))
-    return chi_sq
+    u_diff_sq[mask] = np.sum(diff**2, axis=(1, 2))
+    return u_diff_sq
 
 
 def _clamp_acoustic_frequencies(
@@ -470,8 +471,8 @@ def _display_refinement_summary(
         adps_3=refinement.U_cart_comp_final_Angs2[refinement.asu_atoms],
         s12_12=np.nanmean(refinement.s12_initial),
         s12_13=np.nanmean(refinement.s12_final),
-        chi_sq_12=np.sqrt(np.nanmean(refinement.chi_sq_initial)),
-        chi_sq_13=np.sqrt(np.nanmean(refinement.chi_sq_final)),
+        rmsd_12=np.sqrt(np.nanmean(refinement.U_diff_squared_initial)),
+        rmsd_13=np.sqrt(np.nanmean(refinement.U_diff_squared_final)),
         exclude_hydrogen=exclude_hydrogen
     )
 
@@ -545,7 +546,8 @@ def run(
     mbe_automation.common.display.framed([
         "Normal mode refinement",
     ])
-    
+    print("Using interface to the nomore library of Paul Niklas Ruth")
+    print("https://github.com/Niolon")
     print(f"mesh_size            {mesh_size}")
     print(f"restraint_weight     {restraint_weight}")
     print(f"strategy             {band_selection_strategy.__class__.__name__}")
@@ -730,13 +732,13 @@ def run(
             asu_symbols, 
             exclude_hydrogen_positions
         ),
-        chi_sq_initial=_chi_sq_per_atom(
+        U_diff_squared_initial=_u_diff_squared_per_atom(
             U_cart_comp_initial_asu, 
             U_cart_exp_asu, 
             asu_symbols, 
             exclude_hydrogen_positions
         ),
-        chi_sq_final=_chi_sq_per_atom(
+        U_diff_squared_final=_u_diff_squared_per_atom(
             U_cart_comp_final_asu, 
             U_cart_exp_asu, 
             asu_symbols, 
