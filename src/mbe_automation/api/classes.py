@@ -255,6 +255,7 @@ class ForceConstants(_ForceConstants):
         exclude_hydrogen_positions: bool = True,
         temperature_K: float | None = None,
         q_spacing: float = DEFAULT_Q_SPACING,
+        reasonable_range: tuple[float, float] = (0.1, 2.0)
     ) -> NormalModeRefinement:
         """
         Refine phonon frequencies using the NoMoRe refinement API.
@@ -272,6 +273,7 @@ class ForceConstants(_ForceConstants):
                 If provided, overrides CIF metadata.
             q_spacing: The target spacing for path interpolation in Å⁻¹ along 
                 q-point paths. Used for band tracking.
+            reasonable_range: Allowed range for optimized scaling factors.
         
         Returns:
             NormalModeRefinement object with frequencies, ADPs, and mesh data.
@@ -296,7 +298,8 @@ class ForceConstants(_ForceConstants):
             fix_positions=fix_positions,
             exclude_hydrogen_positions=exclude_hydrogen_positions,
             temperature_K=temperature_K,
-            q_spacing=q_spacing
+            q_spacing=q_spacing,
+            reasonable_range=reasonable_range
         )
 
     def thermodynamics(

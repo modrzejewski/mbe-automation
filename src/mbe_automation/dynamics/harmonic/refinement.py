@@ -105,6 +105,19 @@ def _validate_scaling_factors(
             f"recovered {freqs_recovered[max_diff_idx]:.6f}."
         )
 
+def _validate_reasonable_range(
+    band_scaling_factors: npt.NDArray[np.float64],
+    reasonable_range: tuple[float, float]
+) -> None:
+    """Verify that all optimized scaling factors are within the reasonable range."""
+    lower, upper = reasonable_range
+    if np.any((band_scaling_factors < lower) | (band_scaling_factors > upper)):
+        outliers = band_scaling_factors[(band_scaling_factors < lower) | (band_scaling_factors > upper)]
+        raise ValueError(
+            f"Optimized scaling factors hit boundaries of reasonable range: {outliers}. "
+            f"Expected all to be within {reasonable_range}."
+        )
+
 def to_phonon_data(
     phonopy_object,
     irr_q_frac: npt.NDArray[np.floating],
@@ -525,7 +538,8 @@ def run(
     exclude_hydrogen_positions: bool = True,
     use_irreducible_fbz: bool = False,
     temperature_K: float | None = None,
-    q_spacing: float = DEFAULT_Q_SPACING
+    q_spacing: float = DEFAULT_Q_SPACING,
+    reasonable_range: tuple[float, float] = (0.1, 2.0)
 ) -> NormalModeRefinement:
     """
     Perform normal mode refinement.
@@ -538,6 +552,7 @@ def run(
         band_selection_strategy: Strategy for frequency partitioning. Defaults to SensitivityBased(0.6, 0.9).
         weighting_scheme: Weighting scheme for refinement ('sigma' or 'unit').
         q_spacing: Spacing for path interpolation in Å⁻¹ along q-point paths.
+        reasonable_range: Allowed range for optimized scaling factors.
         
     Returns:
         NormalModeRefinement object with frequencies, ADPs, and mesh data.
@@ -700,6 +715,10 @@ def run(
         band_scaling_factors=band_scaling_factors,
         freqs_initial_reordered_cm1=freqs_initial_reordered_cm1,
         freqs_final_reordered_cm1=freqs_final_reordered_cm1
+    )
+    _validate_reasonable_range(
+        band_scaling_factors=band_scaling_factors,
+        reasonable_range=reasonable_range
     )
 
     cm1_to_THz = 1.0 / phonopy.physical_units.get_physical_units().THzToCm
