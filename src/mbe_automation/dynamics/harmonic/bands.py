@@ -17,14 +17,14 @@ from mbe_automation.storage import views
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT
 from mbe_automation.dynamics.harmonic.modes import at_k_points
 
+DEFAULT_Q_SPACING = 0.05
+
 try:
     from nomore_ase.optimization.band_assignment import assign_bands
     from nomore_ase.core.symmetric_phonons import SymmetricPhonons
+    _NOMORE_AVAILABLE = True
 except ImportError:
-    raise ImportError(
-        "The `dynamics.harmonic.bands` module requires the `nomore_ase` package. "
-        "Install it in your environment to use this functionality."
-    )
+    _NOMORE_AVAILABLE = False
 
 class PhonopyASEAdapter:
     """
@@ -62,20 +62,18 @@ class PhonopyASEAdapter:
         self.ph.dynamical_matrix.run(q)
         return self.ph.dynamical_matrix.dynamical_matrix
 
-def compute_band_indices(
+def track_from_gamma(
     phonopy_object: phonopy.Phonopy,
     q_points: npt.NDArray[np.float64],
-    q_spacing: float = 0.05,
-    k_neighbors: int = 6
+    q_spacing: float = DEFAULT_Q_SPACING,
 ) -> npt.NDArray[np.int64]:
     """
-    Compute band indices for a set of q-points using path tracing.
+    Compute band indices for a set of q-points using path tracing from Gamma.
     
     Args:
         phonopy_object: Consistently initialized Phonopy object
         q_points: (N_q, 3) list of q-points to assign
         q_spacing: Spacing for path interpolation in Å⁻¹
-        k_neighbors: Number of neighbors for graph matching
         
     Returns:
         band_indices: (N_q, N_modes) integer array of band IDs.
@@ -94,13 +92,18 @@ def compute_band_indices(
             
             (i.e., band 0 connects mode 0 at q0 to mode 1 at q1)
     """
+    if not _NOMORE_AVAILABLE:
+        raise ImportError(
+            "The `track_from_gamma` function requires the `nomore_ase` package. "
+            "Install it in your environment to use this functionality."
+        )
+
     adapter = PhonopyASEAdapter(phonopy_object)
     
     flat_indices = assign_bands(
         phonons=adapter,
         q_points=q_points,
         q_spacing=q_spacing,
-        k_neighbors=k_neighbors
     )
     
     n_q = len(q_points)
@@ -124,7 +127,7 @@ def reorder_frequencies(
     
     Args:
         frequencies: (n_q, n_bands) array of frequencies.
-        band_indices: (n_q, n_bands) array of band indices from compute_band_indices.
+        band_indices: (n_q, n_bands) array of band indices from track_from_gamma.
         
     Returns:
         (n_q, n_bands) array where reordered[k, b] is the frequency of band b at q-point k.

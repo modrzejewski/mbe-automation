@@ -15,10 +15,6 @@ import mbe_automation.common.display
 from mbe_automation.dynamics.harmonic.display import print_frequency_comparison, print_adps_comparison
 from phonopy.structure.atoms import symbol_map
 
-if TYPE_CHECKING:
-    from mbe_automation.api.classes import ForceConstants
-    from nomore_ase.crystallography.cctbx_adapter import CctbxAdapter
-
 try:
     from nomore_ase.crystallography.cctbx_adapter import CctbxAdapter
     from nomore_ase.crystallography.smtbx_adapter import SmtbxAdapter
@@ -35,15 +31,15 @@ try:
     from nomore_ase.analysis.s12_similarity import calculate_s12_per_atom
 
     from mbe_automation.dynamics.harmonic.bands import (
-        compute_band_indices,
+        track_from_gamma,
         determine_degenerate_bands,
-        reorder_frequencies
+        reorder_frequencies,
+        DEFAULT_Q_SPACING
     )
+    _NOMORE_AVAILABLE = True
 except ImportError:
-    raise ImportError(
-        "The `dynamics.harmonic.refinement` module requires the `nomore_ase` package. "
-        "Install it in your environment to use this functionality."
-    )
+    _NOMORE_AVAILABLE = False
+    from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING
 
 
 @dataclass
@@ -113,7 +109,8 @@ def to_phonon_data(
     phonopy_object,
     irr_q_frac: npt.NDArray[np.floating],
     q_weights: npt.NDArray[np.integer],
-    cif_adapter: "CctbxAdapter"
+    cif_adapter: "CctbxAdapter",
+    q_spacing: float = DEFAULT_Q_SPACING
 ) -> PhononData:
     """
     Create PhononData object from computed phonopy data, matching atoms to CIF.
@@ -127,6 +124,12 @@ def to_phonon_data(
     Returns:
         PhononData object ready for refinement.
     """
+    if not _NOMORE_AVAILABLE:
+        raise ImportError(
+            "The `to_phonon_data` function requires the `nomore_ase` package. "
+            "Install it in your environment to use this functionality."
+        )
+
     ph = phonopy_object
     
     freqs_cm1_grid, eigenvectors_grid = mbe_automation.dynamics.harmonic.modes.at_k_points(
@@ -184,9 +187,10 @@ def to_phonon_data(
     flat_weights = np.repeat(q_weights, n_modes_total)
 
     print(f"Computing band assignment for {len(irr_q_frac)} q-points...")
-    band_indices = compute_band_indices(
+    band_indices = track_from_gamma(
         phonopy_object=ph,
-        q_points=irr_q_frac
+        q_points=irr_q_frac,
+        q_spacing=q_spacing
     )
     # band_indices: (n_q, n_modes)
     gamma_index = np.argmin(np.linalg.norm(irr_q_frac, axis=1))
@@ -520,7 +524,8 @@ def run(
     fix_positions: bool = True,
     exclude_hydrogen_positions: bool = True,
     use_irreducible_fbz: bool = False,
-    temperature_K: float | None = None
+    temperature_K: float | None = None,
+    q_spacing: float = DEFAULT_Q_SPACING
 ) -> NormalModeRefinement:
     """
     Perform normal mode refinement.
@@ -530,12 +535,19 @@ def run(
         cif_path: Path to experimental CIF.
         mesh_size: k-point mesh size.
         restraint_weight: Weight for restraining to initial frequencies.
-        mode_selection_strategy: Strategy for frequency partitioning. Defaults to SensitivityBased(0.6, 0.9).
+        band_selection_strategy: Strategy for frequency partitioning. Defaults to SensitivityBased(0.6, 0.9).
         weighting_scheme: Weighting scheme for refinement ('sigma' or 'unit').
+        q_spacing: Spacing for path interpolation in Å⁻¹ along q-point paths.
         
     Returns:
         NormalModeRefinement object with frequencies, ADPs, and mesh data.
     """
+    if not _NOMORE_AVAILABLE:
+        raise ImportError(
+            "The `refinement.run` function requires the `nomore_ase` package. "
+            "Install it in your environment to use this functionality."
+        )
+
     optimizer_options = {"maxiter": 300, "ftol": 1e-9}
     optimizer_method = "SLSQP"
 
@@ -588,7 +600,8 @@ def run(
         phonopy_object=ph,
         irr_q_frac=irr_q_frac,
         q_weights=q_weights,
-        cif_adapter=cctbx_adapter
+        cif_adapter=cctbx_adapter,
+        q_spacing=q_spacing
     )
     
     if temperature_K is not None:

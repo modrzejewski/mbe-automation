@@ -24,6 +24,7 @@ from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 from mbe_automation.storage import AtomicReference as _AtomicReference
 import mbe_automation.dynamics.harmonic.modes
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, ThermalDisplacements
+from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
 import mbe_automation.calculators
@@ -253,6 +254,7 @@ class ForceConstants(_ForceConstants):
         fix_positions: bool = True,
         exclude_hydrogen_positions: bool = True,
         temperature_K: float | None = None,
+        q_spacing: float = DEFAULT_Q_SPACING,
     ) -> NormalModeRefinement:
         """
         Refine phonon frequencies using the NoMoRe refinement API.
@@ -268,6 +270,8 @@ class ForceConstants(_ForceConstants):
                 refinement.
             temperature_K: Temperature in Kelvin used to compute ADPs.
                 If provided, overrides CIF metadata.
+            q_spacing: The target spacing for path interpolation in Å⁻¹ along 
+                q-point paths. Used for band tracking.
         
         Returns:
             NormalModeRefinement object with frequencies, ADPs, and mesh data.
@@ -291,7 +295,8 @@ class ForceConstants(_ForceConstants):
             weighting_scheme=weighting_scheme,
             fix_positions=fix_positions,
             exclude_hydrogen_positions=exclude_hydrogen_positions,
-            temperature_K=temperature_K
+            temperature_K=temperature_K,
+            q_spacing=q_spacing
         )
 
     def thermodynamics(
