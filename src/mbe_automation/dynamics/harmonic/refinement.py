@@ -716,10 +716,6 @@ def run(
         freqs_initial_reordered_cm1=freqs_initial_reordered_cm1,
         freqs_final_reordered_cm1=freqs_final_reordered_cm1
     )
-    _validate_reasonable_range(
-        band_scaling_factors=band_scaling_factors,
-        reasonable_range=reasonable_range
-    )
 
     cm1_to_THz = 1.0 / phonopy.physical_units.get_physical_units().THzToCm
     freqs_initial_reordered_THz = freqs_initial_reordered_cm1 * cm1_to_THz
@@ -782,6 +778,16 @@ def run(
         refinement=refinement,
         asu_symbols=asu_symbols,
         exclude_hydrogen=exclude_hydrogen_positions
+    )
+    #
+    # We perform the validation of scaling factors here
+    # after the summary so that the user can see
+    # which bands are scaled by too much in case an exception
+    # is raised.
+    #
+    _validate_reasonable_range(
+        band_scaling_factors=band_scaling_factors,
+        reasonable_range=reasonable_range
     )
 
     return refinement
