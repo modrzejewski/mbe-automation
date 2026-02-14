@@ -126,7 +126,8 @@ def track_from_gamma(
 def reorder(
     band_indices: npt.NDArray[np.int64],
     frequencies: npt.NDArray[np.float64],
-    eigenvectors: npt.NDArray[np.complex128] | None = None
+    eigenvectors: npt.NDArray[np.complex128] | None = None,
+    eigenvectors_storage: Literal["columns", "rows"] = "rows"
 ) -> npt.NDArray[np.float64] | tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
     """
     Reorder frequencies (and optionally eigenvectors) so that column j contains data of band j.
@@ -134,16 +135,31 @@ def reorder(
     Args:
         band_indices: (n_q, n_bands) array of band indices from track_from_gamma.
         frequencies: (n_q, n_bands) array of frequencies.
-        eigenvectors: Optional (n_q, n_bands, n_atoms, 3) array.
-                      Assumes storage where band index is axis 1 ("rows" storage).
+        eigenvectors: Optional array of eigenvectors.
+                      Shape must be consistent with `dynamics.harmonic.modes.at_k_points`.
+                      - If storage="rows": (n_q, n_bands, n_dim)
+                      - If storage="columns": (n_q, n_dim, n_bands)
+                      Where n_dim must be equal to n_bands.
+                      n_dim is the number of spatial dimensions, i.e. 3 * n_atoms,
+                      where n_atoms is the number of atoms in the unit cell.
+        eigenvectors_storage: Convention for storing eigenvectors, "columns" or "rows".
+            This convention applies to both the input `eigenvectors` array and the output `reordered_vecs` array.
+            - "rows": Eigenvectors are stored in rows (n_kpoints, n_bands, n_dim).
+              v[k, i, :] is the eigenvector for the i-th band at k-point k.
+            - "columns": Eigenvectors are stored in columns (n_kpoints, n_dim, n_bands).
+              v[k, :, i] is the eigenvector for the i-th band at k-point k.
+            Default is "rows".
         
     Returns:
         If eigenvectors is None:
             (n_q, n_bands) array `reordered_freqs` where `reordered_freqs[k, b]` is the frequency of band b at q-point k.
         If eigenvectors is provided:
             Tuple of (reordered_freqs, reordered_vecs).
-            `reordered_vecs[k, b]` is the eigenvector of band b at q-point k, with shape (n_atoms, 3).
+            `reordered_vecs` has the same shape and storage convention as `eigenvectors`.
     """
+    if eigenvectors_storage not in ["rows", "columns"]:
+        raise ValueError(f"Invalid eigenvectors_storage: {eigenvectors_storage}")
+
     n_q, n_bands = frequencies.shape
     
     reordered_freqs = np.empty((n_q, n_bands), dtype=np.float64)
@@ -154,7 +170,10 @@ def reorder(
         reordered_freqs[k, band_indices[k]] = frequencies[k]
         
         if eigenvectors is not None:
-            reordered_vecs[k, band_indices[k]] = eigenvectors[k]
+            if eigenvectors_storage == "rows":
+                reordered_vecs[k, band_indices[k], :] = eigenvectors[k, :, :]
+            else: # columns
+                reordered_vecs[k, :, band_indices[k]] = eigenvectors[k, :, :]
     
     if eigenvectors is not None:
         return reordered_freqs, reordered_vecs
