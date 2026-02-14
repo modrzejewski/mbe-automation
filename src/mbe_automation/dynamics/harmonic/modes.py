@@ -80,8 +80,8 @@ class ThermalDisplacements:
 
 def at_k_point(
     dynamical_matrix: phonopy.DynamicalMatrix,
-    k_point: npt.NDArray[np.floating],
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
+    k_point: npt.NDArray[np.float64],
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
     """
     Compute phonon frequencies and eigenvectors at a specified k-point.
         
@@ -280,7 +280,7 @@ def gruneisen_parameters(
     for i, q in enumerate(qpoints):
         # 3a. Equilibrium properties at q
         # Assuming this returns frequency in THz (consistent with at_k_point)
-        omega, e = force_constants.frequencies_and_eigenvectors(q)
+        omega, e = force_constants.frequencies_and_eigenvectors(k_points=q)
         all_omegas.append(omega)
         
         # 3b. Perturbed dynamical matrices at q
@@ -317,9 +317,9 @@ def gruneisen_parameters(
     )
 
 def _Ejq_eq_3(
-        freqs_THz: npt.NDArray[np.floating],
-        temperature_K: np.floating
-) -> npt.NDArray[np.floating]: # eV
+        freqs_THz: npt.NDArray[np.float64],
+        temperature_K: np.float64
+) -> npt.NDArray[np.float64]: # eV
     """
     Average anergy of a quantum harmonic oscillator E_j(q)
     at temperature T (eq 3 in Ref. 1). Computed for a series
@@ -340,10 +340,10 @@ def _Ejq_eq_3(
     return Ejq # rank (n_freqs, )
 
 def _absolute_amplitude_eq_2(
-        freqs_THz: npt.NDArray[np.floating],
-        temperature_K: np.floating,
-        masses_AMU: npt.NDArray[np.floating] # rank (n_atoms_primitive, )
-) -> npt.NDArray[np.floating]: # Angs, rank (n_freqs, n_atoms_primitive * 3)
+        freqs_THz: npt.NDArray[np.float64],
+        temperature_K: np.float64,
+        masses_AMU: npt.NDArray[np.float64] # rank (n_atoms_primitive, )
+) -> npt.NDArray[np.float64]: # Angs, rank (n_freqs, n_atoms_primitive * 3)
     """
     Amplitude Ajk needed to compute the average thermal displacement
     vector u for mode jk at temperature T.
@@ -390,8 +390,8 @@ def _absolute_amplitude_eq_2(
     return Ajk_Angs # rank (n_freqs, n_atoms_primitive * 3)
 
 def _to_cif(
-        U_cart: npt.NDArray[np.floating],
-        lattice_vectors=npt.NDArray[np.floating] # lattice vectors stored in columns
+        U_cart: npt.NDArray[np.float64],
+        lattice_vectors=npt.NDArray[np.float64] # lattice vectors stored in columns
 ):
     """
     Convert the mean square displacement matrix U(k) to the CIF format.
@@ -416,8 +416,8 @@ def _to_cif(
 def _thermal_displacements(
         dynamical_matrix: phonopy.DynamicalMatrix,
         qpoints: npt.NDArray, # rank (n_qpoints, 3), scaled coordinates of sampling points in the FBZ        
-        temperatures_K: npt.NDArray[np.floating], # temperature points in K, rank (n_temperatures, )
-        time_points_fs: npt.NDArray[np.floating] = np.array([0.0]), # time points in fs, rank (n_time_points, )
+        temperatures_K: npt.NDArray[np.float64], # temperature points in K, rank (n_temperatures, )
+        time_points_fs: npt.NDArray[np.float64] = np.array([0.0]), # time points in fs, rank (n_time_points, )
         selected_modes: npt.NDArray[np.integer] | None = None,
         freq_min_THz: float = 0.0,
         freq_max_THz: float | None = None,
@@ -745,7 +745,7 @@ def phonopy_k_point_grid(
 
 def thermal_displacements(
         force_constants: ForceConstants,
-        temperatures_K: npt.NDArray[np.floating],
+        temperatures_K: npt.NDArray[np.float64],
         phonon_filter: PhononFilter,
         time_points_fs: npt.NDArray = np.array([0.0]),
         cell_type: Literal["primitive", "supercell"] = "supercell",

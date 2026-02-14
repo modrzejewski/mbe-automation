@@ -79,7 +79,7 @@ dataset_path = "properties.hdf5"
 key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
 
 fc = ForceConstants.read(dataset=dataset_path, key=key)
-freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_point=np.array([0.0, 0.0, 0.0]))
+freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_points=np.array([0.0, 0.0, 0.0]))
 
 print("Frequencies (THz):")
 print(freqs_THz)
@@ -128,10 +128,13 @@ The `refine` method will also print a summary table comparing the initial and re
 
 ## Output Explanation
 
-*   **`freqs_THz`**: A 1D NumPy array containing the phonon frequencies (THz).
-    *   The size is `3N`, where `N` is the number of atoms in the primitive cell.
+*   **`freqs_THz`**: An array containing the phonon frequencies (THz).
+    *   If a single k-point was requested, it is a 1D array of size `3N`, where `N` is the number of atoms in the primitive cell.
+    *   If multiple k-points were requested, it is a 2D array of shape `(n_kpoints, 3N)`. The value `freqs_THz[i, j]` is the frequency of the `j`-th band at the `i`-th k-point.
     *   The first 3 modes are acoustic modes with frequencies near zero at the Gamma point. It is normal that the acoustic mode frequencies are slightly negative at the Gamma point due to numerical inaccuracies.
 
-*   **`eigenvecs`**: A 2D NumPy array containing the eigenvectors of the dynamical matrix.
-    *   Shape: `(3N, 3N)`.
-    *   Each **column** `j` corresponds to the eigenvector for the frequency `freqs_THz[j]`.
+*   **`eigenvecs`**: An array containing the eigenvectors of the dynamical matrix.
+    *   Shape (for a single k-point): `(3N, 3N)`.
+    *   Shape (for multiple k-points): `(n_kpoints, 3N, 3N)`.
+    *   If `eigenvectors_storage="columns"` (default), each **column** `j` corresponds to the eigenvector for the frequency `freqs_THz[j]` (single k-point) or `freqs_THz[i, j]` (at k-point index `i`). For multiple k-points, `eigenvecs[i, :, j]` is the eigenvector for the `j`-th band at the `i`-th k-point.
+    *   If `eigenvectors_storage="rows"`, each **row** `j` corresponds to the eigenvector for the frequency `freqs_THz[j]` (single k-point) or `freqs_THz[i, j]` (at k-point index `i`). For multiple k-points, `eigenvecs[i, j, :]` is the eigenvector for the `j`-th band at the `i`-th k-point.

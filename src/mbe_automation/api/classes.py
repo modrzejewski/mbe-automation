@@ -121,13 +121,47 @@ class ForceConstants(_ForceConstants):
     
     def frequencies_and_eigenvectors(
             self,
-            k_point: npt.NDArray[np.floating],
-    ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
+            k_points: npt.NDArray[np.float64],
+            eigenvectors_storage: Literal["columns", "rows"] = "columns",
+    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
+        """
+        Compute phonon frequencies and eigenvectors at specified k-points.
+
+        Args:
+            k_points: The k-point coordinates in reciprocal space (fractional 
+                coordinates). Can be a single k-point (rank 1 array of 3 floats)
+                or multiple k-points (rank 2 array of shape (N, 3)).
+            eigenvectors_storage: Convention for storing eigenvectors, "columns" or "rows".
+                - "columns": v[:, i] is the i-th eigenvector (for a single k-point)
+                   or v[k, :, i] (for multiple k-points).
+                - "rows": v[i, :] is the i-th eigenvector (for a single k-point)
+                   or v[k, i, :] (for multiple k-points).
+                Default is "columns".
+
+        Returns:
+            A tuple containing:
+            - frequencies: Frequencies in THz.
+            - eigenvectors: Eigenvectors of the dynamical matrix.
+        """
         ph = mbe_automation.storage.to_phonopy(self)
-        return mbe_automation.dynamics.harmonic.modes.at_k_point(
-            dynamical_matrix=ph.dynamical_matrix,
-            k_point=k_point,
-        )
+
+        if k_points.ndim == 1:
+            freqs, evecs = mbe_automation.dynamics.harmonic.modes.at_k_point(
+                dynamical_matrix=ph.dynamical_matrix,
+                k_point=k_points,
+            )
+            if eigenvectors_storage == "rows":
+                evecs = evecs.T
+        else:
+            freqs, evecs = mbe_automation.dynamics.harmonic.modes.at_k_points(
+                dynamical_matrix=ph.dynamical_matrix,
+                k_points=k_points,
+                compute_eigenvecs=True,
+                freq_units="THz",
+                eigenvectors_storage=eigenvectors_storage,
+            )
+
+        return freqs, evecs
 
     def k_point_grid(
             self,
@@ -213,7 +247,7 @@ class ForceConstants(_ForceConstants):
 
     def gruneisen_parameters(
             self,
-            k_point: npt.NDArray[np.floating],
+            k_point: npt.NDArray[np.float64],
             calculator: CALCULATORS | None = None,
             relaxation_config: Minimum | None = None,
             delta_V: float = 0.0001,
