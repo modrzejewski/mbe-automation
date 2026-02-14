@@ -24,7 +24,7 @@ from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 from mbe_automation.storage import AtomicReference as _AtomicReference
 import mbe_automation.dynamics.harmonic.modes
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, ThermalDisplacements
-from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING
+from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING, DEFAULT_DEGENERATE_FREQS_TOL
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
 import mbe_automation.calculators
@@ -255,7 +255,8 @@ class ForceConstants(_ForceConstants):
         exclude_hydrogen_positions: bool = True,
         temperature_K: float | None = None,
         q_spacing: float = DEFAULT_Q_SPACING,
-        reasonable_range: tuple[float, float] = (0.1, 2.0)
+        reasonable_range: tuple[float, float] = (0.1, 2.0),
+        degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
     ) -> NormalModeRefinement:
         """
         Refine phonon frequencies using the NoMoRe refinement API.
@@ -274,6 +275,7 @@ class ForceConstants(_ForceConstants):
             q_spacing: The target spacing for path interpolation in Å⁻¹ along 
                 q-point paths. Used for band tracking.
             reasonable_range: Allowed range for optimized scaling factors.
+            degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
         
         Returns:
             NormalModeRefinement object with frequencies, ADPs, and mesh data.
@@ -299,7 +301,8 @@ class ForceConstants(_ForceConstants):
             exclude_hydrogen_positions=exclude_hydrogen_positions,
             temperature_K=temperature_K,
             q_spacing=q_spacing,
-            reasonable_range=reasonable_range
+            reasonable_range=reasonable_range,
+            degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
         )
 
     def thermodynamics(

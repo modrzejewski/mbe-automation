@@ -106,7 +106,7 @@ def at_k_point(
 
 def at_k_points(
     dynamical_matrix: phonopy.DynamicalMatrix,
-    k_points: npt.NDArray[np.floating],
+    k_points: npt.NDArray[np.float64],
     compute_eigenvecs: bool = False,
     freq_units: Literal["THz", "invcm"] = "THz",
     eigenvectors_storage: Literal["columns", "rows"] = "columns"

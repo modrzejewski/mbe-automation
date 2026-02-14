@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import numpy as np
 import numpy.typing as npt
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, Any, List, Literal
 import phonopy
 from mbe_automation.storage.core import ForceConstants
 from mbe_automation.storage import views
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT
 from mbe_automation.dynamics.harmonic.modes import at_k_points
 
-DEFAULT_Q_SPACING = 0.05
+DEFAULT_Q_SPACING = 0.05  # Å⁻¹
+DEFAULT_DEGENERATE_FREQS_TOL = 0.5  # cm⁻¹
 
 try:
     from nomore_ase.optimization.band_assignment import assign_bands
@@ -66,14 +67,16 @@ def track_from_gamma(
     phonopy_object: phonopy.Phonopy,
     q_points: npt.NDArray[np.float64],
     q_spacing: float = DEFAULT_Q_SPACING,
+    degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
 ) -> npt.NDArray[np.int64]:
     """
-    Compute band indices for a set of q-points using path tracing from Gamma.
+    Compute band indices for a set of q-points using path tracking from Gamma.
     
     Args:
-        phonopy_object: Consistently initialized Phonopy object
+        phonopy_object: Initialized Phonopy object
         q_points: (N_q, 3) list of q-points to assign
         q_spacing: Spacing for path interpolation in Å⁻¹
+        degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
         
     Returns:
         band_indices: (N_q, N_modes) integer array of band IDs.
@@ -104,6 +107,8 @@ def track_from_gamma(
         phonons=adapter,
         q_points=q_points,
         q_spacing=q_spacing,
+        use_degenerate_pt=True,
+        degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
     )
     
     n_q = len(q_points)
@@ -118,27 +123,43 @@ def track_from_gamma(
     return flat_indices.reshape(n_q, n_modes)
 
 
-def reorder_frequencies(
+def reorder(
+    band_indices: npt.NDArray[np.int64],
     frequencies: npt.NDArray[np.float64],
-    band_indices: npt.NDArray[np.int64]
-) -> npt.NDArray[np.float64]:
+    eigenvectors: npt.NDArray[np.complex128] | None = None
+) -> npt.NDArray[np.float64] | tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
     """
-    Reorder frequencies so that column j contains frequencies of band j.
+    Reorder frequencies (and optionally eigenvectors) so that column j contains data of band j.
     
     Args:
-        frequencies: (n_q, n_bands) array of frequencies.
         band_indices: (n_q, n_bands) array of band indices from track_from_gamma.
+        frequencies: (n_q, n_bands) array of frequencies.
+        eigenvectors: Optional (n_q, n_bands, n_atoms, 3) array.
+                      Assumes storage where band index is axis 1 ("rows" storage).
         
     Returns:
-        (n_q, n_bands) array where reordered[k, b] is the frequency of band b at q-point k.
+        If eigenvectors is None:
+            (n_q, n_bands) array `reordered_freqs` where `reordered_freqs[k, b]` is the frequency of band b at q-point k.
+        If eigenvectors is provided:
+            Tuple of (reordered_freqs, reordered_vecs).
+            `reordered_vecs[k, b]` is the eigenvector of band b at q-point k, with shape (n_atoms, 3).
     """
     n_q, n_bands = frequencies.shape
     
-    reordered = np.empty((n_q, n_bands), dtype=np.float64)
+    reordered_freqs = np.empty((n_q, n_bands), dtype=np.float64)
+    if eigenvectors is not None:
+        reordered_vecs = np.empty_like(eigenvectors)
+
     for k in range(n_q):
-        reordered[k, band_indices[k]] = frequencies[k]
+        reordered_freqs[k, band_indices[k]] = frequencies[k]
+        
+        if eigenvectors is not None:
+            reordered_vecs[k, band_indices[k]] = eigenvectors[k]
     
-    return reordered
+    if eigenvectors is not None:
+        return reordered_freqs, reordered_vecs
+    
+    return reordered_freqs
 
 
 def find_degenerate_frequencies(freqs: npt.NDArray[np.float64], tolerance: float = 1e-4) -> List[List[int]]:

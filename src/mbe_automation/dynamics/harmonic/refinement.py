@@ -33,13 +33,14 @@ try:
     from mbe_automation.dynamics.harmonic.bands import (
         track_from_gamma,
         determine_degenerate_bands,
-        reorder_frequencies,
-        DEFAULT_Q_SPACING
+        reorder,
+        DEFAULT_Q_SPACING,
+        DEFAULT_DEGENERATE_FREQS_TOL
     )
     _NOMORE_AVAILABLE = True
 except ImportError:
     _NOMORE_AVAILABLE = False
-    from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING
+    from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING, DEFAULT_DEGENERATE_FREQS_TOL
 
 
 @dataclass
@@ -54,8 +55,8 @@ class NormalModeRefinement:
     n_q_points: int
     irr_q_frac: npt.NDArray[np.float64]
     q_weights: npt.NDArray[np.float64]
-    freqs_initial_reordered_THz: npt.NDArray[np.float64] # Shape (n_q, n_bands) reordered by band tracing
-    freqs_final_reordered_THz: npt.NDArray[np.float64]   # Shape (n_q, n_bands) reordered by band tracing
+    freqs_initial_reordered_THz: npt.NDArray[np.float64] # Shape (n_q, n_bands) reordered by band tracking
+    freqs_final_reordered_THz: npt.NDArray[np.float64]   # Shape (n_q, n_bands) reordered by band tracking
     U_cart_exp_Angs2: npt.NDArray[np.float64]
     U_cart_comp_initial_Angs2: npt.NDArray[np.float64]
     U_cart_comp_final_Angs2: npt.NDArray[np.float64]
@@ -123,7 +124,8 @@ def to_phonon_data(
     irr_q_frac: npt.NDArray[np.floating],
     q_weights: npt.NDArray[np.integer],
     cif_adapter: "CctbxAdapter",
-    q_spacing: float = DEFAULT_Q_SPACING
+    q_spacing: float = DEFAULT_Q_SPACING,
+    degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
 ) -> PhononData:
     """
     Create PhononData object from computed phonopy data, matching atoms to CIF.
@@ -133,6 +135,8 @@ def to_phonon_data(
         irr_q_frac: Irreducible q-points (fractional).
         q_weights: Weights of irreducible q-points.
         cif_adapter: Adapter containing the experimental structure (CIF).
+        q_spacing: Spacing for path interpolation in Å⁻¹. Used for band tracking.
+        degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
 
     Returns:
         PhononData object ready for refinement.
@@ -203,7 +207,8 @@ def to_phonon_data(
     band_indices = track_from_gamma(
         phonopy_object=ph,
         q_points=irr_q_frac,
-        q_spacing=q_spacing
+        q_spacing=q_spacing,
+        degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
     )
     # band_indices: (n_q, n_modes)
     gamma_index = np.argmin(np.linalg.norm(irr_q_frac, axis=1))
@@ -539,7 +544,8 @@ def run(
     use_irreducible_fbz: bool = False,
     temperature_K: float | None = None,
     q_spacing: float = DEFAULT_Q_SPACING,
-    reasonable_range: tuple[float, float] = (0.1, 2.0)
+    reasonable_range: tuple[float, float] = (0.1, 2.0),
+    degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
 ) -> NormalModeRefinement:
     """
     Perform normal mode refinement.
@@ -549,10 +555,11 @@ def run(
         cif_path: Path to experimental CIF.
         mesh_size: k-point mesh size.
         restraint_weight: Weight for restraining to initial frequencies.
-        band_selection_strategy: Strategy for frequency partitioning. Defaults to SensitivityBased(0.6, 0.9).
+        band_selection_strategy: Strategy for frequency partitioning. Defaults to SensitivityBased.
         weighting_scheme: Weighting scheme for refinement ('sigma' or 'unit').
         q_spacing: Spacing for path interpolation in Å⁻¹ along q-point paths.
         reasonable_range: Allowed range for optimized scaling factors.
+        degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
         
     Returns:
         NormalModeRefinement object with frequencies, ADPs, and mesh data.
@@ -575,16 +582,17 @@ def run(
     ])
     print("Using interface to the nomore library of Paul Niklas Ruth")
     print("https://github.com/Niolon")
-    print(f"mesh_size            {mesh_size}")
-    print(f"restraint_weight     {restraint_weight}")
-    print(f"strategy             {band_selection_strategy.__class__.__name__}")
-    print(f"max_iter             {optimizer_options['maxiter']}")
-    print(f"optimizer_method     {optimizer_method}")
-    print(f"weighting_scheme     {weighting_scheme}")
-    print(f"fix_positions        {fix_positions}")
-    print(f"exclude_hydrogen     {exclude_hydrogen_positions}")
-    print(f"use_irreducible_fbz  {use_irreducible_fbz}")
-    print(f"temperature_K        {temperature_K if temperature_K is not None else 'from CIF'}")
+    print(f"mesh_size                {mesh_size}")
+    print(f"restraint_weight         {restraint_weight}")
+    print(f"strategy                 {band_selection_strategy.__class__.__name__}")
+    print(f"max_iter                 {optimizer_options['maxiter']}")
+    print(f"optimizer_method         {optimizer_method}")
+    print(f"weighting_scheme         {weighting_scheme}")
+    print(f"fix_positions            {fix_positions}")
+    print(f"exclude_hydrogen         {exclude_hydrogen_positions}")
+    print(f"use_irreducible_fbz      {use_irreducible_fbz}")
+    print(f"temperature_K            {temperature_K if temperature_K is not None else 'from CIF'}")
+    print(f"degenerate_freqs_tol     {degenerate_freqs_tol_cm1} cm⁻¹")
 
     if isinstance(mesh_size, (list, tuple, np.ndarray)):
         mesh_size = np.array(mesh_size)
@@ -616,7 +624,8 @@ def run(
         irr_q_frac=irr_q_frac,
         q_weights=q_weights,
         cif_adapter=cctbx_adapter,
-        q_spacing=q_spacing
+        q_spacing=q_spacing,
+        degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
     )
     
     if temperature_K is not None:
@@ -694,11 +703,11 @@ def run(
     n_bands = n_modes_flat // n_q
     assert n_bands == force_constants.primitive.n_atoms * 3
     
-    freqs_initial_reordered_cm1 = reorder_frequencies(
+    freqs_initial_reordered_cm1 = reorder(
         frequencies=initial_freqs.reshape(n_q, n_bands),
         band_indices=phonons.band_indices.reshape(n_q, n_bands)
     )
-    freqs_final_reordered_cm1 = reorder_frequencies(
+    freqs_final_reordered_cm1 = reorder(
         frequencies=result["frequencies"].reshape(n_q, n_bands),
         band_indices=phonons.band_indices.reshape(n_q, n_bands)
     )
