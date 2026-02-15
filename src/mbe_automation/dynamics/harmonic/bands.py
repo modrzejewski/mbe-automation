@@ -2,8 +2,7 @@
 Band assignment support module.
 
 This module provides the interface between mbe_automation's Phonopy objects
-and nomore_ase's band assignment algorithms. It encapsulates strict interface
-requirements using adapters.
+and nomore_ase's band assignment algorithms.
 """
 
 from __future__ import annotations
@@ -181,7 +180,10 @@ def reorder(
     return reordered_freqs
 
 
-def find_degenerate_frequencies(freqs: npt.NDArray[np.float64], tolerance: float = 1e-4) -> List[List[int]]:
+def find_degenerate_frequencies(
+    freqs: npt.NDArray[np.float64], 
+    tolerance: float = 1e-4
+) -> List[List[int]]:
     """
     Find index groups of degenerate modes.
 
