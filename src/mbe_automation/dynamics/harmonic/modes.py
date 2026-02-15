@@ -178,6 +178,7 @@ def gruneisen_parameters(
         delta_V: float = 0.02,
         supercell_displacement: float = 0.01,
         work_dir: Path | str = Path("./"),
+        degenerate_freqs_tol_cm1: float = 0.5,
 ):
     """
     Compute Gruneisen parameters on a given k-point mesh.
@@ -292,7 +293,8 @@ def gruneisen_parameters(
             from mbe_automation.dynamics.harmonic.bands import track_from_gamma, reorder
             band_indices = track_from_gamma(
                 phonopy_object=ph,
-                q_points=qpoints
+                q_points=qpoints,
+                degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
             )
             # Reorder frequencies and eigenvectors such that the j-th column
             # always corresponds to the j-th phonon branch, regardless of

@@ -283,6 +283,7 @@ class ForceConstants(_ForceConstants):
             delta_V: float = 0.02,
             supercell_displacement: float = 0.01,
             work_dir: Path | str = Path("./"),
+            degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
     ):
         """
         Compute Gruneisen parameters on a given k-point mesh.
@@ -297,6 +298,10 @@ class ForceConstants(_ForceConstants):
             delta_V: Fractional volume change for numerical differentiation (e.g. 0.01 for 1%).
             supercell_displacement: Displacement distance for phonon calculations.
             work_dir: Working directory for intermediate files.
+            degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
+                This threshold is needed because the band tracking algorithm needs to
+                apply degenerate perturbation theory when some of the frequencies form
+                a degenerate subset.
         """
         return mbe_automation.dynamics.harmonic.modes.gruneisen_parameters(
             force_constants=self,
@@ -305,7 +310,8 @@ class ForceConstants(_ForceConstants):
             relaxation_config=relaxation_config,
             delta_V=delta_V,
             supercell_displacement=supercell_displacement,
-            work_dir=work_dir
+            work_dir=work_dir,
+            degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
         )
 
     def refine(
