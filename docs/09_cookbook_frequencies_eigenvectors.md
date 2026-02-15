@@ -128,7 +128,7 @@ The `refine` method will also print a summary table comparing the initial and re
 
 ### Step 4: Band Tracking
 
-When computing phonon bands along a high-symmetry path, you can enable band tracking to ensure that the bands are continuous and correctly ordered based on eigenvector overlap. This is crucial for obtaining smooth band structures.
+When computing phonon bands along a high-symmetry path, you can enable band tracking to ensure that the bands are continuous and correctly ordered based on eigenvector overlap.
 
 **Note:** Band tracking requires the Gamma point `[0, 0, 0]` to be included in your k-point path.
 
