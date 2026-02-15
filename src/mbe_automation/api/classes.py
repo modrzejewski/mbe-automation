@@ -143,7 +143,9 @@ class ForceConstants(_ForceConstants):
                 If True, reorders frequencies and eigenvectors to follow band continuity.
                 Requires k_points to include Gamma [0, 0, 0].
             degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
-                Used only when track_bands=True.
+                Used only when track_bands=True. This threshold is needed because the
+                band tracking algorithm needs to apply degenerate perturbation theory
+                when some of the frequencies form a degenerate subset.
 
         Returns:
             A tuple containing:
@@ -335,6 +337,9 @@ class ForceConstants(_ForceConstants):
                 q-point paths. Used for band tracking.
             reasonable_range: Allowed range for optimized scaling factors.
             degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
+                This threshold is needed because the band tracking algorithm needs to
+                apply degenerate perturbation theory when some of the frequencies form
+                a degenerate subset.
         
         Returns:
             NormalModeRefinement object with frequencies, ADPs, and mesh data.
