@@ -274,33 +274,33 @@ class ForceConstants(_ForceConstants):
 
     def gruneisen_parameters(
             self,
-            k_point: npt.NDArray[np.float64],
-            calculator: CALCULATORS | None = None,
-            relaxation_config: Minimum | None = None,
-            delta_V: float = 0.0001,
-            supercell_matrix: npt.NDArray[np.integer] | None = None,
+            mesh_size: npt.NDArray[np.integer] | str | float,
+            calculator: CALCULATORS,
+            relaxation_config: Minimum,
+            delta_V: float = 0.02,
             supercell_displacement: float = 0.01,
             work_dir: Path | str = Path("./"),
     ):
         """
-        Compute Gruneisen parameters at a given k-point.
+        Compute Gruneisen parameters on a given k-point mesh.
         
         Args:
-            k_point: The k-point coordinates in reciprocal space (fractional coordinates).
+            mesh_size: The k-points for sampling the Brillouin zone. Can be:
+                - "gamma": Use only the [0, 0, 0] k-point.
+                - A floating point number: Defines a supercell of radius R.
+                - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
             calculator: Calculator for optimization and phonon calculations.
             relaxation_config: Configuration for structure relaxation.
             delta_V: Fractional volume change for numerical differentiation (e.g. 0.01 for 1%).
-            supercell_matrix: Supercell matrix for phonon calculations.
             supercell_displacement: Displacement distance for phonon calculations.
             work_dir: Working directory for intermediate files.
         """
         return mbe_automation.dynamics.harmonic.modes.gruneisen_parameters(
             force_constants=self,
-            k_point=k_point,
+            mesh_size=mesh_size,
             calculator=calculator,
             relaxation_config=relaxation_config,
             delta_V=delta_V,
-            supercell_matrix=supercell_matrix,
             supercell_displacement=supercell_displacement,
             work_dir=work_dir
         )

@@ -166,15 +166,40 @@ def at_k_points(
 
 def gruneisen_parameters(
         force_constants: ForceConstants,
-        mesh: npt.NDArray[np.integer] | str | float,
-        calculator: ASECalculator | None = None,
-        relaxation_config: Minimum | None = None,
-        delta_V: float = 0.0001,
-        supercell_matrix: npt.NDArray[np.integer] | None = None,
+        mesh_size: npt.NDArray[np.integer] | str | float,
+        calculator: ASECalculator,
+        relaxation_config: Minimum,
+        delta_V: float = 0.02,
         supercell_displacement: float = 0.01,
         work_dir: Path | str = Path("./"),
 ):
-    # 1. crystal structure and its volume
+    """
+    Compute Gruneisen parameters on a given k-point mesh.
+    
+    Args:
+        force_constants: The ForceConstants object.
+        mesh_size: The k-points for sampling the Brillouin zone. Can be:
+            - "gamma": Use only the [0, 0, 0] k-point.
+            - A floating point number: Defines a supercell of radius R.
+            - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
+        Note: The number of k-points in each direction must be odd to ensure
+        the include the Gamma point required for band tracking.
+        calculator: Calculator for optimization and phonon calculations.
+        relaxation_config: Configuration for structure relaxation.
+        delta_V: Fractional volume change for numerical differentiation (e.g. 0.01 for 1%).
+        supercell_displacement: Displacement distance for phonon calculations.
+        work_dir: Working directory for intermediate files.
+            
+    Returns:
+        A tuple containing:
+        - gruneisen_parameters: Gruneisen parameters for each q-point and band (N_q, N_bands)
+        - qpoints: Array of q-points in fractional coordinates (N_q, 3)
+        - frequencies: Frequencies for each q-point and band (N_q, N_bands)
+        - volume: Equilibrium volume (Å³)
+        - volume_plus: Volume at V * (1 + delta_V) (Å³)
+        - volume_minus: Volume at V * (1 - delta_V) (Å³)
+    """
+    # 1. Structure
     structure = force_constants.primitive
     volume = structure.lattice().volume
     
@@ -185,44 +210,19 @@ def gruneisen_parameters(
     ph = mbe_automation.storage.to_phonopy(force_constants)
     
     # 3. Setup mesh
-    if isinstance(mesh, float):
-        k_point_mesh = phonopy.structure.grid_points.length2mesh(
-            length=mesh,
-            lattice=ph.primitive.cell,
-            rotations=ph.primitive_symmetry.pointgroup_operations
-        )
-    elif isinstance(mesh, str) and mesh == "gamma":
-        k_point_mesh = np.array([1, 1, 1])
-    else:
-        k_point_mesh = mesh
-
-    ph.init_mesh(
-        mesh=k_point_mesh,
-        shift=None,
-        is_time_reversal=True,
-        is_mesh_symmetry=False,
-        with_eigenvectors=True,
-        with_group_velocities=False,
-        is_gamma_center=False,
-        use_iter_mesh=True
+    qpoints, _ = phonopy_k_point_grid(
+        phonopy_object=ph,
+        mesh_size=mesh_size,
+        use_symmetry=False,
+        center_at_gamma=False,
+        odd_numbers=True # odd numbers are required to include the Gamma point for band tracking
     )
-    qpoints = ph.mesh.qpoints
     
-    # Check if we can proceed with optimization
-    if calculator is None or relaxation_config is None:
-         all_omegas = []
-         ph.dynamical_matrix.run(qpoints) 
-         return None, qpoints, ph.mesh.frequencies, volume, None, None
-
-
-    # Step 2: Optimization at V +/- delta_V
+    # Step 2: Optimization at V * (1 +/- delta_V)
     
     work_dir = Path(work_dir)
     unit_cell_V0 = mbe_automation.storage.views.to_ase(structure)
     
-    if supercell_matrix is None:
-         supercell_matrix = force_constants.supercell_matrix
-         
     factors = [1.0 + delta_V, 1.0 - delta_V]
     results_displaced = []
     
@@ -253,7 +253,9 @@ def gruneisen_parameters(
         ph_new = mbe_automation.dynamics.harmonic.core.phonons(
             unit_cell=unit_cell_optimized,
             calculator=calculator,
-            supercell_matrix=supercell_matrix,
+            # The same supercell_matrix must be used for all volumes to avoid
+            # changing both the volume and the quality of the harmonic model.
+            supercell_matrix=force_constants.supercell_matrix,
             supercell_displacement=supercell_displacement,
             key=None
         )
@@ -269,19 +271,22 @@ def gruneisen_parameters(
     V_minus = results_displaced[1]["volume"]
     ph_minus = results_displaced[1]["phonopy_object"]
 
-    # Step 3: Calculate Gruneisen parameters for each q-point
-    
+    # Step 3: Calculation of Gruneisen parameters
     delta_V_val = V_plus - V_minus
-    all_gammas = []
-    all_omegas = []
-   
-    # dynamical_matrix = ph.dynamical_matrix # (Unused variable removed for clarity)
     
+    all_omegas, all_evecs = at_k_points(
+        dynamical_matrix=ph.dynamical_matrix,
+        k_points=qpoints,
+        compute_eigenvecs=True,
+        eigenvectors_storage="columns"
+    )
+    
+    all_gammas = []
+      
     for i, q in enumerate(qpoints):
         # 3a. Equilibrium properties at q
-        # Assuming this returns frequency in THz (consistent with at_k_point)
-        omega, e = force_constants.frequencies_and_eigenvectors(k_points=q)
-        all_omegas.append(omega)
+        omega = all_omegas[i]
+        e = all_evecs[i]
         
         # 3b. Perturbed dynamical matrices at q
         ph_plus.dynamical_matrix.run(q)
@@ -710,6 +715,7 @@ def phonopy_k_point_grid(
         - qpoints: Array of q-points in fractional coordinates (N, 3)
         - weights: Array of weights for each q-point (N,)
     """
+
     if isinstance(mesh_size, float):
         mesh = phonopy.structure.grid_points.length2mesh(
             length=mesh_size,
@@ -721,9 +727,15 @@ def phonopy_k_point_grid(
              mesh = np.where(mesh % 2 == 0, mesh + 1, mesh)
     elif isinstance(mesh_size, str) and mesh_size == "gamma":
         mesh = np.array([1, 1, 1])
+    elif isinstance(mesh_size, (list, np.ndarray)):
+        mesh = np.array(mesh_size, dtype=np.int64)
     else:
-        mesh = mesh_size
-        if odd_numbers:
+        raise TypeError(
+            f"Invalid type for mesh_size: {type(mesh_size)}. "
+            "Expected float, 'gamma', or list/array."
+        )
+    
+    if odd_numbers:
             if np.any(mesh % 2 == 0):
                 raise ValueError(
                     f"odd_numbers=True was requested, but the supplied mesh {mesh} "
