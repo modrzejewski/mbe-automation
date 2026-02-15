@@ -31,11 +31,65 @@ CALCULATION_STATUS_FAILED = 3
 
 @dataclass
 class BrillouinZonePath:
-    kpoints: List[npt.NDArray[np.floating]]
-    frequencies: List[npt.NDArray[np.floating]]
+    """
+    Data container for phonon band structures along a path in the Brillouin zone.
+
+    The path is defined as a sequence of segments. Each segment is a sequence of k-points.
+    The segments may be disconnected.
+
+    Parameters
+    ----------
+    kpoints : List[npt.NDArray[np.float64]]
+        List of k-points for each segment.
+        Length: n_segments
+        Shape of each element: (n_kpoints_in_segment, 3)
+    frequencies : List[npt.NDArray[np.float64]]
+        List of phonon frequencies for each segment.
+        Length: n_segments
+        Shape of each element: (n_kpoints_in_segment, n_bands)
+        Units: THz
+    path_connections : npt.NDArray[np.bool_]
+        Connection status between segments.
+        Length: n_segments
+        If path_connections[i] is True, the end of segment i is connected to the start of segment i+1.
+        The last element is always False.
+    labels : npt.NDArray[np.str_]
+        Labels for special k-points.
+        Length: n_symbols.
+        Note that the number of labels is NOT equal to the number of segments + 1.
+        It depends on the connectivity of the path.
+        If all segments are connected, n_labels = n_segments + 1.
+        If no segments are connected, n_labels = 2 * n_segments.
+    distances : List[npt.NDArray[np.float64]]
+        Distances along the path in reciprocal space, used for plotting.
+        Length: n_segments
+        Shape of each element: (n_kpoints_in_segment,)
+        These are cumulative distances. If segments are connected, the distance
+        continues increasing. If disconnected, there might be a jump or reset depending
+        on the implementation, but usually for plotting, we handle discontinuities
+        based on `path_connections`.
+
+    Examples
+    --------
+    Consider a path G-X-M-G with 3 segments: G-X, X-M, M-G.
+    All segments are connected.
+    
+    n_segments = 3
+    path_connections = [True, True, False]
+    labels = ["G", "X", "M", "G"] (4 labels)
+
+    Consider a disconnected path G-X (segment 0) and M-G (segment 1).
+    
+    n_segments = 2
+    path_connections = [False, False]
+    labels = ["G", "X", "M", "G"] (4 labels)
+    
+    """
+    kpoints: List[npt.NDArray[np.float64]]
+    frequencies: List[npt.NDArray[np.float64]]
     path_connections: npt.NDArray[np.bool_]
     labels: npt.NDArray[np.str_]
-    distances: List[npt.NDArray[np.floating]]
+    distances: List[npt.NDArray[np.float64]]
 
 @dataclass
 class EOSCurves:
