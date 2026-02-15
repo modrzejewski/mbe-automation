@@ -171,6 +171,9 @@ class ForceConstants(_ForceConstants):
             )
 
         if track_bands:
+            if k_points.ndim == 1 or (k_points.ndim == 2 and len(k_points) == 1):
+                raise ValueError("Band tracking requires multiple k-points, but only one was provided.")
+
             gamma_indices = np.where(np.all(np.isclose(k_points, [0, 0, 0], atol=1e-5), axis=1))[0]
             if len(gamma_indices) == 0:
                 raise ValueError("k_points must include the Gamma point [0, 0, 0] when track_bands=True.")
