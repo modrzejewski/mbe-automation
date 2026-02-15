@@ -15,6 +15,12 @@ except ImportError:
     MACECalculator = None
     mace_available = False
 
+try:
+    import nomore_ase
+    _NOMORE_AVAILABLE = True
+except ImportError:
+    _NOMORE_AVAILABLE = False
+
 import mbe_automation.common
 import mbe_automation.storage
 from mbe_automation.storage.core import ForceConstants
@@ -280,6 +286,30 @@ def gruneisen_parameters(
         compute_eigenvecs=True,
         eigenvectors_storage="columns"
     )
+
+    if len(qpoints) > 1:
+        if _NOMORE_AVAILABLE:
+            from mbe_automation.dynamics.harmonic.bands import track_from_gamma, reorder
+            band_indices = track_from_gamma(
+                phonopy_object=ph,
+                q_points=qpoints
+            )
+            # Reorder frequencies and eigenvectors such that the j-th column
+            # always corresponds to the j-th phonon branch, regardless of
+            # band crossings. Reordered eigenvectors v[k, :, j] always
+            # belong to the j-th branch, regardless of the q-point index k.
+            all_omegas, all_evecs = reorder(
+                band_indices=band_indices,
+                frequencies=all_omegas,
+                eigenvectors=all_evecs,
+                eigenvectors_storage="columns"
+            )
+        else:
+            print(
+                "WARNING: More than one k-point used but `nomore_ase` library is not available. "
+                "Band tracking and reordering will be skipped. Results might be incorrect. "
+                "Installation of `nomore_ase` is recommended."
+            )
     
     all_gammas = []
       
