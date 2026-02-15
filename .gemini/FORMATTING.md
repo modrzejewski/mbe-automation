@@ -24,3 +24,18 @@ def find_degenerate_frequencies(
     *   **Rationale:** Function names are designed to be extremely brief, but sound precise when read with the full module path.
     *   **Exception:** This rule can be relaxed if using the full module path would result in an extremely long line.
 
+
+## Function Calls
+
+*   **Explicit Arguments:** When calling functions from `mbe_automation` or `nomore_ase`, always use explicit argument passing (e.g., `func(arg1=val1, arg2=val2)`).
+*   **Line Breaks:** Place a line break after every argument in the function call.
+
+### Example
+
+```python
+mbe_automation.dynamics.harmonic.bands.reorder(
+    band_indices=band_indices,
+    frequencies=frequencies,
+    eigenvectors=eigenvectors,
+)
+```

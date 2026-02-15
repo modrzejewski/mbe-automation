@@ -123,6 +123,8 @@ class ForceConstants(_ForceConstants):
             self,
             k_points: npt.NDArray[np.float64],
             eigenvectors_storage: Literal["columns", "rows"] = "columns",
+            track_bands: bool = False,
+            degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
     ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
         """
         Compute phonon frequencies and eigenvectors at specified k-points.
@@ -137,6 +139,11 @@ class ForceConstants(_ForceConstants):
                 - "rows": v[i, :] is the i-th eigenvector (for a single k-point)
                    or v[k, i, :] (for multiple k-points).
                 Default is "columns".
+            track_bands: Whether to track bands using non-adiabatic overlap.
+                If True, reorders frequencies and eigenvectors to follow band continuity.
+                Requires k_points to include Gamma [0, 0, 0].
+            degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
+                Used only when track_bands=True.
 
         Returns:
             A tuple containing:
@@ -158,6 +165,24 @@ class ForceConstants(_ForceConstants):
                 k_points=k_points,
                 compute_eigenvecs=True,
                 freq_units="THz",
+                eigenvectors_storage=eigenvectors_storage,
+            )
+
+        if track_bands:
+            gamma_indices = np.where(np.all(np.isclose(k_points, [0, 0, 0], atol=1e-5), axis=1))[0]
+            if len(gamma_indices) == 0:
+                raise ValueError("k_points must include the Gamma point [0, 0, 0] when track_bands=True.")
+            
+            band_indices = mbe_automation.dynamics.harmonic.bands.track_from_gamma(
+                phonopy_object=ph,
+                q_points=k_points,
+                degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+            )
+            
+            freqs, evecs = mbe_automation.dynamics.harmonic.bands.reorder(
+                band_indices=band_indices,
+                frequencies=freqs,
+                eigenvectors=evecs,
                 eigenvectors_storage=eigenvectors_storage,
             )
 

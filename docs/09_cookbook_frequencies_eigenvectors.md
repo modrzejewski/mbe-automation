@@ -126,6 +126,37 @@ print("Refined Frequencies (THz):", refinement_result.freqs_final_THz)
 
 The `refine` method will also print a summary table comparing the initial and refined frequencies, as well as the agreement with experimental ADPs.
 
+### Step 4: Band Tracking
+
+When computing phonon bands along a high-symmetry path, you can enable band tracking to ensure that the bands are continuous and correctly ordered based on eigenvector overlap. This is crucial for obtaining smooth band structures.
+
+**Note:** Band tracking requires the Gamma point `[0, 0, 0]` to be included in your k-point path.
+
+```python
+import numpy as np
+from mbe_automation import ForceConstants
+
+# ... (load ForceConstants as before) ...
+
+# Define a path that includes Gamma
+k_points = np.array([
+    [0.0, 0.0, 0.0],  # Gamma
+    [0.1, 0.0, 0.0],
+    [0.2, 0.0, 0.0],
+    # ...
+])
+
+# Compute frequencies with band tracking enabled
+# degenerate_freqs_tol_cm1 controls the threshold for detecting degenerate modes (default: 0.5 cm⁻¹)
+freqs_tracked, eigenvecs_tracked = fc.frequencies_and_eigenvectors(
+    k_points=k_points,
+    track_bands=True,
+    degenerate_freqs_tol_cm1=0.5
+)
+
+# resulting freqs_tracked will have bands continuous in index j across k-points i
+```
+
 ## Output Explanation
 
 *   **`freqs_THz`**: An array containing the phonon frequencies (THz).
