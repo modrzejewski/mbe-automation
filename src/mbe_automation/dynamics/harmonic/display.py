@@ -99,15 +99,13 @@ def potential_energy_curve(
         return fig
 
     
-def band_structure(
-        dataset: str,
-        key: str,
+def _band_structure(
+        fbz_path: mbe_automation.storage.core.BrillouinZonePath,
         save_path: str | None = None,
         freq_max_THz: float | None = None,
         color_map: str = "plasma",
         freq_units: Literal["THz", "cm-1"] = "THz"
 ):
-    fbz_path = mbe_automation.storage.read_brillouin_zone_path(dataset, key)
     frequencies = fbz_path.frequencies
     distances = fbz_path.distances
     path_connections = fbz_path.path_connections
@@ -207,6 +205,29 @@ def band_structure(
         plt.close(fig)
     else:
         return fig
+
+
+def band_structure(
+        fbz_path: mbe_automation.storage.core.BrillouinZonePath | None = None,
+        dataset: str | None = None,
+        key: str | None = None,
+        save_path: str | None = None,
+        freq_max_THz: float | None = None,
+        color_map: str = "plasma",
+        freq_units: Literal["THz", "cm-1"] = "THz"
+):
+    if fbz_path is None:
+        if dataset is None or key is None:
+            raise ValueError("Either 'fbz_path' or both 'dataset' and 'key' must be provided.")
+        fbz_path = mbe_automation.storage.read_brillouin_zone_path(dataset, key)
+
+    return _band_structure(
+        fbz_path,
+        save_path=save_path,
+        freq_max_THz=freq_max_THz,
+        color_map=color_map,
+        freq_units=freq_units
+    )
 
 
 def eos_curves(

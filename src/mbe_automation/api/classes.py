@@ -1,4 +1,5 @@
 from __future__ import annotations
+import phonopy
 from dataclasses import dataclass, field
 import typing
 from typing import Tuple, Literal, Sequence, List, TYPE_CHECKING, Optional
@@ -22,6 +23,7 @@ from mbe_automation.storage import Trajectory as _Trajectory
 from mbe_automation.storage import MolecularCrystal as _MolecularCrystal
 from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 from mbe_automation.storage import AtomicReference as _AtomicReference
+from mbe_automation.storage import BrillouinZonePath as _BrillouinZonePath
 import mbe_automation.dynamics.harmonic.modes
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, ThermalDisplacements
 from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING, DEFAULT_DEGENERATE_FREQS_TOL
@@ -43,12 +45,64 @@ from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY
 import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.thermodynamics
+import mbe_automation.dynamics.harmonic.brillouin_zone
 from copy import deepcopy
 
 
 if TYPE_CHECKING:
     from nomore_ase.core.frequency_partition import FrequencyPartitionStrategy
     from mbe_automation.dynamics.harmonic.refinement import NormalModeRefinement
+    from phonopy.phonon.band_structure import BandStructure
+
+@dataclass(kw_only=True)
+class BrillouinZonePath(_BrillouinZonePath):
+    @classmethod
+    def read(cls, dataset: str, key: str) -> BrillouinZonePath:
+        return cls(**vars(
+            mbe_automation.storage.read_brillouin_zone_path(dataset, key)
+        ))
+
+    @classmethod
+    def from_phonopy(
+            cls,
+            obj: (
+                phonopy.phonon.band_structure.BandStructure
+                | phonopy.Phonopy
+            )
+    ) -> BrillouinZonePath:
+        if isinstance(obj, phonopy.Phonopy):
+            band_structure = obj.band_structure
+        else:
+            band_structure = obj
+        return cls(**vars(
+            mbe_automation.dynamics.harmonic.brillouin_zone.from_phonopy(
+                band_structure
+            )
+        ))
+
+    def plot(
+            self,
+            save_path: str | None = None,
+            freq_max_THz: float | None = None,
+            color_map: str = "plasma",
+            freq_units: Literal["THz", "cm-1"] = "THz"
+    ):
+        """
+        Plot the band structure.
+        
+        Args:
+            save_path: Path to save the plot. If None, returns the figure.
+            freq_max_THz: Maximum frequency limit for the plot in THz.
+            color_map: Matplotlib colormap name.
+            freq_units: Units for frequency axis, "THz" or "cm-1".
+        """
+        return mbe_automation.dynamics.harmonic.display.band_structure(
+            fbz_path=self,
+            save_path=save_path,
+            freq_max_THz=freq_max_THz,
+            color_map=color_map,
+            freq_units=freq_units
+        )
 
 class _TrainingStructure:
     def to_mace_dataset(
@@ -274,6 +328,31 @@ class ForceConstants(_ForceConstants):
             phonon_filter=phonon_filter,
             check_roundtrip=check_roundtrip,
         )
+
+    def brillouin_zone_path(
+            self,
+            n_points: int = 20,
+            track_bands: bool = False,
+    ) -> BrillouinZonePath:
+        """
+        Determine high-symmetry path and calculate phonon dispersion.
+
+        Args:
+            n_points: Requested number of q-points along a single segment of the path.
+            track_bands: Whether to enforce continuous band tracking using eigenvector overlaps
+                and degenerate perturbation theory. Requires `nomore_ase`.
+
+        Returns:
+            BrillouinZonePath object containing the calculated dispersion, q-points, labels, and distances.
+        """
+        ph = self.to_phonopy()
+        return BrillouinZonePath(**vars(
+            mbe_automation.dynamics.harmonic.brillouin_zone.init_fbz_path(
+                phonopy_object=ph,
+                n_points=n_points,
+                track_bands=track_bands,
+            )
+        ))
 
     def gruneisen_parameters(
             self,

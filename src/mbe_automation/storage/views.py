@@ -394,8 +394,3 @@ def to_phonopy(
 
     return ph
 
-
-
-
-
-

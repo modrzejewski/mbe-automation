@@ -23,7 +23,6 @@ from .calculators import (
 )
 
 from .storage.core import (
-    BrillouinZonePath,
     EOSCurves,
     UniqueClusters,
 )
@@ -40,5 +39,6 @@ from .api import (
     Dataset,
     AtomicReference,
     AnySystem,
+    BrillouinZonePath,
     run,
 )

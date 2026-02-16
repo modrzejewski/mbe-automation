@@ -4,6 +4,7 @@ from . import eos
 from . import modes
 from . import display
 from . import euphonic
+from . import brillouin_zone
 
 try:
     import nomore_ase
