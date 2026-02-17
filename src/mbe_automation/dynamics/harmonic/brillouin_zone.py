@@ -14,6 +14,7 @@ try:
         match_modes_hungarian,
         resolve_degenerate_basis,
         eigenvector_overlap_matrix,
+        interpolate_and_track_bands,
     )
     _NOMORE_AVAILABLE = True
 except ImportError:
@@ -83,7 +84,53 @@ def _adapt_basis_to_perturbation(
 
     return refined_evals, refined_evecs
 
+
+def _resolve_segment_connection(
+    q_start: npt.NDArray, 
+    q_end: npt.NDArray, 
+    phonopy_object: phonopy.Phonopy
+) -> npt.NDArray:
+    """
+    Bridge two discontinuous q-points by generating an interpolated straight path.
+    
+    Generates a virtual path between q_start and q_end and tracks the evolution
+    of eigenvectors to determine how modes map from one point to the other.
+    
+    Parameters
+    ----------
+    q_start : array-like, shape (3,)
+        Starting q-point in fractional coordinates.
+    q_end : array-like, shape (3,)
+        Ending q-point in fractional coordinates.
+    phonopy_object : phonopy.Phonopy
+        Phonopy object containing force constants and structure.
+        
+    Returns
+    -------
+    mapping : np.ndarray, shape (n_modes,)
+        Array of indices where mapping[i] = j means mode i at q_start maps to mode j at q_end.
+    """
+    from . import bands
+    adapter = bands.PhonopyASEAdapter(phonopy_object)
+    D_N = adapter.get_force_constant()
+    
+    # Use default spacing from bands module if available, else hardcode
+    q_spacing = getattr(bands, "DEFAULT_Q_SPACING", 0.05)
+    
+    mapping = interpolate_and_track_bands(
+        phonons=adapter,
+        D_N=D_N,
+        q_start=q_start,
+        q_end=q_end,
+        q_spacing=q_spacing,
+        use_degenerate_pt=True,
+        degenerate_freqs_tol_cm1=0.5 # Default tolerance
+    )
+    return mapping
+
+
 def _segment_freqs(
+
     q_paths: list[npt.NDArray[np.float64]],
     path_connections: npt.NDArray[np.bool_],
     phonopy_object: phonopy.Phonopy,
@@ -151,8 +198,20 @@ def _segment_freqs(
         # Determine starting mapping
         # If this segment is connected to the previous one, use propagated mapping for continuity.
         # Otherwise, reset to the global "track from Gamma" assignment.
-        if i > 0 and path_connections[i-1] and previous_end_mapping is not None:
-             current_mapping = previous_end_mapping.copy()
+        if i > 0 and previous_end_mapping is not None:
+            if path_connections[i-1]:
+                 current_mapping = previous_end_mapping.copy()
+            else:
+                 # Check geometric proximity (effective continuity)
+                 q_prev = q_paths[i-1][-1]
+                 q_curr = q_paths[i][0]
+                 # Use squared Euclidean distance in fractional coordinates
+                 # 1e-5 tolerance is sufficient for identifying "same point"
+                 if np.sum((q_prev - q_curr)**2) < 1e-10:
+                      bridge_mapping = _resolve_segment_connection(q_prev, q_curr, phonopy_object)
+                      current_mapping = bridge_mapping[previous_end_mapping]
+                 else:
+                      current_mapping = start_assignments[i].copy()
         else:
              current_mapping = start_assignments[i].copy()
              
