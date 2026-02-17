@@ -129,11 +129,59 @@ def _resolve_segment_connection(
     return mapping
 
 
-def _segment_freqs(
+def _segment_labels(
+    labels: list[str] | npt.NDArray[np.str_],
+    path_connections: list[bool] | npt.NDArray[np.bool_],
+) -> list[list[str]]:
+    """Unpack compressed path labels into start and end labels per segment.
 
+    The input `labels` list uses a compressed format where connected segments
+    share a single label point. If segment i is connected to segment i+1,
+    the end label of segment i serves as the start label of segment i+1 and
+    appears only once in the list. Disconnected segments list both labels.
+
+    Example
+    -------
+    Connected path A->B->C:
+        labels=['A', 'B', 'C'], path_connections=[True, False]
+        Result: [['A', 'B'], ['B', 'C']]
+
+    Discontinuous path A->B, C->D:
+        labels=['A', 'B', 'C', 'D'], path_connections=[False, False]
+        Result: [['A', 'B'], ['C', 'D']]
+
+    Args
+    ----
+    labels : list[str] | np.ndarray
+        List of high-symmetry point labels in compressed format.
+    path_connections : list[bool] | np.ndarray
+        Boolean array indicating if segment i connects to segment i+1.
+
+    Returns
+    -------
+    list[list[str]]
+        List of [start_label, end_label] pairs for each segment.
+    """
+    segment_labels = []
+    idx = 0
+    for connection in path_connections:
+        start = labels[idx]
+        end = labels[idx+1]
+        segment_labels.append([start, end])
+
+        if connection:
+            idx += 1
+        else:
+            idx += 2
+
+    return segment_labels
+
+
+def _segment_freqs(
     q_paths: list[npt.NDArray[np.float64]],
     path_connections: npt.NDArray[np.bool_],
     phonopy_object: phonopy.Phonopy,
+    labels: list[str] | npt.NDArray[np.str_],
 ) -> list[npt.NDArray[np.float64]]:
     """Extract start points of segments and track bands from Gamma.
 
@@ -156,6 +204,8 @@ def _segment_freqs(
         Boolean array indicating if segment i connects to segment i+1.
     phonopy_object : phonopy.Phonopy
         Phonopy object.
+    labels : list[str] | np.ndarray
+        List of high-symmetry point labels in compressed format.
 
     Returns
     -------
@@ -165,10 +215,13 @@ def _segment_freqs(
     """
 
     start_points = [path[0] for path in q_paths]
-    start_assignments = bands.track_from_gamma(phonopy_object, np.array(start_points))
+    map_path_from_gamma = bands.track_from_gamma(phonopy_object, np.array(start_points))
     
     physical_units = phonopy.physical_units.get_physical_units()
     to_THz = physical_units.DefaultToTHz
+
+    segment_labels = _segment_labels(labels, path_connections)
+    map_high_symmetry_path = {}
     
     segment_frequencies = []
     
@@ -195,25 +248,32 @@ def _segment_freqs(
             
         n_modes = len(refined_evals[0])
         
+        start_label, end_label = segment_labels[i]
+
         # Determine starting mapping
-        # If this segment is connected to the previous one, use propagated mapping for continuity.
-        # Otherwise, reset to the global "track from Gamma" assignment.
-        if i > 0 and previous_end_mapping is not None:
-            if path_connections[i-1]:
-                 current_mapping = previous_end_mapping.copy()
-            else:
-                 # Check geometric proximity (effective continuity)
+        # 1. Path Continuity
+        if i > 0 and previous_end_mapping is not None and path_connections[i-1]:
+             current_mapping = previous_end_mapping.copy()
+        
+        # 2. Label Cache Lookup
+        elif start_label in map_high_symmetry_path:
+             current_mapping = map_high_symmetry_path[start_label].copy()
+
+        # 3. Geometric Proximity & 4. Gamma Fallback
+        else:
+             # Check geometric proximity (effective continuity) fallback
+             if i > 0 and previous_end_mapping is not None:
                  q_prev = q_paths[i-1][-1]
                  q_curr = q_paths[i][0]
                  # Use squared Euclidean distance in fractional coordinates
-                 # 1e-5 tolerance is sufficient for identifying "same point"
+                 # 1e-10 tolerance is sufficient for identifying "same point"
                  if np.sum((q_prev - q_curr)**2) < 1e-10:
                       bridge_mapping = _resolve_segment_connection(q_prev, q_curr, phonopy_object)
                       current_mapping = bridge_mapping[previous_end_mapping]
                  else:
-                      current_mapping = start_assignments[i].copy()
-        else:
-             current_mapping = start_assignments[i].copy()
+                      current_mapping = map_path_from_gamma[i].copy()
+             else:
+                 current_mapping = map_path_from_gamma[i].copy()
              
         segment_freqs_sorted = np.zeros((n_q, n_modes))
         
@@ -240,6 +300,9 @@ def _segment_freqs(
                 
         segment_frequencies.append(segment_freqs_sorted)
         previous_end_mapping = current_mapping
+        
+        if end_label not in map_high_symmetry_path:
+            map_high_symmetry_path[end_label] = current_mapping.copy()
         
     return segment_frequencies
 
@@ -317,7 +380,8 @@ def init_fbz_path(
         segment_frequencies = _segment_freqs(
             q_paths=q_paths, 
             path_connections=np.array(path_connections, dtype=bool),
-            phonopy_object=phonopy_object
+            phonopy_object=phonopy_object,
+            labels=list(labels),
         )
         
     all_frequencies = []
