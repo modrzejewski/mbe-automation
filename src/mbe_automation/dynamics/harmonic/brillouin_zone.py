@@ -101,6 +101,7 @@ def _resolve_segment_connection(
     q_end: npt.NDArray, 
     phonopy_object: phonopy.Phonopy,
     delta_q: float = 0.05,
+    degenerate_freqs_tol_cm1: float = 0.5,
 ) -> npt.NDArray:
     """
     Bridge two discontinuous q-points by generating an interpolated straight path.
@@ -136,7 +137,7 @@ def _resolve_segment_connection(
         q_end=q_end,
         q_spacing=q_spacing,
         use_degenerate_pt=True,
-        degenerate_freqs_tol_cm1=0.5, # Default tolerance
+        degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
         delta_q=delta_q,
     )
     return mapping
@@ -196,6 +197,7 @@ def _segment_freqs(
     phonopy_object: phonopy.Phonopy,
     labels: list[str] | npt.NDArray[np.str_],
     delta_q: float = 0.05,
+    degenerate_freqs_tol_cm1: float = 0.5,
 ) -> list[npt.NDArray[np.float64]]:
     """Extract start points of segments and track bands from Gamma.
 
@@ -233,6 +235,7 @@ def _segment_freqs(
         phonopy_object, 
         np.array(start_points),
         delta_q=delta_q,
+        degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
     )
     
     physical_units = phonopy.physical_units.get_physical_units()
@@ -269,6 +272,7 @@ def _segment_freqs(
             evecs_list=evecs_list,
             phonopy_object=phonopy_object,
             delta_q=delta_q,
+            degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
         )
             
         n_modes = len(refined_evals[0])
@@ -360,6 +364,7 @@ def init_fbz_path(
     n_points: int = 20,
     track_bands: bool = False,
     delta_q: float = 0.05,
+    degenerate_freqs_tol_cm1: float = 0.5,
 ) -> core.BrillouinZonePath:
     """Determine high-symmetry path and calculate phonon dispersion.
 
@@ -409,6 +414,7 @@ def init_fbz_path(
             phonopy_object=phonopy_object,
             labels=list(labels),
             delta_q=delta_q,
+            degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
         )
         
     all_frequencies = []

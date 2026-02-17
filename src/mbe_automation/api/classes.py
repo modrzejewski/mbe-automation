@@ -338,6 +338,7 @@ class ForceConstants(_ForceConstants):
             n_points: int = 20,
             track_bands: bool = False,
             delta_q: float = 0.05,
+            degenerate_freqs_tol_cm1: float = 0.5,
     ) -> BrillouinZonePath:
         """
         Determine high-symmetry path and calculate phonon dispersion.
@@ -347,6 +348,8 @@ class ForceConstants(_ForceConstants):
             track_bands: Whether to enforce continuous band tracking using eigenvector overlaps
                 and degenerate perturbation theory. Requires `nomore_ase`.
             delta_q: Displacement distance for perturbation theory in Å⁻¹
+                Used only when track_bands=True.
+            degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
                 Used only when track_bands=True.
 
         Returns:
@@ -359,6 +362,7 @@ class ForceConstants(_ForceConstants):
                 n_points=n_points,
                 track_bands=track_bands,
                 delta_q=delta_q,
+                degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
             )
         ))
 
