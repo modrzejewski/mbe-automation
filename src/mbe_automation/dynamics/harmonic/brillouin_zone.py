@@ -85,6 +85,7 @@ def _adapt_basis_to_perturbation(
 
 def _segment_freqs(
     q_paths: list[npt.NDArray[np.float64]],
+    path_connections: npt.NDArray[np.bool_],
     phonopy_object: phonopy.Phonopy,
 ) -> list[npt.NDArray[np.float64]]:
     """Extract start points of segments and track bands from Gamma.
@@ -93,12 +94,19 @@ def _segment_freqs(
     Uses degenerate perturbation theory to resolve band crossings and
     Hungarian matching of eigenvector overlaps to ensure continuous band
     indices (tracking).
+    
+    If segments are connected (as indicated by path_connections), the band 
+    mapping is propagated from the end of one segment to the start of the next,
+    ensuring visual continuity. Otherwise, the mapping is reset to the 
+    global assignment determined by `track_from_gamma`.
 
     Args
     ----
     q_paths : list[np.ndarray]
         List of arrays of q-points, where each array represents a continuous 
         segment of the brillouin zone path.
+    path_connections : np.ndarray
+        Boolean array indicating if segment i connects to segment i+1.
     phonopy_object : phonopy.Phonopy
         Phonopy object.
 
@@ -116,6 +124,9 @@ def _segment_freqs(
     to_THz = physical_units.DefaultToTHz
     
     segment_frequencies = []
+    
+    # Store the mapping from the end of the previous segment
+    previous_end_mapping = None
     
     for i, path in enumerate(q_paths):
         n_q = len(path)
@@ -136,8 +147,15 @@ def _segment_freqs(
         )
             
         n_modes = len(refined_evals[0])
-        start_assignment = start_assignments[i]
-        current_mapping = start_assignment.copy()
+        
+        # Determine starting mapping
+        # If this segment is connected to the previous one, use propagated mapping for continuity.
+        # Otherwise, reset to the global "track from Gamma" assignment.
+        if i > 0 and path_connections[i-1] and previous_end_mapping is not None:
+             current_mapping = previous_end_mapping.copy()
+        else:
+             current_mapping = start_assignments[i].copy()
+             
         segment_freqs_sorted = np.zeros((n_q, n_modes))
         
         freqs_0 = (np.sqrt(np.abs(refined_evals[0])) * np.sign(refined_evals[0])) * to_THz
@@ -162,6 +180,7 @@ def _segment_freqs(
                 segment_freqs_sorted[k+1, current_mapping[m]] = freqs_kplus1[m]
                 
         segment_frequencies.append(segment_freqs_sorted)
+        previous_end_mapping = current_mapping
         
     return segment_frequencies
 
@@ -236,7 +255,11 @@ def init_fbz_path(
                 "nomore_ase is required for track_bands=True. "
                 "Please install it or set track_bands=False."
             )
-        segment_frequencies = _segment_freqs(q_paths, phonopy_object)
+        segment_frequencies = _segment_freqs(
+            q_paths=q_paths, 
+            path_connections=np.array(path_connections, dtype=bool),
+            phonopy_object=phonopy_object
+        )
         
     all_frequencies = []
     all_distances = []

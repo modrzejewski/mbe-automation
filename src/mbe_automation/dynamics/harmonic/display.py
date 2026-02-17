@@ -143,12 +143,22 @@ def _band_structure(
         for start, end in zip(break_indices, break_indices[1:])
     ]
 
-    fig, axes = plt.subplots(
-        1, len(breaks), sharey=True,
-        gridspec_kw={'width_ratios': width_ratios, 'wspace': 0.05}
-    )
-    if len(breaks) == 1:
+    # By definition of BrillouinZonePath (following Seekpath/Phonopy conventions),
+    # the last element of path_connections should be False, so breaks should not be empty.
+    # However, we handle the case where it might be True (e.g. manually constructed paths)
+    # to prevent crashes.
+    if len(breaks) == 0:
+        fig, axes = plt.subplots(
+            1, 1, sharey=True,
+        )
         axes = [axes]
+    else:
+        fig, axes = plt.subplots(
+            1, len(breaks), sharey=True,
+            gridspec_kw={'width_ratios': width_ratios, 'wspace': 0.05}
+        )
+        if len(breaks) == 1:
+             axes = [axes]
 
     label_count = 0
     continuous_segments = [
