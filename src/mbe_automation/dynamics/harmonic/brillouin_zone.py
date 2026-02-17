@@ -15,7 +15,6 @@ try:
         resolve_degenerate_basis,
         eigenvector_overlap_matrix,
         interpolate_and_track_bands,
-        perturbation_central_difference,
     )
     _NOMORE_AVAILABLE = True
 except ImportError:
@@ -55,11 +54,12 @@ def _adapt_basis_to_perturbation(
     degenerate_freqs_tol_cm1: float = 0.5,
     delta_q: float = 0.05,
 ) -> tuple[list[npt.NDArray[np.float64]], list[npt.NDArray[np.complex128]]]:
-    """Refine eigenvectors using degenerate perturbation theory.
+    """Refine eigenvectors within degenerate subspaces.
 
-    Resolve mixing in degenerate subspaces by diagonalizing the
-    central-difference perturbation matrix. This ensures continuous
-    bands across the FBZ path.
+    Project D(q+δq) onto each degenerate subspace and diagonalize.
+    Since D(q) projects to λ·I within a degenerate subspace, this
+    selects the same linear combinations as diagonalizing the
+    perturbation dD, but avoids the subtraction of two large matrices.
     """
     n_q = len(D_q_list)
     refined_evecs = []
@@ -71,20 +71,24 @@ def _adapt_basis_to_perturbation(
         phonopy_object.dynamical_matrix.run(q)
         return phonopy_object.dynamical_matrix.dynamical_matrix
 
+    direction_cart = q_direction @ reciprocal_cell
+    norm_cart = np.linalg.norm(direction_cart)
+    if norm_cart < 1e-12:
+        return evals_list, [
+            v.T.reshape(v.shape[1], v.shape[0] // 3, 3)
+            for v in evecs_list
+        ]
+    unit_frac = q_direction / norm_cart
+
     for k in range(n_q):
         w2 = evals_list[k]
         v = evecs_list[k]
 
-        dD = perturbation_central_difference(
-            q_center=q_points[k],
-            q_direction=q_direction,
-            delta_q=delta_q,
-            reciprocal_cell=reciprocal_cell,
-            dynamical_matrix_at=dynamical_matrix_at,
-        )
+        q_neighbor = q_points[k] + delta_q * unit_frac
+        D_neighbor = dynamical_matrix_at(q_neighbor)
 
         w2_resolved, v_resolved = resolve_degenerate_basis(
-            w2, v, dD, degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1
+            w2, v, D_neighbor, degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1
         )
         refined_evals.append(w2_resolved)
 
