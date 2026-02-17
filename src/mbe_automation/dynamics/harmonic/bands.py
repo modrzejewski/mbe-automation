@@ -67,6 +67,7 @@ def track_from_gamma(
     q_points: npt.NDArray[np.float64],
     q_spacing: float = DEFAULT_Q_SPACING,
     degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
+    delta_q: float = 0.05,
 ) -> npt.NDArray[np.int64]:
     """
     Compute band indices for a set of q-points using path tracking from Gamma.
@@ -76,6 +77,7 @@ def track_from_gamma(
         q_points: (N_q, 3) list of q-points to assign
         q_spacing: Spacing for path interpolation in Å⁻¹
         degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
+        delta_q: Displacement distance for perturbation theory in Å⁻¹
         
     Returns:
         band_indices: (N_q, N_modes) integer array of band IDs.
@@ -108,6 +110,7 @@ def track_from_gamma(
         q_spacing=q_spacing,
         use_degenerate_pt=True,
         degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+        delta_q=delta_q,
     )
     
     n_q = len(q_points)

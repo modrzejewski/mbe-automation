@@ -99,7 +99,8 @@ def _adapt_basis_to_perturbation(
 def _resolve_segment_connection(
     q_start: npt.NDArray, 
     q_end: npt.NDArray, 
-    phonopy_object: phonopy.Phonopy
+    phonopy_object: phonopy.Phonopy,
+    delta_q: float = 0.05,
 ) -> npt.NDArray:
     """
     Bridge two discontinuous q-points by generating an interpolated straight path.
@@ -135,7 +136,8 @@ def _resolve_segment_connection(
         q_end=q_end,
         q_spacing=q_spacing,
         use_degenerate_pt=True,
-        degenerate_freqs_tol_cm1=0.5 # Default tolerance
+        degenerate_freqs_tol_cm1=0.5, # Default tolerance
+        delta_q=delta_q,
     )
     return mapping
 
@@ -193,6 +195,7 @@ def _segment_freqs(
     path_connections: npt.NDArray[np.bool_],
     phonopy_object: phonopy.Phonopy,
     labels: list[str] | npt.NDArray[np.str_],
+    delta_q: float = 0.05,
 ) -> list[npt.NDArray[np.float64]]:
     """Extract start points of segments and track bands from Gamma.
 
@@ -226,7 +229,11 @@ def _segment_freqs(
     """
 
     start_points = [path[0] for path in q_paths]
-    map_path_from_gamma = bands.track_from_gamma(phonopy_object, np.array(start_points))
+    map_path_from_gamma = bands.track_from_gamma(
+        phonopy_object, 
+        np.array(start_points),
+        delta_q=delta_q,
+    )
     
     physical_units = phonopy.physical_units.get_physical_units()
     to_THz = physical_units.DefaultToTHz
@@ -261,6 +268,7 @@ def _segment_freqs(
             evals_list=evals_list,
             evecs_list=evecs_list,
             phonopy_object=phonopy_object,
+            delta_q=delta_q,
         )
             
         n_modes = len(refined_evals[0])
@@ -351,6 +359,7 @@ def init_fbz_path(
     phonopy_object: phonopy.Phonopy,
     n_points: int = 20,
     track_bands: bool = False,
+    delta_q: float = 0.05,
 ) -> core.BrillouinZonePath:
     """Determine high-symmetry path and calculate phonon dispersion.
 
@@ -399,6 +408,7 @@ def init_fbz_path(
             path_connections=np.array(path_connections, dtype=bool),
             phonopy_object=phonopy_object,
             labels=list(labels),
+            delta_q=delta_q,
         )
         
     all_frequencies = []

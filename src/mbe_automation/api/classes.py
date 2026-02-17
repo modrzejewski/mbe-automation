@@ -179,6 +179,7 @@ class ForceConstants(_ForceConstants):
             eigenvectors_storage: Literal["columns", "rows"] = "columns",
             track_bands: bool = False,
             degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
+            delta_q: float = 0.05,
     ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
         """
         Compute phonon frequencies and eigenvectors at specified k-points.
@@ -200,7 +201,9 @@ class ForceConstants(_ForceConstants):
                 Used only when track_bands=True. This threshold is needed because the
                 band tracking algorithm needs to apply degenerate perturbation theory
                 when some of the frequencies form a degenerate subset.
-
+            delta_q: Displacement distance for perturbation theory in Å⁻¹
+                Used only when track_bands=True.
+ 
         Returns:
             A tuple containing:
             - frequencies: Frequencies in THz.
@@ -236,6 +239,7 @@ class ForceConstants(_ForceConstants):
                 phonopy_object=ph,
                 q_points=k_points,
                 degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+                delta_q=delta_q,
             )
             
             freqs, evecs = mbe_automation.dynamics.harmonic.bands.reorder(
@@ -333,6 +337,7 @@ class ForceConstants(_ForceConstants):
             self,
             n_points: int = 20,
             track_bands: bool = False,
+            delta_q: float = 0.05,
     ) -> BrillouinZonePath:
         """
         Determine high-symmetry path and calculate phonon dispersion.
@@ -341,6 +346,8 @@ class ForceConstants(_ForceConstants):
             n_points: Requested number of q-points along a single segment of the path.
             track_bands: Whether to enforce continuous band tracking using eigenvector overlaps
                 and degenerate perturbation theory. Requires `nomore_ase`.
+            delta_q: Displacement distance for perturbation theory in Å⁻¹
+                Used only when track_bands=True.
 
         Returns:
             BrillouinZonePath object containing the calculated dispersion, q-points, labels, and distances.
@@ -351,6 +358,7 @@ class ForceConstants(_ForceConstants):
                 phonopy_object=ph,
                 n_points=n_points,
                 track_bands=track_bands,
+                delta_q=delta_q,
             )
         ))
 
