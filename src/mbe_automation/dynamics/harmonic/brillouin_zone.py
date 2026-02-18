@@ -204,12 +204,12 @@ def _segment_freqs(
             phonopy_object.dynamical_matrix.run(q)
             D_q_list.append(phonopy_object.dynamical_matrix.dynamical_matrix)
 
-        epsilon = 0.01
+        epsilon = 0.0001
         dD_segment = D_q_list[-1] - D_q_list[0]
         refined_evals = []
         refined_evecs = []
         for D_q in D_q_list:
-            _, v = np.linalg.eigh(D_q + epsilon * dD_segment)
+            _, v = np.linalg.eigh((1.0 - epsilon) * D_q + epsilon * dD_segment)
             w2 = np.real(np.einsum("ij,ij->j", v.conj(), D_q @ v))
             refined_evals.append(w2)
             n_modes = v.shape[1]
