@@ -204,7 +204,7 @@ def _segment_freqs(
             phonopy_object.dynamical_matrix.run(q)
             D_q_list.append(phonopy_object.dynamical_matrix.dynamical_matrix)
 
-        epsilon = 0.0001
+        epsilon = 0.001
         dD_segment = D_q_list[-1] - D_q_list[0]
         refined_evals = []
         refined_evecs = []
