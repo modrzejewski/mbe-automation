@@ -123,7 +123,7 @@ def to_phonon_data(
     phonopy_object,
     irr_q_frac: npt.NDArray[np.floating],
     q_weights: npt.NDArray[np.integer],
-    cif_adapter: "CctbxAdapter",
+    cif_adapter: Optional["CctbxAdapter"] = None,
     q_spacing: float = DEFAULT_Q_SPACING,
     degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
 ) -> PhononData:
@@ -134,7 +134,8 @@ def to_phonon_data(
         phonopy_object: The phonopy object with initialized mesh.
         irr_q_frac: Irreducible q-points (fractional).
         q_weights: Weights of irreducible q-points.
-        cif_adapter: Adapter containing the experimental structure (CIF).
+        cif_adapter: Adapter containing the experimental structure (CIF). 
+            If None, identity permutation is assumed.
         q_spacing: Spacing for path interpolation in Å⁻¹. Used for band tracking.
         degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
 
@@ -160,20 +161,31 @@ def to_phonon_data(
     flat_freqs_cm1 = freqs_cm1_grid.flatten()
     n_atoms_fc = len(ph.primitive)
     
-    source_to_target_indices = compute_atom_permutation(ph.primitive, cif_adapter)
-    
-    reordering_needed = not np.all(source_to_target_indices == np.arange(n_atoms_fc))
-    
-    p1_structure = cif_adapter.xray_structure.expand_to_p1()
-    target_symbols = [sc.element_symbol() for sc in p1_structure.scatterers()]
-    target_frac = np.array([sc.site for sc in p1_structure.scatterers()]) % 1.0
-    n_target = len(target_symbols)
-    
-    _validate_atomic_numbers(
-        ph.primitive.numbers,
-        target_symbols,
-        source_to_target_indices
-    )
+    if cif_adapter is not None:
+        source_to_target_indices = compute_atom_permutation(ph.primitive, cif_adapter)
+        reordering_needed = not np.all(source_to_target_indices == np.arange(n_atoms_fc))
+        
+        if reordering_needed:
+            print(f"Reordering ForceConstants atoms to match CIF order. Permutation found.")
+        else:
+            print("Atom order matches between ForceConstants and CIF.")
+        
+        p1_structure = cif_adapter.xray_structure.expand_to_p1()
+        target_symbols = [sc.element_symbol() for sc in p1_structure.scatterers()]
+        target_frac = np.array([sc.site for sc in p1_structure.scatterers()]) % 1.0
+        n_target = len(target_symbols)
+        
+        _validate_atomic_numbers(
+            ph.primitive.numbers,
+            target_symbols,
+            source_to_target_indices
+        )
+    else:
+        source_to_target_indices = np.arange(n_atoms_fc)
+        reordering_needed = False
+        target_symbols = ph.primitive.symbols
+        target_frac = ph.primitive.scaled_positions % 1.0
+        n_target = n_atoms_fc
     
     # Reorder Eigenvectors
     # eigenvectors_grid: (n_q, n_modes, n_modes)
@@ -184,8 +196,7 @@ def to_phonon_data(
     flat_eigenvectors = eigenvectors_grid.reshape(-1, n_atoms_fc, 3)
     
     if reordering_needed:
-        print(f"Reordering ForceConstants atoms to match CIF order. Permutation found.")
-        
+
         # Reorder Eigenvectors
         # flat_eigenvectors: (n_q * n_modes, n_atoms, 3) 
         # We need to permute along axis 1 (atoms)
@@ -196,7 +207,7 @@ def to_phonon_data(
         final_masses = _permute_atoms(ph.primitive.masses, source_to_target_indices, axis=0)
         
     else:
-        print("Atom order matches between ForceConstants and CIF.")
+
         final_positions = ph.primitive.scaled_positions % 1.0
         final_symbols = ph.primitive.symbols
         final_masses = ph.primitive.masses
@@ -534,7 +545,8 @@ def _get_asu_atoms(smtbx_adapter) -> npt.NDArray[np.int64]:
 
 def run(
     force_constants,
-    cif_path: str,
+    cif_path: str | None = None,
+    U_cart_ref: npt.NDArray[np.float64] | None = None,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
     restraint_weight: float | None = None,
     band_selection_strategy: Optional["FrequencyPartitionStrategy"] = None,
@@ -552,7 +564,8 @@ def run(
     
     Args:
         force_constants: mbe_automation ForceConstants object.
-        cif_path: Path to experimental CIF.
+        cif_path: Path to experimental CIF. Optional if U_cart_ref is provided.
+        U_cart_ref: Reference Cartesian ADPs (n_atoms, 3, 3) for direct fitting.
         mesh_size: k-point mesh size.
         restraint_weight: Weight for restraining to initial frequencies.
         band_selection_strategy: Strategy for frequency partitioning. Defaults to SensitivityBased.
@@ -569,6 +582,15 @@ def run(
             "The `refinement.run` function requires the `nomore_ase` package. "
             "Install it in your environment to use this functionality."
         )
+
+    if cif_path is None and U_cart_ref is None:
+        raise ValueError("Either `cif_path` or `U_cart_ref` must be provided.")
+
+    if cif_path is not None and U_cart_ref is not None:
+        raise ValueError("Only one of `cif_path` or `U_cart_ref` can be provided.") 
+
+    if U_cart_ref is not None and temperature_K is None:
+        raise ValueError("`temperature_K` must be provided when `U_cart_ref` is provided.")
 
     optimizer_options = {"maxiter": 300, "ftol": 1e-9}
     optimizer_method = "SLSQP"
@@ -603,11 +625,13 @@ def run(
                 f"Mesh size must consist of odd integers to ensure Gamma point inclusion.\n"
                 f"Received: {mesh_size}. Please use odd numbers (e.g., [3, 3, 3])."
             )
-    
-    print(f"Loading experimental data from {cif_path}")
-    cctbx_adapter = CctbxAdapter(cif_path)
-    
-    print(f"  Space Group: {cctbx_adapter.space_group_symbol}")
+
+    if cif_path is not None:
+        print(f"Loading experimental data from {cif_path}")
+        cctbx_adapter = CctbxAdapter(cif_path)
+        print(f"  Space Group: {cctbx_adapter.space_group_symbol}")
+    else:
+        cctbx_adapter = None
     
     print("Computing phonon data on mesh...")
     
@@ -630,8 +654,10 @@ def run(
     
     if temperature_K is not None:
         temperature = temperature_K
-    else:
+    elif cctbx_adapter is not None:
         temperature = cctbx_adapter.get_temperature()
+    else:
+        temperature = None
 
     if temperature is None:
         raise ValueError(
@@ -656,16 +682,17 @@ def run(
         degeneracy_groups=phonons.degeneracy_groups
     )
 
-    # Initialize SmtbxAdapter
-    # Requires xray_structure, reflections, phonons (for mapping)
-    smtbx_adapter = SmtbxAdapter(
-        xray_structure=cctbx_adapter.xray_structure,
-        reflections=cctbx_adapter.get_reflections(),
-        weighting_scheme=weighting_scheme,
-        phonon_data=phonons
-    )
-    
-    print(f"  Reflections: {smtbx_adapter.observations.size()} observations")
+    # Initialize SmtbxAdapter if cif_path is provided
+    if cctbx_adapter is not None:
+        smtbx_adapter = SmtbxAdapter(
+            xray_structure=cctbx_adapter.xray_structure,
+            reflections=cctbx_adapter.get_reflections(),
+            weighting_scheme=weighting_scheme,
+            phonon_data=phonons
+        )
+        print(f"  Reflections: {smtbx_adapter.observations.size()} observations")
+    else:
+        smtbx_adapter = None
     
     # Create mode groups to handle degeneracies and bands
     pre_groups = create_pre_groups(phonons)
@@ -682,20 +709,43 @@ def run(
     restraint_instance = None
     if restraint_weight > 0.0:
         restraint_instance = BayesianFrequencyRestraint(
-            initial_frequencies=initial_freqs,
+            initial_freqs=initial_freqs,
             temperature=temperature
         )
 
-    result = engine.run_joint(
-        initial_frequencies=initial_freqs,
-        restraint=restraint_instance,
-        restraint_weight=restraint_weight,
-        groups=groups,
-        optimizer_options=optimizer_options,
-        optimizer_method=optimizer_method,
-        fix_positions=fix_positions,
-        exclude_hydrogen_positions=exclude_hydrogen_positions
-    )
+    if U_cart_ref is not None:
+        print("Performing ADP-only fitting")
+        result = engine.fit_to_adps(
+            initial_frequencies=initial_freqs,
+            u_exp=U_cart_ref,
+            groups=groups,
+            restraint_weight=restraint_weight,
+            smoothness_weight=0.0, # Not exposed in run() yet
+        )
+        # fit_to_adps returns a dict with 'frequencies', 'success', etc.
+        # Joint refinement returns 'scale_factors' and 'groups' for mapping.
+        # We compute them here for compatibility.
+        final_freqs_flat = result["frequencies"]
+        scale_factors = np.ones(groups.n_parameters())
+        unique_gids = sorted(np.unique(groups.group_ids[groups.group_ids >= 0]))
+        for i, gid in enumerate(unique_gids):
+            mode_idx = groups.get_group_modes(gid)[0]
+            if initial_freqs[mode_idx] > 1e-3:
+                scale_factors[i] = final_freqs_flat[mode_idx] / initial_freqs[mode_idx]
+        
+        result["scale_factors"] = scale_factors
+        result["groups"] = groups
+    else:
+        result = engine.run_joint(
+            initial_frequencies=initial_freqs,
+            restraint=restraint_instance,
+            restraint_weight=restraint_weight,
+            groups=groups,
+            optimizer_options=optimizer_options,
+            optimizer_method=optimizer_method,
+            fix_positions=fix_positions,
+            exclude_hydrogen_positions=exclude_hydrogen_positions
+        )
 
     n_atoms_p1 = phonons.n_atoms
     n_modes_flat = len(initial_freqs)
@@ -732,14 +782,20 @@ def run(
     
     U_cart_comp_initial_p1 = calculator.calculate_u_cart(initial_freqs)
     U_cart_comp_final_p1 = calculator.calculate_u_cart(result["frequencies"])
-    U_cart_exp_p1 = extract_adps_from_structure(
-        cctbx_adapter.xray_structure.expand_to_p1(
-            sites_mod_positive=True
-        )
-    )
     
-    asu_atoms = _get_asu_atoms(smtbx_adapter)
-    asu_symbols = [sc.element_symbol() for sc in smtbx_adapter.structure.scatterers()]
+    if cctbx_adapter is not None:
+        U_cart_exp_p1 = extract_adps_from_structure(
+            cctbx_adapter.xray_structure.expand_to_p1(
+                sites_mod_positive=True
+            )
+        )
+        asu_atoms = _get_asu_atoms(smtbx_adapter)
+        asu_symbols = [sc.element_symbol() for sc in smtbx_adapter.structure.scatterers()]
+    else:
+        U_cart_exp_p1 = U_cart_ref
+        asu_atoms = np.arange(len(phonons.symbols))
+        asu_symbols = phonons.symbols
+
     U_cart_exp_asu = U_cart_exp_p1[asu_atoms]
     U_cart_comp_initial_asu = U_cart_comp_initial_p1[asu_atoms]
     U_cart_comp_final_asu = U_cart_comp_final_p1[asu_atoms]

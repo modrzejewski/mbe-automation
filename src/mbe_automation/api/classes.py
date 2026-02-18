@@ -407,7 +407,8 @@ class ForceConstants(_ForceConstants):
 
     def refine(
         self,
-        cif_path: str,
+        cif_path: str | None = None,
+        U_cart_ref: npt.NDArray[np.float64] | None = None,
         mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
         restraint_weight: float | None = None,
         band_selection_strategy: FrequencyPartitionStrategy | None = None,
@@ -423,7 +424,8 @@ class ForceConstants(_ForceConstants):
         Refine phonon frequencies using the NoMoRe refinement API.
         
         Args:
-            cif_path: Path to experimental CIF.
+            cif_path: Path to experimental CIF. Optional if U_cart_ref is provided.
+            U_cart_ref: Reference Cartesian ADPs (n_atoms, 3, 3) for direct fitting.
             mesh_size: k-point mesh size ("gamma", float radius, or [Nx, Ny, Nz]).
             restraint_weight: Weight for restraining to initial frequencies.
             band_selection_strategy: Frequency partitioning strategy object (or None for default).
@@ -432,7 +434,7 @@ class ForceConstants(_ForceConstants):
             exclude_hydrogen_positions: Whether to exclude hydrogens from position 
                 refinement.
             temperature_K: Temperature in Kelvin used to compute ADPs.
-                If provided, overrides CIF metadata.
+                If provided, overrides CIF metadata. Required if U_cart_ref is provided.
             q_spacing: The target spacing for path interpolation in Å⁻¹ along 
                 q-point paths. Used for band tracking.
             reasonable_range: Allowed range for optimized scaling factors.
@@ -457,6 +459,7 @@ class ForceConstants(_ForceConstants):
         return refinement.run(
             force_constants=self,
             cif_path=cif_path,
+            U_cart_ref=U_cart_ref,
             mesh_size=mesh_size,
             restraint_weight=restraint_weight,
             band_selection_strategy=band_selection_strategy,
