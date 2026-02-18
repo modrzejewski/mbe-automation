@@ -12,7 +12,6 @@ try:
     from . import bands
     from nomore_ase.optimization.band_assignment import (
         match_modes_hungarian,
-        resolve_degenerate_basis,
         eigenvector_overlap_matrix,
         interpolate_and_track_bands,
     )
@@ -43,61 +42,6 @@ def from_phonopy(
         labels=np.array(band_structure.labels, dtype=str),
         distances=band_structure.distances,
     )
-
-def _adapt_basis_to_perturbation(
-    q_points: npt.NDArray[np.float64],
-    q_direction: npt.NDArray[np.float64],
-    D_q_list: list[npt.NDArray[np.complex128]],
-    evals_list: list[npt.NDArray[np.float64]],
-    evecs_list: list[npt.NDArray[np.complex128]],
-    phonopy_object: phonopy.Phonopy,
-    degenerate_freqs_tol_cm1: float = 0.5,
-    delta_q: float = 0.05,
-) -> tuple[list[npt.NDArray[np.float64]], list[npt.NDArray[np.complex128]]]:
-    """Refine eigenvectors within degenerate subspaces.
-
-    Project D(q+δq) onto each degenerate subspace and diagonalize.
-    Since D(q) projects to λ·I within a degenerate subspace, this
-    selects the same linear combinations as diagonalizing the
-    perturbation dD, but avoids the subtraction of two large matrices.
-    """
-    n_q = len(D_q_list)
-    refined_evecs = []
-    refined_evals = []
-
-    reciprocal_cell = np.linalg.inv(phonopy_object.primitive.cell).T
-
-    def dynamical_matrix_at(q):
-        phonopy_object.dynamical_matrix.run(q)
-        return phonopy_object.dynamical_matrix.dynamical_matrix
-
-    direction_cart = q_direction @ reciprocal_cell
-    norm_cart = np.linalg.norm(direction_cart)
-    if norm_cart < 1e-12:
-        return evals_list, [
-            v.T.reshape(v.shape[1], v.shape[0] // 3, 3)
-            for v in evecs_list
-        ]
-    unit_frac = q_direction / norm_cart
-
-    for k in range(n_q):
-        w2 = evals_list[k]
-        v = evecs_list[k]
-
-        q_neighbor = q_points[k] + delta_q * unit_frac
-        D_neighbor = dynamical_matrix_at(q_neighbor)
-
-        w2_resolved, v_resolved = resolve_degenerate_basis(
-            w2, v, D_neighbor, degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1
-        )
-        refined_evals.append(w2_resolved)
-
-        n_modes = v_resolved.shape[1]
-        n_atoms = v_resolved.shape[0] // 3
-        evecs_reshaped = v_resolved.T.reshape(n_modes, n_atoms, 3)
-        refined_evecs.append(evecs_reshaped)
-
-    return refined_evals, refined_evecs
 
 
 def _resolve_segment_connection(
@@ -259,25 +203,18 @@ def _segment_freqs(
         for q in path:
             phonopy_object.dynamical_matrix.run(q)
             D_q_list.append(phonopy_object.dynamical_matrix.dynamical_matrix)
-            
-        evals_list = []
-        evecs_list = []
-        for D in D_q_list:
-            w2, v = np.linalg.eigh(D)
-            evals_list.append(w2)
-            evecs_list.append(v)
-            
-        q_direction = path[-1] - path[0]
-        refined_evals, refined_evecs = _adapt_basis_to_perturbation(
-            q_points=path,
-            q_direction=q_direction,
-            D_q_list=D_q_list,
-            evals_list=evals_list,
-            evecs_list=evecs_list,
-            phonopy_object=phonopy_object,
-            delta_q=delta_q,
-            degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
-        )
+
+        epsilon = 0.01
+        dD_segment = D_q_list[-1] - D_q_list[0]
+        refined_evals = []
+        refined_evecs = []
+        for D_q in D_q_list:
+            _, v = np.linalg.eigh(D_q + epsilon * dD_segment)
+            w2 = np.real(np.einsum("ij,ij->j", v.conj(), D_q @ v))
+            refined_evals.append(w2)
+            n_modes = v.shape[1]
+            n_atoms = v.shape[0] // 3
+            refined_evecs.append(v.T.reshape(n_modes, n_atoms, 3))
             
         n_modes = len(refined_evals[0])
         
