@@ -67,8 +67,7 @@ class PhononFilter:
 @dataclass
 class ThermalDisplacements:
     """
-    Coordinate displacements due to vibrational
-    motion.
+    Coordinate displacements due to vibrational motion.
 
     1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
        multi-temperature anisotropic displacement parameters. I. Theory
@@ -78,11 +77,23 @@ class ThermalDisplacements:
        anisotropic displacement parameters, J. Appl. Cryst. 35, 477 (2002);
        doi: 10.1107/S0021889802008580
     
+    Attributes:
+        mean_square_displacements_matrix_diagonal: rank (n_temperatures, n_atoms, 3, 3).
+            Contains anisotropic displacement parameters U in Cartesian coordinates (Å²).
+            Eq 5 in ref 1.
+        mean_square_displacements_matrix_diagonal_cif: rank (n_temperatures, n_atoms, 3, 3).
+            Contains anisotropic displacement parameters U in the CIF format (Å²).
+            Eq 4a in ref 2.
+        mean_square_displacements_matrix_full: rank (n_temperatures, n_atoms, n_atoms, 3, 3).
+            Full variance-covariance matrix of atomic displacements (Å²).
+            Eq 6 in ref 1.
+        instantaneous_displacements: rank (n_temperatures, n_time_points, n_atoms, 3)
+            or None. Instantaneous atomic displacements (Å). Eq 2 in ref 1.
     """
-    mean_square_displacements_matrix_diagonal: npt.NDArray[np.float64] # eq 5 in ref 1
-    mean_square_displacements_matrix_diagonal_cif: npt.NDArray[np.float64] # eq 4a in ref 2
-    mean_square_displacements_matrix_full: npt.NDArray[np.float64] # eq 6 in ref 1
-    instantaneous_displacements: npt.NDArray[np.float64] | None # eq 2 in ref 1
+    mean_square_displacements_matrix_diagonal: npt.NDArray[np.float64]
+    mean_square_displacements_matrix_diagonal_cif: npt.NDArray[np.float64]
+    mean_square_displacements_matrix_full: npt.NDArray[np.float64]
+    instantaneous_displacements: npt.NDArray[np.float64] | None
 
 def at_k_point(
     dynamical_matrix: phonopy.DynamicalMatrix,

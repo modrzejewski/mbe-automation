@@ -472,6 +472,58 @@ class ForceConstants(_ForceConstants):
             degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
         )
 
+    def effective_gamma_point_freqs(
+        self,
+        temperature_K: float,
+        band_selection_strategy: FrequencyPartitionStrategy | None = None,
+        phonon_filter: PhononFilter | None = None,
+    ) -> npt.NDArray[np.float64]:
+        """
+        Compute effective Gamma-point frequencies using normal mode refinement.
+
+        Improve the Gamma-only model by calculating effective frequencies 
+        recovering ADPs computed with first Brillouin zone sampling (defined 
+        in phonon_filter). By default, a dense mesh applies.
+
+        Args:
+            temperature_K: Temperature in Kelvin.
+            band_selection_strategy: Frequency partitioning strategy. If None, 
+                defaults to SensitivityBasedStrategy(0.75, 0.90).
+            phonon_filter: Optional filter for phonons passed to thermal displacement calculation.
+
+        Returns:
+            f_gamma: Effective Gamma-point frequencies in THz.
+        """
+        try:
+            from nomore_ase.core.frequency_partition import SensitivityBasedStrategy
+        except ImportError:
+            raise ImportError(
+                "The `ForceConstants.effective_gamma_point_freqs` method requires "
+                "the `nomore_ase` package. Install it in your environment to use "
+                "this functionality."
+            )
+
+        if band_selection_strategy is None:
+            band_selection_strategy = SensitivityBasedStrategy(
+                low_threshold=0.75,
+                high_threshold=0.90
+            )
+
+        adps = self.thermal_displacements(
+            temperature_K=temperature_K,
+            phonon_filter=phonon_filter
+        )
+        U_cart_ref = adps.mean_square_displacements_matrix_diagonal[0]
+
+        refinement = self.refine(
+            U_cart_ref=U_cart_ref,
+            temperature_K=temperature_K,
+            mesh_size="gamma",
+            band_selection_strategy=band_selection_strategy
+        )
+
+        return refinement.freqs_final_reordered_THz[0]
+
     def thermodynamics(
             self,
             k_point_mesh: npt.NDArray[np.int64] | Literal["gamma"] | float,
@@ -488,9 +540,8 @@ class ForceConstants(_ForceConstants):
             temperatures_K: Array of temperatures in Kelvin.
             
         Returns:
-            Pandas DataFrame with thermodynamic properties data.
+            Pandas DataFrame with thermodynamic properties.
         """
-        # 1. Get q-points and weights from Phonopy mesh
         ph = self.to_phonopy()
         
         q_points, weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
@@ -499,8 +550,6 @@ class ForceConstants(_ForceConstants):
             use_symmetry=True 
         )
         
-        # 2. Compute frequencies in THz
-        # We need (n_q, n_bands) array of frequencies.
         freqs_THz, _ = mbe_automation.dynamics.harmonic.modes.at_k_points(
             dynamical_matrix=ph.dynamical_matrix,
             k_points=q_points,
@@ -508,7 +557,6 @@ class ForceConstants(_ForceConstants):
             freq_units="THz"
         )
         
-        # 3. Calculate thermodynamics
         return mbe_automation.dynamics.harmonic.thermodynamics.run(
             freqs_THz=freqs_THz,
             weights=weights,
