@@ -563,5 +563,9 @@ def equilibrium_curve(
         "min_found": min_found,
         "min_extrapolated": min_extrapolated
     })
+    mbe_automation.dynamics.harmonic.display.eos_fitting_summary(
+        df_crystal_eos=df,
+        filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
+    )
     return df
 

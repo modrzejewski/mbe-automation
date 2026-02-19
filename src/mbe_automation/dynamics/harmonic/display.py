@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 import os
 import os.path
 from typing import Literal
@@ -491,6 +492,70 @@ def print_frequency_comparison(
             f"{scaling_factors[b]:>10.3f} "
             f"{shift_g[b]:>10.1f}"
         )
+
+
+def eos_fitting_summary(
+    df_crystal_eos: pd.DataFrame,
+    filter_out_extrapolated_minimum: bool
+):
+    """
+    Print a summary of the EOS fitting results across all temperatures.
+    """
+    
+    print("\n" + "=" * 80)
+    print(f"{'Gibbs free energy minimization summary':^80}")
+    print("=" * 80)
+    
+    #
+    # Construct the summary table
+    #
+    summary_rows = []
+    for _, row in df_crystal_eos.iterrows():
+        T = row["T (K)"]
+        V = row["V_eos (Å³∕unit cell)"]
+        min_found = row["min_found"]
+        min_extrapolated = row["min_extrapolated"]
+        
+        if not min_found:
+            status = "skip (no minimum)"
+        elif min_extrapolated and filter_out_extrapolated_minimum:
+            status = "skip (extrapolated)"
+        else:
+            status = "proceed"
+            
+        summary_rows.append({
+            "T (K)": f"{T:8.2f}",
+            "V (Å³)": f"{V:8.2f}" if not np.isnan(V) else f"{'N/A':>8}",
+            "min_found": f"{str(min_found):^10}",
+            "min_extrapolated": f"{str(min_extrapolated):^16}",
+            "status": status
+        })
+        
+    df_summary = pd.DataFrame(summary_rows)
+    print(df_summary.to_string(index=False), flush=True)
+    print("-" * 80)
+    
+    #
+    # Diagnostic information
+    #
+    n_total = len(df_crystal_eos)
+    n_proceed = sum(1 for r in summary_rows if r["status"] == "proceed")
+    
+    if n_proceed == 0:
+        print("\n[!] CRITICAL: No valid minima found for any temperature.")
+        print("    The workflow cannot proceed with equilibrium-volume calculations.")
+    elif n_proceed < n_total:
+        print(f"\n[!] WARNING: Valid minima found for only {n_proceed}/{n_total} temperature points.")
+    
+    if n_proceed < n_total:
+        print("\nSuggestions:")
+        print("1. Inspect the volume sampling range (volume_range/thermal_pressures_GPa).")
+        print("   The current range might not bracket the equilibrium volume at all temperatures.")
+        print("2. Check for dynamic instabilities (imaginary phonon frequencies).")
+        print("   Inspect the phonon dispersion plots in the 'phonons' directory.")
+        print("3. Consider if the filtering criteria (filter_out_imaginary_*) are too strict.")
+        
+    print("=" * 80 + "\n", flush=True)
 
 
 

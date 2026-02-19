@@ -222,6 +222,15 @@ def fit(V, G, equation_of_state):
 
     if equation_of_state in interpolation:
         spline_fit = spline_interpolation(V, G)
+        if spline_fit.min_found:
+            return spline_fit
+        
+        # Fallback to polynomial if spline fails to find a minimum
+        if len(V) >= get_minimum_points_for_eos("polynomial"):
+            warnings.warn("Spline interpolation failed to find a minimum. Falling back to polynomial fit.")
+            poly_fit = polynomial_fit(V, G)
+            return poly_fit
+        
         return spline_fit
 
     poly_fit = polynomial_fit(V, G)

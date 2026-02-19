@@ -320,10 +320,12 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         data_frames_at_T.append(df_crystal_T)
 
     if not data_frames_at_T:
-        warnings.warn(
-            "Thermal expansion analysis could not find a valid free energy minimum "
-            "at any temperature. Halting workflow."
-        )
+        print("\n" + "!" * 80)
+        print("HALTING WORKFLOW".center(80))
+        print("!" * 80)
+        print("No valid free energy minimum was found at any temperature.")
+        print("Check the 'Gibbs free energy minimization summary' above for details.")
+        print("!" * 80 + "\n")
         mbe_automation.common.display.timestamp_finish(datetime_start)
         return
     #
