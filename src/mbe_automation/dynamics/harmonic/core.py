@@ -281,6 +281,7 @@ def equilibrium_curve(
         filter_out_imaginary_acoustic,
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
+        filter_out_extrapolated_minimum,
         dataset,
         root_key,
         save_plots,
@@ -310,6 +311,7 @@ def equilibrium_curve(
     print(f"filter_out_imaginary_acoustic   {filter_out_imaginary_acoustic}")
     print(f"filter_out_imaginary_optical    {filter_out_imaginary_optical}")
     print(f"filter_out_broken_symmetry      {filter_out_broken_symmetry}")
+    print(f"filter_out_extrapolated_minimum {filter_out_extrapolated_minimum}")
     
     if eos_sampling == "volume" or eos_sampling == "uniform_scaling":
         print("sampled range of cell volumes (V∕V₀)")
