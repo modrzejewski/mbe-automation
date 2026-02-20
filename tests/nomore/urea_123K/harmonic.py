@@ -18,7 +18,7 @@ relaxation_config = Minimum(
     symmetrize_final_structure=False,
 )
 
-crystal, u_cart_exp = mbe_automation.storage.read_cif_with_apds("./urea_123K_xray.cif")
+crystal, u_cart_exp = mbe_automation.storage.cif.read_cif_with_apds("./urea_123K_xray.cif")
 print(u_cart_exp)
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(

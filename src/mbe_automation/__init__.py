@@ -1,11 +1,3 @@
-# CCTBX imports must precede numpy (loaded by submodules)
-# to avoid segmentation faults with numpy 2.x
-# This hack should be removed once CCTBX is fixed.
-try:
-    import iotbx.cif
-except ImportError:
-    pass
-
 from . import common
 from . import storage
 from . import structure

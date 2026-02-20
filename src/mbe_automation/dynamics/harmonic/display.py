@@ -517,15 +517,15 @@ def eos_fitting_summary(
         min_extrapolated = row["min_extrapolated"]
         
         if not min_found:
-            status = "skip (no minimum)"
+            status = "skipped (no minimum found)"
         elif min_extrapolated and filter_out_extrapolated_minimum:
-            status = "skip (extrapolated)"
+            status = "skipped (minimum beyond scanned range)"
         else:
-            status = "proceed"
+            status = "accepted"
             
         summary_rows.append({
-            "T (K)": f"{T:8.2f}",
-            "V (Å³)": f"{V:8.2f}" if not np.isnan(V) else f"{'N/A':>8}",
+            "T (K)": f"{T:8.1f}",
+            "V (Å³)": f"{V:8.1f}" if not np.isnan(V) else f"{'N/A':>8}",
             "min_found": f"{str(min_found):^10}",
             "min_extrapolated": f"{str(min_extrapolated):^16}",
             "status": status
@@ -551,8 +551,7 @@ def eos_fitting_summary(
         print("\nSuggestions:")
         print("1. Inspect the volume sampling range (volume_range/thermal_pressures_GPa).")
         print("   The current range might not bracket the equilibrium volume at all temperatures.")
-        print("2. Check for dynamic instabilities (imaginary phonon frequencies).")
-        print("   Inspect the phonon dispersion plots in the 'phonons' directory.")
+        print("2. Check phonon dispersion plots for imaginary frequencies.")
         print("3. Consider if the filtering criteria (filter_out_imaginary_*) are too strict.")
         
     print("=" * 80 + "\n", flush=True)
