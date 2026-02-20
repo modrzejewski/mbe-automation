@@ -278,6 +278,13 @@ class FreeEnergy:
             if np.any(diffs < 1.0E-5):
                  raise ValueError("Numerically close temperatures detected in temperatures_K.")
         
+        self.volume_range = np.sort(np.atleast_1d(self.volume_range))
+        if len(self.volume_range) > 1:
+            #
+            # Remove duplicate volumes
+            #
+            self.volume_range = self.volume_range[np.insert(np.diff(self.volume_range) >= 1.0E-3, 0, True)]
+
         if (
                 self.thermal_expansion and
                 self.relaxation.backend == "dftb"

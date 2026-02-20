@@ -521,7 +521,7 @@ def eos_fitting_summary(
         elif min_extrapolated and filter_out_extrapolated_minimum:
             status = "skipped (minimum beyond scanned range)"
         else:
-            status = "accepted"
+            status = "proceed"
             
         summary_rows.append({
             "T (K)": f"{T:8.1f}",
