@@ -5,6 +5,7 @@ from . import modes
 from . import display
 from . import euphonic
 from . import brillouin_zone
+from . import thermodynamics
 
 try:
     import nomore_ase
