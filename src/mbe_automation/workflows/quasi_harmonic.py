@@ -347,7 +347,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # The numerical algorithm chosen for dX/dT depends on the number of available
     # temperature points.
     #
-    df_thermal_expansion = mbe_automation.dynamics.harmonic.eos.fit_thermal_expansion_properties(
+    df_thermal_expansion = mbe_automation.dynamics.harmonic.thermodynamics.fit_thermal_expansion_properties(
         df_crystal_equilibrium=df_crystal_qha
     )
     if config.molecule is not None:
