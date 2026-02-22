@@ -12,8 +12,7 @@ from dataclasses import dataclass
 @dataclass
 class ThermalExpansionProperties:
     """
-    Store quantities evaluated by numerical differentiation
-    once equilibrium volumes at different temperatures are known.
+    Store quantities evaluated by numerical differentiation with respect to temperature.
     
     Attributes:
         C_P_tot_formula_I: Heat capacity at constant pressure computed via the derivative
@@ -258,6 +257,16 @@ def fit_thermal_expansion_properties(
                           spline differentiation and finite differences
                           disagree
     
+    Args:
+        df_crystal_equilibrium: Pandas DataFrame with columns:
+        - "T (K)"
+        - "V_crystal (Å³∕unit cell)"
+        - "H_tot_crystal (kJ∕mol∕unit cell)"
+        - "C_V_vib_crystal (J∕K∕mol∕unit cell)"
+        - "cell_length_a (Å)"
+        - "cell_length_b (Å)"
+        - "cell_length_c (Å)"
+        - "dSdV_vib_crystal (J∕K∕mol∕Å³∕unit cell)"
     """
     T = df_crystal_equilibrium["T (K)"].to_numpy()
     V = df_crystal_equilibrium["V_crystal (Å³∕unit cell)"].to_numpy()
