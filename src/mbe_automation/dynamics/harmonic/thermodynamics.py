@@ -1,22 +1,31 @@
 from __future__ import annotations
+from typing import Callable
+from numpy.polynomial.polynomial import Polynomial
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 from phonopy.physical_units import get_physical_units
 from scipy.interpolate import CubicSpline
 import warnings
+from dataclasses import dataclass
 
 @dataclass
 class ThermalExpansionProperties:
     """
-    Properties related to thermal expansion of a crystal,
-    computed using numerical differentiation.
+    Store quantities evaluated by numerical differentiation
+    once equilibrium volumes at different temperatures are known.
     
     Attributes:
         C_P_tot_formula_I: Heat capacity at constant pressure computed via the derivative
             of the total enthalpy with respect to temperature (C_P(T, p) = dH_tot(T, p)/dT).
         C_P_tot_formula_II: Heat capacity at constant pressure computed via the
-            mathematical relation: C_P(T, p) = C_V + T * V * alpha_V * (dS_vib(T, V) / dV)_(V=Veq(T,p)).
+            mathematical relation: C_P(T, p) = C_V(T, V) + T * V * alpha_V(T, V) * (dS_vib(T, V) / dV)
+            where V is the equilibrium volume at temperature T and pressure p:
+            V = Veq(T, p)
+        alpha_V: Volumetric thermal expansion coefficient.
+        alpha_L_a: Linear thermal expansion coefficient along the a-axis.
+        alpha_L_b: Linear thermal expansion coefficient along the b-axis.
+        alpha_L_c: Linear thermal expansion coefficient along the c-axis.
     """
     C_P_tot_formula_I: npt.NDArray[np.float64]
     C_P_tot_formula_II: npt.NDArray[np.float64]
@@ -131,7 +140,7 @@ def run(
     })
 
 
-def _fit_thermal_expansion_properties_finite_diff(T, V, H, S, C_V, a, b, c):
+def _fit_thermal_expansion_properties_finite_diff(T, V, H, C_V, a, b, c, dSdV):
     """
     Compute thermal expansion properties using finite differences.
     This procedure requires at least two data points for forward/backward
@@ -151,7 +160,6 @@ def _fit_thermal_expansion_properties_finite_diff(T, V, H, S, C_V, a, b, c):
     
     alpha_V = dVdT / V
     
-    dSdV = np.gradient(S, V)
     # C_P_tot_formula_II from Eq 39: C_V + T * dV/dT * dS/dV
     # We substitute dV/dT = V * alpha_V
     C_P_tot_formula_II = C_V + T * V * alpha_V * dSdV
@@ -189,7 +197,7 @@ def _hybrid_derivative(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -
 
     return d_dx
     
-def _fit_thermal_expansion_properties_cspline(T, V, H, S, C_V, a, b, c):
+def _fit_thermal_expansion_properties_cspline(T, V, H, C_V, a, b, c, dSdV):
     """
     Compute thermal expansion properties using numerical differentiation
     of a cubic spline. This procedure requires at least four data points.
@@ -203,18 +211,6 @@ def _fit_thermal_expansion_properties_cspline(T, V, H, S, C_V, a, b, c):
     
     alpha_V = dVdT / V
 
-    # Calculate dS/dV for Eq 39
-    # CubicSpline requires strictly increasing V's.
-    if np.any(np.diff(np.sort(V)) <= 1.0):
-        raise RuntimeError("Equilibrium volumes must differ by more than 1 Å³. Cannot compute dS/dV using CubicSpline.")
-
-    sort_idx = np.argsort(V)
-    V_sorted = V[sort_idx]
-    S_sorted = S[sort_idx]
-    dSdV_sorted = _hybrid_derivative(V_sorted, S_sorted)
-    dSdV = np.empty_like(dSdV_sorted)
-    dSdV[sort_idx] = dSdV_sorted
-    
     C_P_tot_formula_II = C_V + T * V * alpha_V * dSdV
     
     return ThermalExpansionProperties(
@@ -226,7 +222,9 @@ def _fit_thermal_expansion_properties_cspline(T, V, H, S, C_V, a, b, c):
         alpha_L_c = dcdT / c,  # 1/K
     )
 
-def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
+def fit_thermal_expansion_properties(
+    df_crystal_equilibrium: pd.DataFrame
+):
     """
     Compute physical quantities by numerical differentiation
 
@@ -264,11 +262,11 @@ def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
     T = df_crystal_equilibrium["T (K)"].to_numpy()
     V = df_crystal_equilibrium["V_crystal (Å³∕unit cell)"].to_numpy()
     H = df_crystal_equilibrium["H_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
-    S = df_crystal_equilibrium["S_vib_crystal (J∕K∕mol∕unit cell)"].to_numpy()
     C_V = df_crystal_equilibrium["C_V_vib_crystal (J∕K∕mol∕unit cell)"].to_numpy()
     a = df_crystal_equilibrium["cell_length_a (Å)"].to_numpy()
     b = df_crystal_equilibrium["cell_length_b (Å)"].to_numpy()
     c = df_crystal_equilibrium["cell_length_c (Å)"].to_numpy()
+    dSdV = df_crystal_equilibrium["dSdV_vib_crystal (J∕K∕mol∕Å³∕unit cell)"].to_numpy()
 
     n_temperatures = len(T)
     #
@@ -281,12 +279,12 @@ def fit_thermal_expansion_properties(df_crystal_equilibrium: pd.DataFrame):
 
     if n_temperatures >= 4:
         properties = _fit_thermal_expansion_properties_cspline(
-            T, V, H, S, C_V, a, b, c
+            T, V, H, C_V, a, b, c, dSdV=dSdV
         )
     
     elif n_temperatures >= 2:
         properties = _fit_thermal_expansion_properties_finite_diff(
-            T, V, H, S, C_V, a, b, c
+            T, V, H, C_V, a, b, c, dSdV=dSdV
         )
 
     else:

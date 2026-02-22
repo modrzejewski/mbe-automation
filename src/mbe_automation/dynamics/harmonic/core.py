@@ -22,6 +22,7 @@ import sys
 import pandas as pd
 import warnings
 from numpy.polynomial.polynomial import Polynomial
+from scipy.interpolate import CubicSpline
 
 import mbe_automation.common
 import mbe_automation.storage
@@ -33,6 +34,64 @@ import mbe_automation.dynamics.harmonic.data
 import mbe_automation.dynamics.harmonic.display
 from mbe_automation.configs.structure import Minimum
 from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
+from dataclasses import dataclass
+
+@dataclass
+class InterpolatedHarmonicProperties:
+    interpolated_at_equilibrium_volume: pd.DataFrame
+    exact_at_sampled_volume: pd.DataFrame
+    select_T: list[npt.NDArray[np.bool_]]
+    temperatures_K: npt.NDArray[np.float64]
+
+    def S_vib_at_T(
+        self, 
+        temperature_K: float, 
+        derivative: bool = False
+    ) -> CubicSpline | Polynomial:
+        """
+        Return an interpolated continuous function S_vib(V) at temperature T.
+
+        Fit a cubic spline or a quadratic polynomial to the vibrational
+        entropy as a function of the unit cell volume.
+
+        Args:
+            temperature_K (float): Temperature at which to interpolate (K).
+            derivative (bool, optional): If True, return the volume 
+                derivative dS_vib/dV instead of S_vib(V). Defaults to False.
+
+        Returns:
+            Callable: An interpolable function taking unit cell volume (Å³) 
+            as input and returning the vibrational entropy (J∕K∕mol∕unit cell), 
+            or its volume derivative at constant temperature (J∕K∕mol∕Å³∕unit cell).
+        """
+        idx = np.where(np.isclose(self.temperatures_K, temperature_K, atol=1e-6))[0]
+        if len(idx) == 0:
+            raise ValueError(f"Temperature {temperature_K} K not found in sampled temperatures.")
+        
+        i = idx[0]
+        mask = self.select_T[i]
+        df_T = self.exact_at_sampled_volume[mask]
+        
+        V = df_T["V_crystal (Å³∕unit cell)"].to_numpy()
+        S = df_T["S_vib_crystal (J∕K∕mol∕unit cell)"].to_numpy()
+        
+        # Sort values by volume to ensure CubicSpline works correctly
+        sort_idx = np.argsort(V)
+        V_sorted = V[sort_idx]
+        S_sorted = S[sort_idx]
+        
+        n_volumes = len(V_sorted)
+        if n_volumes < 3:
+            raise ValueError(
+                f"Cannot fit S_vib(V) at T={temperature_K} K. "
+                f"Need at least 3 volumes, but got {n_volumes}."
+            )
+        elif n_volumes == 3:
+            interpolator = Polynomial.fit(V_sorted, S_sorted, deg=2)
+            return interpolator.deriv(1) if derivative else interpolator
+        else:
+            interpolator = CubicSpline(V_sorted, S_sorted, bc_type="not-a-knot")
+            return interpolator.derivative(1) if derivative else interpolator
 
 def _assert_equivalent_cells(
         phonopy_cell: PhonopyAtoms,
@@ -569,5 +628,10 @@ def equilibrium_curve(
         df_crystal_eos=df,
         filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
     )
-    return df
+    return InterpolatedHarmonicProperties(
+        interpolated_at_equilibrium_volume=df,
+        exact_at_sampled_volume=df_eos[good_points],
+        select_T=select_T,
+        temperatures_K=np.array(temperatures)
+    )
 

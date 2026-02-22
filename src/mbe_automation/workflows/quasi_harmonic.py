@@ -6,6 +6,7 @@ import ase.units
 import numpy as np
 import pandas as pd
 import warnings
+import functools
 
 import mbe_automation.common
 import mbe_automation.configs
@@ -213,7 +214,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     #
     interp_mesh = phonons.mesh.mesh_numbers # enforce the same mesh for all systems
 
-    df_crystal_eos = mbe_automation.dynamics.harmonic.core.equilibrium_curve(
+    interpolated_harmonic_props = mbe_automation.dynamics.harmonic.core.equilibrium_curve(
         unit_cell_V0,
         space_group_V0,
         config.calculator,
@@ -237,6 +238,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.root_key,
         config.save_plots,
     )
+    df_crystal_eos = interpolated_harmonic_props.interpolated_at_equilibrium_volume
     #
     # Harmonic properties for unit cells with temperature-dependent
     # equilibrium volumes V(T). Data points where eos fit failed
@@ -317,6 +319,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             system_label=label_crystal,
             level_of_theory=config.calculator.level_of_theory,
         )
+        interpolator = interpolated_harmonic_props.S_vib_at_T(T, derivative=True)
+        df_crystal_T["dSdV_vib_crystal (J∕K∕mol∕Å³∕unit cell)"] = interpolator(V)
         df_crystal_T.index = [i] # map current dataframe to temperature T
         data_frames_at_T.append(df_crystal_T)
 
