@@ -38,10 +38,26 @@ from dataclasses import dataclass
 
 @dataclass
 class InterpolatedHarmonicProperties:
+    """
+    Store harmonic properties interpolated at temperature-dependent equilibrium volumes.
+
+    Attributes:
+        interpolated_at_equilibrium_volume: Harmonic properties interpolated at the equilibrium volume for each temperature.
+        exact_at_sampled_volume: Harmonic properties computed at the sampled volumes.
+        select_T: Boolean masks selecting rows in `exact_at_sampled_volume` for each temperature.
+        temperatures_K: Temperatures (K).
+        sampled_volumes_A3: Cell volumes (Å³) of sampled points (accepted as high-quality 
+        according to the filtering criteria).
+        dataset: HDF5 dataset name containing the computed `ForceConstants`.
+        force_constants_keys: List of HDF5 keys corresponding to the `ForceConstants` of the sampled points.
+    """
     interpolated_at_equilibrium_volume: pd.DataFrame
     exact_at_sampled_volume: pd.DataFrame
     select_T: list[npt.NDArray[np.bool_]]
     temperatures_K: npt.NDArray[np.float64]
+    sampled_volumes_A3: npt.NDArray[np.float64]
+    dataset: str
+    force_constants_keys: list[str]
 
     def S_vib_at_T(
         self, 
@@ -628,10 +644,18 @@ def equilibrium_curve(
         df_crystal_eos=df,
         filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
     )
+    force_constants_keys = [
+        f"{root_key}/phonons/force_constants/{label}"
+        for label in df_eos[good_points & select_T[0]]["system_label_crystal"]
+    ]
+
     return InterpolatedHarmonicProperties(
         interpolated_at_equilibrium_volume=df,
         exact_at_sampled_volume=df_eos[good_points],
         select_T=select_T,
-        temperatures_K=np.array(temperatures)
+        temperatures_K=np.array(temperatures),
+        sampled_volumes_A3=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
+        dataset=dataset,
+        force_constants_keys=force_constants_keys
     )
 
