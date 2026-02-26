@@ -24,6 +24,7 @@ from mbe_automation.storage import MolecularCrystal as _MolecularCrystal
 from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 from mbe_automation.storage import AtomicReference as _AtomicReference
 from mbe_automation.storage import BrillouinZonePath as _BrillouinZonePath
+from mbe_automation.dynamics.harmonic.core import EOSMetadata as _EOSMetadata
 import mbe_automation.dynamics.harmonic.modes
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, ThermalDisplacements
 from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING, DEFAULT_DEGENERATE_FREQS_TOL
@@ -54,6 +55,51 @@ if TYPE_CHECKING:
     from nomore_ase.core.frequency_partition import FrequencyPartitionStrategy
     from mbe_automation.dynamics.harmonic.refinement import NormalModeRefinement
     from phonopy.phonon.band_structure import BandStructure
+
+@dataclass(kw_only=True)
+class EOSMetadata(_EOSMetadata):
+    @classmethod
+    def read(cls, dataset: str, key: str) -> EOSMetadata:
+        return cls(**vars(
+            mbe_automation.storage.core.read_eos_metadata(dataset, key)
+        ))
+
+    def gruneisen_model(
+        self,
+        reference_volume_idx: int,
+        mesh_size: npt.NDArray[np.integer] | str | float,
+        temperature_K: float,
+        polynomial_degree: Literal[1, 2] = 2,
+        freq_min_THz: float = 1e-3,
+        band_selection_strategy: FrequencyPartitionStrategy | None = None,
+    ) -> mbe_automation.dynamics.harmonic.gruneisen.GammaPointGruneisenModel:
+        """
+        Construct a Gamma-point Gruneisen model from the equation of state data.
+        
+        Args:
+            reference_volume_idx: Index of the reference volume in `sampled_volumes_A3`.
+            mesh_size: The k-point mesh used to compute atomic displacement parameters.
+            temperature_K: Temperature in Kelvin used for computing atomic displacements.
+            polynomial_degree: Degree of the polynomial fit for the volume-dependent 
+                Gruneisen parameter.
+            freq_min_THz: Minimum frequency threshold. Bands with frequencies below 
+                this value will not be scaled.
+            band_selection_strategy: Strategy for partitioning frequencies during 
+                the refinement process.
+                
+        Returns:
+            GammaPointGruneisenModel object capable of scaling effective 
+            Gamma-point frequencies to arbitrary volumes.
+        """
+        return mbe_automation.dynamics.harmonic.gruneisen.GammaPointGruneisenModel.from_eos_metadata(
+            harmonic_properties=self,
+            reference_volume_idx=reference_volume_idx,
+            mesh_size=mesh_size,
+            temperature_K=temperature_K,
+            polynomial_degree=polynomial_degree,
+            freq_min_THz=freq_min_THz,
+            band_selection_strategy=band_selection_strategy,
+        )
 
 @dataclass(kw_only=True)
 class BrillouinZonePath(_BrillouinZonePath):

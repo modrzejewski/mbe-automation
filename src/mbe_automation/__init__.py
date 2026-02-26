@@ -32,5 +32,6 @@ from .api import (
     AtomicReference,
     AnySystem,
     BrillouinZonePath,
+    EOSMetadata,
     run,
 )
