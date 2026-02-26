@@ -739,6 +739,98 @@ def read_eos_curves(
     return eos_curves
 
 
+def save_eos_metadata(
+        eos_metadata,
+        dataset: str,
+        key: str,
+):
+    """
+    Save an EOSMetadata object to an HDF5 dataset.
+    """
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
+    with dataset_file(dataset, "a") as f:
+        if key in f:
+            del f[key]
+
+        group = f.create_group(key)
+        group.attrs["dataclass"] = "EOSMetadata"
+
+        group.create_dataset(
+            name="T (K)",
+            data=eos_metadata.temperatures_K
+        )
+        group.create_dataset(
+            name="V_sampled (Å³∕unit cell)",
+            data=eos_metadata.sampled_volumes_A3
+        )
+        group.create_dataset(
+            name="force_constants_keys",
+            data=np.array([s.encode("utf-8") for s in eos_metadata.force_constants_keys]),
+            dtype=h5py.string_dtype(encoding="utf-8")
+        )
+
+        select_T_stacked = np.vstack(eos_metadata.select_T)
+        group.create_dataset(
+            name="select_T",
+            data=select_T_stacked
+        )
+
+    # Save DataFrames outside the main dataset_file block to prevent 
+    # deadlocks if save_data_frame also acquires a lock 
+    # (though save_data_frame also uses dataset_file internally).
+    save_data_frame(
+        dataset=dataset,
+        key=f"{key}/interpolated_at_equilibrium_volume",
+        df=eos_metadata.interpolated_at_equilibrium_volume
+    )
+    save_data_frame(
+        dataset=dataset,
+        key=f"{key}/exact_at_sampled_volume",
+        df=eos_metadata.exact_at_sampled_volume
+    )
+
+
+def read_eos_metadata(
+        dataset: str,
+        key: str,
+):
+    """
+    Read an EOSMetadata object from an HDF5 dataset.
+    """
+    from mbe_automation.dynamics.harmonic.core import EOSMetadata
+    
+    with dataset_file(dataset, "r") as f:
+        group = f[key]
+        
+        temperatures_K = group["T (K)"][...]
+        sampled_volumes_A3 = group["V_sampled (Å³∕unit cell)"][...]
+        force_constants_keys = group["force_constants_keys"][...].astype(str).tolist()
+        
+        select_T_stacked = group["select_T"][...]
+        select_T = [row for row in select_T_stacked]
+
+    # Read DataFrames sequentially
+    interpolated_df = read_data_frame(
+        dataset=dataset,
+        key=f"{key}/interpolated_at_equilibrium_volume"
+    )
+    exact_df = read_data_frame(
+        dataset=dataset,
+        key=f"{key}/exact_at_sampled_volume"
+    )
+
+    return EOSMetadata(
+        interpolated_at_equilibrium_volume=interpolated_df,
+        exact_at_sampled_volume=exact_df,
+        select_T=select_T,
+        temperatures_K=temperatures_K,
+        sampled_volumes_A3=sampled_volumes_A3,
+        dataset=dataset,
+        force_constants_keys=force_constants_keys
+    )
+
+
+
 def _save_structure(
         dataset: str,
         key: str,

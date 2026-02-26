@@ -46,6 +46,7 @@ import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.thermodynamics
 import mbe_automation.dynamics.harmonic.brillouin_zone
+import mbe_automation.dynamics.harmonic.gruneisen
 from copy import deepcopy
 
 
@@ -365,45 +366,6 @@ class ForceConstants(_ForceConstants):
                 degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
             )
         ))
-
-    def gruneisen_parameters(
-            self,
-            mesh_size: npt.NDArray[np.integer] | str | float,
-            calculator: CALCULATORS,
-            relaxation_config: Minimum,
-            delta_V: float = 0.02,
-            supercell_displacement: float = 0.01,
-            work_dir: Path | str = Path("./"),
-            degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
-    ):
-        """
-        Compute Gruneisen parameters on a given k-point mesh.
-        
-        Args:
-            mesh_size: The k-points for sampling the Brillouin zone. Can be:
-                - "gamma": Use only the [0, 0, 0] k-point.
-                - A floating point number: Defines a supercell of radius R.
-                - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
-            calculator: Calculator for optimization and phonon calculations.
-            relaxation_config: Configuration for structure relaxation.
-            delta_V: Fractional volume change for numerical differentiation (e.g. 0.01 for 1%).
-            supercell_displacement: Displacement distance for phonon calculations.
-            work_dir: Working directory for intermediate files.
-            degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
-                This threshold is needed because the band tracking algorithm needs to
-                apply degenerate perturbation theory when some of the frequencies form
-                a degenerate subset.
-        """
-        return mbe_automation.dynamics.harmonic.modes.gruneisen_parameters(
-            force_constants=self,
-            mesh_size=mesh_size,
-            calculator=calculator,
-            relaxation_config=relaxation_config,
-            delta_V=delta_V,
-            supercell_displacement=supercell_displacement,
-            work_dir=work_dir,
-            degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
-        )
 
     def refine(
         self,

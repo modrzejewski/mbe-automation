@@ -37,7 +37,7 @@ from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLIN
 from dataclasses import dataclass
 
 @dataclass
-class InterpolatedHarmonicProperties:
+class EOSMetadata:
     """
     Store harmonic properties interpolated at temperature-dependent equilibrium volumes.
 
@@ -649,7 +649,7 @@ def equilibrium_curve(
         for label in df_eos[good_points & select_T[0]]["system_label_crystal"]
     ]
 
-    return InterpolatedHarmonicProperties(
+    eos_obj = EOSMetadata(
         interpolated_at_equilibrium_volume=df,
         exact_at_sampled_volume=df_eos[good_points],
         select_T=select_T,
@@ -658,4 +658,12 @@ def equilibrium_curve(
         dataset=dataset,
         force_constants_keys=force_constants_keys
     )
+
+    mbe_automation.storage.core.save_eos_metadata(
+        eos_metadata=eos_obj,
+        dataset=dataset,
+        key=f"{root_key}/eos_metadata"
+    )
+
+    return eos_obj
 

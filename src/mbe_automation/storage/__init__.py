@@ -32,6 +32,8 @@ from mbe_automation.storage.core import (
     read_finite_subsystem,
     save_attribute,
     read_attribute,
+    save_eos_metadata,
+    read_eos_metadata,
 )
 
 from .tools import (
