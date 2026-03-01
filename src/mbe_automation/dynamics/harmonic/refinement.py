@@ -41,6 +41,70 @@ try:
 except ImportError:
     _NOMORE_AVAILABLE = False
     from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING, DEFAULT_DEGENERATE_FREQS_TOL
+    class FrequencyPartitionStrategy:
+        pass
+
+
+@dataclass
+class LowestNBands(FrequencyPartitionStrategy):
+    """
+    Partition modes by assigning independent scaling factors to the lowest n bands.
+
+    Fix all higher bands.
+    """
+    n: int
+
+    def compute_groups(
+        self,
+        phonon_data: Any,
+        pre_groups: Optional[List[List[int]]] = None
+    ) -> Any:
+        from nomore_ase.core.frequency_partition import RefinementGroups
+
+        band_indices = phonon_data.band_indices
+        n_modes = len(band_indices)
+        group_ids = np.full(n_modes, -1, dtype=int)
+        metadata = {}
+
+        if pre_groups is None:
+            # Fallback to individual band IDs if no pre_groups
+            mask = (band_indices >= 0) & (band_indices < self.n)
+            group_ids[mask] = band_indices[mask]
+            
+            metadata[-1] = {"type": "fixed", "n_modes": int(np.sum(group_ids == -1))}
+            for b in range(self.n):
+                metadata[b] = {
+                    "type": "band",
+                    "band_index": b,
+                    "n_modes": int(np.sum(band_indices == b))
+                }
+        else:
+            # Assign single group ID to each pre_group that falls within the lowest n bands
+            next_group_id = 0
+            for pre_group in pre_groups:
+                # Get the bands corresponding to these modes
+                bands_in_group = band_indices[pre_group]
+                # A pre_group is considered 'active' if any of its modes belongs to a band < n
+                # (typically all modes in a degeneracy group belong to the same band, or set of degenerate bands)
+                if np.any((bands_in_group >= 0) & (bands_in_group < self.n)):
+                    group_ids[pre_group] = next_group_id
+                    
+                    band_idx = int(bands_in_group[0]) if len(bands_in_group) > 0 else -1
+                    metadata[next_group_id] = {
+                        "type": "degenerate_band",
+                        "band_index": band_idx,
+                        "n_modes": len(pre_group)
+                    }
+                    next_group_id += 1
+                else:
+                    group_ids[pre_group] = -1
+
+            metadata[-1] = {"type": "fixed", "n_modes": int(np.sum(group_ids == -1))}
+
+        return RefinementGroups(
+            group_ids=group_ids,
+            group_metadata=metadata
+        )
 
 
 @dataclass
