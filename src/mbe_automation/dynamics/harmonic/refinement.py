@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
-from typing import Dict, Any, Optional, Literal, List, TYPE_CHECKING
+from typing import Any, Optional, Literal, List
 import phonopy.physical_units
 import mbe_automation.dynamics.harmonic.modes
 from scipy.spatial.distance import cdist
@@ -190,6 +190,7 @@ def to_phonon_data(
     cif_adapter: Optional["CctbxAdapter"] = None,
     q_spacing: float = DEFAULT_Q_SPACING,
     degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
+    symmetry_tolerance: float | None = None,
 ) -> PhononData:
     """
     Create PhononData object from computed phonopy data, matching atoms to CIF.
@@ -202,6 +203,10 @@ def to_phonon_data(
             If None, identity permutation is assumed.
         q_spacing: Spacing for path interpolation in Å⁻¹. Used for band tracking.
         degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
+        symmetry_tolerance: Tolerance used by nomore_ase to determine if two 
+            normal modes are degenerate. It defines the minimum required inner product 
+            (overlap) between their eigenvectors after applying a lattice 
+            symmetry operation.
 
     Returns:
         PhononData object ready for refinement.
@@ -230,7 +235,7 @@ def to_phonon_data(
         reordering_needed = not np.all(source_to_target_indices == np.arange(n_atoms_fc))
         
         if reordering_needed:
-            print(f"Reordering ForceConstants atoms to match CIF order. Permutation found.")
+            print("Reordering ForceConstants atoms to match CIF order. Permutation found.")
         else:
             print("Atom order matches between ForceConstants and CIF.")
         
@@ -287,7 +292,12 @@ def to_phonon_data(
     )
     # band_indices: (n_q, n_modes)
     gamma_index = np.argmin(np.linalg.norm(irr_q_frac, axis=1))
-    degeneracy_groups = determine_degenerate_bands(ph, band_indices, gamma_index)
+    degeneracy_groups = determine_degenerate_bands(
+        ph, 
+        band_indices, 
+        gamma_index,
+        symmetry_tolerance=symmetry_tolerance
+    )
 
     mode_q_indices = np.repeat(np.arange(len(irr_q_frac)), n_modes_total)
 
@@ -622,6 +632,7 @@ def run(
     q_spacing: float = DEFAULT_Q_SPACING,
     reasonable_range: tuple[float, float] | None = None,
     degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
+    symmetry_tolerance: float | None = None,
 ) -> NormalModeRefinement:
     """
     Perform normal mode refinement.
@@ -637,6 +648,10 @@ def run(
         q_spacing: Spacing for path interpolation in Å⁻¹ along q-point paths.
         reasonable_range: Allowed range for optimized scaling factors.
         degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
+        symmetry_tolerance: Tolerance used by nomore_ase to determine if two 
+            normal modes are degenerate. It defines the minimum required inner product 
+            (overlap) between their eigenvectors after applying a lattice 
+            symmetry operation.
         
     Returns:
         NormalModeRefinement object with frequencies, ADPs, and mesh data.
@@ -679,6 +694,7 @@ def run(
     print(f"use_irreducible_fbz      {use_irreducible_fbz}")
     print(f"temperature_K            {temperature_K if temperature_K is not None else 'from CIF'}")
     print(f"degenerate_freqs_tol     {degenerate_freqs_tol_cm1} cm⁻¹")
+    print(f"symmetry_tolerance       {symmetry_tolerance}")
 
     if isinstance(mesh_size, (list, tuple, np.ndarray)):
         mesh_size = np.array(mesh_size)
@@ -714,6 +730,7 @@ def run(
         cif_adapter=cctbx_adapter,
         q_spacing=q_spacing,
         degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+        symmetry_tolerance=symmetry_tolerance,
     )
     
     if temperature_K is not None:

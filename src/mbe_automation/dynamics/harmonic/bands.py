@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import numpy as np
 import numpy.typing as npt
-from typing import TYPE_CHECKING, Any, List, Literal
+from typing import Any, List, Literal
 import phonopy
-from mbe_automation.storage.core import ForceConstants
 from mbe_automation.storage import views
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT
 from mbe_automation.dynamics.harmonic.modes import at_k_points
@@ -239,7 +238,8 @@ def find_degenerate_frequencies(
 def determine_degenerate_bands(
     phonopy_object: phonopy.Phonopy,
     band_indices: npt.NDArray[np.int64],
-    gamma_index: int
+    gamma_index: int,
+    symmetry_tolerance: float | None = None,
 ) -> List[List[int]]:
     """
     Compute degeneracy groups using nomore_ase's rigorous symmetry analysis.
@@ -257,6 +257,10 @@ def determine_degenerate_bands(
         band_indices: (n_q * n_bands,) or (n_q, n_bands) array of band indices.
                       Values must be in range [0, n_bands-1].
         gamma_index: Index of the Gamma point in the q-point list corresponding to band_indices.
+        symmetry_tolerance: Tolerance used by nomore_ase to determine if two 
+            normal modes are degenerate. It defines the minimum required inner product 
+            (overlap) between their eigenvectors after applying a lattice 
+            symmetry operation. Defaults to 0.01 if None (1% overlap test).
         
     Returns:
         List of lists, where each inner list contains mode indices (into the flattened frequency array)
@@ -294,7 +298,13 @@ def determine_degenerate_bands(
     n_modes = n_atoms * 3
     
     eigenvectors = eigenvecs_gamma.reshape(n_modes, n_atoms, 3)
-    gamma_mode_groups = sym_calc.find_degeneracy_groups_by_symmetry(eigenvectors, q_point=(0,0,0))
+    
+    tol = symmetry_tolerance if symmetry_tolerance is not None else 0.01
+    gamma_mode_groups = sym_calc.find_degeneracy_groups_by_symmetry(
+        eigenvectors, 
+        q_point=(0,0,0),
+        tol=tol
+    )
     
     bands_at_gamma = band_indices[gamma_index]    
     flat_band_indices = band_indices.flatten()

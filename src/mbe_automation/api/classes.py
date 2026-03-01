@@ -2,12 +2,11 @@ from __future__ import annotations
 import phonopy
 from dataclasses import dataclass, field
 import typing
-from typing import Tuple, Literal, Sequence, List, TYPE_CHECKING, Optional
+from typing import Tuple, Literal, Sequence, List, TYPE_CHECKING
 from pathlib import Path
 import pandas as pd
 import numpy as np
 import numpy.typing as npt
-import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 
@@ -42,19 +41,17 @@ from mbe_automation.storage.core import (
     CALCULATION_STATUS_FAILED,
     read_attribute,
 )
-from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE, Minimum
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_LOOSE
 import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.thermodynamics
 import mbe_automation.dynamics.harmonic.brillouin_zone
 import mbe_automation.dynamics.harmonic.gruneisen
-from copy import deepcopy
 
 
 if TYPE_CHECKING:
     from nomore_ase.core.frequency_partition import FrequencyPartitionStrategy
     from mbe_automation.dynamics.harmonic.refinement import NormalModeRefinement
-    from phonopy.phonon.band_structure import BandStructure
 
 @dataclass(kw_only=True)
 class EOSMetadata(_EOSMetadata):
@@ -73,6 +70,7 @@ class EOSMetadata(_EOSMetadata):
         freq_min_THz: float = 1e-3,
         band_selection_strategy: FrequencyPartitionStrategy | None = None,
         external_freqs_THz: npt.NDArray[np.float64] | None = None,
+        symmetry_tolerance: float | None = None,
     ) -> mbe_automation.dynamics.harmonic.gruneisen.GammaPointGruneisenModel:
         """
         Construct a Gamma-point Gruneisen model from the equation of state data.
@@ -102,6 +100,7 @@ class EOSMetadata(_EOSMetadata):
             freq_min_THz=freq_min_THz,
             band_selection_strategy=band_selection_strategy,
             external_freqs_THz=external_freqs_THz,
+            symmetry_tolerance=symmetry_tolerance,
         )
 
 @dataclass(kw_only=True)
@@ -430,6 +429,7 @@ class ForceConstants(_ForceConstants):
         q_spacing: float = DEFAULT_Q_SPACING,
         reasonable_range: tuple[float, float] | None = None,
         degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
+        symmetry_tolerance: float | None = None,
     ) -> NormalModeRefinement:
         """
         Refine phonon frequencies using the NoMoRe refinement API.
@@ -453,6 +453,10 @@ class ForceConstants(_ForceConstants):
                 This threshold is needed because the band tracking algorithm needs to
                 apply degenerate perturbation theory when some of the frequencies form
                 a degenerate subset.
+            symmetry_tolerance: Tolerance used by nomore_ase to determine if two 
+                normal modes are degenerate. It defines the minimum required inner product 
+                (overlap) between their eigenvectors after applying a lattice 
+                symmetry operation. Defaults to 0.01 (1% overlap test).
         
         Returns:
             NormalModeRefinement object with frequencies, ADPs, and mesh data.
@@ -481,6 +485,7 @@ class ForceConstants(_ForceConstants):
             q_spacing=q_spacing,
             reasonable_range=reasonable_range,
             degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+            symmetry_tolerance=symmetry_tolerance,
         )
 
     def effective_gamma_point_freqs(

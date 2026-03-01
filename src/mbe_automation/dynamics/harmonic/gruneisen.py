@@ -2,9 +2,7 @@ from __future__ import annotations
 from typing import Literal, TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
-from pathlib import Path
 from dataclasses import dataclass
-import phonopy
 import pandas as pd
 from numpy.polynomial.polynomial import Polynomial
 from scipy.interpolate import CubicSpline
@@ -19,7 +17,6 @@ if TYPE_CHECKING:
     from nomore_ase.core.frequency_partition import FrequencyPartitionStrategy
 
 from mbe_automation.dynamics.harmonic.modes import (
-    phonopy_k_point_grid,
     PhononFilter,
 )
 from mbe_automation.dynamics.harmonic.core import EOSMetadata
@@ -59,6 +56,7 @@ class GammaPointGruneisenModel:
         freq_min_THz: float = 1e-3,
         band_selection_strategy: "FrequencyPartitionStrategy | None" = None,
         external_freqs_THz: npt.NDArray[np.float64] | None = None,
+        symmetry_tolerance: float | None = None,
     ) -> GammaPointGruneisenModel:
         """
         Construct a GammaPointGruneisenModel using effective frequencies.
@@ -75,6 +73,7 @@ class GammaPointGruneisenModel:
             polynomial_degree: Degree of the polynomial fit for gamma(V).
             freq_min_THz: Frequency threshold. Bands below this are not scaled.
             band_selection_strategy: Frequency partitioning strategy for refinement.
+            symmetry_tolerance: Tolerance for considering modes as mixing under transformation.
             
         Returns:
             GammaPointGruneisenModel: Model to interpolate effective frequencies.
@@ -126,7 +125,8 @@ class GammaPointGruneisenModel:
                 U_cart_ref=U_cart_ref,
                 temperature_K=temperature_K,
                 mesh_size="gamma",
-                band_selection_strategy=band_selection_strategy
+                band_selection_strategy=band_selection_strategy,
+                symmetry_tolerance=symmetry_tolerance,
             )
             
             omega_gamma = refinement.freqs_final_reordered_THz[0] # (N_bands) array
