@@ -23,6 +23,7 @@ dependencies = [
   "seekpath",
   "euphonic",
   "phonopy>=2.43.1",
+  "symfc>=1.6.1",
   "tqdm",
   "joblib",
   "h5py",
