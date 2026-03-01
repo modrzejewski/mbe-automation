@@ -556,7 +556,7 @@ def run(
     use_irreducible_fbz: bool = False,
     temperature_K: float | None = None,
     q_spacing: float = DEFAULT_Q_SPACING,
-    reasonable_range: tuple[float, float] = (0.1, 2.0),
+    reasonable_range: tuple[float, float] | None = None,
     degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
 ) -> NormalModeRefinement:
     """
@@ -673,6 +673,12 @@ def run(
     print(f"  Normalization factor (Total Q): {total_q}")
     print(f"  Temperature: {temperature} K")
     
+    if reasonable_range is None:
+        if len(irr_q_frac) == 1:
+            reasonable_range = (0.1, 10.0)
+        else:
+            reasonable_range = (0.1, 2.0)
+
     calculator = NoMoReCalculator(
         eigenvectors=phonons.eigenvectors,
         masses=phonons.masses,

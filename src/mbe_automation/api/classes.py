@@ -428,7 +428,7 @@ class ForceConstants(_ForceConstants):
         exclude_hydrogen_positions: bool = True,
         temperature_K: float | None = None,
         q_spacing: float = DEFAULT_Q_SPACING,
-        reasonable_range: tuple[float, float] = (0.1, 2.0),
+        reasonable_range: tuple[float, float] | None = None,
         degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
     ) -> NormalModeRefinement:
         """
