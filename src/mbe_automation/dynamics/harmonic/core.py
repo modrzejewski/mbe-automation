@@ -46,7 +46,7 @@ class EOSMetadata:
         exact_at_sampled_volume: Harmonic properties computed at the sampled volumes.
         select_T: Boolean masks selecting rows in `exact_at_sampled_volume` for each temperature.
         temperatures_K: Temperatures (K).
-        sampled_volumes_A3: Cell volumes (Å³) of sampled points (accepted as high-quality 
+        sampled_volumes: Cell volumes (Å³) of sampled points (accepted as high-quality 
         according to the filtering criteria).
         dataset: HDF5 dataset name containing the computed `ForceConstants`.
         force_constants_keys: List of HDF5 keys corresponding to the `ForceConstants` of the sampled points.
@@ -55,7 +55,7 @@ class EOSMetadata:
     exact_at_sampled_volume: pd.DataFrame
     select_T: list[npt.NDArray[np.bool_]]
     temperatures_K: npt.NDArray[np.float64]
-    sampled_volumes_A3: npt.NDArray[np.float64]
+    sampled_volumes: npt.NDArray[np.float64]
     dataset: str
     force_constants_keys: list[str]
 
@@ -654,7 +654,7 @@ def equilibrium_curve(
         exact_at_sampled_volume=df_eos[good_points],
         select_T=select_T,
         temperatures_K=np.array(temperatures),
-        sampled_volumes_A3=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
+        sampled_volumes=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
         dataset=dataset,
         force_constants_keys=force_constants_keys
     )

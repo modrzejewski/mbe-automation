@@ -72,12 +72,13 @@ class EOSMetadata(_EOSMetadata):
         polynomial_degree: Literal[1, 2] = 2,
         freq_min_THz: float = 1e-3,
         band_selection_strategy: FrequencyPartitionStrategy | None = None,
+        external_freqs_THz: npt.NDArray[np.float64] | None = None,
     ) -> mbe_automation.dynamics.harmonic.gruneisen.GammaPointGruneisenModel:
         """
         Construct a Gamma-point Gruneisen model from the equation of state data.
         
         Args:
-            reference_volume_idx: Index of the reference volume in `sampled_volumes_A3`.
+            reference_volume_idx: Index of the reference unit cell volume in `sampled_volumes`.
             mesh_size: The k-point mesh used to compute atomic displacement parameters.
             temperature_K: Temperature in Kelvin used for computing atomic displacements.
             polynomial_degree: Degree of the polynomial fit for the volume-dependent 
@@ -86,6 +87,7 @@ class EOSMetadata(_EOSMetadata):
                 this value will not be scaled.
             band_selection_strategy: Strategy for partitioning frequencies during 
                 the refinement process.
+            external_freqs_THz: Custom effective frequencies to propagate.
                 
         Returns:
             GammaPointGruneisenModel object capable of scaling effective 
@@ -99,6 +101,7 @@ class EOSMetadata(_EOSMetadata):
             polynomial_degree=polynomial_degree,
             freq_min_THz=freq_min_THz,
             band_selection_strategy=band_selection_strategy,
+            external_freqs_THz=external_freqs_THz,
         )
 
 @dataclass(kw_only=True)

@@ -761,7 +761,7 @@ def save_eos_metadata(
         )
         group.create_dataset(
             name="V_sampled (Å³∕unit cell)",
-            data=eos_metadata.sampled_volumes_A3
+            data=eos_metadata.sampled_volumes
         )
         group.create_dataset(
             name="force_constants_keys",
@@ -803,7 +803,7 @@ def read_eos_metadata(
         group = f[key]
         
         temperatures_K = group["T (K)"][...]
-        sampled_volumes_A3 = group["V_sampled (Å³∕unit cell)"][...]
+        sampled_volumes = group["V_sampled (Å³∕unit cell)"][...]
         force_constants_keys = group["force_constants_keys"][...].astype(str).tolist()
         
         select_T_stacked = group["select_T"][...]
@@ -824,7 +824,7 @@ def read_eos_metadata(
         exact_at_sampled_volume=exact_df,
         select_T=select_T,
         temperatures_K=temperatures_K,
-        sampled_volumes_A3=sampled_volumes_A3,
+        sampled_volumes=sampled_volumes,
         dataset=dataset,
         force_constants_keys=force_constants_keys
     )

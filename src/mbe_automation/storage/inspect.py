@@ -23,6 +23,7 @@ class DatasetKey:
         "ForceConstants",
         "BrillouinZonePath",
         "EOSCurves",
+        "EOSMetadata",
     ]
 
 @dataclass
@@ -96,7 +97,7 @@ class DatasetKeys:
                 contains_exactly_n_molecules = obj.attrs.get("n_molecules")
                 level_of_theory = None
 
-            elif dataclass_attr in ["ForceConstants", "BrillouinZonePath", "EOSCurves"]:
+            elif dataclass_attr in ["ForceConstants", "BrillouinZonePath", "EOSCurves", "EOSMetadata"]:
                 has_feature_vectors = None
                 has_ground_truth = None
                 is_periodic = True
@@ -176,6 +177,9 @@ class DatasetKeys:
 
     def eos_curves(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "EOSCurves")
+
+    def eos_metadata(self) -> DatasetKeys:
+        return self._filter(lambda x: x.dataclass == "EOSMetadata")
 
     def force_constants(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "ForceConstants")
