@@ -316,9 +316,6 @@ def phonons(
         show_drift=True,
         fc_calculator_log_level=1
     )
-    phonons.symmetrize_force_constants(
-        use_symfc_projector=True
-    )
     print(f"Force constants completed", flush=True)
     #
     # Computation of thermodynamic properties with phonopy requires
