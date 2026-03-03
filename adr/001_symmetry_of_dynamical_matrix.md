@@ -1,6 +1,6 @@
 # Transformation of the Dynamical Matrix under Spatial Symmetry
 
-This document derives the transformation properties of the dynamical matrix $D(\mathbf{q})$ under a spatial point group symmetry operation $S$ belonging to the space group of a crystal.
+This document derives the transformation properties of the dynamical matrix $D(\mathbf{q})$ under a spatial point group symmetry operation $S$ belonging to the space group of a crystal. All vectors (positions $\mathbf{r}$, displacements $\mathbf{u}$, wavevectors $\mathbf{q}$, reciprocal lattice vectors $\mathbf{G}$) are expressed in the **crystallographic (fractional) coordinate system**.
 
 ## 1. Transformation of Atomic Displacements
 
@@ -58,17 +58,17 @@ $$\Phi(S(\kappa_i), S(\kappa_j) | S\mathbf{R}) = S \Phi(\kappa_i, \kappa_j | \ma
 
 ## 3. Transformation of the Dynamical Matrix
 
-Following the Phonopy convention, the dynamical matrix block connecting basis atoms $\kappa_i$ and $\kappa_j$ at wavevector $\mathbf{q}$ is:
+Following the Phonopy convention, the dynamical matrix block connecting basis atoms $\kappa_i$ and $\kappa_j$ at wavevector $\mathbf{q}$ is defined with a $2\pi$ phase factor because we use fractional vectors:
 
-$$D(\kappa_i, \kappa_j | \mathbf{q}) = \frac{1}{\sqrt{m_{\kappa_i} m_{\kappa_j}}} \sum_{\mathbf{R}} \Phi(\kappa_i, \kappa_j | \mathbf{R}) e^{i \mathbf{q} \cdot (\mathbf{x}(\kappa_j, \mathbf{R}) - \mathbf{x}(\kappa_i, \mathbf{0}))}$$
+$$D(\kappa_i, \kappa_j | \mathbf{q}) = \frac{1}{\sqrt{m_{\kappa_i} m_{\kappa_j}}} \sum_{\mathbf{R}} \Phi(\kappa_i, \kappa_j | \mathbf{R}) e^{i 2\pi \mathbf{q} \cdot (\mathbf{x}(\kappa_j, \mathbf{R}) - \mathbf{x}(\kappa_i, \mathbf{0}))}$$
 
 Apply the similarity transformation $S$ to the dynamical matrix. Given that basis atom masses are invariant under crystal symmetry operations ($m_{S(\kappa)} = m_\kappa$), $S$ operates solely on the force constant tensor:
 
-$$S D(\kappa_i, \kappa_j | \mathbf{q}) S^{-1} = \frac{1}{\sqrt{m_{S(\kappa_i)} m_{S(\kappa_j)}}} \sum_{\mathbf{R}} \left[ S \Phi(\kappa_i, \kappa_j | \mathbf{R}) S^{-1} \right] e^{i \mathbf{q} \cdot (\mathbf{x}(\kappa_j, \mathbf{R}) - \mathbf{x}(\kappa_i, \mathbf{0}))}$$
+$$S D(\kappa_i, \kappa_j | \mathbf{q}) S^{-1} = \frac{1}{\sqrt{m_{S(\kappa_i)} m_{S(\kappa_j)}}} \sum_{\mathbf{R}} \left[ S \Phi(\kappa_i, \kappa_j | \mathbf{R}) S^{-1} \right] e^{i 2\pi \mathbf{q} \cdot (\mathbf{x}(\kappa_j, \mathbf{R}) - \mathbf{x}(\kappa_i, \mathbf{0}))}$$
 
 Substitute the relation derived in Section 2:
 
-$$S D(\kappa_i, \kappa_j | \mathbf{q}) S^{-1} = \frac{1}{\sqrt{m_{S(\kappa_i)} m_{S(\kappa_j)}}} \sum_{\mathbf{R}} \Phi(S(\kappa_i), S(\kappa_j) | S\mathbf{R}) e^{i \mathbf{q} \cdot (\mathbf{x}(\kappa_j, \mathbf{R}) - \mathbf{x}(\kappa_i, \mathbf{0}))}$$
+$$S D(\kappa_i, \kappa_j | \mathbf{q}) S^{-1} = \frac{1}{\sqrt{m_{S(\kappa_i)} m_{S(\kappa_j)}}} \sum_{\mathbf{R}} \Phi(S(\kappa_i), S(\kappa_j) | S\mathbf{R}) e^{i 2\pi \mathbf{q} \cdot (\mathbf{x}(\kappa_j, \mathbf{R}) - \mathbf{x}(\kappa_i, \mathbf{0}))}$$
 
 Rewrite the argument of the phase factor using the invariance of the scalar product under orthogonal transformations, $(S\mathbf{q}) \cdot (S\mathbf{b}) = \mathbf{a} \cdot \mathbf{b}$, and the coordinate mapping definitions:
 
@@ -78,11 +78,11 @@ $$= (S\mathbf{q}) \cdot (\mathbf{x}(S(\kappa_j), S\mathbf{R}) - \mathbf{x}(S(\ka
 
 Substitute this back into the summation:
 
-$$S D(\kappa_i, \kappa_j | \mathbf{q}) S^{-1} = \frac{1}{\sqrt{m_{S(\kappa_i)} m_{S(\kappa_j)}}} \sum_{\mathbf{R}} \Phi(S(\kappa_i), S(\kappa_j) | S\mathbf{R}) e^{i (S\mathbf{q}) \cdot (\mathbf{x}(S(\kappa_j), S\mathbf{R}) - \mathbf{x}(S(\kappa_i), \mathbf{0}))}$$
+$$S D(\kappa_i, \kappa_j | \mathbf{q}) S^{-1} = \frac{1}{\sqrt{m_{S(\kappa_i)} m_{S(\kappa_j)}}} \sum_{\mathbf{R}} \Phi(S(\kappa_i), S(\kappa_j) | S\mathbf{R}) e^{i 2\pi (S\mathbf{q}) \cdot (\mathbf{x}(S(\kappa_j), S\mathbf{R}) - \mathbf{x}(S(\kappa_i), \mathbf{0}))}$$
 
 Perform a change of variables in the summation. Define the transformed lattice vector $\mathbf{R}' = S\mathbf{R}$. Summing over all $\mathbf{R}$ is identical to summing over all $\mathbf{R}'$:
 
-$$S D(\kappa_i, \kappa_j | \mathbf{q}) S^{-1} = \frac{1}{\sqrt{m_{S(\kappa_i)} m_{S(\kappa_j)}}} \sum_{\mathbf{R}'} \Phi(S(\kappa_i), S(\kappa_j) | \mathbf{R}') e^{i (S\mathbf{q}) \cdot (\mathbf{x}(S(\kappa_j), \mathbf{R}') - \mathbf{x}(S(\kappa_i), \mathbf{0}))}$$
+$$S D(\kappa_i, \kappa_j | \mathbf{q}) S^{-1} = \frac{1}{\sqrt{m_{S(\kappa_i)} m_{S(\kappa_j)}}} \sum_{\mathbf{R}'} \Phi(S(\kappa_i), S(\kappa_j) | \mathbf{R}') e^{i 2\pi (S\mathbf{q}) \cdot (\mathbf{x}(S(\kappa_j), \mathbf{R}') - \mathbf{x}(S(\kappa_i), \mathbf{0}))}$$
 
 The right-hand side is exactly the definition of the dynamical matrix block evaluated for the sites $S(\kappa_i)$ and $S(\kappa_j)$ at the transformed wavevector $S\mathbf{q}$:
 
@@ -96,27 +96,27 @@ $$S\mathbf{q} = \mathbf{q} + \mathbf{G}$$
 
 Substitute this transformation into the definition of the dynamical matrix evaluated at $S\mathbf{q}$:
 
-$$D(S(\kappa_i), S(\kappa_j) | \mathbf{q} + \mathbf{G}) = \frac{1}{\sqrt{m_{S(\kappa_i)} m_{S(\kappa_j)}}} \sum_{\mathbf{R}'} \Phi(S(\kappa_i), S(\kappa_j) | \mathbf{R}') e^{i (\mathbf{q} + \mathbf{G}) \cdot (\mathbf{R}' + \mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})}$$
+$$D(S(\kappa_i), S(\kappa_j) | \mathbf{q} + \mathbf{G}) = \frac{1}{\sqrt{m_{S(\kappa_i)} m_{S(\kappa_j)}}} \sum_{\mathbf{R}'} \Phi(S(\kappa_i), S(\kappa_j) | \mathbf{R}') e^{i 2\pi (\mathbf{q} + \mathbf{G}) \cdot (\mathbf{R}' + \mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})}$$
 
 Expand the dot product in the exponential:
 
-$$e^{i (\mathbf{q} + \mathbf{G}) \cdot (\mathbf{R}' + \mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})} = e^{i \mathbf{q} \cdot (\mathbf{R}' + \mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})} e^{i \mathbf{G} \cdot \mathbf{R}'} e^{i \mathbf{G} \cdot (\mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})}$$
+$$e^{i 2\pi (\mathbf{q} + \mathbf{G}) \cdot (\mathbf{R}' + \mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})} = e^{i 2\pi \mathbf{q} \cdot (\mathbf{R}' + \mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})} e^{i 2\pi \mathbf{G} \cdot \mathbf{R}'} e^{i 2\pi \mathbf{G} \cdot (\mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})}$$
 
-The first term is exactly the phase factor required to reconstruct $D(S(\kappa_i), S(\kappa_j) | \mathbf{q})$. Because $\mathbf{G}$ is a reciprocal lattice vector and $\mathbf{R}'$ is a Bravais lattice vector, their dot product is an integer multiple of $2\pi$, meaning $e^{i \mathbf{G} \cdot \mathbf{R}'} = 1$. The expression simplifies to:
+The first term is exactly the phase factor required to reconstruct $D(S(\kappa_i), S(\kappa_j) | \mathbf{q})$. Because $\mathbf{G}$ is an integer-valued reciprocal lattice vector and $\mathbf{R}'$ is an integer-valued Bravais lattice vector (in fractional coordinates), their dot product is an integer $n$, meaning $e^{i 2\pi \mathbf{G} \cdot \mathbf{R}'} = e^{i 2\pi n} = 1$. The expression simplifies to:
 
-$$D(S(\kappa_i), S(\kappa_j) | S\mathbf{q}) = D(S(\kappa_i), S(\kappa_j) | \mathbf{q}) e^{i\mathbf{G} \cdot (\mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})}$$
+$$D(S(\kappa_i), S(\kappa_j) | S\mathbf{q}) = D(S(\kappa_i), S(\kappa_j) | \mathbf{q}) e^{i 2\pi \mathbf{G} \cdot (\mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})}$$
 
 Equating this with the transformation derived in Section 3 yields a relation between $3 \times 3$ blocks evaluated at the exact same wavevector $\mathbf{q}$:
 
-$$S D(\kappa_i, \kappa_j | \mathbf{q}) S^{-1} = D(S(\kappa_i), S(\kappa_j) | \mathbf{q}) e^{i\mathbf{G} \cdot (\mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})}$$
+$$S D(\kappa_i, \kappa_j | \mathbf{q}) S^{-1} = D(S(\kappa_i), S(\kappa_j) | \mathbf{q}) e^{i 2\pi \mathbf{G} \cdot (\mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})}$$
 
 To correct numerical deviations in a computed dynamical matrix, this exact symmetry is enforced by averaging over all $N_q$ operations in the little group. Isolate the target block $D(\kappa_i, \kappa_j | \mathbf{q})$ by applying $S^{-1}$ from the left and $S$ from the right:
 
-$$D(\kappa_i, \kappa_j | \mathbf{q}) = S^{-1} \left[ D(S(\kappa_i), S(\kappa_j) | \mathbf{q}) e^{i\mathbf{G} \cdot (\mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})} \right] S$$
+$$D(\kappa_i, \kappa_j | \mathbf{q}) = S^{-1} \left[ D(S(\kappa_i), S(\kappa_j) | \mathbf{q}) e^{i 2\pi \mathbf{G} \cdot (\mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})} \right] S$$
 
 The fully symmetrized block $D^{\text{sym}}(\kappa_i, \kappa_j | \mathbf{q})$ is the group average of the rotationally transformed blocks connecting the permuted atoms:
 
-$$D^{\text{sym}}(\kappa_i, \kappa_j | \mathbf{q}) = \frac{1}{N_q} \sum_{S \in G_{\mathbf{q}}} S^{-1} \left[ D(S(\kappa_i), S(\kappa_j) | \mathbf{q}) e^{i\mathbf{G} \cdot (\mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})} \right] S$$
+$$D^{\text{sym}}(\kappa_i, \kappa_j | \mathbf{q}) = \frac{1}{N_q} \sum_{S \in G_{\mathbf{q}}} S^{-1} \left[ D(S(\kappa_i), S(\kappa_j) | \mathbf{q}) e^{i 2\pi \mathbf{G} \cdot (\mathbf{r}_{S(\kappa_j)} - \mathbf{r}_{S(\kappa_i)})} \right] S$$
 
 Because $S$ is an orthogonal transformation in Cartesian coordinates, $S^{-1} = S^T$. The equation evaluates a purely $3 \times 3$ matrix multiplication for each symmetry operation.
 
