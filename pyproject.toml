@@ -33,8 +33,7 @@ dependencies = [
   "dynasor",
   "nglview",
   "pymatviz",
-  "chemiscope",
-  "cctbx-base",
+  "chemiscope"
 ]
 
 [project.optional-dependencies]
