@@ -79,6 +79,7 @@ dataset_path = "properties.hdf5"
 key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
 
 fc = ForceConstants.read(dataset=dataset_path, key=key)
+# You can optionally enable dynamical matrix symmetrization by passing symmetrize_Dq=True
 freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_points=np.array([0.0, 0.0, 0.0]))
 
 print("Frequencies (THz):")
@@ -116,6 +117,7 @@ fc = ForceConstants.read(dataset=dataset_path, key=key)
 refinement_result = fc.refine(
     cif_path=cif_path,
     mesh_size=[3, 3, 3],
+    symmetrize_Dq=True, # enabled by default
 )
 
 # The refinement_result object contains initial and final frequencies,
@@ -151,7 +153,8 @@ k_points = np.array([
 freqs_tracked, eigenvecs_tracked = fc.frequencies_and_eigenvectors(
     k_points=k_points,
     track_bands=True,
-    degenerate_freqs_tol_cm1=0.5
+    degenerate_freqs_tol_cm1=0.5,
+    symmetrize_Dq=True, # optionally symmetrize the dynamical matrix
 )
 
 # resulting freqs_tracked will have bands continuous in index j across k-points i

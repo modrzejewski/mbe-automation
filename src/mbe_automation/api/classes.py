@@ -229,6 +229,8 @@ class ForceConstants(_ForceConstants):
             track_bands: bool = False,
             degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
             delta_q: float = 0.05,
+            symmetrize_Dq: bool = False,
+            symprec: float = 1e-5,
     ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
         """
         Compute phonon frequencies and eigenvectors at specified k-points.
@@ -252,6 +254,8 @@ class ForceConstants(_ForceConstants):
                 when some of the frequencies form a degenerate subset.
             delta_q: Displacement distance for perturbation theory in Å⁻¹
                 Used only when track_bands=True.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
  
         Returns:
             A tuple containing:
@@ -262,18 +266,22 @@ class ForceConstants(_ForceConstants):
 
         if k_points.ndim == 1:
             freqs, evecs = mbe_automation.dynamics.harmonic.modes.at_k_point(
-                dynamical_matrix=ph.dynamical_matrix,
+                phonopy_object=ph,
                 k_point=k_points,
+                symmetrize_Dq=symmetrize_Dq,
+                symprec=symprec,
             )
             if eigenvectors_storage == "rows":
                 evecs = evecs.T
         else:
             freqs, evecs = mbe_automation.dynamics.harmonic.modes.at_k_points(
-                dynamical_matrix=ph.dynamical_matrix,
+                phonopy_object=ph,
                 k_points=k_points,
                 compute_eigenvecs=True,
                 freq_units="THz",
                 eigenvectors_storage=eigenvectors_storage,
+                symmetrize_Dq=symmetrize_Dq,
+                symprec=symprec,
             )
 
         if track_bands:
@@ -289,6 +297,8 @@ class ForceConstants(_ForceConstants):
                 q_points=k_points,
                 degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
                 delta_q=delta_q,
+                symmetrize_Dq=symmetrize_Dq,
+                symprec=symprec,
             )
             
             freqs, evecs = mbe_automation.dynamics.harmonic.bands.reorder(
@@ -339,7 +349,9 @@ class ForceConstants(_ForceConstants):
     def thermal_displacements(
             self,
             temperature_K: float,
-            phonon_filter: PhononFilter | None = None
+            phonon_filter: PhononFilter | None = None,
+            symmetrize_Dq: bool = False,
+            symprec: float = 1e-5,
     ) -> ThermalDisplacements:
         """
         Compute thermal displacement properties of atoms in the primitive cell.
@@ -348,11 +360,15 @@ class ForceConstants(_ForceConstants):
             temperature_K: Temperature in Kelvin.
             phonon_filter: A PhononFilter object which defines the subset
                 of phonons. If None, all phonons up to infinite frequency are included.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
         """
         return _thermal_displacements(
             force_constants=self,
             temperature_K=temperature_K,
-            phonon_filter=phonon_filter
+            phonon_filter=phonon_filter,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
         
     def to_cif_file(
@@ -362,6 +378,8 @@ class ForceConstants(_ForceConstants):
             temperature_K: float | None = None,
             phonon_filter: PhononFilter | None = None,
             check_roundtrip: bool = True,
+            symmetrize_Dq: bool = False,
+            symprec: float = 1e-5,
     ) -> None:
         """
         Save the primitive cell to a CIF file.
@@ -372,6 +390,8 @@ class ForceConstants(_ForceConstants):
             temperature_K: Temperature in Kelvin (required if save_adps is True).
             phonon_filter: Optional filter for phonons (used if save_adps is True).
             check_roundtrip: Whether to verify that ADPs are correctly saved (roundtrip check).
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
         """
         _to_cif_file(
             force_constants=self,
@@ -380,6 +400,8 @@ class ForceConstants(_ForceConstants):
             temperature_K=temperature_K,
             phonon_filter=phonon_filter,
             check_roundtrip=check_roundtrip,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
 
     def brillouin_zone_path(
@@ -388,6 +410,8 @@ class ForceConstants(_ForceConstants):
             track_bands: bool = False,
             delta_q: float = 0.05,
             degenerate_freqs_tol_cm1: float = 0.5,
+            symmetrize_Dq: bool = False,
+            symprec: float = 1e-5,
     ) -> BrillouinZonePath:
         """
         Determine high-symmetry path and calculate phonon dispersion.
@@ -400,6 +424,8 @@ class ForceConstants(_ForceConstants):
                 Used only when track_bands=True.
             degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
                 Used only when track_bands=True.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
 
         Returns:
             BrillouinZonePath object containing the calculated dispersion, q-points, labels, and distances.
@@ -412,6 +438,8 @@ class ForceConstants(_ForceConstants):
                 track_bands=track_bands,
                 delta_q=delta_q,
                 degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+                symmetrize_Dq=symmetrize_Dq,
+                symprec=symprec,
             )
         ))
 
@@ -430,6 +458,8 @@ class ForceConstants(_ForceConstants):
         reasonable_range: tuple[float, float] | None = None,
         degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
         symmetry_tolerance: float | None = None,
+        symmetrize_Dq: bool = True,
+        symprec: float = 1e-5,
     ) -> NormalModeRefinement:
         """
         Refine phonon frequencies using the NoMoRe refinement API.
@@ -456,13 +486,17 @@ class ForceConstants(_ForceConstants):
             symmetry_tolerance: Tolerance used by nomore_ase to determine if two 
                 normal modes are degenerate. It defines the minimum required inner product 
                 (overlap) between their eigenvectors after applying a lattice 
-                symmetry operation. Defaults to 0.01 (1% overlap test).
+                symmetry operation.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
         
         Returns:
             NormalModeRefinement object with frequencies, ADPs, and mesh data.
         """
         try:
-            import nomore_ase
+            # we're importing nomore only to check
+            # if this library is available in the environment
+            import nomore_ase 
             from mbe_automation.dynamics.harmonic import refinement
         except ImportError:
             raise ImportError(
@@ -486,6 +520,8 @@ class ForceConstants(_ForceConstants):
             reasonable_range=reasonable_range,
             degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
             symmetry_tolerance=symmetry_tolerance,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
 
     def effective_gamma_point_freqs(
@@ -493,6 +529,8 @@ class ForceConstants(_ForceConstants):
         temperature_K: float,
         band_selection_strategy: FrequencyPartitionStrategy | None = None,
         phonon_filter: PhononFilter | None = None,
+        symmetrize_Dq: bool = True,
+        symprec: float = 1e-5,
     ) -> npt.NDArray[np.float64]:
         """
         Compute effective Gamma-point frequencies using normal mode refinement.
@@ -506,6 +544,8 @@ class ForceConstants(_ForceConstants):
             band_selection_strategy: Frequency partitioning strategy. If None, 
                 defaults to SensitivityBasedStrategy(0.75, 0.90).
             phonon_filter: Optional filter for phonons passed to thermal displacement calculation.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
 
         Returns:
             f_gamma: Effective Gamma-point frequencies in THz.
@@ -527,7 +567,9 @@ class ForceConstants(_ForceConstants):
 
         adps = self.thermal_displacements(
             temperature_K=temperature_K,
-            phonon_filter=phonon_filter
+            phonon_filter=phonon_filter,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
         U_cart_ref = adps.mean_square_displacements_matrix_diagonal[0]
 
@@ -535,7 +577,9 @@ class ForceConstants(_ForceConstants):
             U_cart_ref=U_cart_ref,
             temperature_K=temperature_K,
             mesh_size="gamma",
-            band_selection_strategy=band_selection_strategy
+            band_selection_strategy=band_selection_strategy,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
 
         return refinement.freqs_final_reordered_THz[0]
@@ -544,6 +588,8 @@ class ForceConstants(_ForceConstants):
             self,
             k_point_mesh: npt.NDArray[np.int64] | Literal["gamma"] | float,
             temperatures_K: npt.NDArray[np.float64],
+            symmetrize_Dq: bool = False,
+            symprec: float = 1e-5,
     ) -> pd.DataFrame:
         """
         Compute thermodynamic properties (vib energy, entropy, etc.) at given temperatures.
@@ -554,6 +600,8 @@ class ForceConstants(_ForceConstants):
                 - A floating point number: Defines a supercell of radius R.
                 - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
             temperatures_K: Array of temperatures in Kelvin.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
             
         Returns:
             Pandas DataFrame with thermodynamic properties.
@@ -567,10 +615,12 @@ class ForceConstants(_ForceConstants):
         )
         
         freqs_THz, _ = mbe_automation.dynamics.harmonic.modes.at_k_points(
-            dynamical_matrix=ph.dynamical_matrix,
+            phonopy_object=ph,
             k_points=q_points,
             compute_eigenvecs=False,
-            freq_units="THz"
+            freq_units="THz",
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
         
         return mbe_automation.dynamics.harmonic.thermodynamics.run(
@@ -1116,8 +1166,10 @@ def _completed_frames(structure: _Structure, level_of_theory: str | dict | None)
 
     targets = []
     if isinstance(level_of_theory, dict):
-        if "target" in level_of_theory: targets.append(level_of_theory["target"])
-        if "baseline" in level_of_theory: targets.append(level_of_theory["baseline"])
+        if "target" in level_of_theory:
+            targets.append(level_of_theory["target"])
+        if "baseline" in level_of_theory:
+            targets.append(level_of_theory["baseline"])
     else:
         targets.append(level_of_theory)
 
@@ -1770,6 +1822,8 @@ def _thermal_displacements(
         force_constants: ForceConstants,
         temperature_K: float,
         phonon_filter: PhononFilter | None = None,
+        symmetrize_Dq: bool = False,
+        symprec: float = 1e-5,
 ) -> ThermalDisplacements:
     
     if phonon_filter is None:
@@ -1782,7 +1836,9 @@ def _thermal_displacements(
         force_constants=force_constants,
         temperatures_K=np.array([temperature_K]),
         phonon_filter=phonon_filter,
-        cell_type="primitive"
+        cell_type="primitive",
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
     )
 
 def _to_cif_file(
@@ -1792,6 +1848,8 @@ def _to_cif_file(
     temperature_K: float | None = None,
     phonon_filter: PhononFilter | None = None,
     check_roundtrip: bool = True,
+    symmetrize_Dq: bool = False,
+    symprec: float = 1e-5,
 ) -> None:
     disp = None
     if save_adps:
@@ -1799,7 +1857,9 @@ def _to_cif_file(
             raise ValueError("temperature_K must be provided to save thermal displacements (ADPs).")
         disp = force_constants.thermal_displacements(
             temperature_K=temperature_K,
-            phonon_filter=phonon_filter
+            phonon_filter=phonon_filter,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
     
     mbe_automation.storage.to_cif_file(

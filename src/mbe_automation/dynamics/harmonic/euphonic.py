@@ -73,7 +73,7 @@ def to_euphonic_modes(
 
     # 4. Compute frequencies and eigenvectors
     freqs, eigenvecs = mbe_automation.dynamics.harmonic.modes.at_k_points(
-        dynamical_matrix=ph.dynamical_matrix,
+        phonopy_object=ph,
         k_points=qpoints,
         compute_eigenvecs=True,
         freq_units="THz",

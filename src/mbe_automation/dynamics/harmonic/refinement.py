@@ -134,7 +134,7 @@ class NormalModeRefinement:
 
 def _band_scaling_factors(
     scale_factors: npt.NDArray[np.float64],
-    groups: "RefinementGroups",
+    groups: "mbe_automation.dynamics.harmonic.refinement.RefinementGroups",
     n_q: int,
     n_bands: int,
     gamma_idx: int
@@ -191,6 +191,8 @@ def to_phonon_data(
     q_spacing: float = DEFAULT_Q_SPACING,
     degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
     symmetry_tolerance: float | None = None,
+    symmetrize_Dq: bool = True,
+    symprec: float = 1e-5,
 ) -> PhononData:
     """
     Create PhononData object from computed phonopy data, matching atoms to CIF.
@@ -220,11 +222,13 @@ def to_phonon_data(
     ph = phonopy_object
     
     freqs_cm1_grid, eigenvectors_grid = mbe_automation.dynamics.harmonic.modes.at_k_points(
-        dynamical_matrix=ph.dynamical_matrix,
+        phonopy_object=ph,
         k_points=irr_q_frac,
         compute_eigenvecs=True,
         freq_units="invcm",
-        eigenvectors_storage="rows"
+        eigenvectors_storage="rows",
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
     )
 
     flat_freqs_cm1 = freqs_cm1_grid.flatten()
@@ -289,6 +293,8 @@ def to_phonon_data(
         q_points=irr_q_frac,
         q_spacing=q_spacing,
         degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
     )
     # band_indices: (n_q, n_modes)
     gamma_index = np.argmin(np.linalg.norm(irr_q_frac, axis=1))
@@ -296,7 +302,9 @@ def to_phonon_data(
         ph, 
         band_indices, 
         gamma_index,
-        symmetry_tolerance=symmetry_tolerance
+        symmetry_tolerance=symmetry_tolerance,
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
     )
 
     mode_q_indices = np.repeat(np.arange(len(irr_q_frac)), n_modes_total)
@@ -633,6 +641,8 @@ def run(
     reasonable_range: tuple[float, float] | None = None,
     degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
     symmetry_tolerance: float | None = None,
+    symmetrize_Dq: bool = True,
+    symprec: float = 1e-5,
 ) -> NormalModeRefinement:
     """
     Perform normal mode refinement.
@@ -731,6 +741,8 @@ def run(
         q_spacing=q_spacing,
         degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
         symmetry_tolerance=symmetry_tolerance,
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
     )
     
     if temperature_K is not None:
@@ -834,7 +846,6 @@ def run(
             exclude_hydrogen_positions=exclude_hydrogen_positions
         )
 
-    n_atoms_p1 = phonons.n_atoms
     n_modes_flat = len(initial_freqs)
     n_q = len(irr_q_frac)
     n_bands = n_modes_flat // n_q

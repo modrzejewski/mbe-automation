@@ -55,7 +55,7 @@ The following table summarizes the key methods available across these classes.
 | **`extract_finite_subsystems`** | Extracts finite clusters of molecules (e.g., dimers, trimers) based on distance or number of molecules. | `MolecularCrystal` |
 | **`positions`** | Returns positions of specific molecules in the crystal. | `MolecularCrystal` |
 | **`atomic_numbers`** | Returns atomic numbers of specific molecules in the crystal. | `MolecularCrystal` |
-| **`frequencies_and_eigenvectors`** | Calculates phonon frequencies and eigenvectors at specific k-points. Supports band tracking via `track_bands=True`. | `ForceConstants` |
+| **`frequencies_and_eigenvectors`** | Calculates phonon frequencies and eigenvectors at specific k-points. Supports band tracking via `track_bands=True` and dynamical matrix symmetrization via `symmetrize_Dq=True`. | `ForceConstants` |
 | **`k_point_grid`** | Generates a k-point mesh for the system. | `ForceConstants` |
 | **`to_phonopy`** | Converts the object to a Phonopy object. | `ForceConstants` |
 | **`thermal_displacements`** | Computes thermal displacement properties (ADPs). | `ForceConstants` |

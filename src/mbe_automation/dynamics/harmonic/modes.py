@@ -1,11 +1,11 @@
 from __future__ import annotations
-from typing import Literal, Tuple, List
+from typing import Literal, Tuple
 from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
-import ase
 import math
 import phonopy
+import pymatgen.core
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from ase.calculators.calculator import Calculator as ASECalculator
 try:
@@ -16,7 +16,7 @@ except ImportError:
     mace_available = False
 
 try:
-    import nomore_ase
+    from mbe_automation.dynamics.harmonic.bands import track_from_gamma, reorder
     _NOMORE_AVAILABLE = True
 except ImportError:
     _NOMORE_AVAILABLE = False
@@ -25,9 +25,10 @@ import mbe_automation.common
 import mbe_automation.storage
 from mbe_automation.storage.core import ForceConstants
 import mbe_automation.structure
-from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE, Minimum
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, Minimum
 import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
+from mbe_automation.dynamics.harmonic.symmetry import symmetrized_dynamical_matrix
 from copy import deepcopy
 from pathlib import Path
 
@@ -96,14 +97,16 @@ class ThermalDisplacements:
     instantaneous_displacements: npt.NDArray[np.float64] | None
 
 def at_k_point(
-    dynamical_matrix: phonopy.DynamicalMatrix,
+    phonopy_object: phonopy.Phonopy,
     k_point: npt.NDArray[np.float64],
+    symmetrize_Dq: bool = False,
+    symprec: float = 1e-5,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
     """
     Compute phonon frequencies and eigenvectors at a specified k-point.
         
     Args:
-    dynamical_matrix: Phonopy dynamical matrix object.
+    phonopy_object: Phonopy object.
     k_point: The k-point coordinates in reciprocal space (fractional coordinates).
     Returns:
     A tuple containing:
@@ -111,8 +114,11 @@ def at_k_point(
     - eigenvectors (n_modes, n_modes) stored as columns. The column v[:, i] is the
       normalized eigenvector corresponding to the eigenvalue w[i].
     """
-    dynamical_matrix.run(k_point)
-    D = dynamical_matrix.dynamical_matrix # mass-weighted dynamical matrix
+    if symmetrize_Dq:
+        D = symmetrized_dynamical_matrix(phonopy_object, k_point, tolerance=symprec)
+    else:
+        phonopy_object.dynamical_matrix.run(k_point)
+        D = phonopy_object.dynamical_matrix.dynamical_matrix # mass-weighted dynamical matrix
     eigenvals, eigenvecs = np.linalg.eigh(D) # eigenvectors ejk are dimensionless
     freqs_THz = (
         np.sqrt(abs(eigenvals)) * np.sign(eigenvals)
@@ -122,17 +128,19 @@ def at_k_point(
 
 
 def at_k_points(
-    dynamical_matrix: phonopy.DynamicalMatrix,
+    phonopy_object: phonopy.Phonopy,
     k_points: npt.NDArray[np.float64],
     compute_eigenvecs: bool = False,
     freq_units: Literal["THz", "invcm"] = "THz",
-    eigenvectors_storage: Literal["columns", "rows"] = "columns"
+    eigenvectors_storage: Literal["columns", "rows"] = "columns",
+    symmetrize_Dq: bool = False,
+    symprec: float = 1e-5,
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128] | None]:
     """
     Compute phonon frequencies and optionally eigenvectors at specified k-points.
 
     Args:
-        dynamical_matrix: Phonopy dynamical matrix object.
+        phonopy_object: Phonopy object.
         k_points: The k-point coordinates in reciprocal space (fractional coordinates).
         compute_eigenvecs: Whether to compute and return eigenvectors.
         freq_units: Units for return frequencies, "THz" or "invcm".
@@ -153,7 +161,7 @@ def at_k_points(
     to_THz = physical_units.DefaultToTHz
     
     n_kpoints = len(k_points)
-    n_modes = len(dynamical_matrix.primitive) * 3
+    n_modes = len(phonopy_object.primitive) * 3
     
     all_freqs = np.zeros((n_kpoints, n_modes), dtype=np.float64)
     if compute_eigenvecs:
@@ -162,8 +170,11 @@ def at_k_points(
         all_eigenvecs = None
     
     for i, k in enumerate(k_points):
-        dynamical_matrix.run(k)
-        D = dynamical_matrix.dynamical_matrix
+        if symmetrize_Dq:
+            D = symmetrized_dynamical_matrix(phonopy_object, k, tolerance=symprec)
+        else:
+            phonopy_object.dynamical_matrix.run(k)
+            D = phonopy_object.dynamical_matrix.dynamical_matrix
         if compute_eigenvecs:
             evals, evecs = np.linalg.eigh(D)
             if eigenvectors_storage == "rows":
@@ -293,7 +304,7 @@ def gruneisen_parameters(
     delta_V_val = V_plus - V_minus
     
     all_omegas, all_evecs = at_k_points(
-        dynamical_matrix=ph.dynamical_matrix,
+        phonopy_object=ph,
         k_points=qpoints,
         compute_eigenvecs=True,
         eigenvectors_storage="columns"
@@ -301,7 +312,6 @@ def gruneisen_parameters(
 
     if len(qpoints) > 1:
         if _NOMORE_AVAILABLE:
-            from mbe_automation.dynamics.harmonic.bands import track_from_gamma, reorder
             band_indices = track_from_gamma(
                 phonopy_object=ph,
                 q_points=qpoints,
@@ -462,7 +472,7 @@ def _to_cif(
     return U_cif
 
 def _thermal_displacements(
-        dynamical_matrix: phonopy.DynamicalMatrix,
+        phonopy_object: phonopy.Phonopy,
         qpoints: npt.NDArray, # rank (n_qpoints, 3), scaled coordinates of sampling points in the FBZ        
         temperatures_K: npt.NDArray[np.float64], # temperature points in K, rank (n_temperatures, )
         time_points_fs: npt.NDArray[np.float64] = np.array([0.0]), # time points in fs, rank (n_time_points, )
@@ -473,6 +483,8 @@ def _thermal_displacements(
         amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
         n_random_samples: int = 1, # ignored unless amplitude_scan=="random" or amplitude_scan=="equidistant"
         rng: np.random.Generator | None = None,
+        symmetrize_Dq: bool = False,
+        symprec: float = 1e-5,
 ) -> ThermalDisplacements:
     """
     Compute thermal displacement vectors of atoms
@@ -524,8 +536,8 @@ def _thermal_displacements(
 
     assert n_time_points > 0
 
-    n_atoms_primitive = len(dynamical_matrix.primitive)
-    n_atoms_supercell = len(dynamical_matrix.supercell)
+    n_atoms_primitive = len(phonopy_object.primitive)
+    n_atoms_supercell = len(phonopy_object.supercell)
     n_modes = n_atoms_primitive * 3
 
     if selected_modes is not None:
@@ -537,9 +549,8 @@ def _thermal_displacements(
         mask = np.zeros(n_atoms_primitive * 3, dtype=bool)
         mask[selected_modes-1] = True # shifting by 1 because the index of the first mode is 1
         
-    p2s_map = np.array(dynamical_matrix.primitive.p2s_map, dtype=np.int64)
-    s2p_map = np.array(dynamical_matrix.primitive.s2p_map, dtype=np.int64)
-    p2p_map = dynamical_matrix.primitive.p2p_map
+    s2p_map = np.array(phonopy_object.primitive.s2p_map, dtype=np.int64)
+    p2p_map = phonopy_object.primitive.p2p_map
     supercell_to_primitive = np.array(
         [p2p_map[s2p_map[i]] for i in range(n_atoms_supercell)],
         dtype=np.int64
@@ -575,8 +586,10 @@ def _thermal_displacements(
 
     for q in qpoints:
         all_freqs_THz, eigenvecs = at_k_point(
-            dynamical_matrix=dynamical_matrix,
+            phonopy_object=phonopy_object,
             k_point=q,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
         if selected_modes is None:
             mask = (all_freqs_THz > freq_min_THz)
@@ -603,7 +616,7 @@ def _thermal_displacements(
             Ajk_primitive[temp_idx] = _absolute_amplitude_eq_2(
                 freqs_THz=freqs_THz,
                 temperature_K=temp_K,
-                masses_AMU=dynamical_matrix.primitive.masses
+                masses_AMU=phonopy_object.primitive.masses
             )
         Ajk_ejk_primitive = Ajk_primitive * ejk_primitive[np.newaxis, :, :]
         #
@@ -660,8 +673,8 @@ def _thermal_displacements(
         if cell_type == "supercell":
             ejk = ejk_primitive[:, primitive_to_supercell_coords]
             Ajk = Ajk_primitive[:, :, primitive_to_supercell_coords]
-            scaled_positions = dynamical_matrix.supercell.scaled_positions
-            supercell_matrix = dynamical_matrix.supercell.supercell_matrix
+            scaled_positions = phonopy_object.supercell.scaled_positions
+            supercell_matrix = phonopy_object.supercell.supercell_matrix
             #
             # Position-dependent part of the phase factor
             # Exp(i * q * r)
@@ -673,7 +686,7 @@ def _thermal_displacements(
 
         if cell_type == "primitive":
             ejk, Ajk = ejk_primitive, Ajk_primitive
-            scaled_positions = dynamical_matrix.primitive.scaled_positions
+            scaled_positions = phonopy_object.primitive.scaled_positions
             exp_iqr = np.repeat(
                 np.exp(2j * np.pi * np.dot(scaled_positions, q)),
                 3
@@ -723,7 +736,7 @@ def _thermal_displacements(
         mean_square_displacements_matrix_diagonal=mean_sq_disp_diagonal,
         mean_square_displacements_matrix_diagonal_cif=_to_cif(
             U_cart=mean_sq_disp_diagonal,
-            lattice_vectors=dynamical_matrix.primitive.cell.T
+            lattice_vectors=phonopy_object.primitive.cell.T
         ),
         mean_square_displacements_matrix_full=mean_sq_disp_full,
         instantaneous_displacements=instant_disp
@@ -807,6 +820,8 @@ def thermal_displacements(
         amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
         n_random_samples: int = 1, # ignored unless random_scan=="random" or random_scan=="equidistant"
         rng: np.random.Generator | None = None,
+        symmetrize_Dq: bool = False,
+        symprec: float = 1e-5,
 ) -> ThermalDisplacements:
     """
     Compute thermal displacement properties of atoms in a crystal lattice.
@@ -872,7 +887,7 @@ def thermal_displacements(
     if phonon_filter.freq_max_THz is not None:
         print(f"freq_max            {phonon_filter.freq_max_THz:.1f} THz")
     else:
-        print(f"freq_max            unlimited")
+        print("freq_max            unlimited")
     nx, ny, nz = ph.mesh.mesh_numbers
     print(f"k_points_mesh       {nx}×{ny}×{nz}")
     print(f"amplitude_scan      {amplitude_scan}")
@@ -885,7 +900,7 @@ def thermal_displacements(
     print("Diagonalization of dynamic matrix at each k point...", flush=True)
     
     disp = _thermal_displacements(
-        dynamical_matrix=ph.dynamical_matrix,
+        phonopy_object=ph,
         qpoints=qpoints,
         temperatures_K=temperatures_K,
         time_points_fs=time_points_fs,
@@ -896,6 +911,8 @@ def thermal_displacements(
         amplitude_scan=amplitude_scan,
         n_random_samples=n_random_samples,
         rng=rng,
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
     )
     
     print("Thermal displacements completed", flush=True)

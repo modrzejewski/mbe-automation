@@ -39,9 +39,11 @@ class PhonopyASEAdapter:
     - Eigenvalues: eV/(Å²·AMU) -> assign_bands interprets this correctly as energy in eV.
     """
     
-    def __init__(self, ph: phonopy.Phonopy):
+    def __init__(self, ph: phonopy.Phonopy, symmetrize_Dq: bool = False, symprec: float = 1e-5):
         self.ph = ph
         self.atoms = views.to_ase(ph.primitive)
+        self.symmetrize_Dq = symmetrize_Dq
+        self.symprec = symprec
         
     def get_force_constant(self) -> npt.NDArray[np.float64]:
         """Return force constants matrix."""
@@ -58,8 +60,12 @@ class PhonopyASEAdapter:
         Returns:
             Dynamical matrix (n_modes, n_modes)
         """
-        self.ph.dynamical_matrix.run(q)
-        return self.ph.dynamical_matrix.dynamical_matrix
+        if self.symmetrize_Dq:
+            from mbe_automation.dynamics.harmonic.symmetry import symmetrized_dynamical_matrix
+            return symmetrized_dynamical_matrix(self.ph, q, tolerance=self.symprec)
+        else:
+            self.ph.dynamical_matrix.run(q)
+            return self.ph.dynamical_matrix.dynamical_matrix
 
 def track_from_gamma(
     phonopy_object: phonopy.Phonopy,
@@ -67,6 +73,8 @@ def track_from_gamma(
     q_spacing: float = DEFAULT_Q_SPACING,
     degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
     delta_q: float = 0.05,
+    symmetrize_Dq: bool = False,
+    symprec: float = 1e-5,
 ) -> npt.NDArray[np.int64]:
     """
     Compute band indices for a set of q-points using path tracking from Gamma.
@@ -101,7 +109,7 @@ def track_from_gamma(
             "Install it in your environment to use this functionality."
         )
 
-    adapter = PhonopyASEAdapter(phonopy_object)
+    adapter = PhonopyASEAdapter(phonopy_object, symmetrize_Dq=symmetrize_Dq, symprec=symprec)
     
     flat_indices = assign_bands(
         phonons=adapter,
@@ -240,6 +248,8 @@ def determine_degenerate_bands(
     band_indices: npt.NDArray[np.int64],
     gamma_index: int,
     symmetry_tolerance: float | None = None,
+    symmetrize_Dq: bool = False,
+    symprec: float = 1e-5,
 ) -> List[List[int]]:
     """
     Compute degeneracy groups using nomore_ase's rigorous symmetry analysis.
@@ -260,7 +270,7 @@ def determine_degenerate_bands(
         symmetry_tolerance: Tolerance used by nomore_ase to determine if two 
             normal modes are degenerate. It defines the minimum required inner product 
             (overlap) between their eigenvectors after applying a lattice 
-            symmetry operation. Defaults to 0.01 if None (1% overlap test).
+            symmetry operation. Defaults to 0.01 if None.
         
     Returns:
         List of lists, where each inner list contains mode indices (into the flattened frequency array)
@@ -287,10 +297,12 @@ def determine_degenerate_bands(
     )
 
     _, eigenvecs_all = at_k_points(
-        phonopy_object.dynamical_matrix, 
-        [[0, 0, 0]], 
+        phonopy_object=phonopy_object, 
+        k_points=[[0, 0, 0]], 
         compute_eigenvecs=True, 
-        eigenvectors_storage="rows"
+        eigenvectors_storage="rows",
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
     )
     
     eigenvecs_gamma = eigenvecs_all[0]

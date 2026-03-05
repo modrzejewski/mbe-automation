@@ -8,7 +8,6 @@ from mbe_automation.storage import core
 from . import modes
 
 try:
-    import nomore_ase
     from . import bands
     from nomore_ase.optimization.band_assignment import (
         match_modes_hungarian,
@@ -50,6 +49,8 @@ def _resolve_segment_connection(
     phonopy_object: phonopy.Phonopy,
     delta_q: float = 0.05,
     degenerate_freqs_tol_cm1: float = 0.5,
+    symmetrize_Dq: bool = False,
+    symprec: float = 1e-5,
 ) -> npt.NDArray:
     """
     Bridge two discontinuous q-points by generating an interpolated straight path.
@@ -72,7 +73,7 @@ def _resolve_segment_connection(
         Array of indices where mapping[i] = j means mode i at q_start maps to mode j at q_end.
     """
     from . import bands
-    adapter = bands.PhonopyASEAdapter(phonopy_object)
+    adapter = bands.PhonopyASEAdapter(phonopy_object, symmetrize_Dq=symmetrize_Dq, symprec=symprec)
     D_N = adapter.get_force_constant()
     
     # Use default spacing from bands module if available, else hardcode
@@ -146,6 +147,8 @@ def _segment_freqs(
     labels: list[str] | npt.NDArray[np.str_],
     delta_q: float = 0.05,
     degenerate_freqs_tol_cm1: float = 0.5,
+    symmetrize_Dq: bool = False,
+    symprec: float = 1e-5,
 ) -> list[npt.NDArray[np.float64]]:
     """Extract start points of segments and track bands from Gamma.
 
@@ -184,6 +187,8 @@ def _segment_freqs(
         np.array(start_points),
         delta_q=delta_q,
         degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
     )
     
     physical_units = phonopy.physical_units.get_physical_units()
@@ -201,8 +206,12 @@ def _segment_freqs(
         n_q = len(path)
         D_q_list = []
         for q in path:
-            phonopy_object.dynamical_matrix.run(q)
-            D_q_list.append(phonopy_object.dynamical_matrix.dynamical_matrix)
+            if symmetrize_Dq:
+                from mbe_automation.dynamics.harmonic.symmetry import symmetrized_dynamical_matrix
+                D_q_list.append(symmetrized_dynamical_matrix(phonopy_object, q, tolerance=symprec))
+            else:
+                phonopy_object.dynamical_matrix.run(q)
+                D_q_list.append(phonopy_object.dynamical_matrix.dynamical_matrix)
 
         epsilon = 0.001
         dD_segment = D_q_list[-1] - D_q_list[0]
@@ -238,7 +247,7 @@ def _segment_freqs(
                  # Use squared Euclidean distance in fractional coordinates
                  # 1e-10 tolerance is sufficient for identifying "same point"
                  if np.sum((q_prev - q_curr)**2) < 1e-10:
-                      bridge_mapping = _resolve_segment_connection(q_prev, q_curr, phonopy_object)
+                      bridge_mapping = _resolve_segment_connection(q_prev, q_curr, phonopy_object, symmetrize_Dq=symmetrize_Dq, symprec=symprec)
                       current_mapping = bridge_mapping[previous_end_mapping]
                  else:
                       current_mapping = map_path_from_gamma[i].copy()
@@ -306,6 +315,8 @@ def init_fbz_path(
     track_bands: bool = False,
     delta_q: float = 0.05,
     degenerate_freqs_tol_cm1: float = 0.5,
+    symmetrize_Dq: bool = False,
+    symprec: float = 1e-5,
 ) -> core.BrillouinZonePath:
     """Determine high-symmetry path and calculate phonon dispersion.
 
@@ -356,6 +367,8 @@ def init_fbz_path(
             labels=list(labels),
             delta_q=delta_q,
             degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
         
     all_frequencies = []
@@ -376,10 +389,12 @@ def init_fbz_path(
         else:
             # Fallback to standard calculation (no tracking)
             freqs, vecs = modes.at_k_points(
-                dynamical_matrix=phonopy_object.dynamical_matrix,
+                phonopy_object=phonopy_object,
                 k_points=path,
                 compute_eigenvecs=True,
                 eigenvectors_storage="columns",
+                symmetrize_Dq=symmetrize_Dq,
+                symprec=symprec,
             )
             all_frequencies.append(freqs)
 
