@@ -8,6 +8,7 @@ from mbe_automation.storage import core
 from . import modes
 
 try:
+    import nomore_ase
     from . import bands
     from nomore_ase.optimization.band_assignment import (
         match_modes_hungarian,

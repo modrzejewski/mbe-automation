@@ -483,7 +483,7 @@ def _thermal_displacements(
         amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
         n_random_samples: int = 1, # ignored unless amplitude_scan=="random" or amplitude_scan=="equidistant"
         rng: np.random.Generator | None = None,
-        symmetrize_Dq: bool = False,
+        symmetrize_Dq: bool = True,
         symprec: float = 1e-5,
 ) -> ThermalDisplacements:
     """
@@ -820,7 +820,7 @@ def thermal_displacements(
         amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
         n_random_samples: int = 1, # ignored unless random_scan=="random" or random_scan=="equidistant"
         rng: np.random.Generator | None = None,
-        symmetrize_Dq: bool = False,
+        symmetrize_Dq: bool = True,
         symprec: float = 1e-5,
 ) -> ThermalDisplacements:
     """

@@ -58,10 +58,12 @@ def symmetrized_dynamical_matrix(
     assert any(
         np.array_equal(rots[i], identity_3x3) for i in little_group_indices
     ), "Identity operation missing from little group — averaging by 1/N_q would be invalid."
- 
+
     N_q = len(little_group_indices)
     ph.dynamical_matrix.run(q)
     D_exact = ph.dynamical_matrix.dynamical_matrix
+    if N_q == 1:
+        return (D_exact + D_exact.conj().T) / 2.0
     L = ph.primitive.cell.T
     L_inv = np.linalg.inv(L)
     n_atoms = len(ph.primitive)

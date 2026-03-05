@@ -40,6 +40,7 @@ This file provides instructions for AI agents interacting with this repository.
 When checking Python code, pay special attention to the following frequent errors:
 
 1.  A parameter without a default value following a parameter *with* a default value in a function signature.
+2.  A field without a default value following a field *with* a default value in a dataclass definition.
 3.  Incorrect definitions of numpy datatypes in type hints.
 
 ---

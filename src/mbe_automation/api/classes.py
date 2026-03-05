@@ -350,7 +350,7 @@ class ForceConstants(_ForceConstants):
             self,
             temperature_K: float,
             phonon_filter: PhononFilter | None = None,
-            symmetrize_Dq: bool = False,
+            symmetrize_Dq: bool = True,
             symprec: float = 1e-5,
     ) -> ThermalDisplacements:
         """
@@ -1822,7 +1822,7 @@ def _thermal_displacements(
         force_constants: ForceConstants,
         temperature_K: float,
         phonon_filter: PhononFilter | None = None,
-        symmetrize_Dq: bool = False,
+        symmetrize_Dq: bool = True,
         symprec: float = 1e-5,
 ) -> ThermalDisplacements:
     
@@ -1848,7 +1848,7 @@ def _to_cif_file(
     temperature_K: float | None = None,
     phonon_filter: PhononFilter | None = None,
     check_roundtrip: bool = True,
-    symmetrize_Dq: bool = False,
+    symmetrize_Dq: bool = True,
     symprec: float = 1e-5,
 ) -> None:
     disp = None
