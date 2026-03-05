@@ -7,3 +7,6 @@
 [submodule "src/graph_electrostatics"]
 	path = src/graph_electrostatics
 	url = https://github.com/WillBaldwin0/graph_electrostatics.git
+[submodule "src/mace"]
+	path = src/mace
+	url = https://github.com/ACEsuit/mace.git
