@@ -17,6 +17,13 @@ def _find_little_group_indices(
             if (np.abs(G) < tolerance).all():
                 little_group_indices.append(i)
             else:
+                #
+                # If G's elements are integers, then the current operation does belong
+                # to the little group at q, but the point q lays on the boundary of FBZ.
+                # This implies we would need to account for a phase factor depending on G
+                # when transforming D(q), but that's not implemented. Thus, we require the
+                # mesh points to be kept strictly inside FBZ.
+                #
                 raise ValueError("Only meshes strictly inside the first Brillouin zone are supported.")
     return little_group_indices
 
@@ -27,7 +34,7 @@ def symmetrized_dynamical_matrix(
     tolerance: float = 1e-5
 ) -> npt.NDArray[np.complex128]:
     """
-    Symmetrize the dynamical matrix at a given wavevector $q$.
+    Symmetrize the dynamical matrix at a given wavevector q.
 
     The symmetrization is performed by averaging over all spatial point group
     symmetry operations belonging to the little group $G_q$ of the wavevector $q$.
@@ -46,12 +53,15 @@ def symmetrized_dynamical_matrix(
     little_group_indices = _find_little_group_indices(
         rots, q, tolerance
     )
+
+    identity_3x3 = np.eye(3, dtype=np.int64)
+    assert any(
+        np.array_equal(rots[i], identity_3x3) for i in little_group_indices
+    ), "Identity operation missing from little group — averaging by 1/N_q would be invalid."
+ 
     N_q = len(little_group_indices)
     ph.dynamical_matrix.run(q)
     D_exact = ph.dynamical_matrix.dynamical_matrix
-    if N_q <= 1:
-        return D_exact
-
     L = ph.primitive.cell.T
     L_inv = np.linalg.inv(L)
     n_atoms = len(ph.primitive)
