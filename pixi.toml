@@ -46,7 +46,8 @@ mbe-automation = { path = ".", editable = true }
 nomore-ase = { path = "src/nomore_ase", editable = true }
 pyscf = ">=2.12.0"
 pyscf-dispersion = "*"
-mace-torch = ">=0.3.14"
+mace-torch = { path = "src/mace" }
+graph-longrange = { path = "src/graph_electrostatics" }
 
 # --- Feature: GPU CUDA 12 ---
 [feature.cuda12.pypi-dependencies]
