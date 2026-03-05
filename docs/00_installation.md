@@ -35,16 +35,23 @@ Your shell prompt should now be prefixed with `(mbe_env)`, indicating that the v
 Navigate to the directory where you want to store the project and clone the `mbe-automation` repository from GitHub:
 
 ```bash
-git clone https://github.com/modrzejewski/mbe-automation.git
+git clone --recurse-submodules https://github.com/modrzejewski/mbe-automation.git
 cd mbe-automation
 ```
-The repository uses git submodules for external dependencies. Download these dependencies by running:
+
+The repository depends on several git submodules located in `src/`:
+
+| Submodule | Path |
+| :--- | :--- |
+| `mace` | `src/mace` |
+| `graph_electrostatics` | `src/graph_electrostatics` |
+| `nomore_ase` | `src/nomore_ase` |
+
+The `--recurse-submodules` flag initializes and downloads them automatically. If you cloned without it, run:
 
 ```bash
 git submodule update --init --recursive
 ```
-
-Failure to run this command will result in errors, such as missing parameter files during DFTB calculations.
 
 ## 3. Install the Program
 
