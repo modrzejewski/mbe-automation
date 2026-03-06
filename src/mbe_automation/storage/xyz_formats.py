@@ -196,6 +196,22 @@ def _cif_with_adps(
     return None
 
 
+def _print_cell_summary(system: ase.Atoms, label: str) -> None:
+    """Print lattice parameters and atom count for a periodic system."""
+    space_group, hmsymbol = mbe_automation.structure.crystal.check_symmetry(
+        unit_cell=system,
+        symmetry_thresh=SYMMETRY_TOLERANCE_STRICT,
+    )
+    lengths = system.cell.lengths()
+    angles = system.cell.angles()
+    print(label)
+    print(f"  Symmetry          [{hmsymbol}][{space_group}]")
+    print(f"  Lattice lengths   a={lengths[0]:.4f}, b={lengths[1]:.4f}, c={lengths[2]:.4f} Å")
+    print(f"  Lattice angles    alpha={angles[0]:.4f}, beta={angles[1]:.4f}, gamma={angles[2]:.4f} °")
+    print(f"  Cell volume       {system.get_volume():.4f} Å³")
+    print(f"  Number of atoms   {len(system)}")
+
+
 def from_xyz_file(
         read_path: str,
         transform_to_symmetrized_primitive: bool = True,
@@ -206,7 +222,7 @@ def from_xyz_file(
         "Loading Structure",
         f"Path: {read_path}"
     ])
-    
+
     if read_path.lower().endswith(".cif"):
         structure = pymatgen.core.Structure.from_file(read_path)
         system = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
@@ -214,38 +230,14 @@ def from_xyz_file(
         system = ase.io.read(read_path)
 
     if transform_to_symmetrized_primitive and np.all(system.pbc):
-        input_space_group, input_hmsymbol = mbe_automation.structure.crystal.check_symmetry(
-            unit_cell=system,
-            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT,
-        )
-
+        _print_cell_summary(system, "Raw input")
         print("Reduction to standardized primitive cell (pymatgen)...")
         system = mbe_automation.structure.crystal.to_symmetrized_primitive(
             unit_cell=system,
             symprec=symprec
         )
+        _print_cell_summary(system, "Post-transformation to symmetrized primitive")
 
-        space_group, hmsymbol = mbe_automation.structure.crystal.check_symmetry(
-            unit_cell=system,
-            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT
-        )
-
-        if space_group != input_space_group:
-            print(
-                f"Performed symmetry refinement: "
-                f"[{input_hmsymbol}][{input_space_group}] → [{hmsymbol}][{space_group}]"
-            )
-        else:
-            print(f"No symmetry refinement needed")
-            print(f"Symmetry under strict tolerance: [{input_hmsymbol}][{input_space_group}]")
-
-        lengths = system.cell.lengths()
-        print(f"Lattice lengths   a={lengths[0]:.4f}, b={lengths[1]:.4f}, c={lengths[2]:.4f} Å")
-        angles = system.cell.angles()
-        print(f"Lattice angles    alpha={angles[0]:.4f}, beta={angles[1]:.4f}, gamma={angles[2]:.4f} °")
-        print(f"Cell volume       {system.get_volume():.4f} Å³")
-        print(f"Number of atoms   {len(system)}")
-        
     return system
 
 
