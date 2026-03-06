@@ -262,7 +262,6 @@ class FreeEnergy:
     verbose: int = 0
     save_plots: bool = True
     save_csv: bool = True
-    save_xyz: bool = True
 
     def __post_init__(self):
         import mbe_automation.dynamics.harmonic.eos

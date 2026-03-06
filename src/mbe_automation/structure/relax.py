@@ -248,10 +248,17 @@ def crystal(
         same_conventions=False,
     )
     if rmsd is None:
-        print("RMSD could not be computed (structures did not match within tolerances or atom count changed)")
+        print("RMSD could not be computed (structures did not match within tolerances)")
     else:
         print(f"RMSD w.r.t. initial structure: {rmsd:.6f} Å")
-    
+    if config.save_structure_files:
+        cif_path = str(work_dir / "relaxed_structure.cif")
+        print(f"Saving relaxed crystal to {cif_path}")
+        mbe_automation.storage.xyz_formats.to_cif_file(
+            save_path=cif_path,
+            system=relaxed_system,
+        )
+
     return relaxed_system, space_group
     
 
@@ -390,12 +397,10 @@ def isolated_molecule(
             n_atoms=molecule.n_atoms,
             level_of_theory=calculator.level_of_theory,
         )
-        
-        return relaxed_molecule
 
     elif isinstance(molecule, ase.Atoms):
         
-        return _isolated_molecule(
+        relaxed_molecule = _isolated_molecule(
             molecule=molecule,
             calculator=calculator,
             config=config,
@@ -405,4 +410,15 @@ def isolated_molecule(
 
     else:
         raise ValueError("Unsupported object passed to relax.isolated_molecule.")
+
+    if config.save_structure_files:
+        xyz_path = str(Path(work_dir) / "relaxed_structure.xyz")
+        print(f"Saving relaxed molecule to {xyz_path}")
+        mbe_automation.storage.xyz_formats.to_xyz_file(
+            save_path=xyz_path,
+            system=relaxed_molecule,
+        )
+
+    return relaxed_molecule
+
 

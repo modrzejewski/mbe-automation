@@ -116,6 +116,12 @@ class Minimum:
     algo_primary: Literal["PreconLBFGS", "PreconFIRE"] = "PreconLBFGS"
     algo_fallback: Literal["PreconLBFGS", "PreconFIRE"] = "PreconFIRE"
 
+                                   #
+                                   # Save final relaxed structure as an .xyz
+                                   # or .cif file in the working directory
+                                   #
+    save_structure_files: bool = True
+
     @property
     def pressure_GPa(self) -> float:
         """Get external pressure (GPa)."""

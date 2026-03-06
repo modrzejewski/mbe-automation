@@ -51,7 +51,6 @@ This chapter documents the configuration classes used to control the various wor
 | `verbose`                       | Verbosity of the program's output. `0` suppresses warnings.                                                                                                                                      | `0`                                             |
 | `save_plots`                    | If `True`, save plots of the simulation results.                                                                                                                                                 | `True`                                          |
 | `save_csv`                      | If `True`, save CSV files of the simulation results.                                                                                                                                             | `True`                                          |
-| `save_xyz`                      | If `True`, save XYZ files of the simulation results.                                                                                                                                             | `True`                                          |
 
 ### `Enthalpy` Class
 
@@ -183,3 +182,4 @@ This chapter documents the configuration classes used to control the various wor
 | `backend`                    | Software used to perform the geometry relaxation: "ase" or "dftb".                                                                                                    | `"ase"`             |
 | `algo_primary`               | Primary algorithm for structure relaxation ("PreconLBFGS" or "PreconFIRE"). Referenced only if backend="ase".                                                         | `"PreconLBFGS"`     |
 | `algo_fallback`              | Fallback algorithm if the primary relaxation algorithm fails. Referenced only if backend="ase".                                                                       | `"PreconFIRE"`      |
+| `save_structure_files`       | If `True`, save the final relaxed structure as `relaxed_structure.xyz` (for molecules) or `relaxed_structure.cif` (for crystals) in the active `work_dir`.            | `True`              |

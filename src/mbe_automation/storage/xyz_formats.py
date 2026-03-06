@@ -23,7 +23,7 @@ def _cif_with_adps(
         save_path: str,
         struct: pymatgen.core.Structure,
         adps_cif: npt.NDArray[np.floating] | None = None,
-        symprec: float = 1.0E-5,
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
         significant_figures: int = 8,
     ) -> None:
     """
