@@ -238,6 +238,7 @@ def from_xyz_file(
         _print_cell_summary(system, "Raw input cell" if transform else "Input cell")
 
         if transform:
+            system_initial = system
             if transform_to_primitive:
                 print("Conversion to symmetrized primitive cell (spglib)...")
                 cell_vectors, atomic_numbers, scaled_positions = (
@@ -265,6 +266,19 @@ def from_xyz_file(
                 pbc=True,
             )
             _print_cell_summary(system, "Cell after transformation")
+            rmsd = mbe_automation.structure.crystal.match(
+                positions_a=system_initial.get_positions(),
+                atomic_numbers_a=system_initial.get_atomic_numbers(),
+                cell_vectors_a=system_initial.cell.array,
+                positions_b=system.get_positions(),
+                atomic_numbers_b=system.get_atomic_numbers(),
+                cell_vectors_b=system.cell.array,
+                same_conventions=False,
+            )
+            if rmsd is None:
+                raise ValueError("Raw and transformed structures did not match within tolerances")
+            else:
+                print(f"  RMSD w.r.t. raw input structure: {rmsd:.6f} Å")
 
     return system
 

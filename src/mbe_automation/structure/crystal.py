@@ -356,7 +356,8 @@ def match(
     cell_vectors_b: npt.NDArray[np.floating],
     ltol: float = 0.2,
     stol: float = 0.3,
-    angle_tol: float = 5.0
+    angle_tol: float = 5.0,
+    same_conventions: bool = True,
 ) -> float | None:
     """
     Calculate minimum RMSD between two periodic structures.
@@ -374,19 +375,22 @@ def match(
         ltol: Fractional length tolerance for lattice matching.
         stol: Site tolerance for matching.
         angle_tol: Angle tolerance for lattice matching in degrees.
+        same_conventions: If True, raise ValueError when atom counts or elemental
+            compositions differ. If False, skip these checks.
 
     Returns:
         The minimum RMSD between the two structures in Å, or None if they
         do not match within the given tolerances.
     """
-    if atomic_numbers_a.shape[0] != atomic_numbers_b.shape[0]:
-         raise ValueError("Structures must have the same number of atoms.")
+    if same_conventions:
+        if atomic_numbers_a.shape[0] != atomic_numbers_b.shape[0]:
+            raise ValueError("Structures must have the same number of atoms.")
 
-    max_z = max(np.max(atomic_numbers_a), np.max(atomic_numbers_b))
-    composition_a = np.bincount(atomic_numbers_a, minlength=max_z + 1)
-    composition_b = np.bincount(atomic_numbers_b, minlength=max_z + 1)
-    if not np.array_equal(composition_a, composition_b):
-        raise ValueError("Structures have different elemental compositions.")
+        max_z = max(np.max(atomic_numbers_a), np.max(atomic_numbers_b))
+        composition_a = np.bincount(atomic_numbers_a, minlength=max_z + 1)
+        composition_b = np.bincount(atomic_numbers_b, minlength=max_z + 1)
+        if not np.array_equal(composition_a, composition_b):
+            raise ValueError("Structures have different elemental compositions.")
 
     pmg_struct_a = pymatgen.core.Structure(
         lattice=cell_vectors_a,
