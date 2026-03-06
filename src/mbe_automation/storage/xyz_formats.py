@@ -233,21 +233,38 @@ def from_xyz_file(
     else:
         system = ase.io.read(read_path)
 
-    if (symmetrize or transform_to_primitive) and np.all(system.pbc):
-        _print_cell_summary(system, "Raw input cell")
-        if transform_to_primitive:
-            print("Conversion to symmetrized primitive cell (pymatgen)...")
-            system = mbe_automation.structure.crystal.to_symmetrized_primitive(
-                unit_cell=system,
-                symprec=symprec
+    if np.all(system.pbc):
+        transform = symmetrize or transform_to_primitive
+        _print_cell_summary(system, "Raw input cell" if transform else "Input cell")
+
+        if transform:
+            if transform_to_primitive:
+                print("Conversion to symmetrized primitive cell (spglib)...")
+                cell_vectors, atomic_numbers, scaled_positions = (
+                    mbe_automation.structure.crystal.to_symmetrized_primitive_cell_spglib(
+                        cell_vectors=system.cell.array,
+                        atomic_numbers=system.get_atomic_numbers(),
+                        scaled_positions=system.get_scaled_positions(),
+                        symprec=symprec,
+                    )
+                )
+            else:
+                print("Symmetry refinement to conventional standard cell (spglib)...")
+                cell_vectors, atomic_numbers, scaled_positions = (
+                    mbe_automation.structure.crystal.to_symmetrized_conventional_cell_spglib(
+                        cell_vectors=system.cell.array,
+                        atomic_numbers=system.get_atomic_numbers(),
+                        scaled_positions=system.get_scaled_positions(),
+                        symprec=symprec,
+                    )
+                )
+            system = ase.Atoms(
+                numbers=atomic_numbers,
+                scaled_positions=scaled_positions,
+                cell=cell_vectors,
+                pbc=True,
             )
-        else:
-            print("Symmetry refinement to conventional standard cell (pymatgen)...")
-            system = mbe_automation.structure.crystal.to_symmetrized(
-                unit_cell=system,
-                symprec=symprec
-            )
-        _print_cell_summary(system, "Cell after transformation to symmetrized primitive")
+            _print_cell_summary(system, "Cell after transformation")
 
     return system
 

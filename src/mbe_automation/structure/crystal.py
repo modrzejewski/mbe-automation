@@ -100,8 +100,54 @@ def to_symmetrized(
     pmg_refined = spg_analyzer.get_refined_structure()
     return pymatgen.io.ase.AseAtomsAdaptor.get_atoms(pmg_refined)
 
-    
-    
+def _standardize_cell_spglib(
+        cell_vectors: npt.NDArray[np.float64],
+        atomic_numbers: npt.NDArray[np.int64],
+        scaled_positions: npt.NDArray[np.float64],
+        to_primitive: bool,
+        symprec: float,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    """Call spglib.standardize_cell. Return (cell_vectors (3,3), atomic_numbers (N,), scaled_positions (N,3))."""
+    import spglib
+    result = spglib.standardize_cell(
+        (cell_vectors, scaled_positions, atomic_numbers),
+        to_primitive=to_primitive,
+        no_idealize=False,
+        symprec=symprec,
+    )
+    if result is None:
+        raise RuntimeError("spglib failed to standardize the cell.")
+    new_lattice, new_positions, new_numbers = result
+    return new_lattice, new_numbers, new_positions
+
+
+def to_symmetrized_primitive_cell_spglib(
+        cell_vectors: npt.NDArray[np.float64],
+        atomic_numbers: npt.NDArray[np.int64],
+        scaled_positions: npt.NDArray[np.float64],
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    """
+    Standardize to the primitive cell and idealize positions using spglib.
+    Return (cell_vectors (3,3), atomic_numbers (N,), scaled_positions (N,3)).
+    """
+    return _standardize_cell_spglib(cell_vectors, atomic_numbers, scaled_positions, to_primitive=True, symprec=symprec)
+
+
+def to_symmetrized_conventional_cell_spglib(
+        cell_vectors: npt.NDArray[np.float64],
+        atomic_numbers: npt.NDArray[np.int64],
+        scaled_positions: npt.NDArray[np.float64],
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    """
+    Standardize to the conventional cell and idealize positions using spglib.
+    Does not reduce to the primitive cell.
+    Return (cell_vectors (3,3), atomic_numbers (N,), scaled_positions (N,3)).
+    """
+    return _standardize_cell_spglib(cell_vectors, atomic_numbers, scaled_positions, to_primitive=False, symprec=symprec)
+
+
 def check_symmetry(
         unit_cell: ase.Atoms,
         symmetry_thresh = SYMMETRY_TOLERANCE_STRICT # tight symmetry tolerance used in Phonopy
@@ -124,36 +170,6 @@ def check_symmetry(
     space_group_symbol = spg_analyzer.get_space_group_symbol()
     return space_group_number, space_group_symbol
 
-
-def symmetrize(unit_cell: ase.Atoms, symmetrization_thresh: float = 1.0E-2) -> tuple[Atoms, int]:
-    """
-    Use spglib to remove the geometry optimization artifacts 
-    and refine the unit cell to the closest space group.
-
-    """
-    #
-    # Check the symmetry of the input unit cell
-    # with tight tolerance
-    #
-    input_spacegroup_index, input_hmsymbol = check_symmetry(unit_cell)
-    #
-    # Find the closest space group using
-    # lower symmetrization tolerance
-    #
-    sym_unit_cell = unit_cell.copy()
-    ase.spacegroup.symmetrize.refine_symmetry(sym_unit_cell, symprec=symmetrization_thresh)
-    #
-    # Check the symmetry of the symmetrized
-    # cell with tight tolerance
-    #
-    sym_spacegroup_index, sym_hmsymbol = check_symmetry(sym_unit_cell)
-
-    if sym_spacegroup_index != input_spacegroup_index:
-        print(f"Refined space group: [{input_hmsymbol}][{input_spacegroup_index}] → [{sym_hmsymbol}][{sym_spacegroup_index}]")
-    else:
-        print(f"Perfect symmetry, no refinement: [{input_hmsymbol}][{input_spacegroup_index}]")
-        
-    return sym_unit_cell, sym_spacegroup_index
 
 def get_equivalent_indices(
     structure: ase.Atoms | pymatgen.core.Structure,
