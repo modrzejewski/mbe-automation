@@ -8,6 +8,7 @@ from numpy.polynomial.polynomial import Polynomial
 from scipy.interpolate import CubicSpline
 
 try:
+    import cctbx
     import nomore_ase
     _NOMORE_AVAILABLE = True
 except ImportError:

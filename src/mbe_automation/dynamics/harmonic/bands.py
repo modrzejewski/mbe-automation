@@ -19,6 +19,7 @@ DEFAULT_Q_SPACING = 0.05  # Å⁻¹
 DEFAULT_DEGENERATE_FREQS_TOL = 0.5  # cm⁻¹
 
 try:
+    import cctbx
     from nomore_ase.optimization.band_assignment import assign_bands
     from nomore_ase.core.symmetric_phonons import SymmetricPhonons
     _NOMORE_AVAILABLE = True

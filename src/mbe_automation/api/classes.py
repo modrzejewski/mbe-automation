@@ -494,14 +494,13 @@ class ForceConstants(_ForceConstants):
             NormalModeRefinement object with frequencies, ADPs, and mesh data.
         """
         try:
-            # we're importing nomore only to check
-            # if this library is available in the environment
-            import nomore_ase 
+            import cctbx
+            import nomore_ase
             from mbe_automation.dynamics.harmonic import refinement
         except ImportError:
             raise ImportError(
-                "The `ForceConstants.refine` method requires the `nomore_ase` package. "
-                "Install it in your environment to use this functionality."
+                "The `ForceConstants.refine` method requires the `nomore_ase` and `cctbx` packages. "
+                "Install them in your environment to use this functionality."
             )
         if isinstance(mesh_size, list):
             mesh_size = np.array(mesh_size, dtype=np.int64)
@@ -551,11 +550,12 @@ class ForceConstants(_ForceConstants):
             f_gamma: Effective Gamma-point frequencies in THz.
         """
         try:
+            import cctbx
             from nomore_ase.core.frequency_partition import SensitivityBasedStrategy
         except ImportError:
             raise ImportError(
                 "The `ForceConstants.effective_gamma_point_freqs` method requires "
-                "the `nomore_ase` package. Install it in your environment to use "
+                "the `nomore_ase` and `cctbx` packages. Install them in your environment to use "
                 "this functionality."
             )
 

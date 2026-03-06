@@ -16,6 +16,7 @@ from mbe_automation.dynamics.harmonic.display import print_frequency_comparison,
 from phonopy.structure.atoms import symbol_map
 
 try:
+    import cctbx
     from nomore_ase.crystallography.cctbx_adapter import CctbxAdapter
     from nomore_ase.crystallography.smtbx_adapter import SmtbxAdapter
     from nomore_ase.core.calculator import NoMoReCalculator
