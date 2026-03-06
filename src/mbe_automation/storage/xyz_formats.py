@@ -215,7 +215,7 @@ def _print_cell_summary(system: ase.Atoms, label: str) -> None:
 def from_xyz_file(
         read_path: str,
         symmetrize: bool = True,
-        transform_to_primitive: bool = False,
+        transform_to_primitive: bool = True,
         symprec: float = SYMMETRY_TOLERANCE_LOOSE
 ) -> ase.Atoms:
 

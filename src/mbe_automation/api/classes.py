@@ -648,7 +648,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             cls,
             read_path: str,
             symmetrize: bool = True,
-            transform_to_primitive: bool = False,
+            transform_to_primitive: bool = True,
             symprec: float = SYMMETRY_TOLERANCE_LOOSE,
     ):
         ase_atoms = mbe_automation.storage.from_xyz_file(
