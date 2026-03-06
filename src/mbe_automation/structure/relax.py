@@ -237,6 +237,20 @@ def crystal(
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
+        
+    rmsd = mbe_automation.structure.crystal.match(
+        positions_a=unit_cell.get_positions(),
+        atomic_numbers_a=unit_cell.get_atomic_numbers(),
+        cell_vectors_a=unit_cell.cell.array,
+        positions_b=relaxed_system.get_positions(),
+        atomic_numbers_b=relaxed_system.get_atomic_numbers(),
+        cell_vectors_b=relaxed_system.cell.array,
+        same_conventions=False,
+    )
+    if rmsd is None:
+        print("RMSD could not be computed (structures did not match within tolerances or atom count changed)")
+    else:
+        print(f"RMSD w.r.t. initial structure: {rmsd:.6f} Å")
     
     return relaxed_system, space_group
     
