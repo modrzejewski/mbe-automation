@@ -71,7 +71,7 @@ def to_symmetrized_primitive(
     a loose threshold (SYMMETRY_TOLERANCE_LOOSE) if your structure
     comes immediately from geometry optimization.
     """
-    
+
     pmg_unit_cell = pymatgen.io.ase.AseAtomsAdaptor.get_structure(unit_cell)
     spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(
         structure=pmg_unit_cell,
@@ -79,6 +79,27 @@ def to_symmetrized_primitive(
     )
     pmg_primitive = spg_analyzer.get_primitive_standard_structure()
     return pymatgen.io.ase.AseAtomsAdaptor.get_atoms(pmg_primitive)
+
+
+def to_symmetrized(
+        unit_cell: ase.Atoms,
+        symprec: float = SYMMETRY_TOLERANCE_STRICT
+) -> ase.Atoms:
+    """
+    Refine unit cell to the conventional standard structure.
+    Snaps atomic positions and cell parameters to symmetry-ideal values
+    without converting to a primitive cell.
+    Apply with a loose threshold (SYMMETRY_TOLERANCE_LOOSE) if the structure
+    comes immediately from geometry optimization.
+    """
+    pmg_unit_cell = pymatgen.io.ase.AseAtomsAdaptor.get_structure(unit_cell)
+    spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(
+        structure=pmg_unit_cell,
+        symprec=symprec
+    )
+    pmg_refined = spg_analyzer.get_refined_structure()
+    return pymatgen.io.ase.AseAtomsAdaptor.get_atoms(pmg_refined)
+
     
     
 def check_symmetry(

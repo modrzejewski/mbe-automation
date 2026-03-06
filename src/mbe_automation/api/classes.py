@@ -494,6 +494,8 @@ class ForceConstants(_ForceConstants):
             NormalModeRefinement object with frequencies, ADPs, and mesh data.
         """
         try:
+            # we're importing nomore only to check
+            # if this library is available in the environment
             import cctbx
             import nomore_ase
             from mbe_automation.dynamics.harmonic import refinement
@@ -645,16 +647,18 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
     def from_xyz_file(
             cls,
             read_path: str,
-            transform_to_symmetrized_primitive: bool = True,
+            symmetrize: bool = True,
+            transform_to_primitive: bool = False,
             symprec: float = SYMMETRY_TOLERANCE_LOOSE,
     ):
         ase_atoms = mbe_automation.storage.from_xyz_file(
             read_path=read_path,
-            transform_to_symmetrized_primitive=transform_to_symmetrized_primitive,
+            symmetrize=symmetrize,
+            transform_to_primitive=transform_to_primitive,
             symprec=symprec,
-        )        
+        )
         return cls(**vars(mbe_automation.storage.from_ase_atoms(ase_atoms)))
-        
+
     def subsample(
             self,
             n: int,

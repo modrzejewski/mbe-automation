@@ -214,9 +214,13 @@ def _print_cell_summary(system: ase.Atoms, label: str) -> None:
 
 def from_xyz_file(
         read_path: str,
-        transform_to_symmetrized_primitive: bool = True,
+        symmetrize: bool = True,
+        transform_to_primitive: bool = False,
         symprec: float = SYMMETRY_TOLERANCE_LOOSE
 ) -> ase.Atoms:
+
+    if transform_to_primitive and not symmetrize:
+        raise ValueError("transform_to_primitive requires symmetrize=True.")
 
     mbe_automation.common.display.framed([
         "Loading Structure",
@@ -229,14 +233,21 @@ def from_xyz_file(
     else:
         system = ase.io.read(read_path)
 
-    if transform_to_symmetrized_primitive and np.all(system.pbc):
-        _print_cell_summary(system, "Raw input")
-        print("Reduction to standardized primitive cell (pymatgen)...")
-        system = mbe_automation.structure.crystal.to_symmetrized_primitive(
-            unit_cell=system,
-            symprec=symprec
-        )
-        _print_cell_summary(system, "Post-transformation to symmetrized primitive")
+    if (symmetrize or transform_to_primitive) and np.all(system.pbc):
+        _print_cell_summary(system, "Raw input cell")
+        if transform_to_primitive:
+            print("Conversion to symmetrized primitive cell (pymatgen)...")
+            system = mbe_automation.structure.crystal.to_symmetrized_primitive(
+                unit_cell=system,
+                symprec=symprec
+            )
+        else:
+            print("Symmetry refinement to conventional standard cell (pymatgen)...")
+            system = mbe_automation.structure.crystal.to_symmetrized(
+                unit_cell=system,
+                symprec=symprec
+            )
+        _print_cell_summary(system, "Cell after transformation to symmetrized primitive")
 
     return system
 
