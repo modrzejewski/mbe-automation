@@ -3,6 +3,8 @@ from collections import defaultdict
 from typing import Any, Literal
 from typing import TYPE_CHECKING
 import pymatgen
+from pymatgen.io.cif import CifParser
+import pymatgen.core
 import ase.io
 import ase
 import numpy as np
@@ -18,6 +20,16 @@ import mbe_automation.storage.views
 import mbe_automation.common.display
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 from mbe_automation.dynamics.harmonic.modes import symmetrize_adps
+
+def _read_cif_pymatgen(filepath: str) -> pymatgen.core.Structure:
+    """Read a structure from a file."""
+    parser = CifParser(
+        filepath,
+        site_tolerance=0.1,
+        occupancy_tolerance=np.inf
+    )
+    structures = parser.parse_structures()
+    return structures[0]
 
 def _cif_with_adps(
         save_path: str,
@@ -228,10 +240,7 @@ def from_xyz_file(
     ])
 
     if read_path.lower().endswith(".cif"):
-        structure = pymatgen.core.Structure.from_file(
-            filename=read_path,
-            merge_tol=0.1, # needed to remove duplicate atoms
-        )
+        structure = _read_cif_pymatgen(read_path)
         system = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
     else:
         system = ase.io.read(read_path)
