@@ -588,16 +588,16 @@ class ForceConstants(_ForceConstants):
 
     def thermodynamics(
             self,
-            k_point_mesh: npt.NDArray[np.int64] | Literal["gamma"] | float,
+            mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
             temperatures_K: npt.NDArray[np.float64],
-            symmetrize_Dq: bool = False,
+            symmetrize_Dq: bool = True,
             symprec: float = 1e-5,
     ) -> pd.DataFrame:
         """
         Compute thermodynamic properties (vib energy, entropy, etc.) at given temperatures.
         
         Args:
-            k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
+            mesh_size: The k-points for sampling the Brillouin zone. Can be:
                 - "gamma": Use only the [0, 0, 0] k-point.
                 - A floating point number: Defines a supercell of radius R.
                 - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
@@ -612,7 +612,7 @@ class ForceConstants(_ForceConstants):
         
         q_points, weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
             phonopy_object=ph,
-            mesh_size=k_point_mesh,
+            mesh_size=mesh_size,
             use_symmetry=True 
         )
         
