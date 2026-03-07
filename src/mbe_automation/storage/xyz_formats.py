@@ -228,7 +228,10 @@ def from_xyz_file(
     ])
 
     if read_path.lower().endswith(".cif"):
-        structure = pymatgen.core.Structure.from_file(read_path)
+        structure = pymatgen.core.Structure.from_file(
+            filename=read_path,
+            merge_tol=0.1, # needed to remove duplicate atoms
+        )
         system = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
     else:
         system = ase.io.read(read_path)
@@ -284,8 +287,6 @@ def from_xyz_file(
                 print(f"  RMSD w.r.t. raw input structure: {rmsd:.6f} Å")
 
     return system
-
-
 
 
 def to_xyz_file(
