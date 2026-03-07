@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
-from typing import Any
+from typing import Any, Literal
 from typing import TYPE_CHECKING
 import pymatgen
 import ase.io
@@ -214,13 +214,13 @@ def _print_cell_summary(system: ase.Atoms, label: str) -> None:
 
 def from_xyz_file(
         read_path: str,
-        symmetrize: bool = True,
-        transform_to_primitive: bool = True,
+        transform: Literal[
+            "to_symmetrized_conventional_cell",
+            "to_symmetrized_primitive_cell",
+            "no_transformation"
+        ] = "to_symmetrized_primitive_cell",
         symprec: float = SYMMETRY_TOLERANCE_LOOSE
 ) -> ase.Atoms:
-
-    if transform_to_primitive and not symmetrize:
-        raise ValueError("transform_to_primitive requires symmetrize=True.")
 
     mbe_automation.common.display.framed([
         "Loading Structure",
@@ -234,12 +234,12 @@ def from_xyz_file(
         system = ase.io.read(read_path)
 
     if np.all(system.pbc):
-        transform = symmetrize or transform_to_primitive
-        _print_cell_summary(system, "Raw input cell" if transform else "Input cell")
+        do_transform = transform != "no_transformation"
+        _print_cell_summary(system, "Raw input cell" if do_transform else "Input cell")
 
-        if transform:
+        if do_transform:
             system_initial = system
-            if transform_to_primitive:
+            if transform == "to_symmetrized_primitive_cell":
                 print("Conversion to symmetrized primitive cell (spglib)...")
                 cell_vectors, atomic_numbers, scaled_positions = (
                     mbe_automation.structure.crystal.to_symmetrized_primitive_cell_spglib(
@@ -249,7 +249,7 @@ def from_xyz_file(
                         symprec=symprec,
                     )
                 )
-            else:
+            elif transform == "to_symmetrized_conventional_cell":
                 print("Symmetry refinement to conventional standard cell (spglib)...")
                 cell_vectors, atomic_numbers, scaled_positions = (
                     mbe_automation.structure.crystal.to_symmetrized_conventional_cell_spglib(
@@ -259,6 +259,9 @@ def from_xyz_file(
                         symprec=symprec,
                     )
                 )
+            else:
+                raise ValueError(f"Unknown transformation: {transform}")
+                
             system = ase.Atoms(
                 numbers=atomic_numbers,
                 scaled_positions=scaled_positions,
@@ -281,6 +284,8 @@ def from_xyz_file(
                 print(f"  RMSD w.r.t. raw input structure: {rmsd:.6f} Å")
 
     return system
+
+
 
 
 def to_xyz_file(

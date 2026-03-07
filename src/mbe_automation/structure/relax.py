@@ -144,7 +144,7 @@ def crystal(
     print(f"max_force_on_atom             {config.max_force_on_atom_eV_A:.1e} eV/Å")
     if config.cell_relaxation == "full":
         print(f"pressure                      {config.pressure_GPa} GPa")
-    print(f"transform_relaxed_crystal     {config.transform_relaxed_crystal}")
+    print(f"transform                     {config.transform}")
 
     cuda_available = torch.cuda.is_available()
     if cuda_available:
@@ -171,7 +171,7 @@ def crystal(
         optimize_lattice_vectors = False
         optimize_volume = False
 
-    if config.transform_relaxed_crystal != "no_transformation":
+    if config.transform != "no_transformation":
         #
         # Check symmetry of the input structure
         # with tight tolerance
@@ -206,7 +206,7 @@ def crystal(
             work_dir=work_dir,
         )
     
-    if config.transform_relaxed_crystal == "symmetrized_primitive_cell":
+    if config.transform == "to_symmetrized_primitive_cell":
         print("Transformation to symmetrized primitive cell (spglib)...")
         cell_vectors, atomic_numbers, scaled_positions = (
             mbe_automation.structure.crystal.to_symmetrized_primitive_cell_spglib(
@@ -222,7 +222,7 @@ def crystal(
             cell=cell_vectors,
             pbc=True,
         )
-    elif config.transform_relaxed_crystal == "symmetrized_conventional_cell":
+    elif config.transform == "to_symmetrized_conventional_cell":
         print("Transformation to symmetrized conventional cell (spglib)...")
         cell_vectors, atomic_numbers, scaled_positions = (
             mbe_automation.structure.crystal.to_symmetrized_conventional_cell_spglib(
@@ -239,7 +239,7 @@ def crystal(
             pbc=True,
         )
 
-    if config.transform_relaxed_crystal != "no_transformation":
+    if config.transform != "no_transformation":
         space_group, hmsymbol = mbe_automation.structure.crystal.check_symmetry(
             unit_cell=relaxed_system,
             symmetry_thresh=config.symmetry_tolerance_strict
@@ -250,7 +250,7 @@ def crystal(
                 f"[{input_hmsymbol}][{input_space_group}] → [{hmsymbol}][{space_group}]"
             )
         else:
-            print(f"No refinement needed")
+            print(f"No symmetry change")
             print(f"Symmetry under strict tolerance: [{input_hmsymbol}][{input_space_group}]")
     else:
         space_group, _ = mbe_automation.structure.crystal.check_symmetry(

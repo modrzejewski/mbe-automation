@@ -77,11 +77,11 @@ class Minimum:
                                    # symmetrization may introduce significant
                                    # residual forces on atoms.
                                    #
-    transform_relaxed_crystal: Literal[
-        "symmetrized_primitive_cell",
-        "symmetrized_conventional_cell",
+    transform: Literal[
+        "to_symmetrized_primitive_cell",
+        "to_symmetrized_conventional_cell",
         "no_transformation"
-    ] = "symmetrized_primitive_cell"
+    ] = "to_symmetrized_primitive_cell"
                                    #
                                    # Tolerance (in Angstrom) used for symmetry detection
                                    # for imperfect structures after relaxation with a finite

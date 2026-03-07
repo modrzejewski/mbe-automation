@@ -647,14 +647,27 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
     def from_xyz_file(
             cls,
             read_path: str,
-            symmetrize: bool = True,
-            transform_to_primitive: bool = True,
+            transform: Literal[
+                "to_symmetrized_conventional_cell",
+                "to_symmetrized_primitive_cell",
+                "no_transformation"
+            ] = "to_symmetrized_primitive_cell",
             symprec: float = SYMMETRY_TOLERANCE_LOOSE,
     ):
+        """
+        Read a structure from a coordinate file.
+
+        Args:
+            read_path: Path to the coordinate file.
+            transform: Symmetrization applied to the periodic structure.
+            symprec: Tolerance used for symmetry detection (in Å).
+
+        Returns:
+            Structure object.
+        """
         ase_atoms = mbe_automation.storage.from_xyz_file(
             read_path=read_path,
-            symmetrize=symmetrize,
-            transform_to_primitive=transform_to_primitive,
+            transform=transform,
             symprec=symprec,
         )
         return cls(**vars(mbe_automation.storage.from_ase_atoms(ase_atoms)))

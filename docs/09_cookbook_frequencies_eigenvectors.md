@@ -22,12 +22,12 @@ mace_calc = MACE(model_path="mace.model")
 relaxation_config = Minimum(
     cell_relaxation="only_atoms",
     max_force_on_atom_eV_A=1.0E-4,
-    transform_relaxed_crystal="no_transformation"
+    transform="no_transformation"
 )
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file(cif_path, transform_to_symmetrized_primitive=False),
+    crystal=Structure.from_xyz_file(cif_path, transform="no_transformation"),
     temperatures_K=np.array([300.0]),
     calculator=mace_calc,
     supercell_radius=24.0,
