@@ -111,24 +111,6 @@ class BrillouinZonePath(_BrillouinZonePath):
             mbe_automation.storage.read_brillouin_zone_path(dataset, key)
         ))
 
-    @classmethod
-    def from_phonopy(
-            cls,
-            obj: (
-                phonopy.phonon.band_structure.BandStructure
-                | phonopy.Phonopy
-            )
-    ) -> BrillouinZonePath:
-        if isinstance(obj, phonopy.Phonopy):
-            band_structure = obj.band_structure
-        else:
-            band_structure = obj
-        return cls(**vars(
-            mbe_automation.dynamics.harmonic.brillouin_zone.from_phonopy(
-                band_structure
-            )
-        ))
-
     def plot(
             self,
             save_path: str | None = None,
@@ -407,10 +389,7 @@ class ForceConstants(_ForceConstants):
     def brillouin_zone_path(
             self,
             n_points: int = 20,
-            track_bands: bool = False,
-            delta_q: float = 0.05,
-            degenerate_freqs_tol_cm1: float = 0.5,
-            symmetrize_Dq: bool = False,
+            symmetrize_Dq: bool = True,
             symprec: float = 1e-5,
     ) -> BrillouinZonePath:
         """
@@ -418,12 +397,6 @@ class ForceConstants(_ForceConstants):
 
         Args:
             n_points: Requested number of q-points along a single segment of the path.
-            track_bands: Whether to enforce continuous band tracking using eigenvector overlaps
-                and degenerate perturbation theory. Requires `nomore_ase`.
-            delta_q: Displacement distance for perturbation theory in Å⁻¹
-                Used only when track_bands=True.
-            degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
-                Used only when track_bands=True.
             symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
                 using crystal symmetry operations.
 
@@ -435,9 +408,6 @@ class ForceConstants(_ForceConstants):
             mbe_automation.dynamics.harmonic.brillouin_zone.init_fbz_path(
                 phonopy_object=ph,
                 n_points=n_points,
-                track_bands=track_bands,
-                delta_q=delta_q,
-                degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
                 symmetrize_Dq=symmetrize_Dq,
                 symprec=symprec,
             )

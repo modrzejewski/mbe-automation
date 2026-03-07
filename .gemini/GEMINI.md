@@ -47,4 +47,5 @@ When checking Python code, pay special attention to the following frequent error
 
 ## Testing
 
-* Remember that for any tests with `nomore_ase` you need to run `pixi` environment.
+*   Remember that for any tests with `nomore_ase` you need to run `pixi` environment.
+*   **CRITICAL**: Only run tests in `mbe_automation`, not other programs!
