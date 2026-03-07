@@ -22,7 +22,7 @@ mace_calc = MACE(model_path="mace.model")
 relaxation_config = Minimum(
     cell_relaxation="only_atoms",
     max_force_on_atom_eV_A=1.0E-4,
-    symmetrize_final_structure=False
+    transform_relaxed_crystal="no_transformation"
 )
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(

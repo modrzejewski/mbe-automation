@@ -77,7 +77,11 @@ class Minimum:
                                    # symmetrization may introduce significant
                                    # residual forces on atoms.
                                    #
-    symmetrize_final_structure: bool = True
+    transform_relaxed_crystal: Literal[
+        "symmetrized_primitive_cell",
+        "symmetrized_conventional_cell",
+        "no_transformation"
+    ] = "symmetrized_primitive_cell"
                                    #
                                    # Tolerance (in Angstrom) used for symmetry detection
                                    # for imperfect structures after relaxation with a finite
@@ -115,7 +119,6 @@ class Minimum:
                                    #
     algo_primary: Literal["PreconLBFGS", "PreconFIRE"] = "PreconLBFGS"
     algo_fallback: Literal["PreconLBFGS", "PreconFIRE"] = "PreconFIRE"
-
                                    #
                                    # Save final relaxed structure as an .xyz
                                    # or .cif file in the working directory

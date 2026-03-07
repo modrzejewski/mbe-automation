@@ -144,7 +144,7 @@ def crystal(
     print(f"max_force_on_atom             {config.max_force_on_atom_eV_A:.1e} eV/Å")
     if config.cell_relaxation == "full":
         print(f"pressure                      {config.pressure_GPa} GPa")
-    print(f"symmetrize_final_structure    {config.symmetrize_final_structure}")
+    print(f"transform_relaxed_crystal     {config.transform_relaxed_crystal}")
 
     cuda_available = torch.cuda.is_available()
     if cuda_available:
@@ -171,7 +171,7 @@ def crystal(
         optimize_lattice_vectors = False
         optimize_volume = False
 
-    if config.symmetrize_final_structure:
+    if config.transform_relaxed_crystal != "no_transformation":
         #
         # Check symmetry of the input structure
         # with tight tolerance
@@ -206,12 +206,40 @@ def crystal(
             work_dir=work_dir,
         )
     
-    if config.symmetrize_final_structure:
-        print("Transformation to symmetrized primitive cell...")
-        relaxed_system = mbe_automation.structure.crystal.to_symmetrized_primitive(
-            unit_cell=relaxed_system,
-            symprec=config.symmetry_tolerance_loose
+    if config.transform_relaxed_crystal == "symmetrized_primitive_cell":
+        print("Transformation to symmetrized primitive cell (spglib)...")
+        cell_vectors, atomic_numbers, scaled_positions = (
+            mbe_automation.structure.crystal.to_symmetrized_primitive_cell_spglib(
+                cell_vectors=relaxed_system.cell.array,
+                atomic_numbers=relaxed_system.get_atomic_numbers(),
+                scaled_positions=relaxed_system.get_scaled_positions(),
+                symprec=config.symmetry_tolerance_loose
+            )
         )
+        relaxed_system = ase.Atoms(
+            numbers=atomic_numbers,
+            scaled_positions=scaled_positions,
+            cell=cell_vectors,
+            pbc=True,
+        )
+    elif config.transform_relaxed_crystal == "symmetrized_conventional_cell":
+        print("Transformation to symmetrized conventional cell (spglib)...")
+        cell_vectors, atomic_numbers, scaled_positions = (
+            mbe_automation.structure.crystal.to_symmetrized_conventional_cell_spglib(
+                cell_vectors=relaxed_system.cell.array,
+                atomic_numbers=relaxed_system.get_atomic_numbers(),
+                scaled_positions=relaxed_system.get_scaled_positions(),
+                symprec=config.symmetry_tolerance_loose
+            )
+        )
+        relaxed_system = ase.Atoms(
+            numbers=atomic_numbers,
+            scaled_positions=scaled_positions,
+            cell=cell_vectors,
+            pbc=True,
+        )
+
+    if config.transform_relaxed_crystal != "no_transformation":
         space_group, hmsymbol = mbe_automation.structure.crystal.check_symmetry(
             unit_cell=relaxed_system,
             symmetry_thresh=config.symmetry_tolerance_strict
