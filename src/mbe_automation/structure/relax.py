@@ -267,12 +267,12 @@ def crystal(
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
         
     match_result = mbe_automation.structure.crystal.match(
-        positions_a=unit_cell.get_positions(),
-        atomic_numbers_a=unit_cell.get_atomic_numbers(),
-        cell_vectors_a=unit_cell.cell.array,
-        positions_b=relaxed_system.get_positions(),
-        atomic_numbers_b=relaxed_system.get_atomic_numbers(),
-        cell_vectors_b=relaxed_system.cell.array,
+        positions_a=relaxed_system.get_positions(),
+        atomic_numbers_a=relaxed_system.get_atomic_numbers(),
+        cell_vectors_a=relaxed_system.cell.array,
+        positions_b=unit_cell.get_positions(),
+        atomic_numbers_b=unit_cell.get_atomic_numbers(),
+        cell_vectors_b=unit_cell.cell.array,
     )
     if match_result is None:
         print("RMSD could not be computed (structures did not match within tolerances)")
@@ -280,8 +280,8 @@ def crystal(
         mbe_automation.structure.crystal.compare_lattice_params(
             initial_cell_vectors=unit_cell.cell.array,
             match_result=match_result,
-            label_initial_structure="input",
-            label_final_structure="relaxed",
+            label_initial_structure="initial",
+            label_final_structure="relaxed (aligned to initial structure)",
         )
     if config.save_structure_files:
         cif_path = str(work_dir / "relaxed_structure.cif")
