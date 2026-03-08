@@ -266,19 +266,23 @@ def crystal(
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
         
-    rmsd = mbe_automation.structure.crystal.match(
+    match_result = mbe_automation.structure.crystal.match(
         positions_a=unit_cell.get_positions(),
         atomic_numbers_a=unit_cell.get_atomic_numbers(),
         cell_vectors_a=unit_cell.cell.array,
         positions_b=relaxed_system.get_positions(),
         atomic_numbers_b=relaxed_system.get_atomic_numbers(),
         cell_vectors_b=relaxed_system.cell.array,
-        same_conventions=False,
     )
-    if rmsd is None:
+    if match_result is None:
         print("RMSD could not be computed (structures did not match within tolerances)")
     else:
-        print(f"RMSD w.r.t. initial structure: {rmsd:.6f} Å")
+        mbe_automation.structure.crystal.compare_lattice_params(
+            initial_cell_vectors=unit_cell.cell.array,
+            match_result=match_result,
+            label_initial_structure="input",
+            label_final_structure="relaxed",
+        )
     if config.save_structure_files:
         cif_path = str(work_dir / "relaxed_structure.cif")
         print(f"Saving relaxed crystal to {cif_path}")

@@ -28,6 +28,17 @@ except ImportError:
     get_min_image_distance = None
     doped_available = False
 
+@dataclass
+class CrystalMatch:
+    """Result of matching two crystal structures."""
+    rmsd: float
+    lattice_transformation: npt.NDArray[np.int64]
+    fractional_translation: npt.NDArray[np.float64]
+    atom_permutation: list[int | None]
+    aligned_positions_a: npt.NDArray[np.float64]
+    aligned_atomic_numbers_a: npt.NDArray[np.int64]
+    aligned_cell_vectors_a: npt.NDArray[np.float64]
+
 def display(unit_cell: ase.Atoms, key: str | None=None) -> None:
     """
     Display parameters of the unit cell.
@@ -348,22 +359,38 @@ def density(unit_cell: Atoms):
 
 
 def match(
-    positions_a: npt.NDArray[np.floating],
-    atomic_numbers_a: npt.NDArray[np.integer],
-    cell_vectors_a: npt.NDArray[np.floating],
-    positions_b: npt.NDArray[np.floating],
-    atomic_numbers_b: npt.NDArray[np.integer],
-    cell_vectors_b: npt.NDArray[np.floating],
+    positions_a: npt.NDArray[np.float64],
+    atomic_numbers_a: npt.NDArray[np.int64],
+    cell_vectors_a: npt.NDArray[np.float64],
+    positions_b: npt.NDArray[np.float64],
+    atomic_numbers_b: npt.NDArray[np.int64],
+    cell_vectors_b: npt.NDArray[np.float64],
     ltol: float = 0.2,
     stol: float = 0.3,
     angle_tol: float = 5.0,
-    same_conventions: bool = True,
-) -> float | None:
+) -> CrystalMatch | None:
     """
     Calculate minimum RMSD between two periodic structures.
 
     Verifies identical atom count and elemental composition before matching.
     The function reorders atoms to find the optimal fit.
+
+    Returns a `CrystalMatch` containing:
+    1. `rmsd`: The minimum RMSD between the two structures.
+    2. `lattice_transformation`: The matrix transforming the lattice basis of A to match B.
+    3. `fractional_translation`: The fractional shift vector applied to atoms.
+    4. `atom_permutation`: The index mapping of atoms from A to align with B.
+    5. `aligned_positions_a`: Cartesian coordinates of A aligned to B and folded to the nearest periodic image of B.
+    6. `aligned_atomic_numbers_a`: Atomic numbers of A aligned to B.
+    7. `aligned_cell_vectors_a`: Lattice vectors of A aligned to B.
+
+    Example:
+        match_result = match(...)
+        if match_result is not None:
+            # The aligned parameters are readily available inside match_result:
+            positions = match_result.aligned_positions_a
+            atomic_numbers = match_result.aligned_atomic_numbers_a
+            cell_vectors = match_result.aligned_cell_vectors_a
 
     Args:
         positions_a: Atomic positions for structure A. Shape: (n_atoms, 3).
@@ -375,23 +402,10 @@ def match(
         ltol: Fractional length tolerance for lattice matching.
         stol: Site tolerance for matching.
         angle_tol: Angle tolerance for lattice matching in degrees.
-        same_conventions: If True, raise ValueError when atom counts or elemental
-            compositions differ. If False, skip these checks.
 
     Returns:
-        The minimum RMSD between the two structures in Å, or None if they
-        do not match within the given tolerances.
+        A CrystalMatch dataclass, or None if the structures do not match within the given tolerances.
     """
-    if same_conventions:
-        if atomic_numbers_a.shape[0] != atomic_numbers_b.shape[0]:
-            raise ValueError("Structures must have the same number of atoms.")
-
-        max_z = max(np.max(atomic_numbers_a), np.max(atomic_numbers_b))
-        composition_a = np.bincount(atomic_numbers_a, minlength=max_z + 1)
-        composition_b = np.bincount(atomic_numbers_b, minlength=max_z + 1)
-        if not np.array_equal(composition_a, composition_b):
-            raise ValueError("Structures have different elemental compositions.")
-
     pmg_struct_a = pymatgen.core.Structure(
         lattice=cell_vectors_a,
         species=atomic_numbers_a,
@@ -405,8 +419,69 @@ def match(
         coords_are_cartesian=True
     )
 
-    matcher = StructureMatcher(ltol=ltol, stol=stol, angle_tol=angle_tol)
-    # get_rms_dist returns (rmsd, mapping)
-    rmsd, _ = matcher.get_rms_dist(pmg_struct_a, pmg_struct_b)
+    # primitive_cell=False prevents reduction to the primitive cell before matching.
+    # This is required so that the returned atom permutation array corresponds
+    # exactly to the original atoms in the provided input structures.
+    matcher = StructureMatcher(
+        ltol=ltol, 
+        stol=stol, 
+        angle_tol=angle_tol,
+        primitive_cell=False
+    )
+    
+    trans = matcher.get_transformation(pmg_struct_b, pmg_struct_a)
+    if trans is None:
+        return None
+        
+    lattice_transformation, fractional_translation, atom_permutation = trans
+    
+    rmsd = matcher.get_rms_dist(pmg_struct_b, pmg_struct_a)[0]
+    pmg_aligned_a = matcher.get_s2_like_s1(pmg_struct_b, pmg_struct_a)
 
-    return rmsd
+    return CrystalMatch(
+        rmsd=rmsd,
+        lattice_transformation=lattice_transformation,
+        fractional_translation=fractional_translation,
+        atom_permutation=atom_permutation,
+        aligned_positions_a=pmg_aligned_a.cart_coords,
+        aligned_atomic_numbers_a=np.array(pmg_aligned_a.atomic_numbers, dtype=np.int64),
+        aligned_cell_vectors_a=pmg_aligned_a.lattice.matrix,
+    )
+
+
+def compare_lattice_params(
+    initial_cell_vectors: npt.NDArray[np.float64], 
+    match_result: CrystalMatch,
+    label_initial_structure: str,
+    label_final_structure: str
+) -> None:
+    """
+    Print a side-by-side comparison of lattice parameters.
+
+    `match_result` is from a call to `crystal.match` where the final 
+    periodic structure is aligned to match closely the initial structure.
+
+    Args:
+        initial_cell_vectors: Lattice vectors of the initial structure.
+            Stored in rows: [[ax, ay, az], [bx, by, bz], [cx, cy, cz]].
+        match_result: Result of the crystal matching.
+        label_initial_structure: Label for the initial structure display.
+        label_final_structure: Label for the final structure display.
+    """
+
+    initial_lattice = pymatgen.core.Lattice(initial_cell_vectors)
+    initial_lengths = initial_lattice.abc
+    initial_angles = initial_lattice.angles
+    initial_vol = initial_lattice.volume
+
+    aligned_lattice = pymatgen.core.Lattice(match_result.aligned_cell_vectors_a)
+    aligned_lengths = aligned_lattice.abc
+    aligned_angles = aligned_lattice.angles
+    aligned_vol = aligned_lattice.volume
+
+    print(f"Lattice parameter comparison: {label_initial_structure} -> {label_final_structure}")
+    print(f"  Lattice lengths (a, b, c) [Å]   {initial_lengths[0]:.4f}, {initial_lengths[1]:.4f}, {initial_lengths[2]:.4f} -> {aligned_lengths[0]:.4f}, {aligned_lengths[1]:.4f}, {aligned_lengths[2]:.4f}")
+    print(f"  Lattice angles (α, β, γ) [°]    {initial_angles[0]:.1f}, {initial_angles[1]:.1f}, {initial_angles[2]:.1f} -> {aligned_angles[0]:.1f}, {aligned_angles[1]:.1f}, {aligned_angles[2]:.1f}")
+    print(f"  Cell volume [Å³]                {initial_vol:.2f} -> {aligned_vol:.2f}")
+    print(f"  RMSD [Å]                        {match_result.rmsd:.6f}")
+    print("")

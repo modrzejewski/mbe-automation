@@ -281,22 +281,20 @@ def from_xyz_file(
                 pbc=True,
             )
             _print_cell_summary(system, "Cell after transformation")
-            rmsd = mbe_automation.structure.crystal.match(
+            match_result = mbe_automation.structure.crystal.match(
                 positions_a=system_initial.get_positions(),
                 atomic_numbers_a=system_initial.get_atomic_numbers(),
                 cell_vectors_a=system_initial.cell.array,
                 positions_b=system.get_positions(),
                 atomic_numbers_b=system.get_atomic_numbers(),
                 cell_vectors_b=system.cell.array,
-                same_conventions=False,
             )
-            if rmsd is None:
+            if match_result is None:
                 raise ValueError("Raw and transformed structures did not match within tolerances")
             else:
-                print(f"  RMSD w.r.t. raw input structure: {rmsd:.6f} Å")
+                print(f"  RMSD w.r.t. raw input structure: {match_result.rmsd:.6f} Å")
 
     return system
-
 
 def to_xyz_file(
         save_path: str,

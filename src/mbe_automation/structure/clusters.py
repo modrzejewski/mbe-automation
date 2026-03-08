@@ -417,12 +417,12 @@ def detect_molecules(
             #
             # For debugging
             #
-            rmsd = mbe_automation.structure.crystal.match(
+            match_result = mbe_automation.structure.crystal.match(
                 positions_a, atomic_numbers_a, cell_a,
                 positions_b, atomic_numbers_b, cell_b
             )
-            assert rmsd is not None
-            assert rmsd < 1.0E-8
+            assert match_result is not None
+            assert match_result.rmsd < 1.0E-8
 
     return mbe_automation.storage.MolecularCrystal(
         supercell=system_unwrapped,
