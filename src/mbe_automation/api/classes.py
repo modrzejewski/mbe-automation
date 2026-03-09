@@ -623,6 +623,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
                 "no_transformation"
             ] = "to_symmetrized_primitive_cell",
             symprec: float = SYMMETRY_TOLERANCE_LOOSE,
+            align_to_input: bool = False,
     ):
         """
         Read a structure from a coordinate file.
@@ -631,6 +632,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             read_path: Path to the coordinate file.
             transform: Symmetrization applied to the periodic structure.
             symprec: Tolerance used for symmetry detection (in Å).
+            align_to_input: If True, align the structure to the raw input orientation.
 
         Returns:
             Structure object.
@@ -639,6 +641,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             read_path=read_path,
             transform=transform,
             symprec=symprec,
+            align_to_input=align_to_input,
         )
         return cls(**vars(mbe_automation.storage.from_ase_atoms(ase_atoms)))
 

@@ -74,6 +74,17 @@ The following table summarizes the key methods available across these classes.
 | **`atomic_reference`** | Calculates ground-state energies for all unique isolated atoms (used for generating MLIP baselines). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem`, `Dataset` |
 | **`levels_of_theory`** | Lists the levels of theory available in the atomic reference. | `AtomicReference` |
 
+### `from_xyz_file` Method
+
+Available in `Structure`. Loads an atomistic system from an `.xyz` or `.cif` file.
+
+| Argument | Description | Default |
+| :--- | :--- | :--- |
+| `read_path` | Path to the input file. | - |
+| `transform` | Symmetry transformation applied after loading: `"to_symmetrized_conventional_cell"`, `"to_symmetrized_primitive_cell"`, or `"no_transformation"`. | `"to_symmetrized_primitive_cell"` |
+| `symprec` | Symmetry tolerance for transformation (Å). | `1.0E-2` |
+| `align_to_input` | If `True`, and a transformation is applied, align the resulting system back to the orientation and atom ordering of the raw input structure. | `False` |
+
 ### Usage Notes
 *   **`subsample`**: Requires feature vectors to be present (computed via `run` or during an MD simulation) to calculate distances in chemical space.
 *   **`run`**: Can be used to evaluate ground truth (energies and forces) or to generate descriptors (feature vectors) for subsampling. Supports disjoint work distribution via the `chunk` argument (tuple of `(index, total_chunks)`), enabling parallel execution in high-throughput environments (e.g., SLURM job arrays).
