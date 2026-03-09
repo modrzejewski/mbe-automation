@@ -287,10 +287,10 @@ def crystal(
 
     mbe_automation.structure.crystal.compare_conventional_cells(
         structure_initial=AseAtomsAdaptor.get_structure(unit_cell),
-        structure_final=AseAtomsAdaptor.get_structure(relaxed_cell),
+        structure_final=AseAtomsAdaptor.get_structure(relaxed_system),
         label_initial="initial (conventional cell)",
         label_final="relaxed (conventional cell)",
-        symprec=SYMMETRY_TOLERANCE_LOOSE
+        symprec=config.symmetry_tolerance_loose
     )
 
     relaxed_system.calc = calculator

@@ -14,7 +14,7 @@ import numpy.typing as npt
 from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
 from pymatgen.analysis.structure_matcher import StructureMatcher
 import pymatgen
-import pymagent.core
+import pymatgen.core
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 import mbe_automation.storage
