@@ -235,8 +235,8 @@ def from_xyz_file(
 ) -> ase.Atoms:
 
     mbe_automation.common.display.framed([
-        "Loading Structure",
-        f"Path: {read_path}"
+        "Reading structure from file",
+        read_path
     ])
 
     if read_path.lower().endswith(".cif"):
@@ -250,9 +250,9 @@ def from_xyz_file(
         _print_cell_summary(system, "Raw input cell" if do_transform else "Input cell")
 
         if do_transform:
+            print(f"Input cell will be symmetrized with tolerance {symprec:.6f} Å")
             system_initial = system
             if transform == "to_symmetrized_primitive_cell":
-                print("Transforming input to symmetrized primitive cell...")
                 cell_vectors, atomic_numbers, scaled_positions = (
                     mbe_automation.structure.crystal.to_symmetrized_primitive_cell(
                         cell_vectors=system.cell.array,
@@ -262,7 +262,6 @@ def from_xyz_file(
                     )
                 )
             elif transform == "to_symmetrized_conventional_cell":
-                print("Transforming input to conventional standard cell...")
                 cell_vectors, atomic_numbers, scaled_positions = (
                     mbe_automation.structure.crystal.to_symmetrized_conventional_cell(
                         cell_vectors=system.cell.array,

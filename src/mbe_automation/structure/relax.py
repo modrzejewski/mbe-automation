@@ -209,7 +209,7 @@ def crystal(
         )
     
     if config.transform == "to_symmetrized_primitive_cell":
-        print("Transformation to symmetrized primitive cell (spglib)...")
+        print("Transformation to symmetrized primitive cell...")
         cell_vectors, atomic_numbers, scaled_positions = (
             mbe_automation.structure.crystal.to_symmetrized_primitive_cell(
                 cell_vectors=relaxed_system.cell.array,
@@ -225,7 +225,7 @@ def crystal(
             pbc=True,
         )
     elif config.transform == "to_symmetrized_conventional_cell":
-        print("Transformation to symmetrized conventional cell (spglib)...")
+        print("Transformation to symmetrized conventional cell...")
         cell_vectors, atomic_numbers, scaled_positions = (
             mbe_automation.structure.crystal.to_symmetrized_conventional_cell_spglib(
                 cell_vectors=relaxed_system.cell.array,
