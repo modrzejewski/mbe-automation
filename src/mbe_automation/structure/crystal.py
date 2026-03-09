@@ -14,6 +14,8 @@ import numpy.typing as npt
 from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
 from pymatgen.analysis.structure_matcher import StructureMatcher
 import pymatgen
+import pymagent.core
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 import mbe_automation.storage
 import mbe_automation.common
@@ -491,3 +493,47 @@ def compare_lattice_params(
     print(f"  Cell volume [Å³]                {initial_vol:.2f} -> {aligned_vol:.2f}")
     print(f"  RMSD [Å]                        {match_result.rmsd:.6f}")
     print("")
+
+
+def compare_conventional_cells(
+    structure_initial: pymatgen.core.Structure,
+    structure_final: pymatgen.core.Structure,
+    label_initial: str,
+    label_final: str,
+    symprec: float = SYMMETRY_TOLERANCE_LOOSE
+) -> None:
+    """
+    Print a side-by-side comparison of conventional unit cell parameters.
+    """
+    sga_i = SpacegroupAnalyzer(structure_initial, symprec=symprec)
+    sga_f = SpacegroupAnalyzer(structure_final, symprec=symprec)
+
+    conv_i = sga_i.get_conventional_standard_structure(international_monoclinic=True)
+    conv_f = sga_f.get_conventional_standard_structure(international_monoclinic=True)
+
+    lat_i, lat_f = conv_i.lattice, conv_f.lattice
+    abc_i, abc_f = np.array(lat_i.abc), np.array(lat_f.abc)
+    ang_i, ang_f = np.array(lat_i.angles), np.array(lat_f.angles)
+    
+    vol_i, vol_f = lat_i.volume, lat_f.volume
+    diff_abc = (abc_f - abc_i) / abc_i * 100
+    diff_vol = (vol_f - vol_i) / vol_i * 100
+
+    sg_i = f"{sga_i.get_space_group_symbol()} ({sga_i.get_space_group_number()})"
+    sg_f = f"{sga_f.get_space_group_symbol()} ({sga_f.get_space_group_number()})"
+
+    print(f"Space Group: {sg_i} -> {sg_f}")
+    print(f"{'-' * 75}")
+    print(f"{'Parameter':<15} | {label_initial:<15} | {label_final:<15} | {'Change [%]':<10}")
+    print(f"{'-' * 75}")
+
+    params = ["a [Å]", "b [Å]", "c [Å]"]
+    for i, p in enumerate(params):
+        print(f"{p:<15} | {abc_i[i]:<15.3f} | {abc_f[i]:<15.3f} | {diff_abc[i]:<+10.2f}")
+
+    angles = ["α [°]", "β [°]", "γ [°]"]
+    for i, a in enumerate(angles):
+        print(f"{a:<15} | {ang_i[i]:<15.1f} | {ang_f[i]:<15.1f} | {'-':<10}")
+
+    print(f"{'Volume [Å³]':<15} | {vol_i:<15.1f} | {vol_f:<15.1f} | {diff_vol:<+10.2f}")
+    print(f"{'-' * 75}\n")

@@ -7,6 +7,7 @@ from ase.optimize.precon import Exp
 from ase.optimize.precon.lbfgs import PreconLBFGS
 from ase.optimize.precon.fire import PreconFIRE
 from ase.calculators.calculator import Calculator as ASECalculator
+from pymatgen.io.ase import AseAtomsAdaptor
 import ase.filters
 import ase.units
 import numpy as np
@@ -284,12 +285,13 @@ def crystal(
                 pbc=True,
             )
 
-        mbe_automation.structure.crystal.compare_lattice_params(
-            initial_cell_vectors=unit_cell.cell.array,
-            match_result=match_result,
-            label_initial_structure="initial",
-            label_final_structure="relaxed (aligned to initial structure)",
-        )
+    mbe_automation.structure.crystal.compare_conventional_cells(
+        structure_initial=AseAtomsAdaptor.get_structure(unit_cell),
+        structure_final=AseAtomsAdaptor.get_structure(relaxed_cell),
+        label_initial="initial (conventional cell)",
+        label_final="relaxed (conventional cell)",
+        symprec=SYMMETRY_TOLERANCE_LOOSE
+    )
 
     relaxed_system.calc = calculator
     max_force = np.abs(relaxed_system.get_forces()).max()
