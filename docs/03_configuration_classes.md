@@ -183,4 +183,3 @@ This chapter documents the configuration classes used to control the various wor
 | `algo_primary`               | Primary algorithm for structure relaxation ("PreconLBFGS" or "PreconFIRE"). Referenced only if backend="ase".                                                         | `"PreconLBFGS"`     |
 | `algo_fallback`              | Fallback algorithm if the primary relaxation algorithm fails. Referenced only if backend="ase".                                                                       | `"PreconFIRE"`      |
 | `save_structure_files`       | If `True`, save the final relaxed structure as `relaxed_structure.xyz` (for molecules) or `relaxed_structure.cif` (for crystals) in the active `work_dir`.            | `True`              |
-| `align_to_input`             | If `True`, align the relaxed crystal structure to the input structure using `StructureMatcher` from `pymatgen`. | `False`             |

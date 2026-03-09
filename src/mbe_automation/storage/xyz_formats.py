@@ -231,8 +231,7 @@ def from_xyz_file(
             "to_symmetrized_primitive_cell",
             "no_transformation"
         ] = "to_symmetrized_primitive_cell",
-        symprec: float = SYMMETRY_TOLERANCE_LOOSE,
-        align_to_input: bool = False
+        symprec: float = SYMMETRY_TOLERANCE_LOOSE
 ) -> ase.Atoms:
 
     mbe_automation.common.display.framed([
@@ -290,18 +289,8 @@ def from_xyz_file(
                 atomic_numbers_b=system.get_atomic_numbers(),
                 cell_vectors_b=system.cell.array,
             )
-            if match_result is None:
-                raise ValueError("Raw and transformed structures did not match within tolerances")
-            else:
+            if match_result is not None:
                 print(f"  RMSD w.r.t. raw input structure: {match_result.rmsd:.6f} Å")
-                if align_to_input:
-                    print("  Aligning transformed structure to raw input structure...")
-                    system = ase.Atoms(
-                        numbers=match_result.aligned_atomic_numbers_a,
-                        positions=match_result.aligned_positions_a,
-                        cell=match_result.aligned_cell_vectors_a,
-                        pbc=True,
-                    )
 
     return system
 
