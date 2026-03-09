@@ -252,9 +252,9 @@ def from_xyz_file(
         if do_transform:
             system_initial = system
             if transform == "to_symmetrized_primitive_cell":
-                print("Conversion to symmetrized primitive cell (spglib)...")
+                print("Transforming input to symmetrized primitive cell...")
                 cell_vectors, atomic_numbers, scaled_positions = (
-                    mbe_automation.structure.crystal.to_symmetrized_primitive_cell_spglib(
+                    mbe_automation.structure.crystal.to_symmetrized_primitive_cell(
                         cell_vectors=system.cell.array,
                         atomic_numbers=system.get_atomic_numbers(),
                         scaled_positions=system.get_scaled_positions(),
@@ -262,9 +262,9 @@ def from_xyz_file(
                     )
                 )
             elif transform == "to_symmetrized_conventional_cell":
-                print("Symmetry refinement to conventional standard cell (spglib)...")
+                print("Transforming input to conventional standard cell...")
                 cell_vectors, atomic_numbers, scaled_positions = (
-                    mbe_automation.structure.crystal.to_symmetrized_conventional_cell_spglib(
+                    mbe_automation.structure.crystal.to_symmetrized_conventional_cell(
                         cell_vectors=system.cell.array,
                         atomic_numbers=system.get_atomic_numbers(),
                         scaled_positions=system.get_scaled_positions(),
@@ -280,17 +280,12 @@ def from_xyz_file(
                 cell=cell_vectors,
                 pbc=True,
             )
-            _print_cell_summary(system, "Cell after transformation")
-            match_result = mbe_automation.structure.crystal.match(
-                positions_a=system_initial.get_positions(),
-                atomic_numbers_a=system_initial.get_atomic_numbers(),
-                cell_vectors_a=system_initial.cell.array,
-                positions_b=system.get_positions(),
-                atomic_numbers_b=system.get_atomic_numbers(),
-                cell_vectors_b=system.cell.array,
-            )
-            if match_result is not None:
-                print(f"  RMSD w.r.t. raw input structure: {match_result.rmsd:.6f} Å")
+
+        mbe_automation.structure.crystal.display_conventional_cell(
+            structure=system,
+            label: str = "input cell",
+            symprec=symprec,
+        )
 
     return system
 

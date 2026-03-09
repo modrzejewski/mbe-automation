@@ -128,7 +128,7 @@ def crystal(
         config: mbe_automation.configs.structure.Minimum,
         work_dir: Path | str = Path("./"),
         key: str | None = None
-) -> ase.Atoms:
+) -> tuple[ase.Atoms, int]:
 
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -211,7 +211,7 @@ def crystal(
     if config.transform == "to_symmetrized_primitive_cell":
         print("Transformation to symmetrized primitive cell (spglib)...")
         cell_vectors, atomic_numbers, scaled_positions = (
-            mbe_automation.structure.crystal.to_symmetrized_primitive_cell_spglib(
+            mbe_automation.structure.crystal.to_symmetrized_primitive_cell(
                 cell_vectors=relaxed_system.cell.array,
                 atomic_numbers=relaxed_system.get_atomic_numbers(),
                 scaled_positions=relaxed_system.get_scaled_positions(),
@@ -286,10 +286,10 @@ def crystal(
             )
 
     mbe_automation.structure.crystal.compare_conventional_cells(
-        structure_initial=AseAtomsAdaptor.get_structure(unit_cell),
-        structure_final=AseAtomsAdaptor.get_structure(relaxed_system),
-        label_initial="initial (conventional cell)",
-        label_final="relaxed (conventional cell)",
+        structure_initial=unit_cell,
+        structure_final=relaxed_system,
+        label_initial="initial",
+        label_final="relaxed",
         symprec=config.symmetry_tolerance_loose
     )
 
