@@ -272,6 +272,7 @@ def crystal(
         positions_b=unit_cell.get_positions(),
         atomic_numbers_b=unit_cell.get_atomic_numbers(),
         cell_vectors_b=unit_cell.cell.array,
+        compute_atom_to_atom_mapping=True,
     )
     if match_result is None:
         print("RMSD could not be computed (structures did not match within tolerances)")

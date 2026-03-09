@@ -524,17 +524,18 @@ def match(
         angle_tol=angle_tol,
         primitive_cell=(not compute_atom_to_atom_mapping)
     )
-
-    pmg_aligned_a = matcher.get_s2_like_s1(pmg_struct_b, pmg_struct_a)
-    if pmg_aligned_a is None:
-        return None
     
     if compute_atom_to_atom_mapping:
+        pmg_aligned_a = matcher.get_s2_like_s1(pmg_struct_b, pmg_struct_a)
         trans = matcher.get_transformation(pmg_struct_b, pmg_struct_a)
         assert (trans is not None), "Failed to compute mapping between structures. Check the tolerances."
         lattice_transformation, fractional_translation, atom_permutation = trans
+        aligned_positions_a=pmg_aligned_a.cart_coords
+        aligned_atomic_numbers_a=np.array(pmg_aligned_a.atomic_numbers, dtype=np.int64)
+        aligned_cell_vectors_a=pmg_aligned_a.lattice.matrix
     else:
         lattice_transformation, fractional_translation, atom_permutation = None, None, None
+        aligned_positions_a, aligned_atomic_numbers_a, aligned_cell_vectors_a = None, None, None
     
     rmsd = matcher.get_rms_dist(pmg_struct_b, pmg_struct_a)[0]
 
@@ -543,9 +544,9 @@ def match(
         lattice_transformation=lattice_transformation,
         fractional_translation=fractional_translation,
         atom_permutation=atom_permutation,
-        aligned_positions_a=pmg_aligned_a.cart_coords,
-        aligned_atomic_numbers_a=np.array(pmg_aligned_a.atomic_numbers, dtype=np.int64),
-        aligned_cell_vectors_a=pmg_aligned_a.lattice.matrix,
+        aligned_positions_a=aligned_positions_a,
+        aligned_atomic_numbers_a=aligned_atomic_numbers_a,
+        aligned_cell_vectors_a=aligned_cell_vectors_a,
     )
 
 
