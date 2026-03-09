@@ -283,7 +283,7 @@ def from_xyz_file(
 
         mbe_automation.structure.crystal.display_conventional_cell(
             structure=system,
-            label: str = "input cell",
+            label="input cell",
             symprec=symprec,
         )
 
