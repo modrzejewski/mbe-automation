@@ -145,6 +145,7 @@ def crystal(
     if config.cell_relaxation == "full":
         print(f"pressure                      {config.pressure_GPa} GPa")
     print(f"transform                     {config.transform}")
+    print(f"align_to_input                {config.align_to_input}")
 
     cuda_available = torch.cuda.is_available()
     if cuda_available:
@@ -258,9 +259,6 @@ def crystal(
             symmetry_thresh=config.symmetry_tolerance_strict
         )
 
-    relaxed_system.calc = calculator
-    max_force = np.abs(relaxed_system.get_forces()).max()
-    print(f"Final max residual force = {max_force:.1e} eV/Å", flush=True)
     
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
@@ -277,12 +275,26 @@ def crystal(
     if match_result is None:
         print("RMSD could not be computed (structures did not match within tolerances)")
     else:
+        if config.align_to_input:
+            print("Aligning relaxed structure to input structure...")
+            relaxed_system = ase.Atoms(
+                numbers=match_result.aligned_atomic_numbers_a,
+                positions=match_result.aligned_positions_a,
+                cell=match_result.aligned_cell_vectors_a,
+                pbc=True,
+            )
+
         mbe_automation.structure.crystal.compare_lattice_params(
             initial_cell_vectors=unit_cell.cell.array,
             match_result=match_result,
             label_initial_structure="initial",
             label_final_structure="relaxed (aligned to initial structure)",
         )
+
+    relaxed_system.calc = calculator
+    max_force = np.abs(relaxed_system.get_forces()).max()
+    print(f"Final max residual force = {max_force:.1e} eV/Å", flush=True)
+
     if config.save_structure_files:
         cif_path = str(work_dir / "relaxed_structure.cif")
         print(f"Saving relaxed crystal to {cif_path}")

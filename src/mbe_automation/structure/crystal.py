@@ -253,7 +253,7 @@ def supercell_matrix(
         r_point_image: float,
         diagonal: bool = False,
         backend: Literal["doped", "pymatgen", "auto"] = "auto"
-) -> npt.NDArray[np.integer]:
+) -> npt.NDArray[np.int64]:
     """
     Find the transformation of the unit cell vectors
     which generates a super cell with the following
@@ -268,7 +268,13 @@ def supercell_matrix(
     By default, the transformation matrix is non-diagonal,
     which means that the lattice vectors of the super cell
     can be linear combinations of the lattice vectors of
-    the unit cell with integer coefficients.
+    the unit cell with integer coefficients. A non-diagonal
+    supercell might cause deviations from the perfect
+    symmetry of the dynamical matrix, leading to
+    non-degenerate frequencies (e.g., urea). Use functions
+    accepting the "symmetrize_Dq" argument to restore the
+    correct symmetry of the dynamical matrix before
+    computing physical properties.
 
     Use diagonal=True to get the standard
     n1 x n2 x n3 super cell with condition 1 satisfied.

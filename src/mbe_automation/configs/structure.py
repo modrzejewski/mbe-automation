@@ -124,6 +124,11 @@ class Minimum:
                                    # or .cif file in the working directory
                                    #
     save_structure_files: bool = True
+                                   #
+                                   # Construct the relaxed structure aligned to the
+                                   # input structure using StructureMatcher from pymatgen
+                                   #
+    align_to_input: bool = False
 
     @property
     def pressure_GPa(self) -> float:
