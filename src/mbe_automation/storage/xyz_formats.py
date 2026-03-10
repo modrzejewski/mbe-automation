@@ -10,6 +10,7 @@ import ase
 import numpy as np
 import numpy.typing as npt
 import warnings
+import gemmi
 
 if TYPE_CHECKING:
     import mbe_automation.dynamics.harmonic.modes
@@ -30,6 +31,63 @@ def _read_cif_pymatgen(filepath: str) -> pymatgen.core.Structure:
     )
     structures = parser.parse_structures()
     return structures[0]
+
+def _read_cif_gemmi(
+        filepath: str
+    ) -> pymatgen.core.Structure:
+    """
+    Read periodic structure and expand asymmetric unit to P1 unit cell.
+    
+    Args:
+        filepath: Path to the structure file.
+        
+    Returns:
+        Periodic structure with expanded atomic positions.
+    """
+    document = gemmi.cif.read_file(filepath)
+    block = document.sole_block()
+    asymmetric_unit = gemmi.make_small_structure_from_block(block)
+    
+    unit_cell_sites = asymmetric_unit.get_all_unit_cell_sites()
+    unit_cell_sites = sorted(unit_cell_sites, key=lambda site: site.occ, reverse=True)
+    
+    crystal_lattice = pymatgen.core.Lattice.from_parameters(
+        a=asymmetric_unit.cell.a,
+        b=asymmetric_unit.cell.b,
+        c=asymmetric_unit.cell.c,
+        alpha=asymmetric_unit.cell.alpha,
+        beta=asymmetric_unit.cell.beta,
+        gamma=asymmetric_unit.cell.gamma
+    )
+    
+    atomic_symbols = [site.element.name for site in unit_cell_sites]
+    
+    fractional_positions = [
+        [site.fract.x, site.fract.y, site.fract.z]
+        for site in unit_cell_sites
+    ]
+    
+    structure = pymatgen.core.Structure(
+        lattice=crystal_lattice,
+        species=atomic_symbols,
+        coords=fractional_positions,
+        coords_are_cartesian=False
+    )
+    
+    structure.merge_sites(tol=0.1, mode="delete")
+    
+    return structure
+
+def _read_cif(
+    filepath: str,
+    backend: Literal["gemmi", "pymatgen"] = "gemmi"
+):
+    if backend == "gemmi":
+        return _read_cif_gemmi(filepath)
+    elif backend == "pymatgen":
+        return _read_cif_pymatgen(filepath)
+    else:
+        raise ValueError("Invalid backend requested in _read_cif.")        
 
 def _cif_with_adps(
         save_path: str,
@@ -231,7 +289,8 @@ def from_xyz_file(
             "to_symmetrized_primitive_cell",
             "no_transformation"
         ] = "to_symmetrized_primitive_cell",
-        symprec: float = SYMMETRY_TOLERANCE_LOOSE
+        symprec: float = SYMMETRY_TOLERANCE_LOOSE,
+        cif_backend: Literal["gemmi", "pymatgen"] = "gemmi"
 ) -> ase.Atoms:
 
     mbe_automation.common.display.framed([
@@ -240,15 +299,14 @@ def from_xyz_file(
     ])
 
     if read_path.lower().endswith(".cif"):
-        structure = _read_cif_pymatgen(read_path)
+        structure = _read_cif(read_path, backend=cif_backend)
         system = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
     else:
         system = ase.io.read(read_path)
 
     if np.all(system.pbc):
         do_transform = transform != "no_transformation"
-        _print_cell_summary(system, "Raw input cell" if do_transform else "Input cell")
-
+        
         if do_transform:
             print(f"Input cell will be symmetrized with tolerance {symprec:.6f} Å")
             system_initial = system
@@ -282,7 +340,7 @@ def from_xyz_file(
 
         mbe_automation.structure.crystal.display_conventional_cell(
             structure=system,
-            label="input cell",
+            label="symmetrized input structure" if do_transform else "input structure",
             symprec=symprec,
         )
 
