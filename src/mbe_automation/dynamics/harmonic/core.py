@@ -22,7 +22,6 @@ import sys
 import pandas as pd
 import warnings
 from numpy.polynomial.polynomial import Polynomial
-from scipy.interpolate import CubicSpline
 
 import mbe_automation.common
 import mbe_automation.storage
@@ -33,81 +32,7 @@ import mbe_automation.dynamics.harmonic.eos
 import mbe_automation.dynamics.harmonic.data
 import mbe_automation.dynamics.harmonic.display
 from mbe_automation.configs.structure import Minimum
-from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
-from dataclasses import dataclass
-
-@dataclass
-class EOSMetadata:
-    """
-    Store harmonic properties interpolated at temperature-dependent equilibrium volumes.
-
-    Attributes:
-        interpolated_at_equilibrium_volume: Harmonic properties interpolated at the equilibrium volume for each temperature.
-        exact_at_sampled_volume: Harmonic properties computed at the sampled volumes.
-        select_T: Boolean masks selecting rows in `exact_at_sampled_volume` for each temperature.
-        temperatures_K: Temperatures (K).
-        sampled_volumes: Cell volumes (Å³) of sampled points (accepted as high-quality 
-        according to the filtering criteria).
-        dataset: HDF5 dataset name containing the computed `ForceConstants`.
-        force_constants_keys: List of HDF5 keys corresponding to the `ForceConstants` of the sampled points.
-    """
-    interpolated_at_equilibrium_volume: pd.DataFrame
-    exact_at_sampled_volume: pd.DataFrame
-    select_T: list[npt.NDArray[np.bool_]]
-    temperatures_K: npt.NDArray[np.float64]
-    sampled_volumes: npt.NDArray[np.float64]
-    dataset: str
-    force_constants_keys: list[str]
-
-    def S_vib_at_T(
-        self, 
-        temperature_K: float, 
-        derivative: bool = False
-    ) -> CubicSpline | Polynomial:
-        """
-        Return an interpolated continuous function S_vib(V) at temperature T.
-
-        Fit a cubic spline or a quadratic polynomial to the vibrational
-        entropy as a function of the unit cell volume.
-
-        Args:
-            temperature_K (float): Temperature at which to interpolate (K).
-            derivative (bool, optional): If True, return the volume 
-                derivative dS_vib/dV instead of S_vib(V). Defaults to False.
-
-        Returns:
-            Callable: An interpolable function taking unit cell volume (Å³) 
-            as input and returning the vibrational entropy (J∕K∕mol∕unit cell), 
-            or its volume derivative at constant temperature (J∕K∕mol∕Å³∕unit cell).
-        """
-        idx = np.where(np.isclose(self.temperatures_K, temperature_K, atol=1e-6))[0]
-        if len(idx) == 0:
-            raise ValueError(f"Temperature {temperature_K} K not found in sampled temperatures.")
-        
-        i = idx[0]
-        mask = self.select_T[i]
-        df_T = self.exact_at_sampled_volume[mask]
-        
-        V = df_T["V_crystal (Å³∕unit cell)"].to_numpy()
-        S = df_T["S_vib_crystal (J∕K∕mol∕unit cell)"].to_numpy()
-        
-        # Sort values by volume to ensure CubicSpline works correctly
-        sort_idx = np.argsort(V)
-        V_sorted = V[sort_idx]
-        S_sorted = S[sort_idx]
-        
-        n_volumes = len(V_sorted)
-        if n_volumes < 3:
-            raise ValueError(
-                f"Cannot fit S_vib(V) at T={temperature_K} K. "
-                f"Need at least 3 volumes, but got {n_volumes}."
-            )
-        elif n_volumes == 3:
-            interpolator = Polynomial.fit(V_sorted, S_sorted, deg=2)
-            return interpolator.deriv(1) if derivative else interpolator
-        else:
-            interpolator = CubicSpline(V_sorted, S_sorted, bc_type="not-a-knot")
-            return interpolator.derivative(1) if derivative else interpolator
+from mbe_automation.configs.quasi_harmonic import EOS_SAMPLING_ALGOS, EQUATIONS_OF_STATE
 
 def _assert_equivalent_cells(
         phonopy_cell: PhonopyAtoms,
@@ -356,7 +281,6 @@ def equilibrium_curve(
         filter_out_imaginary_acoustic,
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
-        filter_out_extrapolated_minimum,
         dataset,
         root_key,
         save_plots,
@@ -387,7 +311,6 @@ def equilibrium_curve(
     print(f"filter_out_imaginary_acoustic   {filter_out_imaginary_acoustic}")
     print(f"filter_out_imaginary_optical    {filter_out_imaginary_optical}")
     print(f"filter_out_broken_symmetry      {filter_out_broken_symmetry}")
-    print(f"filter_out_extrapolated_minimum {filter_out_extrapolated_minimum}")
     
     if eos_sampling == "volume" or eos_sampling == "uniform_scaling":
         print("sampled range of cell volumes (V∕V₀)")
@@ -502,155 +425,11 @@ def equilibrium_curve(
     ]].to_string(index=False), flush=True)
     print("")
     
-    #
-    # Decision logic for EOS fit
-    #
-    n_total_points = len(df_eos[select_T[0]])
-    n_good_points = len(df_eos[good_points & select_T[0]])
-    min_points_needed = mbe_automation.dynamics.harmonic.eos.get_minimum_points_for_eos(equation_of_state)
-    min_poly_points = mbe_automation.dynamics.harmonic.eos.get_minimum_points_for_eos("polynomial")
+    if len(df_eos[good_points]) == 0:
+        raise RuntimeError("No data points left after applying filtering criteria")
 
-    if empirical_energy_correction is not None:
-        import scipy.optimize
-        import copy
-        import ase.units
-
-        T_ref = empirical_energy_correction.T_ref
-        V_ref_target = empirical_energy_correction.V_ref
-        variant = empirical_energy_correction.variant
-        alpha_min = empirical_energy_correction.alpha_min
-        alpha_max = empirical_energy_correction.alpha_max
-
-        # Find index for T_ref
-        try:
-            T_ref_idx = np.where(np.isclose(temperatures, T_ref, atol=1e-5))[0][0]
-        except IndexError:
-            raise ValueError(f"T_ref ({T_ref}) not found in temperatures.")
-
-        def evaluate_V_min(alpha):
-            # Create a copy of df_eos to test this alpha
-            df_test = df_eos.copy()
-
-            V_array = df_test["V_crystal (Å³∕unit cell)"].to_numpy()
-
-            # Correction term in eV (alpha in appropriate units depending on variant)
-            # variant 1: alpha * (V - V0)
-            # variant 2: alpha / V
-            # Note: G_tot_crystal is in kJ/mol/unit cell. We need to convert eV to kJ/mol.
-            eV_to_kJ_mol = ase.units.mol / (1000.0 / ase.units.kJ)
-            eV_to_kJ_mol = ase.units.eV / (ase.units.kJ / ase.units.mol)
-            # Wait, let's just make the correction directly in kJ/mol, assuming alpha is scaled to give energy in eV.
-            # No, user didn't specify units of alpha, so alpha is just an adjustable parameter. Let's assume the formula gives energy in eV.
-            # Then we convert eV to kJ/mol/unit cell.
-            if variant == "alpha*(V-V0)":
-                correction_eV = alpha * (V_array - V_ref_target)
-            elif variant == "alpha/V":
-                correction_eV = alpha / V_array
-            else:
-                raise ValueError(f"Unknown empirical energy correction variant: {variant}")
-
-            correction_kJ_mol = correction_eV * ase.units.eV / (ase.units.kJ / ase.units.mol)
-
-            # Add correction to G
-            G_test = df_test["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy() + correction_kJ_mol
-
-            # Perform fit for T_ref
-            mask = good_points & select_T[T_ref_idx]
-            V_fit = V_array[mask]
-            G_fit = G_test[mask]
-
-            fit_res = mbe_automation.dynamics.harmonic.eos.fit(
-                V=V_fit,
-                G=G_fit,
-                equation_of_state=equation_of_state
-            )
-
-            if not fit_res.min_found:
-                # If fitting fails, return a large dummy difference to guide optimizer away
-                # or raise error
-                return np.nan
-
-            return fit_res.V_min - V_ref_target
-
-        print(f"Applying empirical energy correction: variant={variant}, T_ref={T_ref}, V_ref={V_ref_target}")
-
-        # We need a robust root finding. Brentq is good but needs a bracket.
-        # Let's search for a bracket if f(alpha_min) and f(alpha_max) have the same sign.
-        try:
-            val_min = evaluate_V_min(alpha_min)
-            val_max = evaluate_V_min(alpha_max)
-
-            if np.isnan(val_min) or np.isnan(val_max):
-                 raise RuntimeError("EOS fitting failed at boundaries of alpha.")
-
-            if val_min * val_max > 0:
-                 raise RuntimeError(f"Could not bracket root for alpha in range [{alpha_min}, {alpha_max}]. "
-                                    f"f({alpha_min})={val_min}, f({alpha_max})={val_max}")
-
-            optimal_alpha = scipy.optimize.brentq(evaluate_V_min, alpha_min, alpha_max)
-            print(f"Found optimal alpha = {optimal_alpha}")
-
-            # Apply optimal alpha to df_eos permanently
-            V_array = df_eos["V_crystal (Å³∕unit cell)"].to_numpy()
-            if variant == "alpha*(V-V0)":
-                correction_eV = optimal_alpha * (V_array - V_ref_target)
-            elif variant == "alpha/V":
-                correction_eV = optimal_alpha / V_array
-
-            correction_kJ_mol = correction_eV * ase.units.eV / (ase.units.kJ / ase.units.mol)
-
-            # Update energies in df_eos
-            df_eos["E_el_crystal (kJ∕mol∕unit cell)"] += correction_kJ_mol
-            df_eos["E_tot_crystal (kJ∕mol∕unit cell)"] += correction_kJ_mol
-            df_eos["F_tot_crystal (kJ∕mol∕unit cell)"] += correction_kJ_mol
-            df_eos["G_tot_crystal (kJ∕mol∕unit cell)"] += correction_kJ_mol
-            df_eos["H_tot_crystal (kJ∕mol∕unit cell)"] += correction_kJ_mol
-
-        except Exception as e:
-            print(f"Failed to find empirical energy correction parameter alpha: {e}")
-            raise
-
-    #
-    # Store all harmonic properties of systems
-    # used to sample the EOS curve.
-    #
-    mbe_automation.storage.save_data_frame(
-        df=df_eos,
-        dataset=dataset,
-        key=f"{root_key}/eos_sampled"
-    )
-    df_eos.to_csv(os.path.join(work_dir, "eos_sampled.csv"))
-
-
-
-    if n_good_points >= min_points_needed:
-        action = "proceed"
-        final_eos = equation_of_state
-    elif n_good_points >= min_poly_points:
-        action = "fallback to polynomial"
-        final_eos = "polynomial"
-    else:
-        action = "stop (insufficient points)"
-        final_eos = "none"
-
-    summary_data = [
-        ["total points", n_total_points],
-        ["good points", n_good_points],
-        ["requested EOS", equation_of_state],
-        ["required points", min_points_needed],
-        ["action", action],
-        ["final EOS", final_eos]
-    ]
-    df_summary = pd.DataFrame(summary_data)
-    print("\nequation of state (EOS) fitting summary:")
-    print(df_summary.to_string(index=False, header=False))
-    print("")
-
-    if final_eos == "none":
+    if len(df_eos[good_points]) < 3:
         raise RuntimeError("Insufficient number of points left after applying filtering criteria")
-
-    if final_eos != equation_of_state:
-        equation_of_state = final_eos
 
     V_eos = np.full(n_temperatures, np.nan)
     G_tot_eos = np.full(n_temperatures, np.nan)
@@ -746,30 +525,5 @@ def equilibrium_curve(
         "min_found": min_found,
         "min_extrapolated": min_extrapolated
     })
-    mbe_automation.dynamics.harmonic.display.eos_fitting_summary(
-        df_crystal_eos=df,
-        filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
-    )
-    force_constants_keys = [
-        f"{root_key}/phonons/force_constants/{label}"
-        for label in df_eos[good_points & select_T[0]]["system_label_crystal"]
-    ]
-
-    eos_obj = EOSMetadata(
-        interpolated_at_equilibrium_volume=df,
-        exact_at_sampled_volume=df_eos[good_points],
-        select_T=select_T,
-        temperatures_K=np.array(temperatures),
-        sampled_volumes=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
-        dataset=dataset,
-        force_constants_keys=force_constants_keys
-    )
-
-    mbe_automation.storage.core.save_eos_metadata(
-        eos_metadata=eos_obj,
-        dataset=dataset,
-        key=f"{root_key}/eos_metadata"
-    )
-
-    return eos_obj
+    return df
 
