@@ -19,8 +19,8 @@ from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLIN
 @dataclass
 class EmpiricalEnergyCorrection:
     variant: Literal["alpha*(V-V0)", "alpha/V"]
-    T0: float
-    V0: float
+    T_ref: float
+    V_ref: float
     alpha_min: float = -10.0
     alpha_max: float = 10.0
 
@@ -287,8 +287,8 @@ class FreeEnergy:
 
 
         if self.empirical_energy_correction is not None:
-            if self.empirical_energy_correction.T0 not in self.temperatures_K:
-                self.temperatures_K = np.sort(np.append(self.temperatures_K, self.empirical_energy_correction.T0))
+            if self.empirical_energy_correction.T_ref not in self.temperatures_K:
+                self.temperatures_K = np.sort(np.append(self.temperatures_K, self.empirical_energy_correction.T_ref))
         self.temperatures_K = np.sort(np.atleast_1d(self.temperatures_K))
         if len(self.temperatures_K) > 1:
             diffs = np.diff(self.temperatures_K)

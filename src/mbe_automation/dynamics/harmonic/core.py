@@ -515,17 +515,17 @@ def equilibrium_curve(
         import copy
         import ase.units
 
-        T0 = empirical_energy_correction.T0
-        V0_target = empirical_energy_correction.V0
+        T_ref = empirical_energy_correction.T_ref
+        V_ref_target = empirical_energy_correction.V_ref
         variant = empirical_energy_correction.variant
         alpha_min = empirical_energy_correction.alpha_min
         alpha_max = empirical_energy_correction.alpha_max
 
-        # Find index for T0
+        # Find index for T_ref
         try:
-            T0_idx = np.where(np.isclose(temperatures, T0, atol=1e-5))[0][0]
+            T_ref_idx = np.where(np.isclose(temperatures, T_ref, atol=1e-5))[0][0]
         except IndexError:
-            raise ValueError(f"T0 ({T0}) not found in temperatures.")
+            raise ValueError(f"T_ref ({T_ref}) not found in temperatures.")
 
         def evaluate_V_min(alpha):
             # Create a copy of df_eos to test this alpha
@@ -543,7 +543,7 @@ def equilibrium_curve(
             # No, user didn't specify units of alpha, so alpha is just an adjustable parameter. Let's assume the formula gives energy in eV.
             # Then we convert eV to kJ/mol/unit cell.
             if variant == "alpha*(V-V0)":
-                correction_eV = alpha * (V_array - V0_target)
+                correction_eV = alpha * (V_array - V_ref_target)
             elif variant == "alpha/V":
                 correction_eV = alpha / V_array
             else:
@@ -554,8 +554,8 @@ def equilibrium_curve(
             # Add correction to G
             G_test = df_test["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy() + correction_kJ_mol
 
-            # Perform fit for T0
-            mask = good_points & select_T[T0_idx]
+            # Perform fit for T_ref
+            mask = good_points & select_T[T_ref_idx]
             V_fit = V_array[mask]
             G_fit = G_test[mask]
 
@@ -570,9 +570,9 @@ def equilibrium_curve(
                 # or raise error
                 return np.nan
 
-            return fit_res.V_min - V0_target
+            return fit_res.V_min - V_ref_target
 
-        print(f"Applying empirical energy correction: variant={variant}, T0={T0}, V0={V0_target}")
+        print(f"Applying empirical energy correction: variant={variant}, T_ref={T_ref}, V_ref={V_ref_target}")
 
         # We need a robust root finding. Brentq is good but needs a bracket.
         # Let's search for a bracket if f(alpha_min) and f(alpha_max) have the same sign.
@@ -593,7 +593,7 @@ def equilibrium_curve(
             # Apply optimal alpha to df_eos permanently
             V_array = df_eos["V_crystal (Å³∕unit cell)"].to_numpy()
             if variant == "alpha*(V-V0)":
-                correction_eV = optimal_alpha * (V_array - V0_target)
+                correction_eV = optimal_alpha * (V_array - V_ref_target)
             elif variant == "alpha/V":
                 correction_eV = optimal_alpha / V_array
 
