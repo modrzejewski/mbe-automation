@@ -16,6 +16,14 @@ import mbe_automation.storage
 from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
 
 @dataclass(kw_only=True)
+class ElectronicEnergyCorrection:
+    type: Literal["linear", "inverse_volume"] = "inverse_volume"
+    T_ref: float
+    V_ref: float
+    e_el_correction_param_min: float = -np.inf
+    e_el_correction_param_max: float = np.inf
+
+@dataclass(kw_only=True)
 class FreeEnergy:
     """
     Default parameters for free energy calculations
@@ -31,6 +39,12 @@ class FreeEnergy:
                                    #
     crystal: ase.Atoms | mbe_automation.storage.Structure
     molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
+                                   #
+                                   # Electronic energy correction
+                                   # applied to match a specific reference
+                                   # volume at a given reference temperature.
+                                   #
+    electronic_energy_correction: ElectronicEnergyCorrection | None = None
                                    #
                                    # Volumetric thermal expansion
                                    #
@@ -276,6 +290,12 @@ class FreeEnergy:
             diffs = np.diff(self.temperatures_K)
             if np.any(diffs < 1.0E-5):
                  raise ValueError("Numerically close temperatures detected in temperatures_K.")
+        
+        if self.electronic_energy_correction is not None:
+            if not np.any(np.isclose(self.temperatures_K, self.electronic_energy_correction.T_ref, atol=1.0E-5)):
+                raise ValueError("ElectronicEnergyCorrection.T_ref must be exactly present in temperatures_K.")
+            if self.electronic_energy_correction.type not in ["linear", "inverse_volume"]:
+                raise ValueError(f"Unknown ElectronicEnergyCorrection type: {self.electronic_energy_correction.type}")
         
         self.volume_range = np.sort(np.atleast_1d(self.volume_range))
         if len(self.volume_range) > 1:

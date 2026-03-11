@@ -537,7 +537,11 @@ def match(
         lattice_transformation, fractional_translation, atom_permutation = None, None, None
         aligned_positions_a, aligned_atomic_numbers_a, aligned_cell_vectors_a = None, None, None
     
-    rmsd = matcher.get_rms_dist(pmg_struct_b, pmg_struct_a)[0]
+    rmsd_tuple = matcher.get_rms_dist(pmg_struct_b, pmg_struct_a)
+    if rmsd_tuple is None:
+        return None
+        
+    rmsd = rmsd_tuple[0]
 
     return CrystalMatch(
         rmsd=rmsd,

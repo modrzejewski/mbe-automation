@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Literal
 import warnings
 import numpy.typing as npt
 from numpy.polynomial.polynomial import Polynomial
@@ -21,9 +21,9 @@ class EOSFitResults:
     min_found: bool
     min_extrapolated: bool
     curve_type: str
-    G_interp: Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]] | None
-    V_sampled: npt.NDArray[np.floating]
-    G_sampled: npt.NDArray[np.floating]
+    G_interp: Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]] | None
+    V_sampled: npt.NDArray[np.float64]
+    G_sampled: npt.NDArray[np.float64]
 
 def birch_murnaghan(volume, e0, v0, b0, b1):
         """Birch-Murnaghan equation from PRB 70, 224107."""
@@ -193,7 +193,11 @@ def spline_interpolation(V, G):
         )
 
 
-def fit(V, G, equation_of_state):
+def fit(
+    V, 
+    G, 
+    equation_of_state
+) -> EOSFitResults:
     """
     Fit Gibbs free energy using a selected analytic formula for G(V).
     """
@@ -258,7 +262,7 @@ def fit(V, G, equation_of_state):
                     b0=popt[2],
                     b1=popt[3]
                 ),
-                G_sampled=G.copy(),
+                    G_sampled=G.copy(),
                 V_sampled=V.copy()
             )
             return nonlinear_fit
@@ -280,4 +284,61 @@ def get_minimum_points_for_eos(equation_of_state: str) -> int:
     else:
         raise ValueError(f"Unknown EOS: {equation_of_state}")
 
+def electronic_energy_correction_term(
+    V, 
+    V_ref, 
+    e_el_correction_param, 
+    correction_type: Literal["linear", "inverse_volume"]
+):
+    """
+    Returns the electronic energy correction in the same units as the energy.
+    """
+    if correction_type == "linear":
+        return e_el_correction_param * (V - V_ref)
+    elif correction_type == "inverse_volume":
+        return e_el_correction_param / V
+    else:
+        raise ValueError(f"Unknown correction type: {correction_type}")
 
+def evaluate_electronic_energy_correction_alpha(
+    V_sampled: npt.NDArray[np.float64],
+    G_sampled: npt.NDArray[np.float64],
+    correction_type: Literal["linear", "inverse_volume"],
+    V_ref: float,
+    e_el_correction_param_min: float,
+    e_el_correction_param_max: float
+) -> float:
+    """
+    Perform a cubic spline fit of G(V) and find e_el_correction_param analytically.
+    """
+    if len(V_sampled) < 4:
+         raise ValueError("Need at least 4 points for cubic spline fit to evaluate alpha.")
+
+    sort_idx = np.argsort(V_sampled)
+    V_sorted = V_sampled[sort_idx]
+    G_sorted = G_sampled[sort_idx]
+
+    if not (V_sorted[0] <= V_ref <= V_sorted[-1]):
+         raise ValueError(
+             f"V_ref ({V_ref:.3f}) must be within the sampled volume range "
+             f"[{V_sorted[0]:.3f}, {V_sorted[-1]:.3f}]."
+         )
+
+    cs = CubicSpline(V_sorted, G_sorted)
+    dGdV_interp = cs.derivative(1)
+    
+    dGdV_tot_Vref = dGdV_interp(V_ref)
+    
+    if correction_type == "linear":
+        e_el_correction_param_opt = -dGdV_tot_Vref
+    elif correction_type == "inverse_volume":
+        e_el_correction_param_opt = (V_ref ** 2) * dGdV_tot_Vref
+    else:
+        raise ValueError(f"Unknown correction type: {correction_type}")
+        
+    if e_el_correction_param_opt < e_el_correction_param_min or e_el_correction_param_opt > e_el_correction_param_max:
+        raise ValueError(
+            f"Found e_el_correction_param={e_el_correction_param_opt:.6e} is outside the allowed bounds [{e_el_correction_param_min}, {e_el_correction_param_max}]."
+        )
+        
+    return float(e_el_correction_param_opt)

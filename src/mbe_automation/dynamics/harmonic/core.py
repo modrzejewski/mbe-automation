@@ -58,6 +58,7 @@ class EOSMetadata:
     sampled_volumes: npt.NDArray[np.float64]
     dataset: str
     force_constants_keys: list[str]
+    e_el_correction_param: float | None = None
 
     def S_vib_at_T(
         self, 
@@ -357,6 +358,7 @@ def equilibrium_curve(
         filter_out_imaginary_optical,
         filter_out_broken_symmetry,
         filter_out_extrapolated_minimum,
+        electronic_energy_correction,
         dataset,
         root_key,
         save_plots,
@@ -553,19 +555,69 @@ def equilibrium_curve(
     min_extrapolated = np.zeros(n_temperatures, dtype=bool)
     curve_type = []
     G_tot_curves = []
-        
+    #
+    # Evaluate Electronic Energy Correction parameter at T_ref
+    #
+    # e_el_correction_param provides a linear or inverse-volume scaling
+    # shift to the electronic energy E_el(V). This shifts the aggregate 
+    # minimum of the Gibbs free energy G(T, p, V) such that the computed 
+    # quasi-harmonic equilibrium volume V(T_ref) exactly matches the 
+    # requested target reference volume V_ref.
+    #
+    e_el_correction_param = None
+    if electronic_energy_correction is not None:
+        print(
+            f"Computing electronic energy correction "
+            f"for T_ref={electronic_energy_correction.T_ref} K, "
+            f"target V_ref={electronic_energy_correction.V_ref} Å³"
+        )
+        i_T_ref = np.where(np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5))[0][0]
+        e_el_correction_param = mbe_automation.dynamics.harmonic.eos.evaluate_electronic_energy_correction_alpha(
+            V_sampled=df_eos[good_points & select_T[i_T_ref]]["V_crystal (Å³∕unit cell)"].to_numpy(),
+            G_sampled=df_eos[good_points & select_T[i_T_ref]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(), 
+            correction_type=electronic_energy_correction.type, 
+            V_ref=electronic_energy_correction.V_ref, 
+            e_el_correction_param_min=electronic_energy_correction.e_el_correction_param_min, 
+            e_el_correction_param_max=electronic_energy_correction.e_el_correction_param_max
+        )
+        print(f"Optimal parameter evaluated via cubic spline: e_el_correction_param = {e_el_correction_param:.6e}")
+
     for i, T in enumerate(temperatures):
+        V_samp = df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy()
+        G_samp = df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
+
         fit = mbe_automation.dynamics.harmonic.eos.fit(
-            V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
-            G=df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
+            V=V_samp,
+            G=G_samp,
             equation_of_state=equation_of_state
         )
-        G_tot_curves.append(fit)
-        G_tot_eos[i] = fit.G_min # interpolated G at equilibrium volume, can slightly differ from the actual G
-        V_eos[i] = fit.V_min     # volume which minimizes G as a function of T and p_external
-        min_found[i] = fit.min_found
-        min_extrapolated[i] = fit.min_extrapolated
-        curve_type.append(fit.curve_type)
+        
+        if electronic_energy_correction is not None:
+            E_corr_samp = mbe_automation.dynamics.harmonic.eos.electronic_energy_correction_term(
+                V=V_samp,
+                V_ref=electronic_energy_correction.V_ref,
+                e_el_correction_param=e_el_correction_param,
+                correction_type=electronic_energy_correction.type
+            )
+            fit_corrected = mbe_automation.dynamics.harmonic.eos.fit(
+                V=V_samp,
+                G=G_samp + E_corr_samp,
+                equation_of_state=equation_of_state
+            )
+            
+            V_eos[i] = fit_corrected.V_min # volume which minimizes G + E_corr
+            min_found[i] = fit_corrected.min_found
+            min_extrapolated[i] = fit_corrected.min_extrapolated
+            curve_type.append(fit_corrected.curve_type)
+            G_tot_curves.append(fit_corrected)
+            G_tot_eos[i] = fit_corrected.G_min # corrected G at equilibrium volume
+        else:
+            V_eos[i] = fit.V_min # volume which minimizes G
+            min_found[i] = fit.min_found
+            min_extrapolated[i] = fit.min_extrapolated
+            curve_type.append(fit.curve_type)
+            G_tot_curves.append(fit)
+            G_tot_eos[i] = fit.G_min # uncorrected G at equilibrium volume
         #
         # Effective pressure (thermal pressure) which forces
         # the equilibrum volume of the unit cell at
@@ -603,7 +655,7 @@ def equilibrium_curve(
         # See fig 2 in Otero-de-la-Roza et al. for
         # an example of a polynomial fit.
         #
-        if fit.min_found:
+        if fit_corrected.min_found:
             weights = mbe_automation.dynamics.harmonic.eos.proximity_weights(
                 V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
                 V_min=V_eos[i]
@@ -640,6 +692,17 @@ def equilibrium_curve(
         "min_found": min_found,
         "min_extrapolated": min_extrapolated
     })
+    
+    if electronic_energy_correction is not None:
+        E_corr_electronic_array = [
+            mbe_automation.dynamics.harmonic.eos.electronic_energy_correction_term(
+                V_eos_i, 
+                electronic_energy_correction.V_ref, 
+                e_el_correction_param, 
+                electronic_energy_correction.type
+            ) for V_eos_i in V_eos
+        ]
+        df["ΔE_el_crystal_eos (kJ∕mol∕unit cell)"] = E_corr_electronic_array
     mbe_automation.dynamics.harmonic.display.eos_fitting_summary(
         df_crystal_eos=df,
         filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
@@ -656,7 +719,8 @@ def equilibrium_curve(
         temperatures_K=np.array(temperatures),
         sampled_volumes=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
         dataset=dataset,
-        force_constants_keys=force_constants_keys
+        force_constants_keys=force_constants_keys,
+        e_el_correction_param=e_el_correction_param
     )
 
     mbe_automation.storage.core.save_eos_metadata(

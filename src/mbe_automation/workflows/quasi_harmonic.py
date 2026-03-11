@@ -234,6 +234,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.filter_out_imaginary_optical,
         config.filter_out_broken_symmetry,
         config.filter_out_extrapolated_minimum,
+        config.electronic_energy_correction,
         config.dataset,
         config.root_key,
         config.save_plots,
@@ -319,6 +320,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             system_label=label_crystal,
             level_of_theory=config.calculator.level_of_theory,
         )
+        if config.electronic_energy_correction is not None:
+            df_crystal_T["ΔE_el_crystal (kJ∕mol∕unit cell)"] = row.get("ΔE_el_crystal_eos (kJ∕mol∕unit cell)", 0.0)
+            
         interpolator = interpolated_harmonic_props.S_vib_at_T(T, derivative=True)
         df_crystal_T["dSdV_vib_crystal (J∕K∕mol∕Å³∕unit cell)"] = interpolator(V)
         df_crystal_T.index = [i] # map current dataframe to temperature T
