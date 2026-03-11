@@ -237,6 +237,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.dataset,
         config.root_key,
         config.save_plots,
+        config.empirical_energy_correction,
     )
     df_crystal_eos = interpolated_harmonic_props.interpolated_at_equilibrium_volume
     #

@@ -15,6 +15,15 @@ import mbe_automation.storage
 
 from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
 
+
+@dataclass
+class EmpiricalEnergyCorrection:
+    variant: Literal["alpha*(V-V0)", "alpha/V"]
+    T0: float
+    V0: float
+    alpha_min: float = -10.0
+    alpha_max: float = 10.0
+
 @dataclass(kw_only=True)
 class FreeEnergy:
     """
@@ -213,6 +222,11 @@ class FreeEnergy:
                                    # Equation of state used to fit energy/free energy
                                    # as a function of volume.
                                    #                                   
+    empirical_energy_correction: EmpiricalEnergyCorrection | None = None
+                                   #
+                                   # Equation of state used to fit energy/free energy
+                                   # as a function of volume.
+                                   #
     equation_of_state: Literal[*EQUATIONS_OF_STATE] = "spline"
                                    #
                                    # Algorithm used to generate points on
@@ -271,6 +285,10 @@ class FreeEnergy:
         if isinstance(self.molecule, mbe_automation.storage.Structure):
             self.molecule = mbe_automation.storage.to_ase(self.molecule)
 
+
+        if self.empirical_energy_correction is not None:
+            if self.empirical_energy_correction.T0 not in self.temperatures_K:
+                self.temperatures_K = np.sort(np.append(self.temperatures_K, self.empirical_energy_correction.T0))
         self.temperatures_K = np.sort(np.atleast_1d(self.temperatures_K))
         if len(self.temperatures_K) > 1:
             diffs = np.diff(self.temperatures_K)
