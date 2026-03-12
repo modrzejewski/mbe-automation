@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Literal, TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
+import ase.units
 from scipy.interpolate import CubicSpline
 
 ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "none"]
@@ -49,6 +50,36 @@ def _eec_value(
         return e_el_correction_param / V
     elif correction_type == "none":
         return np.zeros_like(V) if isinstance(V, (np.ndarray, list)) else 0.0
+    else:
+        raise ValueError(f"Unknown correction type: {correction_type}")
+
+def _eec_pressure(
+    V, 
+    e_el_correction_param, 
+    correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION]
+):
+    """
+    Evaluate the volume derivative of the electronic energy correction.
+
+    Units:
+        - V: Crystal volume in Å³∕unit cell
+        - e_el_correction_param: 
+            * linear: (kJ∕mol) / Å³
+            * inverse_volume: (kJ∕mol) * Å³
+            
+    Returns:
+        Derivative of the correction w.r.t volume in (kJ∕mol) / Å³∕unit cell.
+    """
+    if correction_type == "linear":
+        if isinstance(V, (np.ndarray, list)):
+            return np.full_like(V, e_el_correction_param, dtype=np.float64)
+        return float(e_el_correction_param)
+    elif correction_type == "inverse_volume":
+        return -e_el_correction_param / (V ** 2)
+    elif correction_type == "none":
+        if isinstance(V, (np.ndarray, list)):
+            return np.zeros_like(V, dtype=np.float64)
+        return 0.0
     else:
         raise ValueError(f"Unknown correction type: {correction_type}")
 
@@ -157,6 +188,32 @@ class EEC:
             e_el_correction_param=self.param,
             correction_type=self.config.type
         )
+
+    def evaluate_pressure(self, V: float | npt.NDArray[np.float64]) -> float | npt.NDArray[np.float64]:
+        """
+        Evaluate the analogous pressure of the electronic energy correction at the given volume(s).
+
+        This computes the volume derivative of the correction (dE_eec/dV) and converts
+        it to Gigapascals (GPa), acting as the analogue of the thermal pressure.
+
+        Parameters:
+            V: Crystal volume in Å³∕unit cell.
+            
+        Returns:
+            Correction pressure in GPa.
+        """
+        if not self.is_enabled:
+            if isinstance(V, (np.ndarray, list)):
+                return np.zeros_like(V, dtype=np.float64)
+            return 0.0
+            
+        dEdV = _eec_pressure(
+            V=V,
+            e_el_correction_param=self.param,
+            correction_type=self.config.type
+        )
+        kJ_mol_Angs3_to_GPa = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
+        return dEdV * kJ_mol_Angs3_to_GPa
 
     @classmethod
     def from_sampled_eos_curve(
