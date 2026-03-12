@@ -604,7 +604,6 @@ def equilibrium_curve(
                 G=G_samp + E_corr_samp,
                 equation_of_state=equation_of_state
             )
-            
             V_eos[i] = fit_corrected.V_min # volume which minimizes G + E_corr
             min_found[i] = fit_corrected.min_found
             min_extrapolated[i] = fit_corrected.min_extrapolated
@@ -612,12 +611,12 @@ def equilibrium_curve(
             G_tot_curves.append(fit_corrected)
             G_tot_eos[i] = fit_corrected.G_min # corrected G at equilibrium volume
         else:
-            V_eos[i] = fit.V_min # volume which minimizes G
+            V_eos[i] = fit.V_min # volume which minimizes G at T and p_external
             min_found[i] = fit.min_found
             min_extrapolated[i] = fit.min_extrapolated
             curve_type.append(fit.curve_type)
             G_tot_curves.append(fit)
-            G_tot_eos[i] = fit.G_min # uncorrected G at equilibrium volume
+            G_tot_eos[i] = fit.G_min # interpolated G at V_min can slightly differ from the true G
         #
         # Effective pressure (thermal pressure) which forces
         # the equilibrum volume of the unit cell at
@@ -655,7 +654,7 @@ def equilibrium_curve(
         # See fig 2 in Otero-de-la-Roza et al. for
         # an example of a polynomial fit.
         #
-        if fit_corrected.min_found:
+        if min_found[i]:
             weights = mbe_automation.dynamics.harmonic.eos.proximity_weights(
                 V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
                 V_min=V_eos[i]
@@ -692,17 +691,6 @@ def equilibrium_curve(
         "min_found": min_found,
         "min_extrapolated": min_extrapolated
     })
-    
-    if electronic_energy_correction is not None:
-        E_corr_electronic_array = [
-            mbe_automation.dynamics.harmonic.eos.electronic_energy_correction_term(
-                V_eos_i, 
-                electronic_energy_correction.V_ref, 
-                e_el_correction_param, 
-                electronic_energy_correction.type
-            ) for V_eos_i in V_eos
-        ]
-        df["ΔE_el_crystal_eos (kJ∕mol∕unit cell)"] = E_corr_electronic_array
     mbe_automation.dynamics.harmonic.display.eos_fitting_summary(
         df_crystal_eos=df,
         filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
