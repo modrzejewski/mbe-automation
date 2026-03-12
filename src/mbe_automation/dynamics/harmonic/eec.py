@@ -109,6 +109,28 @@ def _eec_param(
 class EEC:
     """
     Empirical Electronic Energy Correction (EEC) data and evaluation.
+                                    
+    Empirical electronic energy correction applied
+    to enforce known reference volume (V_ref)
+    at reference temperature (T_ref). The EEC contribution
+    is added to the crystal electronic energy (E_el_crystal)
+    and accounted for in all thermodynamic functions derived
+    from E_el_crystal. Two types of ECC are implemented:
+                                   
+    (1) linear: E_el_crystal(corrected) = E_el_crystal + param * V
+    (2) inverse_volume: E_el_crystal(corrected) = E_el_crystal + param / V
+                                   
+    Literature with definitions:
+    1. A. Otero-de-la-Roza and V. Lunana, Treatment of first-principles data
+       for predictive quasiharmonic thermodynamics of solids: The case of MgO
+       Phys. Rev. B 84, 024109 (2011); doi: 10.1103/PhysRevB.84.024109
+    2. F. Luo, Y. Cheng, L.-C. Cai, and X.-R. Chen, Structure and thermodynamics properties
+       of BeO: Empirical corrections in the quasiharmonic approximation,
+       J. Appl. Phys. 113, 033517 (2013); doi: 10.1063/1.4776679
+    3. X. Bidault and S. Chaudhuri, Improved predictions of thermomechanical properties of
+       molecular crystals from energy and dispersion corrected DFT,
+       J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
+                                   
     """
     config: EECConfig
     param: float
