@@ -4,6 +4,7 @@ import ase.thermochemistry
 import ase.units
 import pandas as pd
 import numpy as np
+import numpy.typing as npt
 from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
 
 import mbe_automation.structure.molecule
