@@ -49,8 +49,8 @@ class EOSMetadata:
         temperatures_K: Temperatures (K).
         sampled_volumes: Cell volumes (Å³) of sampled points (accepted as high-quality 
         according to the filtering criteria).
-        dataset: HDF5 dataset name containing the computed `ForceConstants`.
-        force_constants_keys: List of HDF5 keys corresponding to the `ForceConstants` of the sampled points.
+        dataset: Dataset name containing the computed `ForceConstants`.
+        force_constants_keys: List of storage keys corresponding to the `ForceConstants` of the sampled points.
     """
     interpolated_at_equilibrium_volume: pd.DataFrame
     exact_at_sampled_volume: pd.DataFrame
@@ -577,6 +577,17 @@ def equilibrium_curve(
             G_sampled=df_eos[good_points & select_T[i_T_ref]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(), 
             config=electronic_energy_correction
         )
+        #
+        # Add EEC to the electronic energy and to the thermodynamic
+        # functions which depend on E_el:
+        #
+        # E_el, F_tot, H_tot, G_tot, E_tot
+        # 
+        df_eos = mbe_automation.dynamics.harmonic.data.update_with_eec(
+            df_crystal=df_eos,
+            eec=eec,
+            good_points=good_points
+        )
         print(f"Optimal parameter evaluated via cubic spline: e_el_correction_param = {eec.param:.6e}")
     else:
         eec = mbe_automation.dynamics.harmonic.eec.EEC(
@@ -585,17 +596,9 @@ def equilibrium_curve(
         )
 
     for i, T in enumerate(temperatures):
-        V_samp = df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy()
-        G_samp = df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
-        #
-        # Empirical electronic energy correction used to adjust
-        # the equilibrium volume at T_ref to known reference volume V_ref.
-        # Evaluates to zero if correction type is set to "none".
-        #
-        E_corr_samp = eec.evaluate(V=V_samp)
         fit = mbe_automation.dynamics.harmonic.eos.fit(
-            V=V_samp,
-            G=G_samp + E_corr_samp,
+            V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
+            G=df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
             equation_of_state=equation_of_state
         )
         V_eos[i] = fit.V_min 

@@ -31,7 +31,17 @@ def _eec_value(
     correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION]
 ):
     """
-    Returns the electronic energy correction in the same units as the energy.
+    Evaluate the empirical electronic energy correction.
+
+    Units:
+        - V: Crystal volume in Å³∕unit cell
+        - V_ref: Reference volume in Å³∕unit cell
+        - e_el_correction_param: 
+            * linear: (kJ∕mol) / Å³
+            * inverse_volume: (kJ∕mol) * Å³
+            
+    Returns:
+        Energy correction in kJ∕mol∕unit cell (matching the units of e_el_correction_param).
     """
     if correction_type == "linear":
         return e_el_correction_param * (V - V_ref)
@@ -49,6 +59,16 @@ def _eec_param(
 ) -> float:
     """
     Perform a cubic spline fit of G(V) and find e_el_correction_param analytically.
+
+    Units:
+        - V_sampled: Crystal volume in Å³∕unit cell
+        - G_sampled: Total Gibbs free energy in kJ∕mol∕unit cell
+        
+    Resulting parameter units based on correction type (G units / V units):
+        - linear: (kJ∕mol) / Å³
+        - inverse_volume: (kJ∕mol) * Å³
+        
+    Note: Output matches the energy scale of G_sampled (kJ/mol/unit cell).
     """
     if not config.is_enabled:
         return 0.0
@@ -98,6 +118,15 @@ class EEC:
         return self.config.is_enabled
 
     def evaluate(self, V: float | npt.NDArray[np.float64]) -> float | npt.NDArray[np.float64]:
+        """
+        Evaluate the empirical electronic energy correction at the given volume(s).
+
+        Parameters:
+            V: Crystal volume in Å³∕unit cell.
+            
+        Returns:
+            Energy correction in kJ∕mol∕unit cell.
+        """
         if not self.is_enabled:
             return np.zeros_like(V) if isinstance(V, np.ndarray) else 0.0
         return _eec_value(
@@ -113,7 +142,7 @@ class EEC:
         V_sampled: npt.NDArray[np.float64],
         G_sampled: npt.NDArray[np.float64],
         config: EECConfig
-    ) -> EEC:
+    ) -> "EEC":
         if not config.is_enabled:
             return cls(config=config, param=0.0)
             

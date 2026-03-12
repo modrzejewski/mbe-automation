@@ -33,9 +33,26 @@ class FreeEnergy:
     crystal: ase.Atoms | mbe_automation.storage.Structure
     molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
                                    #
-                                   # Electronic energy correction
-                                   # applied to match a specific reference
-                                   # volume at a given reference temperature.
+                                   # Empirical electronic energy correction applied
+                                   # to enforce known reference volume (V_ref)
+                                   # at reference temperature (T_ref). The EEC contribution
+                                   # is added to the crystal electronic energy (E_el_crystal)
+                                   # and accounted for in all thermodynamic functions derived
+                                   # from E_el_crystal. Two types of ECC are implemented:
+                                   #
+                                   # (1) linear: E_el_crystal(corrected) = E_el_crystal + param * V
+                                   # (2) inverse_volume: E_el_crystal(corrected) = E_el_crystal + param / V
+                                   #
+                                   # Literature with definitions:
+                                   # 1. A. Otero-de-la-Roza and V. Lunana, Treatment of first-principles data
+                                   #    for predictive quasiharmonic thermodynamics of solids: The case of MgO
+                                   #    Phys. Rev. B 84, 024109 (2011); doi: 10.1103/PhysRevB.84.024109
+                                   # 2. F. Luo, Y. Cheng, L.-C. Cai, and X.-R. Chen, Structure and thermodynamics properties
+                                   #    of BeO: Empirical corrections in the quasiharmonic approximation,
+                                   #    J. Appl. Phys. 113, 033517 (2013); doi: 10.1063/1.4776679
+                                   # 3. X. Bidault and S. Chaudhuri, Improved predictions of thermomechanical properties of
+                                   #    molecular crystals from energy and dispersion corrected DFT,
+                                   #    J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
                                    #
     electronic_energy_correction: EECConfig = field(default_factory=lambda: EECConfig(type="none"))
                                    #
@@ -287,6 +304,8 @@ class FreeEnergy:
         if self.electronic_energy_correction.is_enabled:
             if not np.any(np.isclose(self.temperatures_K, self.electronic_energy_correction.T_ref, atol=1.0E-5)):
                 raise ValueError("EECConfig.T_ref must be exactly present in temperatures_K.")
+            if self.equation_of_state != "spline":
+                raise ValueError("Electronic energy correction is only supported with the 'spline' equation of state.")
         
         self.volume_range = np.sort(np.atleast_1d(self.volume_range))
         if len(self.volume_range) > 1:
