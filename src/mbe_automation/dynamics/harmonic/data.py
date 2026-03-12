@@ -10,6 +10,7 @@ import mbe_automation.structure.molecule
 import mbe_automation.structure.crystal
 import mbe_automation.dynamics.harmonic.display
 import mbe_automation.storage
+from mbe_automation.dynamics.harmonic.eec import EEC
 
 @dataclass
 class FBZAnalysis:
@@ -177,6 +178,51 @@ def molecule(
         "n_atoms_molecule": n_atoms,
         "system_label_molecule": system_label
         })
+    return df
+
+
+def update_with_eec(
+    df_crystal: pd.DataFrame,
+    eec: EEC,
+    good_points: npt.NDArray[np.bool_] | None = None
+) -> pd.DataFrame:
+    """
+    Update crystal thermodynamic data with the Empirical Electronic Energy Correction (EEC).
+
+    The energy correction is evaluated based on the crystal volume and added
+    to the electronic energy and all derived total energy functions.
+    """
+    if "ΔE_el_crystal (kJ∕mol∕unit cell)" in df_crystal:
+        raise ValueError("Cannot update a data frame which already contains EEC.")
+
+    if not eec.is_enabled:
+        return df_crystal.copy()
+
+    df = df_crystal.copy()
+    #
+    # EEC is evaluated directly in kJ/mol/unit cell
+    #
+    if good_points is None:
+        V_array = df["V_crystal (Å³∕unit cell)"].to_numpy()
+        E_el_correction = eec.evaluate(V=V_array)
+
+        df["E_el_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df["ΔE_el_crystal (kJ∕mol∕unit cell)"] = E_el_correction
+        df["E_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df["F_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df["G_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df["H_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+    else:
+        V_array = df.loc[good_points, "V_crystal (Å³∕unit cell)"].to_numpy()
+        E_el_correction = eec.evaluate(V=V_array)
+
+        df.loc[good_points, "E_el_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df.loc[good_points, "ΔE_el_crystal (kJ∕mol∕unit cell)"] = E_el_correction
+        df.loc[good_points, "E_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df.loc[good_points, "F_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df.loc[good_points, "G_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df.loc[good_points, "H_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+
     return df
 
 

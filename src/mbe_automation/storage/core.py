@@ -739,6 +739,32 @@ def read_eos_curves(
     return eos_curves
 
 
+def _save_eec(group: h5py.Group, eec) -> None:
+    """Save an EEC instance into the provided group."""
+    group.attrs["dataclass"] = "EEC"
+    group.attrs["type"] = eec.config.type
+    if eec.config.T_ref is not None:
+        group.attrs["T_ref"] = eec.config.T_ref
+    if eec.config.V_ref is not None:
+        group.attrs["V_ref"] = eec.config.V_ref
+    group.attrs["param"] = eec.param
+    group.attrs["e_el_correction_param_min"] = eec.config.e_el_correction_param_min
+    group.attrs["e_el_correction_param_max"] = eec.config.e_el_correction_param_max
+
+
+def _read_eec(group: h5py.Group):
+    """Read an EEC instance from the provided group."""
+    from mbe_automation.dynamics.harmonic.eec import EECConfig, EEC
+    eec_config = EECConfig(
+        type=group.attrs["type"],
+        T_ref=group.attrs.get("T_ref"),
+        V_ref=group.attrs.get("V_ref"),
+        e_el_correction_param_min=group.attrs["e_el_correction_param_min"],
+        e_el_correction_param_max=group.attrs["e_el_correction_param_max"],
+    )
+    return EEC(config=eec_config, param=group.attrs["param"])
+
+
 def save_eos_metadata(
         eos_metadata,
         dataset: str,
@@ -775,6 +801,9 @@ def save_eos_metadata(
             data=select_T_stacked
         )
 
+        eec_subgroup = group.create_group("eec")
+        _save_eec(eec_subgroup, eos_metadata.eec)
+
     # Save DataFrames outside the main dataset_file block to prevent 
     # deadlocks if save_data_frame also acquires a lock 
     # (though save_data_frame also uses dataset_file internally).
@@ -793,7 +822,7 @@ def save_eos_metadata(
 def read_eos_metadata(
         dataset: str,
         key: str,
-):
+) -> EOSMetadata:
     """
     Read an EOSMetadata object from an HDF5 dataset.
     """
@@ -809,7 +838,8 @@ def read_eos_metadata(
         select_T_stacked = group["select_T"][...]
         select_T = [row for row in select_T_stacked]
 
-    # Read DataFrames sequentially
+        eec = _read_eec(group["eec"])
+
     interpolated_df = read_data_frame(
         dataset=dataset,
         key=f"{key}/interpolated_at_equilibrium_volume"
@@ -826,10 +856,9 @@ def read_eos_metadata(
         temperatures_K=temperatures_K,
         sampled_volumes=sampled_volumes,
         dataset=dataset,
-        force_constants_keys=force_constants_keys
+        force_constants_keys=force_constants_keys,
+        eec=eec
     )
-
-
 
 def _save_structure(
         dataset: str,

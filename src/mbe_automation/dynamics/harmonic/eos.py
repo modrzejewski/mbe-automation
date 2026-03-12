@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable, Literal
 import warnings
+
 import numpy.typing as npt
 from numpy.polynomial.polynomial import Polynomial
 import scipy.optimize
@@ -284,61 +285,3 @@ def get_minimum_points_for_eos(equation_of_state: str) -> int:
     else:
         raise ValueError(f"Unknown EOS: {equation_of_state}")
 
-def electronic_energy_correction_term(
-    V, 
-    V_ref, 
-    e_el_correction_param, 
-    correction_type: Literal["linear", "inverse_volume"]
-):
-    """
-    Returns the electronic energy correction in the same units as the energy.
-    """
-    if correction_type == "linear":
-        return e_el_correction_param * (V - V_ref)
-    elif correction_type == "inverse_volume":
-        return e_el_correction_param / V
-    else:
-        raise ValueError(f"Unknown correction type: {correction_type}")
-
-def evaluate_electronic_energy_correction_alpha(
-    V_sampled: npt.NDArray[np.float64],
-    G_sampled: npt.NDArray[np.float64],
-    correction_type: Literal["linear", "inverse_volume"],
-    V_ref: float,
-    e_el_correction_param_min: float,
-    e_el_correction_param_max: float
-) -> float:
-    """
-    Perform a cubic spline fit of G(V) and find e_el_correction_param analytically.
-    """
-    if len(V_sampled) < 4:
-         raise ValueError("Need at least 4 points for cubic spline fit to evaluate alpha.")
-
-    sort_idx = np.argsort(V_sampled)
-    V_sorted = V_sampled[sort_idx]
-    G_sorted = G_sampled[sort_idx]
-
-    if not (V_sorted[0] <= V_ref <= V_sorted[-1]):
-         raise ValueError(
-             f"V_ref ({V_ref:.3f}) must be within the sampled volume range "
-             f"[{V_sorted[0]:.3f}, {V_sorted[-1]:.3f}]."
-         )
-
-    cs = CubicSpline(V_sorted, G_sorted)
-    dGdV_interp = cs.derivative(1)
-    
-    dGdV_tot_Vref = dGdV_interp(V_ref)
-    
-    if correction_type == "linear":
-        e_el_correction_param_opt = -dGdV_tot_Vref
-    elif correction_type == "inverse_volume":
-        e_el_correction_param_opt = (V_ref ** 2) * dGdV_tot_Vref
-    else:
-        raise ValueError(f"Unknown correction type: {correction_type}")
-        
-    if e_el_correction_param_opt < e_el_correction_param_min or e_el_correction_param_opt > e_el_correction_param_max:
-        raise ValueError(
-            f"Found e_el_correction_param={e_el_correction_param_opt:.6e} is outside the allowed bounds [{e_el_correction_param_min}, {e_el_correction_param_max}]."
-        )
-        
-    return float(e_el_correction_param_opt)

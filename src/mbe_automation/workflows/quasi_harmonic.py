@@ -320,6 +320,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             system_label=label_crystal,
             level_of_theory=config.calculator.level_of_theory,
         )
+
+        if config.electronic_energy_correction.is_enabled:
+            df_crystal_T = mbe_automation.dynamics.harmonic.data.update_with_eec(
+                df_crystal=df_crystal_T,
+                eec=interpolated_harmonic_props.eec
+            )
+
         interpolator = interpolated_harmonic_props.S_vib_at_T(T, derivative=True)
         df_crystal_T["dSdV_vib_crystal (J∕K∕mol∕Å³∕unit cell)"] = interpolator(V)
         df_crystal_T.index = [i] # map current dataframe to temperature T
