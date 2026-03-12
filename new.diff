@@ -1,0 +1,664 @@
+diff --git a/src/mbe_automation/configs/quasi_harmonic.py b/src/mbe_automation/configs/quasi_harmonic.py
+index 366e767..76b8ad3 100644
+--- a/src/mbe_automation/configs/quasi_harmonic.py
++++ b/src/mbe_automation/configs/quasi_harmonic.py
+@@ -14,14 +14,7 @@ import mbe_automation.calculators
+ import mbe_automation.storage
+
+ from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
+-
+-@dataclass(kw_only=True)
+-class ElectronicEnergyCorrection:
+-    type: Literal["linear", "inverse_volume"] = "inverse_volume"
+-    T_ref: float
+-    V_ref: float
+-    e_el_correction_param_min: float = -np.inf
+-    e_el_correction_param_max: float = np.inf
++from mbe_automation.dynamics.harmonic.eec import ELECTRONIC_ENERGY_CORRECTION, EECConfig
+
+ @dataclass(kw_only=True)
+ class FreeEnergy:
+@@ -40,11 +33,28 @@ class FreeEnergy:
+     crystal: ase.Atoms | mbe_automation.storage.Structure
+     molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
+                                    #
+-                                   # Electronic energy correction
+-                                   # applied to match a specific reference
+-                                   # volume at a given reference temperature.
+-                                   #
+-    electronic_energy_correction: ElectronicEnergyCorrection | None = None
++                                   # Empirical electronic energy correction applied
++                                   # to enforce known reference volume (V_ref)
++                                   # at reference temperature (T_ref). The EEC contribution
++                                   # is added to the crystal electronic energy (E_el_crystal)
++                                   # and accounted for in all thermodynamic functions derived
++                                   # from E_el_crystal. Two types of ECC are implemented:
++                                   #
++                                   # (1) linear: E_el_crystal(corrected) = E_el_crystal + param * V
++                                   # (2) inverse_volume: E_el_crystal(corrected) = E_el_crystal + param / V
++                                   #
++                                   # Literature with definitions:
++                                   # 1. A. Otero-de-la-Roza and V. Lunana, Treatment of first-principles data
++                                   #    for predictive quasiharmonic thermodynamics of solids: The case of MgO
++                                   #    Phys. Rev. B 84, 024109 (2011); doi: 10.1103/PhysRevB.84.024109
++                                   # 2. F. Luo, Y. Cheng, L.-C. Cai, and X.-R. Chen, Structure and thermodynamics properties
++                                   #    of BeO: Empirical corrections in the quasiharmonic approximation,
++                                   #    J. Appl. Phys. 113, 033517 (2013); doi: 10.1063/1.4776679
++                                   # 3. X. Bidault and S. Chaudhuri, Improved predictions of thermomechanical properties of
++                                   #    molecular crystals from energy and dispersion corrected DFT,
++                                   #    J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
++                                   #
++    electronic_energy_correction: EECConfig = field(default_factory=lambda: EECConfig(type="none"))
+                                    #
+                                    # Volumetric thermal expansion
+                                    #
+@@ -291,11 +301,11 @@ class FreeEnergy:
+             if np.any(diffs < 1.0E-5):
+                  raise ValueError("Numerically close temperatures detected in temperatures_K.")
+
+-        if self.electronic_energy_correction is not None:
++        if self.electronic_energy_correction.is_enabled:
+             if not np.any(np.isclose(self.temperatures_K, self.electronic_energy_correction.T_ref, atol=1.0E-5)):
+-                raise ValueError("ElectronicEnergyCorrection.T_ref must be exactly present in temperatures_K.")
+-            if self.electronic_energy_correction.type not in ["linear", "inverse_volume"]:
+-                raise ValueError(f"Unknown ElectronicEnergyCorrection type: {self.electronic_energy_correction.type}")
++                raise ValueError("EECConfig.T_ref must be exactly present in temperatures_K.")
++            if self.equation_of_state != "spline":
++                raise ValueError("Electronic energy correction is only supported with the 'spline' equation of state.")
+
+         self.volume_range = np.sort(np.atleast_1d(self.volume_range))
+         if len(self.volume_range) > 1:
+diff --git a/src/mbe_automation/dynamics/harmonic/core.py b/src/mbe_automation/dynamics/harmonic/core.py
+index 147b18f..9460a70 100644
+--- a/src/mbe_automation/dynamics/harmonic/core.py
++++ b/src/mbe_automation/dynamics/harmonic/core.py
+@@ -30,6 +30,7 @@ import mbe_automation.structure.molecule
+ import mbe_automation.structure.relax
+ import mbe_automation.structure.crystal
+ import mbe_automation.dynamics.harmonic.eos
++import mbe_automation.dynamics.harmonic.eec
+ import mbe_automation.dynamics.harmonic.data
+ import mbe_automation.dynamics.harmonic.display
+ from mbe_automation.configs.structure import Minimum
+@@ -48,8 +49,8 @@ class EOSMetadata:
+         temperatures_K: Temperatures (K).
+         sampled_volumes: Cell volumes (Å³) of sampled points (accepted as high-quality
+         according to the filtering criteria).
+-        dataset: HDF5 dataset name containing the computed `ForceConstants`.
+-        force_constants_keys: List of HDF5 keys corresponding to the `ForceConstants` of the sampled points.
++        dataset: Dataset name containing the computed `ForceConstants`.
++        force_constants_keys: List of storage keys corresponding to the `ForceConstants` of the sampled points.
+     """
+     interpolated_at_equilibrium_volume: pd.DataFrame
+     exact_at_sampled_volume: pd.DataFrame
+@@ -58,7 +59,7 @@ class EOSMetadata:
+     sampled_volumes: npt.NDArray[np.float64]
+     dataset: str
+     force_constants_keys: list[str]
+-    e_el_correction_param: float | None = None
++    eec: mbe_automation.dynamics.harmonic.eec.EEC
+
+     def S_vib_at_T(
+         self,
+@@ -342,26 +343,26 @@ def equilibrium_curve(
+         unit_cell_V0,
+         reference_space_group,
+         calculator,
+-        temperatures,
+-        external_pressure_GPa,
+-        supercell_matrix,
++        temperatures: npt.NDArray[np.float64],
++        external_pressure_GPa: float,
++        supercell_matrix: npt.NDArray[np.int64],
+         interp_mesh,
+         relaxation: Minimum,
+-        supercell_displacement,
+-        work_dir,
+-        thermal_pressures_GPa,
+-        volume_range,
++        supercell_displacement: float,
++        work_dir: str | Path,
++        thermal_pressures_GPa: npt.NDArray[np.float64],
++        volume_range: npt.NDArray[np.float64],
+         equation_of_state: Literal[*EQUATIONS_OF_STATE],
+         eos_sampling: Literal[*EOS_SAMPLING_ALGOS],
+-        imaginary_mode_threshold,
+-        filter_out_imaginary_acoustic,
+-        filter_out_imaginary_optical,
+-        filter_out_broken_symmetry,
+-        filter_out_extrapolated_minimum,
+-        electronic_energy_correction,
+-        dataset,
+-        root_key,
+-        save_plots,
++        imaginary_mode_threshold: float,
++        filter_out_imaginary_acoustic: bool,
++        filter_out_imaginary_optical: bool,
++        filter_out_broken_symmetry: bool,
++        filter_out_extrapolated_minimum: bool,
++        electronic_energy_correction: mbe_automation.dynamics.harmonic.eec.EECConfig,
++        dataset: str,
++        root_key: str,
++        save_plots: bool,
+ ):
+
+     geom_opt_dir = Path(work_dir) / "relaxation"
+@@ -564,59 +565,52 @@ def equilibrium_curve(
+     # quasi-harmonic equilibrium volume V(T_ref) exactly matches the
+     # requested target reference volume V_ref.
+     #
+-    e_el_correction_param = None
+-    if electronic_energy_correction is not None:
++    if electronic_energy_correction.is_enabled:
+         print(
+             f"Computing electronic energy correction "
+             f"for T_ref={electronic_energy_correction.T_ref} K, "
+             f"target V_ref={electronic_energy_correction.V_ref} Å³"
+         )
+         i_T_ref = np.where(np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5))[0][0]
+-        e_el_correction_param = mbe_automation.dynamics.harmonic.eos.evaluate_electronic_energy_correction_alpha(
++        eec = mbe_automation.dynamics.harmonic.eec.EEC.from_sampled_eos_curve(
+             V_sampled=df_eos[good_points & select_T[i_T_ref]]["V_crystal (Å³∕unit cell)"].to_numpy(),
+             G_sampled=df_eos[good_points & select_T[i_T_ref]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
+-            correction_type=electronic_energy_correction.type,
+-            V_ref=electronic_energy_correction.V_ref,
+-            e_el_correction_param_min=electronic_energy_correction.e_el_correction_param_min,
+-            e_el_correction_param_max=electronic_energy_correction.e_el_correction_param_max
++            config=electronic_energy_correction
++        )
++        #
++        # Add EEC to the electronic energy and to the thermodynamic
++        # functions which depend on E_el:
++        #
++        # E_el, F_tot, H_tot, G_tot, E_tot
++        #
++        df_eos = mbe_automation.dynamics.harmonic.data.update_with_eec(
++            df_crystal=df_eos,
++            eec=eec,
++            good_points=good_points
++        )
++        print(f"Optimal parameter evaluated via cubic spline: e_el_correction_param = {eec.param:.6e}")
++    else:
++        eec = mbe_automation.dynamics.harmonic.eec.EEC(
++            config=electronic_energy_correction,
++            param=0.0
+         )
+-        print(f"Optimal parameter evaluated via cubic spline: e_el_correction_param = {e_el_correction_param:.6e}")
+
+     for i, T in enumerate(temperatures):
+-        V_samp = df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy()
+-        G_samp = df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
+-
+         fit = mbe_automation.dynamics.harmonic.eos.fit(
+-            V=V_samp,
+-            G=G_samp,
++            V=df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy(),
++            G=df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
+             equation_of_state=equation_of_state
+         )
+-
+-        if electronic_energy_correction is not None:
+-            E_corr_samp = mbe_automation.dynamics.harmonic.eos.electronic_energy_correction_term(
+-                V=V_samp,
+-                V_ref=electronic_energy_correction.V_ref,
+-                e_el_correction_param=e_el_correction_param,
+-                correction_type=electronic_energy_correction.type
+-            )
+-            fit_corrected = mbe_automation.dynamics.harmonic.eos.fit(
+-                V=V_samp,
+-                G=G_samp + E_corr_samp,
+-                equation_of_state=equation_of_state
+-            )
+-            V_eos[i] = fit_corrected.V_min # volume which minimizes G + E_corr
+-            min_found[i] = fit_corrected.min_found
+-            min_extrapolated[i] = fit_corrected.min_extrapolated
+-            curve_type.append(fit_corrected.curve_type)
+-            G_tot_curves.append(fit_corrected)
+-            G_tot_eos[i] = fit_corrected.G_min # corrected G at equilibrium volume
+-        else:
+-            V_eos[i] = fit.V_min # volume which minimizes G at T and p_external
+-            min_found[i] = fit.min_found
+-            min_extrapolated[i] = fit.min_extrapolated
+-            curve_type.append(fit.curve_type)
+-            G_tot_curves.append(fit)
+-            G_tot_eos[i] = fit.G_min # interpolated G at V_min can slightly differ from the true G
++        V_eos[i] = fit.V_min
++        min_found[i] = fit.min_found
++        min_extrapolated[i] = fit.min_extrapolated
++        curve_type.append(fit.curve_type)
++        G_tot_curves.append(fit)
++        #
++        # Note: interpolated G at V_min can be slightly
++        # different than the true G computed from scratch
++        #
++        G_tot_eos[i] = fit.G_min
+         #
+         # Effective pressure (thermal pressure) which forces
+         # the equilibrum volume of the unit cell at
+@@ -708,7 +702,7 @@ def equilibrium_curve(
+         sampled_volumes=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
+         dataset=dataset,
+         force_constants_keys=force_constants_keys,
+-        e_el_correction_param=e_el_correction_param
++        eec=eec
+     )
+
+     mbe_automation.storage.core.save_eos_metadata(
+diff --git a/src/mbe_automation/dynamics/harmonic/data.py b/src/mbe_automation/dynamics/harmonic/data.py
+index 53da7b7..eba940a 100644
+--- a/src/mbe_automation/dynamics/harmonic/data.py
++++ b/src/mbe_automation/dynamics/harmonic/data.py
+@@ -10,6 +10,7 @@ import mbe_automation.structure.molecule
+ import mbe_automation.structure.crystal
+ import mbe_automation.dynamics.harmonic.display
+ import mbe_automation.storage
++from mbe_automation.dynamics.harmonic.eec import EEC
+
+ @dataclass
+ class FBZAnalysis:
+@@ -180,6 +181,51 @@ def molecule(
+     return df
+
+
++def update_with_eec(
++    df_crystal: pd.DataFrame,
++    eec: EEC,
++    good_points: npt.NDArray[np.bool_] | None = None
++) -> pd.DataFrame:
++    """
++    Update crystal thermodynamic data with the Empirical Electronic Energy Correction (EEC).
++
++    The energy correction is evaluated based on the crystal volume and added
++    to the electronic energy and all derived total energy functions.
++    """
++    if "ΔE_el_crystal (kJ∕mol∕unit cell)" in df_crystal:
++        raise ValueError("Cannot update a data frame which already contains EEC.")
++
++    if not eec.is_enabled:
++        return df_crystal.copy()
++
++    df = df_crystal.copy()
++    #
++    # EEC is evaluated directly in kJ/mol/unit cell
++    #
++    if good_points is None:
++        V_array = df["V_crystal (Å³∕unit cell)"].to_numpy()
++        E_el_correction = eec.evaluate(V=V_array)
++
++        df["E_el_crystal (kJ∕mol∕unit cell)"] += E_el_correction
++        df["ΔE_el_crystal (kJ∕mol∕unit cell)"] = E_el_correction
++        df["E_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
++        df["F_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
++        df["G_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
++        df["H_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
++    else:
++        V_array = df.loc[good_points, "V_crystal (Å³∕unit cell)"].to_numpy()
++        E_el_correction = eec.evaluate(V=V_array)
++
++        df.loc[good_points, "E_el_crystal (kJ∕mol∕unit cell)"] += E_el_correction
++        df.loc[good_points, "ΔE_el_crystal (kJ∕mol∕unit cell)"] = E_el_correction
++        df.loc[good_points, "E_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
++        df.loc[good_points, "F_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
++        df.loc[good_points, "G_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
++        df.loc[good_points, "H_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
++
++    return df
++
++
+ def crystal(
+         unit_cell,
+         phonons,
+diff --git a/src/mbe_automation/dynamics/harmonic/eec.py b/src/mbe_automation/dynamics/harmonic/eec.py
+new file mode 100644
+index 0000000..5c061de
+--- /dev/null
++++ b/src/mbe_automation/dynamics/harmonic/eec.py
+@@ -0,0 +1,176 @@
++from dataclasses import dataclass
++from typing import Literal, TYPE_CHECKING
++import numpy as np
++import numpy.typing as npt
++from scipy.interpolate import CubicSpline
++
++ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "none"]
++
++@dataclass(kw_only=True)
++class EECConfig:
++    type: Literal[*ELECTRONIC_ENERGY_CORRECTION] = "inverse_volume"
++    T_ref: float | None = None
++    V_ref: float | None = None
++    e_el_correction_param_min: float = -np.inf
++    e_el_correction_param_max: float = np.inf
++
++    def __post_init__(self):
++        if self.type not in ELECTRONIC_ENERGY_CORRECTION:
++            raise ValueError(f"Unknown EECConfig type: {self.type}")
++        if self.is_enabled and (self.T_ref is None or self.V_ref is None):
++            raise ValueError(f"T_ref and V_ref must be specified for correction type '{self.type}'.")
++
++    @property
++    def is_enabled(self) -> bool:
++        return self.type != "none"
++
++def _eec_value(
++    V,
++    V_ref,
++    e_el_correction_param,
++    correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION]
++):
++    """
++    Evaluate the empirical electronic energy correction.
++
++    Units:
++        - V: Crystal volume in Å³∕unit cell
++        - V_ref: Reference volume in Å³∕unit cell
++        - e_el_correction_param:
++            * linear: (kJ∕mol) / Å³
++            * inverse_volume: (kJ∕mol) * Å³
++
++    Returns:
++        Energy correction in kJ∕mol∕unit cell (matching the units of e_el_correction_param).
++    """
++    if correction_type == "linear":
++        return e_el_correction_param * (V - V_ref)
++    elif correction_type == "inverse_volume":
++        return e_el_correction_param / V
++    elif correction_type == "none":
++        return np.zeros_like(V) if isinstance(V, (np.ndarray, list)) else 0.0
++    else:
++        raise ValueError(f"Unknown correction type: {correction_type}")
++
++def _eec_param(
++    V_sampled: npt.NDArray[np.float64],
++    G_sampled: npt.NDArray[np.float64],
++    config: EECConfig
++) -> float:
++    """
++    Perform a cubic spline fit of G(V) and find e_el_correction_param analytically.
++
++    Units:
++        - V_sampled: Crystal volume in Å³∕unit cell
++        - G_sampled: Total Gibbs free energy in kJ∕mol∕unit cell
++
++    Resulting parameter units based on correction type (G units / V units):
++        - linear: (kJ∕mol) / Å³
++        - inverse_volume: (kJ∕mol) * Å³
++
++    Note: Output matches the energy scale of G_sampled (kJ/mol/unit cell).
++    """
++    if not config.is_enabled:
++        return 0.0
++
++    if len(V_sampled) < 4:
++         raise ValueError("Need at least 4 points for cubic spline fit to evaluate alpha.")
++
++    sort_idx = np.argsort(V_sampled)
++    V_sorted = V_sampled[sort_idx]
++    G_sorted = G_sampled[sort_idx]
++
++    if not (V_sorted[0] <= config.V_ref <= V_sorted[-1]):
++         raise ValueError(
++             f"V_ref ({config.V_ref:.3f}) must be within the sampled volume range "
++             f"[{V_sorted[0]:.3f}, {V_sorted[-1]:.3f}]."
++         )
++
++    cs = CubicSpline(V_sorted, G_sorted)
++    dGdV_interp = cs.derivative(1)
++
++    dGdV_tot_Vref = dGdV_interp(config.V_ref)
++
++    if config.type == "linear":
++        e_el_correction_param_opt = -dGdV_tot_Vref
++    elif config.type == "inverse_volume":
++        e_el_correction_param_opt = (config.V_ref ** 2) * dGdV_tot_Vref
++    else:
++        raise ValueError(f"Unknown correction type: {config.type}")
++
++    if e_el_correction_param_opt < config.e_el_correction_param_min or e_el_correction_param_opt > config.e_el_correction_param_max:
++        raise ValueError(
++            f"Found e_el_correction_param={e_el_correction_param_opt:.6e} is outside the allowed bounds [{config.e_el_correction_param_min}, {config.e_el_correction_param_max}]."
++        )
++
++    return float(e_el_correction_param_opt)
++
++@dataclass
++class EEC:
++    """
++    Empirical Electronic Energy Correction (EEC) data and evaluation.
++
++    Empirical electronic energy correction applied
++    to enforce known reference volume (V_ref)
++    at reference temperature (T_ref). The EEC contribution
++    is added to the crystal electronic energy (E_el_crystal)
++    and accounted for in all thermodynamic functions derived
++    from E_el_crystal. Two types of ECC are implemented:
++
++    (1) linear: E_el_crystal(corrected) = E_el_crystal + param * V
++    (2) inverse_volume: E_el_crystal(corrected) = E_el_crystal + param / V
++
++    Literature with definitions:
++    1. A. Otero-de-la-Roza and V. Lunana, Treatment of first-principles data
++       for predictive quasiharmonic thermodynamics of solids: The case of MgO
++       Phys. Rev. B 84, 024109 (2011); doi: 10.1103/PhysRevB.84.024109
++    2. F. Luo, Y. Cheng, L.-C. Cai, and X.-R. Chen, Structure and thermodynamics properties
++       of BeO: Empirical corrections in the quasiharmonic approximation,
++       J. Appl. Phys. 113, 033517 (2013); doi: 10.1063/1.4776679
++    3. X. Bidault and S. Chaudhuri, Improved predictions of thermomechanical properties of
++       molecular crystals from energy and dispersion corrected DFT,
++       J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
++
++    """
++    config: EECConfig
++    param: float
++
++    @property
++    def is_enabled(self) -> bool:
++        return self.config.is_enabled
++
++    def evaluate(self, V: float | npt.NDArray[np.float64]) -> float | npt.NDArray[np.float64]:
++        """
++        Evaluate the empirical electronic energy correction at the given volume(s).
++
++        Parameters:
++            V: Crystal volume in Å³∕unit cell.
++
++        Returns:
++            Energy correction in kJ∕mol∕unit cell.
++        """
++        if not self.is_enabled:
++            return np.zeros_like(V) if isinstance(V, np.ndarray) else 0.0
++        return _eec_value(
++            V=V,
++            V_ref=self.config.V_ref,
++            e_el_correction_param=self.param,
++            correction_type=self.config.type
++        )
++
++    @classmethod
++    def from_sampled_eos_curve(
++        cls,
++        V_sampled: npt.NDArray[np.float64],
++        G_sampled: npt.NDArray[np.float64],
++        config: EECConfig
++    ) -> "EEC":
++        if not config.is_enabled:
++            return cls(config=config, param=0.0)
++
++        param = _eec_param(
++            V_sampled=V_sampled,
++            G_sampled=G_sampled,
++            config=config
++        )
++        return cls(config=config, param=param)
+diff --git a/src/mbe_automation/dynamics/harmonic/eos.py b/src/mbe_automation/dynamics/harmonic/eos.py
+index 2946b69..24618e8 100644
+--- a/src/mbe_automation/dynamics/harmonic/eos.py
++++ b/src/mbe_automation/dynamics/harmonic/eos.py
+@@ -1,6 +1,7 @@
+ from dataclasses import dataclass
+ from typing import Callable, Literal
+ import warnings
++
+ import numpy.typing as npt
+ from numpy.polynomial.polynomial import Polynomial
+ import scipy.optimize
+@@ -284,61 +285,3 @@ def get_minimum_points_for_eos(equation_of_state: str) -> int:
+     else:
+         raise ValueError(f"Unknown EOS: {equation_of_state}")
+
+-def electronic_energy_correction_term(
+-    V,
+-    V_ref,
+-    e_el_correction_param,
+-    correction_type: Literal["linear", "inverse_volume"]
+-):
+-    """
+-    Returns the electronic energy correction in the same units as the energy.
+-    """
+-    if correction_type == "linear":
+-        return e_el_correction_param * (V - V_ref)
+-    elif correction_type == "inverse_volume":
+-        return e_el_correction_param / V
+-    else:
+-        raise ValueError(f"Unknown correction type: {correction_type}")
+-
+-def evaluate_electronic_energy_correction_alpha(
+-    V_sampled: npt.NDArray[np.float64],
+-    G_sampled: npt.NDArray[np.float64],
+-    correction_type: Literal["linear", "inverse_volume"],
+-    V_ref: float,
+-    e_el_correction_param_min: float,
+-    e_el_correction_param_max: float
+-) -> float:
+-    """
+-    Perform a cubic spline fit of G(V) and find e_el_correction_param analytically.
+-    """
+-    if len(V_sampled) < 4:
+-         raise ValueError("Need at least 4 points for cubic spline fit to evaluate alpha.")
+-
+-    sort_idx = np.argsort(V_sampled)
+-    V_sorted = V_sampled[sort_idx]
+-    G_sorted = G_sampled[sort_idx]
+-
+-    if not (V_sorted[0] <= V_ref <= V_sorted[-1]):
+-         raise ValueError(
+-             f"V_ref ({V_ref:.3f}) must be within the sampled volume range "
+-             f"[{V_sorted[0]:.3f}, {V_sorted[-1]:.3f}]."
+-         )
+-
+-    cs = CubicSpline(V_sorted, G_sorted)
+-    dGdV_interp = cs.derivative(1)
+-
+-    dGdV_tot_Vref = dGdV_interp(V_ref)
+-
+-    if correction_type == "linear":
+-        e_el_correction_param_opt = -dGdV_tot_Vref
+-    elif correction_type == "inverse_volume":
+-        e_el_correction_param_opt = (V_ref ** 2) * dGdV_tot_Vref
+-    else:
+-        raise ValueError(f"Unknown correction type: {correction_type}")
+-
+-    if e_el_correction_param_opt < e_el_correction_param_min or e_el_correction_param_opt > e_el_correction_param_max:
+-        raise ValueError(
+-            f"Found e_el_correction_param={e_el_correction_param_opt:.6e} is outside the allowed bounds [{e_el_correction_param_min}, {e_el_correction_param_max}]."
+-        )
+-
+-    return float(e_el_correction_param_opt)
+diff --git a/src/mbe_automation/storage/core.py b/src/mbe_automation/storage/core.py
+index c95293b..ec5f5fe 100644
+--- a/src/mbe_automation/storage/core.py
++++ b/src/mbe_automation/storage/core.py
+@@ -739,6 +739,32 @@ def read_eos_curves(
+     return eos_curves
+
+
++def _save_eec(group: h5py.Group, eec) -> None:
++    """Save an EEC instance into the provided group."""
++    group.attrs["dataclass"] = "EEC"
++    group.attrs["type"] = eec.config.type
++    if eec.config.T_ref is not None:
++        group.attrs["T_ref"] = eec.config.T_ref
++    if eec.config.V_ref is not None:
++        group.attrs["V_ref"] = eec.config.V_ref
++    group.attrs["param"] = eec.param
++    group.attrs["e_el_correction_param_min"] = eec.config.e_el_correction_param_min
++    group.attrs["e_el_correction_param_max"] = eec.config.e_el_correction_param_max
++
++
++def _read_eec(group: h5py.Group):
++    """Read an EEC instance from the provided group."""
++    from mbe_automation.dynamics.harmonic.eec import EECConfig, EEC
++    eec_config = EECConfig(
++        type=group.attrs["type"],
++        T_ref=group.attrs.get("T_ref"),
++        V_ref=group.attrs.get("V_ref"),
++        e_el_correction_param_min=group.attrs["e_el_correction_param_min"],
++        e_el_correction_param_max=group.attrs["e_el_correction_param_max"],
++    )
++    return EEC(config=eec_config, param=group.attrs["param"])
++
++
+ def save_eos_metadata(
+         eos_metadata,
+         dataset: str,
+@@ -775,6 +801,9 @@ def save_eos_metadata(
+             data=select_T_stacked
+         )
+
++        eec_subgroup = group.create_group("eec")
++        _save_eec(eec_subgroup, eos_metadata.eec)
++
+     # Save DataFrames outside the main dataset_file block to prevent
+     # deadlocks if save_data_frame also acquires a lock
+     # (though save_data_frame also uses dataset_file internally).
+@@ -793,7 +822,7 @@ def save_eos_metadata(
+ def read_eos_metadata(
+         dataset: str,
+         key: str,
+-):
++) -> EOSMetadata:
+     """
+     Read an EOSMetadata object from an HDF5 dataset.
+     """
+@@ -809,7 +838,8 @@ def read_eos_metadata(
+         select_T_stacked = group["select_T"][...]
+         select_T = [row for row in select_T_stacked]
+
+-    # Read DataFrames sequentially
++        eec = _read_eec(group["eec"])
++
+     interpolated_df = read_data_frame(
+         dataset=dataset,
+         key=f"{key}/interpolated_at_equilibrium_volume"
+@@ -826,11 +856,10 @@ def read_eos_metadata(
+         temperatures_K=temperatures_K,
+         sampled_volumes=sampled_volumes,
+         dataset=dataset,
+-        force_constants_keys=force_constants_keys
++        force_constants_keys=force_constants_keys,
++        eec=eec
+     )
+
+-
+-
+ def _save_structure(
+         dataset: str,
+         key: str,
+diff --git a/src/mbe_automation/workflows/quasi_harmonic.py b/src/mbe_automation/workflows/quasi_harmonic.py
+index 7384a5a..8f72987 100644
+--- a/src/mbe_automation/workflows/quasi_harmonic.py
++++ b/src/mbe_automation/workflows/quasi_harmonic.py
+@@ -320,6 +320,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
+             system_label=label_crystal,
+             level_of_theory=config.calculator.level_of_theory,
+         )
++
++        if config.electronic_energy_correction.is_enabled:
++            df_crystal_T = mbe_automation.dynamics.harmonic.data.update_with_eec(
++                df_crystal=df_crystal_T,
++                eec=interpolated_harmonic_props.eec
++            )
++
+         interpolator = interpolated_harmonic_props.S_vib_at_T(T, derivative=True)
+         df_crystal_T["dSdV_vib_crystal (J∕K∕mol∕Å³∕unit cell)"] = interpolator(V)
+         df_crystal_T.index = [i] # map current dataframe to temperature T
