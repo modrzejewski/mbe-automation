@@ -30,6 +30,7 @@ import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.structure.crystal
 import mbe_automation.dynamics.harmonic.eos
+import mbe_automation.dynamics.harmonic.eec
 import mbe_automation.dynamics.harmonic.data
 import mbe_automation.dynamics.harmonic.display
 from mbe_automation.configs.structure import Minimum
@@ -58,7 +59,7 @@ class EOSMetadata:
     sampled_volumes: npt.NDArray[np.float64]
     dataset: str
     force_constants_keys: list[str]
-    e_el_correction_param: float | None = None
+    eec: mbe_automation.dynamics.harmonic.eec.EEC
 
     def S_vib_at_T(
         self, 
@@ -342,26 +343,26 @@ def equilibrium_curve(
         unit_cell_V0,
         reference_space_group,
         calculator,
-        temperatures,
-        external_pressure_GPa,
-        supercell_matrix,
+        temperatures: npt.NDArray[np.float64],
+        external_pressure_GPa: float,
+        supercell_matrix: npt.NDArray[np.int64],
         interp_mesh,
         relaxation: Minimum,
-        supercell_displacement,
-        work_dir,
-        thermal_pressures_GPa,
-        volume_range,
+        supercell_displacement: float,
+        work_dir: str | Path,
+        thermal_pressures_GPa: npt.NDArray[np.float64],
+        volume_range: npt.NDArray[np.float64],
         equation_of_state: Literal[*EQUATIONS_OF_STATE],
         eos_sampling: Literal[*EOS_SAMPLING_ALGOS],
-        imaginary_mode_threshold,
-        filter_out_imaginary_acoustic,
-        filter_out_imaginary_optical,
-        filter_out_broken_symmetry,
-        filter_out_extrapolated_minimum,
-        electronic_energy_correction,
-        dataset,
-        root_key,
-        save_plots,
+        imaginary_mode_threshold: float,
+        filter_out_imaginary_acoustic: bool,
+        filter_out_imaginary_optical: bool,
+        filter_out_broken_symmetry: bool,
+        filter_out_extrapolated_minimum: bool,
+        electronic_energy_correction: mbe_automation.dynamics.harmonic.eec.EECConfig,
+        dataset: str,
+        root_key: str,
+        save_plots: bool,
 ):
 
     geom_opt_dir = Path(work_dir) / "relaxation"
@@ -564,59 +565,49 @@ def equilibrium_curve(
     # quasi-harmonic equilibrium volume V(T_ref) exactly matches the 
     # requested target reference volume V_ref.
     #
-    e_el_correction_param = None
-    if electronic_energy_correction is not None:
+    if electronic_energy_correction.is_enabled:
         print(
             f"Computing electronic energy correction "
             f"for T_ref={electronic_energy_correction.T_ref} K, "
             f"target V_ref={electronic_energy_correction.V_ref} Å³"
         )
         i_T_ref = np.where(np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5))[0][0]
-        e_el_correction_param = mbe_automation.dynamics.harmonic.eos.evaluate_electronic_energy_correction_alpha(
+        eec = mbe_automation.dynamics.harmonic.eec.EEC.from_sampled_eos_curve(
             V_sampled=df_eos[good_points & select_T[i_T_ref]]["V_crystal (Å³∕unit cell)"].to_numpy(),
             G_sampled=df_eos[good_points & select_T[i_T_ref]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(), 
-            correction_type=electronic_energy_correction.type, 
-            V_ref=electronic_energy_correction.V_ref, 
-            e_el_correction_param_min=electronic_energy_correction.e_el_correction_param_min, 
-            e_el_correction_param_max=electronic_energy_correction.e_el_correction_param_max
+            config=electronic_energy_correction
         )
-        print(f"Optimal parameter evaluated via cubic spline: e_el_correction_param = {e_el_correction_param:.6e}")
+        print(f"Optimal parameter evaluated via cubic spline: e_el_correction_param = {eec.param:.6e}")
+    else:
+        eec = mbe_automation.dynamics.harmonic.eec.EEC(
+            config=electronic_energy_correction, 
+            param=0.0
+        )
 
     for i, T in enumerate(temperatures):
         V_samp = df_eos[good_points & select_T[i]]["V_crystal (Å³∕unit cell)"].to_numpy()
         G_samp = df_eos[good_points & select_T[i]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
-
+        #
+        # Empirical electronic energy correction used to adjust
+        # the equilibrium volume at T_ref to known reference volume V_ref.
+        # Evaluates to zero if correction type is set to "none".
+        #
+        E_corr_samp = eec.evaluate(V=V_samp)
         fit = mbe_automation.dynamics.harmonic.eos.fit(
             V=V_samp,
-            G=G_samp,
+            G=G_samp + E_corr_samp,
             equation_of_state=equation_of_state
         )
-        
-        if electronic_energy_correction is not None:
-            E_corr_samp = mbe_automation.dynamics.harmonic.eos.electronic_energy_correction_term(
-                V=V_samp,
-                V_ref=electronic_energy_correction.V_ref,
-                e_el_correction_param=e_el_correction_param,
-                correction_type=electronic_energy_correction.type
-            )
-            fit_corrected = mbe_automation.dynamics.harmonic.eos.fit(
-                V=V_samp,
-                G=G_samp + E_corr_samp,
-                equation_of_state=equation_of_state
-            )
-            V_eos[i] = fit_corrected.V_min # volume which minimizes G + E_corr
-            min_found[i] = fit_corrected.min_found
-            min_extrapolated[i] = fit_corrected.min_extrapolated
-            curve_type.append(fit_corrected.curve_type)
-            G_tot_curves.append(fit_corrected)
-            G_tot_eos[i] = fit_corrected.G_min # corrected G at equilibrium volume
-        else:
-            V_eos[i] = fit.V_min # volume which minimizes G at T and p_external
-            min_found[i] = fit.min_found
-            min_extrapolated[i] = fit.min_extrapolated
-            curve_type.append(fit.curve_type)
-            G_tot_curves.append(fit)
-            G_tot_eos[i] = fit.G_min # interpolated G at V_min can slightly differ from the true G
+        V_eos[i] = fit.V_min 
+        min_found[i] = fit.min_found
+        min_extrapolated[i] = fit.min_extrapolated
+        curve_type.append(fit.curve_type)
+        G_tot_curves.append(fit)
+        #
+        # Note: interpolated G at V_min can be slightly
+        # different than the true G computed from scratch
+        #
+        G_tot_eos[i] = fit.G_min 
         #
         # Effective pressure (thermal pressure) which forces
         # the equilibrum volume of the unit cell at
@@ -708,7 +699,7 @@ def equilibrium_curve(
         sampled_volumes=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
         dataset=dataset,
         force_constants_keys=force_constants_keys,
-        e_el_correction_param=e_el_correction_param
+        eec=eec
     )
 
     mbe_automation.storage.core.save_eos_metadata(
