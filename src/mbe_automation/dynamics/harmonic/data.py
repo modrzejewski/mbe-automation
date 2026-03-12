@@ -205,6 +205,7 @@ def update_with_eec(
     if good_points is None:
         V_array = df["V_crystal (Å³∕unit cell)"].to_numpy()
         E_el_correction = eec.evaluate(V=V_array)
+        p_eec = eec.evaluate_pressure(V=V_array)
 
         df["E_el_crystal (kJ∕mol∕unit cell)"] += E_el_correction
         df["ΔE_el_crystal (kJ∕mol∕unit cell)"] = E_el_correction
@@ -212,9 +213,11 @@ def update_with_eec(
         df["F_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
         df["G_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
         df["H_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df["p_eec_crystal (GPa)"] = p_eec
     else:
         V_array = df.loc[good_points, "V_crystal (Å³∕unit cell)"].to_numpy()
         E_el_correction = eec.evaluate(V=V_array)
+        p_eec = eec.evaluate_pressure(V=V_array)
 
         df.loc[good_points, "E_el_crystal (kJ∕mol∕unit cell)"] += E_el_correction
         df.loc[good_points, "ΔE_el_crystal (kJ∕mol∕unit cell)"] = E_el_correction
@@ -222,6 +225,7 @@ def update_with_eec(
         df.loc[good_points, "F_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
         df.loc[good_points, "G_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
         df.loc[good_points, "H_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df.loc[good_points, "p_eec_crystal (GPa)"] = p_eec
 
     return df
 

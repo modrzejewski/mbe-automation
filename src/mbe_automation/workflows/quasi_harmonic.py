@@ -266,7 +266,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             # forces QHA equilibrium value
             #
             optimizer = deepcopy(config.relaxation)
-            optimizer._pressure_GPa = row["p_thermal_crystal (GPa)"] + config.pressure_GPa
+            p_effective = (
+                    row["p_thermal_crystal (GPa)"] +
+                    config.pressure_GPa
+                )
+            if config.electronic_energy_correction.is_enabled:
+                p_effective += interpolated_harmonic_props.eec.evaluate_pressure(V)
+            optimizer._pressure_GPa = p_effective
             optimizer.cell_relaxation = "full"
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell=unit_cell_T,
