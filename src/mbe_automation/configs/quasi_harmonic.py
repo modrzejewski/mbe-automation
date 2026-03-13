@@ -14,7 +14,7 @@ import mbe_automation.calculators
 import mbe_automation.storage
 
 from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
-from mbe_automation.dynamics.harmonic.eec import ELECTRONIC_ENERGY_CORRECTION, EECConfig
+from mbe_automation.dynamics.harmonic.eec import ELECTRONIC_ENERGY_CORRECTION, EECConfig as EEC
 
 @dataclass(kw_only=True)
 class FreeEnergy:
@@ -54,7 +54,7 @@ class FreeEnergy:
                                    #    molecular crystals from energy and dispersion corrected DFT,
                                    #    J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
                                    #
-    electronic_energy_correction: EECConfig = field(default_factory=lambda: EECConfig(type="none"))
+    electronic_energy_correction: EEC = field(default_factory=lambda: EEC(type="none"))
                                    #
                                    # Volumetric thermal expansion
                                    #
