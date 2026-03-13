@@ -588,7 +588,8 @@ def equilibrium_curve(
             eec=eec,
             good_points=good_points
         )
-        print(f"Optimal parameter evaluated via cubic spline: e_el_correction_param = {eec.param:.6e}")
+        p_eec_GPa = eec.evaluate_pressure(eec.config.V_ref)
+        print(f"EEC effective pressure at V_ref: {p_eec_GPa:.4f} GPa")
     else:
         eec = mbe_automation.dynamics.harmonic.eec.EEC(
             config=electronic_energy_correction, 

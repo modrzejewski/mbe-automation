@@ -12,8 +12,8 @@ class EECConfig:
     type: Literal[*ELECTRONIC_ENERGY_CORRECTION] = "inverse_volume"
     T_ref: float | None = None
     V_ref: float | None = None
-    e_el_correction_param_min: float = -np.inf
-    e_el_correction_param_max: float = np.inf
+    pressure_min_GPa: float = -5.0
+    pressure_max_GPa: float = 5.0
 
     def __post_init__(self):
         if self.type not in ELECTRONIC_ENERGY_CORRECTION:
@@ -129,9 +129,16 @@ def _eec_param(
     else:
         raise ValueError(f"Unknown correction type: {config.type}")
         
-    if e_el_correction_param_opt < config.e_el_correction_param_min or e_el_correction_param_opt > config.e_el_correction_param_max:
+    p_eec_GPa = _eec_pressure(
+        V=config.V_ref,
+        e_el_correction_param=e_el_correction_param_opt,
+        correction_type=config.type
+    ) * (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
+
+    if p_eec_GPa < config.pressure_min_GPa or p_eec_GPa > config.pressure_max_GPa:
         raise ValueError(
-            f"Found e_el_correction_param={e_el_correction_param_opt:.6e} is outside the allowed bounds [{config.e_el_correction_param_min}, {config.e_el_correction_param_max}]."
+            f"Evaluated EEC pressure {p_eec_GPa:.4f} GPa is outside the allowed bounds "
+            f"[{config.pressure_min_GPa}, {config.pressure_max_GPa}] GPa."
         )
         
     return float(e_el_correction_param_opt)

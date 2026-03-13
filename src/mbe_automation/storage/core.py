@@ -743,39 +743,40 @@ def _save_eec(group: h5py.Group, eec) -> None:
     """Save an EEC instance into the provided group."""
     group.attrs["dataclass"] = "EEC"
     group.attrs["type"] = eec.config.type
-    if eec.config.T_ref is not None:
+    
+    if eec.config.is_enabled:
         group.attrs["T_ref (K)"] = eec.config.T_ref
-    if eec.config.V_ref is not None:
         group.attrs["V_ref (Å³∕unit cell)"] = eec.config.V_ref
+        group.attrs["pressure_min (GPa)"] = eec.config.pressure_min_GPa
+        group.attrs["pressure_max (GPa)"] = eec.config.pressure_max_GPa
         
-    if eec.config.type == "linear":
-        group.attrs["param (kJ∕mol∕Å³)"] = eec.param
-    elif eec.config.type == "inverse_volume":
-        group.attrs["param (kJ∕mol*Å³)"] = eec.param
+        if eec.config.type == "linear":
+            group.attrs["param (kJ∕mol∕Å³)"] = eec.param
+        elif eec.config.type == "inverse_volume":
+            group.attrs["param (kJ∕mol*Å³)"] = eec.param
     else:
         group.attrs["param"] = eec.param
-        
-    group.attrs["e_el_correction_param_min"] = eec.config.e_el_correction_param_min
-    group.attrs["e_el_correction_param_max"] = eec.config.e_el_correction_param_max
 
 
 def _read_eec(group: h5py.Group):
     """Read an EEC instance from the provided group."""
     from mbe_automation.dynamics.harmonic.eec import EECConfig, EEC
     eec_type = group.attrs["type"]
-    eec_config = EECConfig(
-        type=eec_type,
-        T_ref=group.attrs.get("T_ref (K)", group.attrs.get("T_ref")),
-        V_ref=group.attrs.get("V_ref (Å³∕unit cell)", group.attrs.get("V_ref")),
-        e_el_correction_param_min=group.attrs["e_el_correction_param_min"],
-        e_el_correction_param_max=group.attrs["e_el_correction_param_max"],
-    )
     
-    if eec_type == "linear":
-        param = group.attrs.get("param (kJ∕mol∕Å³)", group.attrs.get("param"))
-    elif eec_type == "inverse_volume":
-        param = group.attrs.get("param (kJ∕mol*Å³)", group.attrs.get("param"))
+    if eec_type != "none":
+        eec_config = EECConfig(
+            type=eec_type,
+            T_ref=group.attrs["T_ref (K)"],
+            V_ref=group.attrs["V_ref (Å³∕unit cell)"],
+            pressure_min_GPa=group.attrs["pressure_min (GPa)"],
+            pressure_max_GPa=group.attrs["pressure_max (GPa)"],
+        )
+        if eec_type == "linear":
+            param = group.attrs.get("param (kJ∕mol∕Å³)", group.attrs.get("param"))
+        else:
+            param = group.attrs.get("param (kJ∕mol*Å³)", group.attrs.get("param"))
     else:
+        eec_config = EECConfig(type="none")
         param = group.attrs["param"]
         
     return EEC(config=eec_config, param=param)
