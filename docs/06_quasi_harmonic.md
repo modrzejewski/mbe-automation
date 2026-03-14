@@ -79,7 +79,7 @@ Two types of EEC are supported:
 
 The parameter (`param`) is calculated analytically using a cubic spline fit of the raw Gibbs free energy vs. volume curve to ensure the corrected equilibrium volume matches $V_{\text{ref}}$ at $T_{\text{ref}}$.
 
-To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the `EEC` dataclass from `mbe_automation.configs.quasi_harmonic`.
+To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the [`EEC`](./03_configuration_classes.md#eec-class) dataclass from `mbe_automation.configs.quasi_harmonic`.
 
 The equation of state must be set to `"spline"` (which is the default) to use the EEC option. Additionally, $T_{\text{ref}}$ must be present in the `temperatures_K` array.
 
@@ -133,6 +133,7 @@ Detailed descriptions of the configuration classes can be found in the [Configur
 
 *   **[`FreeEnergy`](./03_configuration_classes.md#freeenergy-class)**: Main configuration for the quasi-harmonic workflow.
 *   **[`Minimum`](./03_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
+*   **[`EEC`](./03_configuration_classes.md#eec-class)**: Configuration for the Empirical Electronic Energy Correction (EEC).
 
 ## Function Call Overview
 
