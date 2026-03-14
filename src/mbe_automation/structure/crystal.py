@@ -23,6 +23,8 @@ import mbe_automation.storage
 import mbe_automation.common
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
+DEFAULT_SYMMETRIZATION_BACKEND: Literal["spglib", "pymatgen"] = "pymatgen"
+
 try:
     from doped.generation import get_ideal_supercell_matrix
     from doped.utils.supercells import get_min_image_distance
@@ -189,7 +191,7 @@ def _standardize_cell(
     scaled_positions: npt.NDArray[np.float64],
     to_primitive: bool,
     symprec: float,
-    backend: Literal["spglib", "pymatgen"] = "pymatgen"
+    backend: Literal["spglib", "pymatgen"] = DEFAULT_SYMMETRIZATION_BACKEND
 ):
     if backend == "spglib":
         standarize_func = _standardize_cell_spglib
@@ -211,7 +213,7 @@ def to_symmetrized_conventional_cell(
         atomic_numbers: npt.NDArray[np.int64],
         scaled_positions: npt.NDArray[np.float64],
         symprec: float = SYMMETRY_TOLERANCE_STRICT,
-        backend: Literal["spglib", "pymatgen"] = "pymatgen"
+        backend: Literal["spglib", "pymatgen"] = DEFAULT_SYMMETRIZATION_BACKEND
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
     """
     Standardize to the conventional cell and idealize positions using spglib.
@@ -232,7 +234,7 @@ def to_symmetrized_primitive_cell(
         atomic_numbers: npt.NDArray[np.int64],
         scaled_positions: npt.NDArray[np.float64],
         symprec: float = SYMMETRY_TOLERANCE_STRICT,
-        backend: Literal["spglib", "pymatgen"] = "pymatgen"
+        backend: Literal["spglib", "pymatgen"] = DEFAULT_SYMMETRIZATION_BACKEND
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
     """
     Standardize to the primitive cell and idealize positions using pymatgen.
@@ -647,32 +649,75 @@ def compare_conventional_cells(
     print(f"{'-' * 75}\n")
 
 
-def display_conventional_cell(
+def conventional_cell_params(
     structure: ase.Atoms | pymatgen.core.Structure,
-    label: str = "Structure",
-    symprec: float = SYMMETRY_TOLERANCE_LOOSE
-) -> None:
+    symprec: float = SYMMETRY_TOLERANCE_LOOSE,
+    backend: Literal["spglib", "pymatgen"] = DEFAULT_SYMMETRIZATION_BACKEND
+) -> tuple[int, pymatgen.core.Lattice, SpacegroupAnalyzer]:
     """
-    Print conventional unit cell parameters of a single structure.
+    Compute conventional cell parameters from an input structure.
+    
+    Args:
+        structure: Input structure as either ase.Atoms or pymatgen Structure.
+        symprec: Symmetry tolerance for spacegroup analysis.
+        
+    Returns:
+        A tuple containing:
+        - The number of atoms in the conventional cell.
+        - Pymatgen Lattice object corresponding to the conventional cell.
+        - The SpacegroupAnalyzer instance used for symmetry analysis.
     """
     if isinstance(structure, ase.Atoms):
         pmg_struct = pymatgen.io.ase.AseAtomsAdaptor.get_structure(structure)
     else:
         pmg_struct = structure
 
-    sga = SpacegroupAnalyzer(pmg_struct, symprec=symprec)
-    conv_struct = sga.get_conventional_standard_structure(international_monoclinic=True)
+    lat_matrix, numbers, scaled_positions_conv = to_symmetrized_conventional_cell(
+        pmg_struct.lattice.matrix,
+        np.array(pmg_struct.atomic_numbers, dtype=np.int64),
+        pmg_struct.frac_coords,
+        symprec,
+        backend
+    )
+
+    n_atoms = len(numbers)
+    lattice = pymatgen.core.Lattice(lat_matrix)
     
-    lat = conv_struct.lattice
+    symmetrized_struct = pymatgen.core.Structure(
+        lattice=lattice,
+        species=numbers,
+        coords=scaled_positions_conv,
+        coords_are_cartesian=False
+    )
+    sga = SpacegroupAnalyzer(symmetrized_struct, symprec=symprec)
+    
+    return n_atoms, lattice, sga
+
+
+def display_conventional_cell(
+    structure: ase.Atoms | pymatgen.core.Structure,
+    label: str = "Structure",
+    symprec: float = SYMMETRY_TOLERANCE_LOOSE,
+    backend: Literal["spglib", "pymatgen"] = DEFAULT_SYMMETRIZATION_BACKEND
+) -> None:
+    """
+    Print conventional unit cell parameters of a single structure.
+    """
+    n_atoms, lat, sga = conventional_cell_params(
+        structure, 
+        symprec=symprec, 
+        backend=backend
+    )
+    
     abc = lat.abc
     ang = lat.angles
     
-    sg_string = f"[{sga.get_space_group_symbol()}][{sga.get_space_group_number()}]"
+    sg_string = f"{sga.get_space_group_symbol()} ({sga.get_space_group_number()})"
 
-    print(f"Conventional cell parameters: {label}")
-    print(f"Space Group: {sg_string}")
+    print(f"conventional cell parameters: {label}")
+    print(f"space group: {sg_string}")
     print(f"{'-' * 40}")
-    print(f"{'Parameter':<15} | {'Value':<15}")
+    print(f"{'parameter':<15} | {'value':<15}")
     print(f"{'-' * 40}")
     
     params = ["a [Å]", "b [Å]", "c [Å]"]
@@ -683,5 +728,6 @@ def display_conventional_cell(
     for i, a in enumerate(angles):
         print(f"{a:<15} | {ang[i]:<15.1f}")
 
-    print(f"{'Volume [Å³]':<15} | {lat.volume:<15.1f}")
+    print(f"{'volume [Å³]':<15} | {lat.volume:<15.1f}")
+    print(f"{'atoms':<15} | {n_atoms:<15}")
     print(f"{'-' * 40}\n")

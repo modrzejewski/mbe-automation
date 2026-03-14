@@ -184,7 +184,7 @@ class Structure:
 
     Structure.ground_truth
 
-    It is expected that ground truth object is populated by
+    It is expected that the ground truth object is populated by
     data points from expensive models which cannot be used
     for structure generation.
     """
