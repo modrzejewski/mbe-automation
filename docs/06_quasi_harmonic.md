@@ -74,7 +74,7 @@ mbe_automation.run(properties_config)
 The Empirical Electronic Energy Correction (EEC) option can be applied to enforce a known reference volume ($V_{\text{ref}}$) at a specific reference temperature ($T_{\text{ref}}$). The EEC contribution is added to the crystal's electronic energy and accounted for in all derived thermodynamic functions.
 
 Two types of EEC are supported:
-1.  **Linear**: $E_{\text{el,corrected}} = E_{\text{el}} + \text{param} \cdot V$
+1.  **Linear**: $E_{\text{el,corrected}} = E_{\text{el}} + \text{param} \cdot (V - V_{\text{ref}})$
 2.  **Inverse Volume**: $E_{\text{el,corrected}} = E_{\text{el}} + \text{param} / V$
 
 The parameter (`param`) is calculated analytically using a cubic spline fit of the raw Gibbs free energy vs. volume curve to ensure the corrected equilibrium volume matches $V_{\text{ref}}$ at $T_{\text{ref}}$.
