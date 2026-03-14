@@ -79,7 +79,7 @@ Two types of EEC are supported:
 
 The parameter (`param`) is calculated analytically using a cubic spline fit of the raw Gibbs free energy vs. volume curve to ensure the corrected equilibrium volume matches $V_{\text{ref}}$ at $T_{\text{ref}}$.
 
-To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the `EECConfig` dataclass from `mbe_automation.dynamics.harmonic.eec`.
+To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the `EEC` dataclass from `mbe_automation.configs.quasi_harmonic`.
 
 The equation of state must be set to `"spline"` (which is the default) to use the EEC option. Additionally, $T_{\text{ref}}$ must be present in the `temperatures_K` array.
 
@@ -91,8 +91,8 @@ import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
 from mbe_automation import Structure
 
-# Import EECConfig
-from mbe_automation.dynamics.harmonic.eec import EECConfig
+# Import EEC
+from mbe_automation.configs.quasi_harmonic import EEC
 
 xyz_solid = "path/to/your/solid.xyz"
 xyz_molecule = "path/to/your/molecule.xyz"
@@ -116,7 +116,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 
     # Enable EEC targeting a volume of 500 A^3 at 300 K
-    electronic_energy_correction=EECConfig(
+    electronic_energy_correction=EEC(
         type="inverse_volume",
         T_ref=300.0,
         V_ref=500.0

@@ -24,7 +24,7 @@ This chapter documents the configuration classes used to control the various wor
 | Parameter                       | Description                                                                                                                                                                                            | Default Value                                   |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
 | `crystal`                       | Initial, non-relaxed crystal structure. The geometry of the crystal unit cell is relaxed prior to the calculation of the harmonic properties.                                                                                                                                                            | -                                               |
-| `electronic_energy_correction`  | Empirical electronic energy correction (EEC) applied to enforce known reference volume ($V_{\text{ref}}$) at reference temperature ($T_{\text{ref}}$). Uses an instance of `EECConfig`. | `EECConfig(type="none")` |
+| `electronic_energy_correction`  | Empirical electronic energy correction (EEC) applied to enforce known reference volume ($V_{\text{ref}}$) at reference temperature ($T_{\text{ref}}$). Uses an instance of `EEC`. | `EEC(type="none")` |
 | `calculator`                    | MLIP calculator for energies and forces.                                                                                                                                                           | -                                               |
 | `molecule`                      | Initial, non-relaxed structure of the isolated molecule. If set to `None`, sublimation free energy is not computed.                                                                           | `None`                                          |
 | `relaxation`                    | An instance of `Minimum` that configures the geometry relaxation parameters.                                                                                                                       | `Minimum()`                                     |
@@ -53,9 +53,9 @@ This chapter documents the configuration classes used to control the various wor
 | `save_plots`                    | If `True`, save plots of the simulation results.                                                                                                                                                 | `True`                                          |
 | `save_csv`                      | If `True`, save CSV files of the simulation results.                                                                                                                                             | `True`                                          |
 
-### `EECConfig` Class
+### `EEC` Class
 
-**Location:** `mbe_automation.dynamics.harmonic.eec.EECConfig`
+**Location:** `mbe_automation.configs.quasi_harmonic.EEC` (alias for `mbe_automation.dynamics.harmonic.eec.EECConfig`)
 
 Configuration object for Empirical Electronic Energy Correction (EEC). EEC enforces a known reference volume ($V_{\text{ref}}$) at a specific reference temperature ($T_{\text{ref}}$) by adding an empirical correction term to the crystal's electronic energy.
 
