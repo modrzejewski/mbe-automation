@@ -290,11 +290,11 @@ class FreeEnergy:
     def __post_init__(self):
         import mbe_automation.dynamics.harmonic.eos
 
-        if self.relaxation.relaxed_structure_transformation != "to_symmetrized_primitive_cell":
+        if self.relaxation.transform != "to_symmetrized_primitive_cell":
             raise ValueError(
                 f"Quasi-harmonic workflows require the Minimum configuration "
-                f"to set relaxed_structure_transformation='to_symmetrized_primitive_cell'. "
-                f"Got: '{self.relaxation.relaxed_structure_transformation}'"
+                f"to set transform='to_symmetrized_primitive_cell'. "
+                f"Got: '{self.relaxation.transform}'"
             )
 
         if isinstance(self.crystal, mbe_automation.storage.Structure):
