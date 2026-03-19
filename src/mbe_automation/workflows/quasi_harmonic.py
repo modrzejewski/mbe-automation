@@ -27,9 +27,9 @@ except ImportError:
 
 def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
-    assert config.relaxation.relaxed_structure_transformation == "to_symmetrized_primitive_cell", (
+    assert config.relaxation.transform == "to_symmetrized_primitive_cell", (
         "Quasi-harmonic workflows require the Minimum configuration to set "
-        "relaxed_structure_transformation='to_symmetrized_primitive_cell'."
+        "transform='to_symmetrized_primitive_cell'."
     )
 
     datetime_start = mbe_automation.common.display.timestamp_start()
