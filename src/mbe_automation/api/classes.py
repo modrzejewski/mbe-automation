@@ -417,6 +417,7 @@ class ForceConstants(_ForceConstants):
         self,
         cif_path: str | None = None,
         U_cart_ref: npt.NDArray[np.float64] | None = None,
+        adp_only_fit: bool = False,
         mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
         restraint_weight: float | None = None,
         band_selection_strategy: FrequencyPartitionStrategy | None = None,
@@ -437,6 +438,7 @@ class ForceConstants(_ForceConstants):
         Args:
             cif_path: Path to experimental CIF. Optional if U_cart_ref is provided.
             U_cart_ref: Reference Cartesian ADPs (n_atoms, 3, 3) for direct fitting.
+            adp_only_fit: Whether to restrict to an ADP-only fit when a CIF path is provided.
             mesh_size: k-point mesh size ("gamma", float radius, or [Nx, Ny, Nz]).
             restraint_weight: Weight for restraining to initial frequencies.
             band_selection_strategy: Frequency partitioning strategy object (or None for default).
@@ -480,6 +482,7 @@ class ForceConstants(_ForceConstants):
             force_constants=self,
             cif_path=cif_path,
             U_cart_ref=U_cart_ref,
+            adp_only_fit=adp_only_fit,
             mesh_size=mesh_size,
             restraint_weight=restraint_weight,
             band_selection_strategy=band_selection_strategy,
