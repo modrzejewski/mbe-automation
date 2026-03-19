@@ -190,14 +190,20 @@ def _assert_supercell_consistency(
 
 def molecular_vibrations(
         molecule,
-        calculator
+        calculator,
+        work_dir: str | Path = "."
 ):
     """
     Compute molecular vibrations of a molecule using
     finite differences.
     """
     molecule.calc = calculator
-    vib = ase.vibrations.Vibrations(molecule)
+
+    vib_dir = Path(work_dir) / "vibrations"
+    os.makedirs(vib_dir, exist_ok=True)
+    vib_name = str(vib_dir / "vib")
+
+    vib = ase.vibrations.Vibrations(molecule, name=vib_name)
     vib.run()
     return vib
 

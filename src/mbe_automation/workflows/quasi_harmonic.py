@@ -85,8 +85,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             key=f"{config.root_key}/structures/{relaxed_molecule_label}"
         )
         vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
-            molecule,
-            config.calculator
+            molecule=molecule,
+            calculator=config.calculator,
+            work_dir=geom_opt_dir/relaxed_molecule_label
         )
 
     if config.relaxation.cell_relaxation == "full":
