@@ -630,6 +630,7 @@ def run(
     force_constants,
     cif_path: str | None = None,
     U_cart_ref: npt.NDArray[np.float64] | None = None,
+    adp_only_fit: bool = False,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
     restraint_weight: float | None = None,
     band_selection_strategy: Optional["FrequencyPartitionStrategy"] = None,
@@ -706,6 +707,7 @@ def run(
     print(f"temperature_K            {temperature_K if temperature_K is not None else 'from CIF'}")
     print(f"degenerate_freqs_tol     {degenerate_freqs_tol_cm1} cm⁻¹")
     print(f"symmetry_tolerance       {symmetry_tolerance}")
+    print(f"adp_only_fit             {adp_only_fit}")
 
     if isinstance(mesh_size, (list, tuple, np.ndarray)):
         mesh_size = np.array(mesh_size)
@@ -782,8 +784,8 @@ def run(
         degeneracy_groups=phonons.degeneracy_groups
     )
 
-    # Initialize SmtbxAdapter if cif_path is provided
-    if cctbx_adapter is not None:
+    # Initialize SmtbxAdapter if cif_path is provided and not adp_only_fit
+    if cctbx_adapter is not None and not adp_only_fit:
         smtbx_adapter = SmtbxAdapter(
             xray_structure=cctbx_adapter.xray_structure,
             reflections=cctbx_adapter.get_reflections(),
@@ -793,6 +795,24 @@ def run(
         print(f"  Reflections: {smtbx_adapter.observations.size()} observations")
     else:
         smtbx_adapter = None
+
+    # Extract experimental ADPs and ASU mappings before engine run
+    if cctbx_adapter is not None:
+        U_cart_exp_p1 = extract_adps_from_structure(
+            cctbx_adapter.xray_structure.expand_to_p1(
+                sites_mod_positive=True
+            )
+        )
+        if smtbx_adapter is not None:
+            asu_atoms = _get_asu_atoms(smtbx_adapter)
+            asu_symbols = [sc.element_symbol() for sc in smtbx_adapter.structure.scatterers()]
+        else:
+            asu_atoms = np.arange(len(phonons.symbols))
+            asu_symbols = phonons.symbols
+    else:
+        U_cart_exp_p1 = U_cart_ref
+        asu_atoms = np.arange(len(phonons.symbols))
+        asu_symbols = phonons.symbols
     
     # Create mode groups to handle degeneracies and bands
     pre_groups = create_pre_groups(phonons)
@@ -813,11 +833,13 @@ def run(
             temperature=temperature
         )
 
-    if U_cart_ref is not None:
+    is_adp_only = (U_cart_ref is not None) or adp_only_fit
+
+    if is_adp_only:
         print("Performing ADP-only fitting")
         result = engine.fit_to_adps(
             initial_frequencies=initial_freqs,
-            u_exp=U_cart_ref,
+            u_exp=U_cart_exp_p1,
             groups=groups,
             restraint_weight=restraint_weight,
             smoothness_weight=0.0, # Not exposed in run() yet
@@ -882,18 +904,7 @@ def run(
     U_cart_comp_initial_p1 = calculator.calculate_u_cart(initial_freqs)
     U_cart_comp_final_p1 = calculator.calculate_u_cart(result["frequencies"])
     
-    if cctbx_adapter is not None:
-        U_cart_exp_p1 = extract_adps_from_structure(
-            cctbx_adapter.xray_structure.expand_to_p1(
-                sites_mod_positive=True
-            )
-        )
-        asu_atoms = _get_asu_atoms(smtbx_adapter)
-        asu_symbols = [sc.element_symbol() for sc in smtbx_adapter.structure.scatterers()]
-    else:
-        U_cart_exp_p1 = U_cart_ref
-        asu_atoms = np.arange(len(phonons.symbols))
-        asu_symbols = phonons.symbols
+
 
     U_cart_exp_asu = U_cart_exp_p1[asu_atoms]
     U_cart_comp_initial_asu = U_cart_comp_initial_p1[asu_atoms]
