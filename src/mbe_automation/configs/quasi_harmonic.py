@@ -40,7 +40,7 @@ class FreeEnergy:
                                    # and accounted for in all thermodynamic functions derived
                                    # from E_el_crystal. Two types of ECC are implemented:
                                    #
-                                   # (1) linear: E_el_crystal(corrected) = E_el_crystal + param * V
+                                   # (1) linear: E_el_crystal(corrected) = E_el_crystal + param * (V - V_ref)
                                    # (2) inverse_volume: E_el_crystal(corrected) = E_el_crystal + param / V
                                    #
                                    # Literature with definitions:
@@ -289,6 +289,13 @@ class FreeEnergy:
 
     def __post_init__(self):
         import mbe_automation.dynamics.harmonic.eos
+
+        if self.relaxation.relaxed_structure_transformation != "to_symmetrized_primitive_cell":
+            raise ValueError(
+                f"Quasi-harmonic workflows require the Minimum configuration "
+                f"to set relaxed_structure_transformation='to_symmetrized_primitive_cell'. "
+                f"Got: '{self.relaxation.relaxed_structure_transformation}'"
+            )
 
         if isinstance(self.crystal, mbe_automation.storage.Structure):
             self.crystal = mbe_automation.storage.to_ase(self.crystal)

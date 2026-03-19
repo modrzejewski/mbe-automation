@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import numpy.typing as npt
 from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
+from typing import Literal
 
 import mbe_automation.structure.molecule
 import mbe_automation.structure.crystal
@@ -243,6 +244,7 @@ def crystal(
         root_key,
         system_label,
         level_of_theory,
+        unit_cell_type: Literal["primitive", "conventional", "unknown"] = "unknown",
 ):
     """
     Physical properties derived from the harmonic model
@@ -282,6 +284,11 @@ def crystal(
     lattice = structure.lattice()
     cell_length_a, cell_length_b, cell_length_c = lattice.lengths # Å
     cell_angle_alpha, cell_angle_beta, cell_angle_gamma = lattice.angles # deg
+    
+    n_atoms_conv_cell, conv_lattice, _ = mbe_automation.structure.crystal.conventional_cell_params(unit_cell)
+    conv_cell_length_a, conv_cell_length_b, conv_cell_length_c = conv_lattice.abc
+    conv_cell_angle_alpha, conv_cell_angle_beta, conv_cell_angle_gamma = conv_lattice.angles
+    V_conv = conv_lattice.volume # Å³
     
     V = lattice.volume # Å³/unit cell
     rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
@@ -338,22 +345,31 @@ def crystal(
         "G_tot_crystal (kJ∕mol∕unit cell)": G_tot_crystal,
         "H_tot_crystal (kJ∕mol∕unit cell)": H_tot_crystal,
         "V_crystal (Å³∕unit cell)": V,
+        "V_crystal (Å³∕conventional cell)": V_conv,
+        "n_atoms_conventional_cell": n_atoms_conv_cell,
+        "n_atoms_primitive_cell": n_atoms_primitive_cell,
         "p_external_crystal (GPa)": external_pressure_GPa,
         "pV_crystal (kJ∕mol∕unit cell)": pV_crystal,
         "ρ_crystal (g∕cm³)": rho,
-        "cell_length_a (Å)": cell_length_a,
-        "cell_length_b (Å)": cell_length_b,
-        "cell_length_c (Å)": cell_length_c,
-        "cell_angle_α (deg)": cell_angle_alpha,
-        "cell_angle_β (deg)": cell_angle_beta,
-        "cell_angle_γ (deg)": cell_angle_gamma,
-        "n_atoms_unit_cell": n_atoms_unit_cell,
+        "primitive_cell_length_a (Å)": cell_length_a,
+        "primitive_cell_length_b (Å)": cell_length_b,
+        "primitive_cell_length_c (Å)": cell_length_c,
+        "primitive_cell_angle_α (deg)": cell_angle_alpha,
+        "primitive_cell_angle_β (deg)": cell_angle_beta,
+        "primitive_cell_angle_γ (deg)": cell_angle_gamma,
+        "conventional_cell_length_a (Å)": conv_cell_length_a,
+        "conventional_cell_length_b (Å)": conv_cell_length_b,
+        "conventional_cell_length_c (Å)": conv_cell_length_c,
+        "conventional_cell_angle_α (deg)": conv_cell_angle_alpha,
+        "conventional_cell_angle_β (deg)": conv_cell_angle_beta,
+        "conventional_cell_angle_γ (deg)": conv_cell_angle_gamma,
         "space_group": space_group,
         "acoustic_freqs_real_crystal": fbz_analysis.acoustic_freqs_real,
         "optical_freqs_real_crystal": fbz_analysis.optical_freqs_real,
         "acoustic_freq_min (THz)": fbz_analysis.acoustic_freq_min_thz,
         "optical_freq_min (THz)": fbz_analysis.optical_freq_min_thz,
         "system_label_crystal": system_label,
+        "unit_cell_type": unit_cell_type,
         "Fourier_interp_mesh": f"{interp_mesh[0]}×{interp_mesh[1]}×{interp_mesh[2]}"
     })
     return df
@@ -384,7 +400,15 @@ def sublimation(df_crystal, df_molecule):
     """
     
     n_atoms_molecule = df_molecule["n_atoms_molecule"]
-    n_atoms_unit_cell = df_crystal["n_atoms_unit_cell"]
+    
+    assert df_crystal["unit_cell_type"].nunique() == 1
+    unit_cell_type = df_crystal["unit_cell_type"].iloc[0]
+    
+    if unit_cell_type == "conventional":
+        n_atoms_unit_cell = df_crystal["n_atoms_conventional_cell"]
+    else:
+        n_atoms_unit_cell = df_crystal["n_atoms_primitive_cell"]
+        
     beta = n_atoms_molecule / n_atoms_unit_cell
     
     V_Ang3 = df_crystal["V_crystal (Å³∕unit cell)"]

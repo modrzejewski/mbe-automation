@@ -71,7 +71,7 @@ mbe_automation.run(properties_config)
 
 ## Empirical Electronic Energy Correction (EEC)
 
-The Empirical Electronic Energy Correction (EEC) option can be applied to enforce a known reference volume ($V_{\text{ref}}$) at a specific reference temperature ($T_{\text{ref}}$). The EEC contribution is added to the crystal's electronic energy and accounted for in all derived thermodynamic functions.
+The Empirical Electronic Energy Correction (EEC) option can be applied to enforce a known reference volume ($V_{\text{ref}}$) for a specific unit cell geometry (either primitive or conventional) at a specific reference temperature ($T_{\text{ref}}$). The EEC contribution is added to the crystal's electronic energy and accounted for in all derived thermodynamic functions.
 
 Two types of EEC are supported:
 1.  **Linear**: $E_{\text{el,corrected}} = E_{\text{el}} + \text{param} \cdot (V - V_{\text{ref}})$
@@ -115,11 +115,12 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 
-    # Enable EEC targeting a reference volume of 145.80 A^3 at 123 K
+    # Enable EEC targeting a reference conventional cell volume of 145.80 A^3 at 123 K
     electronic_energy_correction=EEC(
         type="inverse_volume",
         T_ref=123.0,
-        V_ref=145.80
+        V_ref=145.80,
+        cell="conventional"
     ),
     equation_of_state="spline" # Required for EEC
 )
@@ -319,11 +320,12 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 
-    # Enable EEC targeting a reference volume of 145.80 A^3 at 123 K
+    # Enable EEC targeting a reference conventional cell volume of 145.80 A^3 at 123 K
     electronic_energy_correction=EEC(
         type="inverse_volume",
         T_ref=123.0,
-        V_ref=145.80
+        V_ref=145.80,
+        cell="conventional"
     ),
     equation_of_state="spline" # Required for EEC
 )

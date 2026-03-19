@@ -572,10 +572,17 @@ def equilibrium_curve(
             f"target V_ref={electronic_energy_correction.V_ref} Å³"
         )
         i_T_ref = np.where(np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5))[0][0]
+        df_target = df_eos[good_points & select_T[i_T_ref]]
+        assert df_target["unit_cell_type"].nunique() == 1
+        assert df_target["n_atoms_primitive_cell"].nunique() == 1
+        assert df_target["n_atoms_conventional_cell"].nunique() == 1
         eec = mbe_automation.dynamics.harmonic.eec.EEC.from_sampled_eos_curve(
-            V_sampled=df_eos[good_points & select_T[i_T_ref]]["V_crystal (Å³∕unit cell)"].to_numpy(),
-            G_sampled=df_eos[good_points & select_T[i_T_ref]]["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(), 
-            config=electronic_energy_correction
+            V_sampled=df_target["V_crystal (Å³∕unit cell)"].to_numpy(),
+            G_sampled=df_target["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(), 
+            config=electronic_energy_correction,
+            unit_cell_type=df_target["unit_cell_type"].iloc[0],
+            n_atoms_primitive_cell=df_target["n_atoms_primitive_cell"].iloc[0],
+            n_atoms_conventional_cell=df_target["n_atoms_conventional_cell"].iloc[0],
         )
         #
         # Add EEC to the electronic energy and to the thermodynamic

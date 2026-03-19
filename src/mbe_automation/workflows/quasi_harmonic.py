@@ -27,6 +27,11 @@ except ImportError:
 
 def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
+    assert config.relaxation.relaxed_structure_transformation == "to_symmetrized_primitive_cell", (
+        "Quasi-harmonic workflows require the Minimum configuration to set "
+        "relaxed_structure_transformation='to_symmetrized_primitive_cell'."
+    )
+
     datetime_start = mbe_automation.common.display.timestamp_start()
     
     if config.verbose == 0:
@@ -167,6 +172,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         root_key=config.root_key,
         system_label=relaxed_crystal_label,
         level_of_theory=config.calculator.level_of_theory,
+        unit_cell_type="primitive",
     )
     
     if config.molecule is not None:
@@ -325,6 +331,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             root_key=config.root_key,
             system_label=label_crystal,
             level_of_theory=config.calculator.level_of_theory,
+            unit_cell_type="primitive",
         )
         
         if config.electronic_energy_correction.is_enabled:

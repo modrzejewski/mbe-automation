@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal, TYPE_CHECKING
+from copy import deepcopy
 import numpy as np
 import numpy.typing as npt
 import ase.units
@@ -12,6 +13,7 @@ class EECConfig:
     type: Literal[*ELECTRONIC_ENERGY_CORRECTION] = "inverse_volume"
     T_ref: float | None = None
     V_ref: float | None = None
+    cell: Literal["primitive", "conventional"] = "conventional"
     pressure_min_GPa: float = -5.0
     pressure_max_GPa: float = 5.0
 
@@ -35,14 +37,14 @@ def _eec_value(
     Evaluate the empirical electronic energy correction.
 
     Units:
-        - V: Crystal volume in Å³∕unit cell
-        - V_ref: Reference volume in Å³∕unit cell
+        - V: Crystal volume in Å³ (per unit cell of type specified by EECConfig.cell)
+        - V_ref: Reference volume in Å³ (per unit cell of type specified by EECConfig.cell)
         - e_el_correction_param: 
             * linear: (kJ∕mol) / Å³
             * inverse_volume: (kJ∕mol) * Å³
             
     Returns:
-        Energy correction in kJ∕mol∕unit cell (matching the units of e_el_correction_param).
+        Energy correction in kJ∕mol (per unit cell of type specified by EECConfig.cell).
     """
     if correction_type == "linear":
         return e_el_correction_param * (V - V_ref)
@@ -62,13 +64,13 @@ def _eec_pressure(
     Evaluate the volume derivative of the electronic energy correction.
 
     Units:
-        - V: Crystal volume in Å³∕unit cell
+        - V: Crystal volume in Å³ (per unit cell of type specified by EECConfig.cell)
         - e_el_correction_param: 
             * linear: (kJ∕mol) / Å³
             * inverse_volume: (kJ∕mol) * Å³
             
     Returns:
-        Derivative of the correction w.r.t volume in (kJ∕mol) / Å³∕unit cell.
+        Derivative of the correction w.r.t volume in (kJ∕mol) / Å³ (per unit cell of type specified by EECConfig.cell).
     """
     if correction_type == "linear":
         if isinstance(V, (np.ndarray, list)):
@@ -92,14 +94,14 @@ def _eec_param(
     Perform a cubic spline fit of G(V) and find e_el_correction_param analytically.
 
     Units:
-        - V_sampled: Crystal volume in Å³∕unit cell
-        - G_sampled: Total Gibbs free energy in kJ∕mol∕unit cell
+        - V_sampled: Crystal volume in Å³ (per unit cell of type specified by config.cell)
+        - G_sampled: Total Gibbs free energy in kJ∕mol (per unit cell of type specified by config.cell)
         
     Resulting parameter units based on correction type (G units / V units):
         - linear: (kJ∕mol) / Å³
         - inverse_volume: (kJ∕mol) * Å³
         
-    Note: Output matches the energy scale of G_sampled (kJ/mol/unit cell).
+    Note: Output matches the energy scale of G_sampled (kJ∕mol per unit cell of type specified by config.cell).
     """
     if not config.is_enabled:
         return 0.0
@@ -182,10 +184,10 @@ class EEC:
         Evaluate the empirical electronic energy correction at the given volume(s).
 
         Parameters:
-            V: Crystal volume in Å³∕unit cell.
+            V: Crystal volume in Å³ (per unit cell of type specified by self.config.cell).
             
         Returns:
-            Energy correction in kJ∕mol∕unit cell.
+            Energy correction in kJ∕mol (per unit cell of type specified by self.config.cell).
         """
         if not self.is_enabled:
             return np.zeros_like(V) if isinstance(V, np.ndarray) else 0.0
@@ -204,7 +206,7 @@ class EEC:
         it to Gigapascals (GPa), acting as the analogue of the thermal pressure.
 
         Parameters:
-            V: Crystal volume in Å³∕unit cell.
+            V: Crystal volume in Å³ (per unit cell of type specified by self.config.cell).
             
         Returns:
             Correction pressure in GPa.
@@ -227,14 +229,29 @@ class EEC:
         cls,
         V_sampled: npt.NDArray[np.float64],
         G_sampled: npt.NDArray[np.float64],
-        config: EECConfig
+        config: EECConfig,
+        unit_cell_type: Literal["primitive", "conventional"],
+        n_atoms_primitive_cell: int,
+        n_atoms_conventional_cell: int,
     ) -> "EEC":
+        if unit_cell_type not in ["primitive", "conventional"]:
+            raise ValueError(f"unit_cell_type must be either 'primitive' or 'conventional', got '{unit_cell_type}'")
+        
         if not config.is_enabled:
             return cls(config=config, param=0.0)
             
+        scaled_config = deepcopy(config)
+        
+        if config.cell == "conventional" and unit_cell_type == "primitive":
+             scaled_config.V_ref = config.V_ref * (n_atoms_primitive_cell / n_atoms_conventional_cell)
+             scaled_config.cell = "primitive"
+        elif config.cell == "primitive" and unit_cell_type == "conventional":
+             scaled_config.V_ref = config.V_ref * (n_atoms_conventional_cell / n_atoms_primitive_cell)
+             scaled_config.cell = "conventional"
+
         param = _eec_param(
             V_sampled=V_sampled,
             G_sampled=G_sampled,
-            config=config
+            config=scaled_config
         )
-        return cls(config=config, param=param)
+        return cls(config=scaled_config, param=param)

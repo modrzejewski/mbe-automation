@@ -22,16 +22,22 @@ class ThermalExpansionProperties:
             where V is the equilibrium volume at temperature T and pressure p:
             V = Veq(T, p)
         alpha_V: Volumetric thermal expansion coefficient.
-        alpha_L_a: Linear thermal expansion coefficient along the a-axis.
-        alpha_L_b: Linear thermal expansion coefficient along the b-axis.
-        alpha_L_c: Linear thermal expansion coefficient along the c-axis.
+        alpha_L_a_primitive: Linear thermal expansion coefficient along the primitive a-axis.
+        alpha_L_b_primitive: Linear thermal expansion coefficient along the primitive b-axis.
+        alpha_L_c_primitive: Linear thermal expansion coefficient along the primitive c-axis.
+        alpha_L_a_conv: Linear thermal expansion coefficient along the conventional a-axis.
+        alpha_L_b_conv: Linear thermal expansion coefficient along the conventional b-axis.
+        alpha_L_c_conv: Linear thermal expansion coefficient along the conventional c-axis.
     """
     C_P_tot_formula_I: npt.NDArray[np.float64]
     C_P_tot_formula_II: npt.NDArray[np.float64]
     alpha_V: npt.NDArray[np.float64]
-    alpha_L_a: npt.NDArray[np.float64]
-    alpha_L_b: npt.NDArray[np.float64]
-    alpha_L_c: npt.NDArray[np.float64]
+    alpha_L_a_primitive: npt.NDArray[np.float64]
+    alpha_L_b_primitive: npt.NDArray[np.float64]
+    alpha_L_c_primitive: npt.NDArray[np.float64]
+    alpha_L_a_conv: npt.NDArray[np.float64]
+    alpha_L_b_conv: npt.NDArray[np.float64]
+    alpha_L_c_conv: npt.NDArray[np.float64]
 
 def run(
     freqs_THz: npt.NDArray[np.float64],
@@ -139,7 +145,7 @@ def run(
     })
 
 
-def _fit_thermal_expansion_properties_finite_diff(T, V, H, C_V, a, b, c, dSdV):
+def _fit_thermal_expansion_properties_finite_diff(T, V, H, C_V, a, b, c, dSdV, a_conv, b_conv, c_conv):
     """
     Compute thermal expansion properties using finite differences.
     This procedure requires at least two data points for forward/backward
@@ -156,6 +162,9 @@ def _fit_thermal_expansion_properties_finite_diff(T, V, H, C_V, a, b, c, dSdV):
     dadT = np.gradient(a, T)
     dbdT = np.gradient(b, T)
     dcdT = np.gradient(c, T)
+    da_convdT = np.gradient(a_conv, T)
+    db_convdT = np.gradient(b_conv, T)
+    dc_convdT = np.gradient(c_conv, T)
     
     alpha_V = dVdT / V
     
@@ -167,9 +176,12 @@ def _fit_thermal_expansion_properties_finite_diff(T, V, H, C_V, a, b, c, dSdV):
         C_P_tot_formula_I = dHdT * 1000, # heat capacity at constant pressure J/K/mol/unit cell (formula I)
         C_P_tot_formula_II = C_P_tot_formula_II, # alternative C_P from eq 39 J/K/mol/unit cell (formula II)
         alpha_V = alpha_V,     # volumetric thermal expansion coefficient 1/K
-        alpha_L_a = dadT / a,  # linear thermal expansion coefficient 1/K
-        alpha_L_b = dbdT / b,  # 1/K
-        alpha_L_c = dcdT / c,  # 1/K
+        alpha_L_a_primitive = dadT / a,  # linear thermal expansion coefficient 1/K
+        alpha_L_b_primitive = dbdT / b,  # 1/K
+        alpha_L_c_primitive = dcdT / c,  # 1/K
+        alpha_L_a_conv = da_convdT / a_conv,
+        alpha_L_b_conv = db_convdT / b_conv,
+        alpha_L_c_conv = dc_convdT / c_conv,
     )
 
 def _hybrid_derivative(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
@@ -196,7 +208,7 @@ def _hybrid_derivative(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -
 
     return d_dx
     
-def _fit_thermal_expansion_properties_cspline(T, V, H, C_V, a, b, c, dSdV):
+def _fit_thermal_expansion_properties_cspline(T, V, H, C_V, a, b, c, dSdV, a_conv, b_conv, c_conv):
     """
     Compute thermal expansion properties using numerical differentiation
     of a cubic spline. This procedure requires at least four data points.
@@ -207,6 +219,9 @@ def _fit_thermal_expansion_properties_cspline(T, V, H, C_V, a, b, c, dSdV):
     dadT = _hybrid_derivative(T, a)
     dbdT = _hybrid_derivative(T, b)
     dcdT = _hybrid_derivative(T, c)
+    da_convdT = _hybrid_derivative(T, a_conv)
+    db_convdT = _hybrid_derivative(T, b_conv)
+    dc_convdT = _hybrid_derivative(T, c_conv)
     
     alpha_V = dVdT / V
 
@@ -216,9 +231,12 @@ def _fit_thermal_expansion_properties_cspline(T, V, H, C_V, a, b, c, dSdV):
         C_P_tot_formula_I = dHdT * 1000, # heat capacity at constant pressure J/K/mol/unit cell (formula I)
         C_P_tot_formula_II = C_P_tot_formula_II, # alternative C_P from eq 39 J/K/mol/unit cell (formula II)
         alpha_V = alpha_V,     # volumetric thermal expansion coefficient 1/K
-        alpha_L_a = dadT / a,  # linear thermal expansion coefficient 1/K
-        alpha_L_b = dbdT / b,  # 1/K
-        alpha_L_c = dcdT / c,  # 1/K
+        alpha_L_a_primitive = dadT / a,  # linear thermal expansion coefficient 1/K
+        alpha_L_b_primitive = dbdT / b,  # 1/K
+        alpha_L_c_primitive = dcdT / c,  # 1/K
+        alpha_L_a_conv = da_convdT / a_conv,
+        alpha_L_b_conv = db_convdT / b_conv,
+        alpha_L_c_conv = dc_convdT / c_conv,
     )
 
 def fit_thermal_expansion_properties(
@@ -263,18 +281,24 @@ def fit_thermal_expansion_properties(
         - "V_crystal (Å³∕unit cell)"
         - "H_tot_crystal (kJ∕mol∕unit cell)"
         - "C_V_vib_crystal (J∕K∕mol∕unit cell)"
-        - "cell_length_a (Å)"
-        - "cell_length_b (Å)"
-        - "cell_length_c (Å)"
+        - "primitive_cell_length_a (Å)"
+        - "primitive_cell_length_b (Å)"
+        - "primitive_cell_length_c (Å)"
+        - "conventional_cell_length_a (Å)"
+        - "conventional_cell_length_b (Å)"
+        - "conventional_cell_length_c (Å)"
         - "dSdV_vib_crystal (J∕K∕mol∕Å³∕unit cell)"
     """
     T = df_crystal_equilibrium["T (K)"].to_numpy()
     V = df_crystal_equilibrium["V_crystal (Å³∕unit cell)"].to_numpy()
     H = df_crystal_equilibrium["H_tot_crystal (kJ∕mol∕unit cell)"].to_numpy()
     C_V = df_crystal_equilibrium["C_V_vib_crystal (J∕K∕mol∕unit cell)"].to_numpy()
-    a = df_crystal_equilibrium["cell_length_a (Å)"].to_numpy()
-    b = df_crystal_equilibrium["cell_length_b (Å)"].to_numpy()
-    c = df_crystal_equilibrium["cell_length_c (Å)"].to_numpy()
+    a = df_crystal_equilibrium["primitive_cell_length_a (Å)"].to_numpy()
+    b = df_crystal_equilibrium["primitive_cell_length_b (Å)"].to_numpy()
+    c = df_crystal_equilibrium["primitive_cell_length_c (Å)"].to_numpy()
+    a_conv = df_crystal_equilibrium["conventional_cell_length_a (Å)"].to_numpy()
+    b_conv = df_crystal_equilibrium["conventional_cell_length_b (Å)"].to_numpy()
+    c_conv = df_crystal_equilibrium["conventional_cell_length_c (Å)"].to_numpy()
     dSdV = df_crystal_equilibrium["dSdV_vib_crystal (J∕K∕mol∕Å³∕unit cell)"].to_numpy()
 
     n_temperatures = len(T)
@@ -288,12 +312,12 @@ def fit_thermal_expansion_properties(
 
     if n_temperatures >= 4:
         properties = _fit_thermal_expansion_properties_cspline(
-            T, V, H, C_V, a, b, c, dSdV=dSdV
+            T, V, H, C_V, a, b, c, dSdV=dSdV, a_conv=a_conv, b_conv=b_conv, c_conv=c_conv
         )
     
     elif n_temperatures >= 2:
         properties = _fit_thermal_expansion_properties_finite_diff(
-            T, V, H, C_V, a, b, c, dSdV=dSdV
+            T, V, H, C_V, a, b, c, dSdV=dSdV, a_conv=a_conv, b_conv=b_conv, c_conv=c_conv
         )
 
     else:
@@ -301,15 +325,19 @@ def fit_thermal_expansion_properties(
             C_P_tot_formula_I = np.full(n_temperatures, np.nan),
             C_P_tot_formula_II = np.full(n_temperatures, np.nan),
             alpha_V = np.full(n_temperatures, np.nan),
-            alpha_L_a = np.full(n_temperatures, np.nan),
-            alpha_L_b = np.full(n_temperatures, np.nan),
-            alpha_L_c = np.full(n_temperatures, np.nan),
+            alpha_L_a_primitive = np.full(n_temperatures, np.nan),
+            alpha_L_b_primitive = np.full(n_temperatures, np.nan),
+            alpha_L_c_primitive = np.full(n_temperatures, np.nan),
+            alpha_L_a_conv = np.full(n_temperatures, np.nan),
+            alpha_L_b_conv = np.full(n_temperatures, np.nan),
+            alpha_L_c_conv = np.full(n_temperatures, np.nan),
         )
     #
     # Note that in the output data frame, we are preserving the
     # original, possibly non-contiguous, data index of df_crystal_equilibrium.
-    # This is needed because in some cases, the preceding computation of
-    # equilibrium volumes may fail at some temperatures. Those empty rows
+    # This is needed because in some cases the preceding computation of
+    # equilibrium volumes may fail at a subset of temperatures.
+    # The empty rows corresponding to the failed data points
     # are represented as gaps in the range of dataframe indices.    
     #
     return pd.DataFrame({
@@ -317,7 +345,10 @@ def fit_thermal_expansion_properties(
             "C_P_tot_formula_I (J∕K∕mol∕unit cell)": properties.C_P_tot_formula_I,
             "C_P_tot_formula_II (J∕K∕mol∕unit cell)": properties.C_P_tot_formula_II,
             "α_V (1∕K)": properties.alpha_V,
-            "α_L_a (1∕K)": properties.alpha_L_a,
-            "α_L_b (1∕K)": properties.alpha_L_b,
-            "α_L_c (1∕K)": properties.alpha_L_c,
+            "α_L_a_primitive (1∕K)": properties.alpha_L_a_primitive,
+            "α_L_b_primitive (1∕K)": properties.alpha_L_b_primitive,
+            "α_L_c_primitive (1∕K)": properties.alpha_L_c_primitive,
+            "α_L_a_conventional (1∕K)": properties.alpha_L_a_conv,
+            "α_L_b_conventional (1∕K)": properties.alpha_L_b_conv,
+            "α_L_c_conventional (1∕K)": properties.alpha_L_c_conv,
     }, index=df_crystal_equilibrium.index)

@@ -747,6 +747,7 @@ def _save_eec(group: h5py.Group, eec) -> None:
     if eec.config.is_enabled:
         group.attrs["T_ref (K)"] = eec.config.T_ref
         group.attrs["V_ref (Å³∕unit cell)"] = eec.config.V_ref
+        group.attrs["cell"] = eec.config.cell
         group.attrs["pressure_min (GPa)"] = eec.config.pressure_min_GPa
         group.attrs["pressure_max (GPa)"] = eec.config.pressure_max_GPa
         
@@ -768,6 +769,7 @@ def _read_eec(group: h5py.Group):
             type=eec_type,
             T_ref=group.attrs["T_ref (K)"],
             V_ref=group.attrs["V_ref (Å³∕unit cell)"],
+            cell=group.attrs["cell"],
             pressure_min_GPa=group.attrs["pressure_min (GPa)"],
             pressure_max_GPa=group.attrs["pressure_max (GPa)"],
         )
