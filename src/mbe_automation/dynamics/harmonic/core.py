@@ -474,6 +474,7 @@ def equilibrium_curve(
             root_key=root_key,
             system_label=label,
             level_of_theory=calculator.level_of_theory,
+            unit_cell_type="primitive",
         )
         df_eos_points.append(df_crystal_V)
 
