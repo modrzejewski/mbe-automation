@@ -46,9 +46,10 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     else:
         mbe_automation.common.display.framed("Harmonic properties")
         
-    os.makedirs(config.work_dir, exist_ok=True)
+    Path(config.work_dir).mkdir(parents=True, exist_ok=True)
     geom_opt_dir = Path(config.work_dir) / "relaxation"
-    os.makedirs(geom_opt_dir, exist_ok=True)
+    vibrations_dir = Path(config.work_dir) / "vibrations"
+    geom_opt_dir.mkdir(parents=True, exist_ok=True)
 
     input_space_group, _ = mbe_automation.structure.crystal.check_symmetry(
         config.crystal
@@ -90,8 +91,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             key=f"{config.root_key}/structures/{relaxed_molecule_label}"
         )
         vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
-            molecule,
-            config.calculator
+            molecule=molecule,
+            calculator=config.calculator,
+            work_dir=vibrations_dir/relaxed_molecule_label
         )
 
     if config.relaxation.cell_relaxation == "full":

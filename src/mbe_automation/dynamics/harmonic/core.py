@@ -17,6 +17,7 @@ import ase.units
 import ase.build
 import matplotlib.pyplot as plt
 import os
+import shutil
 import os.path
 import sys
 import pandas as pd
@@ -190,14 +191,21 @@ def _assert_supercell_consistency(
 
 def molecular_vibrations(
         molecule,
-        calculator
+        calculator,
+        work_dir: str | Path = "."
 ):
     """
     Compute molecular vibrations of a molecule using
     finite differences.
     """
     molecule.calc = calculator
-    vib = ase.vibrations.Vibrations(molecule)
+
+    vib_dir = Path(work_dir)
+    if vib_dir.exists():
+        shutil.rmtree(vib_dir)
+    vib_dir.mkdir(parents=True, exist_ok=True)
+
+    vib = ase.vibrations.Vibrations(molecule, name=str(vib_dir))
     vib.run()
     return vib
 
