@@ -104,6 +104,9 @@ class DatasetKeys:
                 contains_exactly_n_molecules = None
                 level_of_theory = None
                 
+            else:
+                return
+                
             self._items.append(DatasetKey(
                 key=name,
                 is_periodic=is_periodic,
