@@ -30,6 +30,7 @@ try:
     from nomore_ase.optimization.restraints import BayesianFrequencyRestraint
     from nomore_ase.analysis.validation import extract_adps_from_structure
     from nomore_ase.analysis.s12_similarity import calculate_s12_per_atom
+    from nomore_ase.utils.geometry import build_atom_mapping_periodic
 
     from mbe_automation.dynamics.harmonic.bands import (
         track_from_gamma,
@@ -424,39 +425,35 @@ def compute_atom_permutation(phonopy_primitive: Any, cif_adapter: "CctbxAdapter"
     Returns:
         permutation: Array of indices such that permutation[i_fc] = i_target.
     """
-    p1_structure = cif_adapter.xray_structure.expand_to_p1()
+    # sites_mod_positive=True wraps generated fractional coordinates to the [0, 1) range
+    p1_structure = cif_adapter.xray_structure.expand_to_p1(sites_mod_positive=True)
     uc = p1_structure.unit_cell()
     n_target = p1_structure.scatterers().size()
     
-    target_frac = np.array([sc.site for sc in p1_structure.scatterers()]) % 1.0
-    target_cart = np.array([uc.orthogonalize(f) for f in target_frac])
-    
     n_atoms_fc = len(phonopy_primitive)
-    fc_frac = phonopy_primitive.scaled_positions % 1.0
     fc_cell = phonopy_primitive.cell
     
     if n_atoms_fc != n_target:
         raise ValueError(f"Atom count mismatch: FC has {n_atoms_fc}, CIF has {n_target}")
 
     _assert_equal_cells(fc_cell, uc)
-    fc_cart_wrapped = (fc_frac @ fc_cell)
-    
-    distances = cdist(fc_cart_wrapped, target_cart)
-    fc_to_target = distances.argmin(axis=1)
-    
-    used_targets = set()
-    source_to_target_indices = np.zeros(n_atoms_fc, dtype=int)
-    
-    for i_fc, i_target in enumerate(fc_to_target):
-        if i_target in used_targets:
-            print(f"WARNING: Duplicate matching for target atom {i_target}. Check if atoms are overlapping or tolerance issue.")
-        used_targets.add(i_target)
-        source_to_target_indices[i_fc] = i_target
 
-    if len(used_targets) != n_target:
-        print(f"WARNING: Not all target atoms matched! Used {len(used_targets)} of {n_target}")
+    target_frac = np.array([sc.site for sc in p1_structure.scatterers()])
+    target_symbols = np.array([sc.element_symbol() for sc in p1_structure.scatterers()])
+    
+    fc_frac = phonopy_primitive.scaled_positions
+    fc_symbols = np.array(phonopy_primitive.symbols)
+    
+    indices, distances = build_atom_mapping_periodic(
+        source_positions=fc_frac,
+        target_positions=target_frac,
+        unit_cell=uc,
+        tolerance=2.0,
+        source_elements=fc_symbols,
+        target_elements=target_symbols
+    )
 
-    return source_to_target_indices
+    return indices
 
 def _s12_per_atom(
     u_comp: npt.NDArray[np.float64],
