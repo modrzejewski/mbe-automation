@@ -116,9 +116,6 @@ def track_from_gamma(
         phonons=adapter,
         q_points=q_points,
         q_spacing=q_spacing,
-        use_degenerate_pt=True,
-        degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
-        delta_q=delta_q,
     )
     
     n_q = len(q_points)

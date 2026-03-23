@@ -287,8 +287,6 @@ def to_phonon_data(
         final_symbols = ph.primitive.symbols
         final_masses = ph.primitive.masses
 
-    flat_weights = np.repeat(q_weights, n_modes_total)
-
     print(f"Computing band assignment for {len(irr_q_frac)} q-points...")
     band_indices = track_from_gamma(
         phonopy_object=ph,
@@ -316,7 +314,6 @@ def to_phonon_data(
         eigenvectors=flat_eigenvectors,
         q_points=irr_q_frac,
         mode_q_indices=mode_q_indices,
-        weights=flat_weights,
         degeneracy_groups=degeneracy_groups,
         positions_frac=final_positions,
         cell=ph.primitive.cell,
@@ -634,7 +631,6 @@ def run(
     weighting_scheme: Literal["sigma", "unit"] = "sigma",
     fix_positions: bool = True,
     exclude_hydrogen_positions: bool = True,
-    use_irreducible_fbz: bool = False,
     temperature_K: float | None = None,
     q_spacing: float = DEFAULT_Q_SPACING,
     reasonable_range: tuple[float, float] | None = None,
@@ -682,6 +678,7 @@ def run(
 
     optimizer_options = {"maxiter": 300, "ftol": 1e-9}
     optimizer_method = "SLSQP"
+    use_irreducible_fbz = False
 
     # Strategy applied to determine which frequencies to refine
     if band_selection_strategy is None:
@@ -777,7 +774,6 @@ def run(
         masses=phonons.masses,
         temperature=phonons.temperature, 
         normalization_factor=float(total_q),
-        weights=phonons.weights,
         degeneracy_groups=phonons.degeneracy_groups
     )
 
@@ -901,8 +897,6 @@ def run(
     U_cart_comp_initial_p1 = calculator.calculate_u_cart(initial_freqs)
     U_cart_comp_final_p1 = calculator.calculate_u_cart(result["frequencies"])
     
-
-
     U_cart_exp_asu = U_cart_exp_p1[asu_atoms]
     U_cart_comp_initial_asu = U_cart_comp_initial_p1[asu_atoms]
     U_cart_comp_final_asu = U_cart_comp_final_p1[asu_atoms]

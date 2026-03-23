@@ -206,7 +206,7 @@ class ForceConstants(_ForceConstants):
     
     def frequencies_and_eigenvectors(
             self,
-            k_points: npt.NDArray[np.float64],
+            k_points: npt.NDArray[np.float64] | list | None = None,
             eigenvectors_storage: Literal["columns", "rows"] = "columns",
             track_bands: bool = False,
             degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
@@ -220,7 +220,8 @@ class ForceConstants(_ForceConstants):
         Args:
             k_points: The k-point coordinates in reciprocal space (fractional 
                 coordinates). Can be a single k-point (rank 1 array of 3 floats)
-                or multiple k-points (rank 2 array of shape (N, 3)).
+                or multiple k-points (rank 2 array of shape (N, 3)). Defaults to the
+                Gamma point `[0.0, 0.0, 0.0]`.
             eigenvectors_storage: Convention for storing eigenvectors, "columns" or "rows".
                 - "columns": v[:, i] is the i-th eigenvector (for a single k-point)
                    or v[k, :, i] (for multiple k-points).
@@ -245,6 +246,9 @@ class ForceConstants(_ForceConstants):
             - eigenvectors: Eigenvectors of the dynamical matrix.
         """
         ph = mbe_automation.storage.to_phonopy(self)
+        if k_points is None:
+            k_points = [0.0, 0.0, 0.0]
+        k_points = np.asarray(k_points, dtype=np.float64)
 
         if k_points.ndim == 1:
             freqs, evecs = mbe_automation.dynamics.harmonic.modes.at_k_point(
