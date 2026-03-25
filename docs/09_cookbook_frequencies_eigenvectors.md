@@ -117,6 +117,8 @@ fc = ForceConstants.read(dataset=dataset_path, key=key)
 refinement_result = fc.refine(
     cif_path=cif_path,
     mesh_size=[3, 3, 3],
+    adp_only_fit=False, # Set to True to restrict to an ADP-only fit
+    exclude_hydrogen_positions=True, # Set to False to include hydrogens in position refinement
     symmetrize_Dq=True, # enabled by default
 )
 
