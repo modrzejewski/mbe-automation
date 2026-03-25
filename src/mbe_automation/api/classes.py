@@ -50,7 +50,6 @@ import mbe_automation.dynamics.harmonic.gruneisen
 
 
 if TYPE_CHECKING:
-    from nomore_ase.core.frequency_partition import FrequencyPartitionStrategy
     from mbe_automation.dynamics.harmonic.refinement import NormalModeRefinement
 
 @dataclass(kw_only=True)
@@ -68,7 +67,7 @@ class EOSMetadata(_EOSMetadata):
         temperature_K: float,
         polynomial_degree: Literal[1, 2] = 2,
         freq_min_THz: float = 1e-3,
-        band_selection_strategy: FrequencyPartitionStrategy | None = None,
+        n_refined: int | None = None,
         external_freqs_THz: npt.NDArray[np.float64] | None = None,
         symmetry_tolerance: float | None = None,
     ) -> mbe_automation.dynamics.harmonic.gruneisen.GammaPointGruneisenModel:
@@ -83,8 +82,7 @@ class EOSMetadata(_EOSMetadata):
                 Gruneisen parameter.
             freq_min_THz: Minimum frequency threshold. Bands with frequencies below 
                 this value will not be scaled.
-            band_selection_strategy: Strategy for partitioning frequencies during 
-                the refinement process.
+            n_refined: Number of lowest-frequency groups to optimize individually.
             external_freqs_THz: Custom effective frequencies to propagate.
                 
         Returns:
@@ -98,7 +96,7 @@ class EOSMetadata(_EOSMetadata):
             temperature_K=temperature_K,
             polynomial_degree=polynomial_degree,
             freq_min_THz=freq_min_THz,
-            band_selection_strategy=band_selection_strategy,
+            n_refined=n_refined,
             external_freqs_THz=external_freqs_THz,
             symmetry_tolerance=symmetry_tolerance,
         )
@@ -423,8 +421,7 @@ class ForceConstants(_ForceConstants):
         U_cart_ref: npt.NDArray[np.float64] | None = None,
         adp_only_fit: bool = False,
         mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
-        restraint_weight: float | None = None,
-        band_selection_strategy: FrequencyPartitionStrategy | None = None,
+        n_refined: int | None = None,
         weighting_scheme: Literal["sigma", "unit"] = "sigma",
         fix_positions: bool = True,
         exclude_hydrogen_positions: bool = True,
@@ -444,8 +441,7 @@ class ForceConstants(_ForceConstants):
             U_cart_ref: Reference Cartesian ADPs (n_atoms, 3, 3) for direct fitting.
             adp_only_fit: Whether to restrict to an ADP-only fit when a CIF path is provided.
             mesh_size: k-point mesh size ("gamma", float radius, or [Nx, Ny, Nz]).
-            restraint_weight: Weight for restraining to initial frequencies.
-            band_selection_strategy: Frequency partitioning strategy object (or None for default).
+            n_refined: Number of lowest-frequency groups to optimize individually.
             weighting_scheme: Weighting scheme ('sigma' or 'unit').
             fix_positions: Whether to fix atomic positions during refinement.
             exclude_hydrogen_positions: Whether to exclude hydrogens from position 
@@ -488,8 +484,7 @@ class ForceConstants(_ForceConstants):
             U_cart_ref=U_cart_ref,
             adp_only_fit=adp_only_fit,
             mesh_size=mesh_size,
-            restraint_weight=restraint_weight,
-            band_selection_strategy=band_selection_strategy,
+            n_refined=n_refined,
             weighting_scheme=weighting_scheme,
             fix_positions=fix_positions,
             exclude_hydrogen_positions=exclude_hydrogen_positions,
@@ -505,7 +500,7 @@ class ForceConstants(_ForceConstants):
     def effective_gamma_point_freqs(
         self,
         temperature_K: float,
-        band_selection_strategy: FrequencyPartitionStrategy | None = None,
+        n_refined: int | None = None,
         phonon_filter: PhononFilter | None = None,
         symmetrize_Dq: bool = True,
         symprec: float = 1e-5,
@@ -519,8 +514,7 @@ class ForceConstants(_ForceConstants):
 
         Args:
             temperature_K: Temperature in Kelvin.
-            band_selection_strategy: Frequency partitioning strategy. If None, 
-                defaults to SensitivityBasedStrategy(0.75, 0.90).
+            n_refined: Number of lowest-frequency groups to optimize individually.
             phonon_filter: Optional filter for phonons passed to thermal displacement calculation.
             symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
                 using crystal symmetry operations.
@@ -530,18 +524,11 @@ class ForceConstants(_ForceConstants):
         """
         try:
             import cctbx
-            from nomore_ase.core.frequency_partition import SensitivityBasedStrategy
         except ImportError:
             raise ImportError(
                 "The `ForceConstants.effective_gamma_point_freqs` method requires "
                 "the `nomore_ase` and `cctbx` packages. Install them in your environment to use "
                 "this functionality."
-            )
-
-        if band_selection_strategy is None:
-            band_selection_strategy = SensitivityBasedStrategy(
-                low_threshold=0.75,
-                high_threshold=0.90
             )
 
         adps = self.thermal_displacements(
@@ -556,7 +543,7 @@ class ForceConstants(_ForceConstants):
             U_cart_ref=U_cart_ref,
             temperature_K=temperature_K,
             mesh_size="gamma",
-            band_selection_strategy=band_selection_strategy,
+            n_refined=n_refined,
             symmetrize_Dq=symmetrize_Dq,
             symprec=symprec,
         )

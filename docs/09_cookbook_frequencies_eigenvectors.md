@@ -80,7 +80,7 @@ key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
 
 fc = ForceConstants.read(dataset=dataset_path, key=key)
 # You can optionally enable dynamical matrix symmetrization by passing symmetrize_Dq=True
-freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors()
+freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_points=[0.0, 0.0, 0.0])
 
 print("Frequencies (THz):")
 print(freqs_THz)

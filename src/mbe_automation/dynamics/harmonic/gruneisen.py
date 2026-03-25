@@ -14,9 +14,6 @@ try:
 except ImportError:
     _NOMORE_AVAILABLE = False
 
-if TYPE_CHECKING:
-    from nomore_ase.core.frequency_partition import FrequencyPartitionStrategy
-
 from mbe_automation.dynamics.harmonic.modes import (
     PhononFilter,
 )
@@ -55,7 +52,7 @@ class GammaPointGruneisenModel:
         temperature_K: float,
         polynomial_degree: Literal[0, 1, 2] = 1,
         freq_min_THz: float = 1e-3,
-        band_selection_strategy: "FrequencyPartitionStrategy | None" = None,
+        n_refined: int | None = None,
         external_freqs_THz: npt.NDArray[np.float64] | None = None,
         symmetry_tolerance: float | None = None,
     ) -> GammaPointGruneisenModel:
@@ -73,7 +70,7 @@ class GammaPointGruneisenModel:
             temperature_K: Temperature in Kelvin used for ADPs and refinement.
             polynomial_degree: Degree of the polynomial fit for gamma(V).
             freq_min_THz: Frequency threshold. Bands below this are not scaled.
-            band_selection_strategy: Frequency partitioning strategy for refinement.
+            n_refined: Number of lowest-frequency groups to optimize individually.
             symmetry_tolerance: Tolerance for considering modes as mixing under transformation.
             
         Returns:
@@ -85,19 +82,12 @@ class GammaPointGruneisenModel:
                 "Install it in your environment to use this functionality."
             )
 
-        from nomore_ase.core.frequency_partition import SensitivityBasedStrategy
         from mbe_automation.api.classes import ForceConstants
 
         phonon_filter = PhononFilter(
             freq_max_THz=None,
             k_point_mesh=mesh_size
         )
-
-        if band_selection_strategy is None:
-            band_selection_strategy = SensitivityBasedStrategy(
-                low_threshold=0.75,
-                high_threshold=0.90
-            )
 
         volumes = harmonic_properties.sampled_volumes
         dataset = harmonic_properties.dataset
@@ -126,7 +116,7 @@ class GammaPointGruneisenModel:
                 U_cart_ref=U_cart_ref,
                 temperature_K=temperature_K,
                 mesh_size="gamma",
-                band_selection_strategy=band_selection_strategy,
+                n_refined=n_refined,
                 symmetry_tolerance=symmetry_tolerance,
             )
             
