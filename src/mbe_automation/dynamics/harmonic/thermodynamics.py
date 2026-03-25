@@ -45,9 +45,7 @@ def run(
     temperatures_K: npt.NDArray[np.float64]
 ) -> pd.DataFrame:
     """
-    Calculate vibrational internal energy and entropy.
-
-    The calculation includes the zero-point energy.
+    Compute crystal vibrational thermodynamic functions.
     
     Args:
         freqs_THz: Phonon frequencies in THz.
@@ -61,10 +59,10 @@ def run(
     Returns:
         Pandas DataFrame with columns:
         - "T (K)"
-        - "E_vib (kJ∕mol∕unit cell)"
-        - "S_vib (J∕K∕mol∕unit cell)"
-        - "C_V_vib (J∕K∕mol∕unit cell)"
-        - "F_vib (kJ∕mol∕unit cell)"
+        - "E_vib_crystal (kJ∕mol∕unit cell)"
+        - "S_vib_crystal (J∕K∕mol∕unit cell)"
+        - "C_V_vib_crystal (J∕K∕mol∕unit cell)"
+        - "F_vib_crystal (kJ∕mol∕unit cell)"
     """
     freqs = np.array(freqs_THz, dtype=np.float64)
     weights = np.array(weights, dtype=np.float64)
@@ -138,10 +136,10 @@ def run(
 
     return pd.DataFrame({
         "T (K)": temps,
-        "E_vib (kJ∕mol∕unit cell)": internal_energy,
-        "S_vib (J∕K∕mol∕unit cell)": entropy,
-        "C_V_vib (J∕K∕mol∕unit cell)": heat_capacity,
-        "F_vib (kJ∕mol∕unit cell)": free_energy
+        "E_vib_crystal (kJ∕mol∕unit cell)": internal_energy,
+        "S_vib_crystal (J∕K∕mol∕unit cell)": entropy,
+        "C_V_vib_crystal (J∕K∕mol∕unit cell)": heat_capacity,
+        "F_vib_crystal (kJ∕mol∕unit cell)": free_energy
     })
 
 

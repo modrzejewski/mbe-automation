@@ -242,10 +242,10 @@ class GammaPointGruneisenModel:
         
         E_el_crystal = float(self.E_el_interpolation(volume))
         
-        F_vib_crystal = df_vib["F_vib (kJ∕mol∕unit cell)"].to_numpy()
-        S_vib_crystal = df_vib["S_vib (J∕K∕mol∕unit cell)"].to_numpy()
-        E_vib_crystal = df_vib["E_vib (kJ∕mol∕unit cell)"].to_numpy()
-        C_V_vib_crystal = df_vib["C_V_vib (J∕K∕mol∕unit cell)"].to_numpy()
+        F_vib_crystal = df_vib["F_vib_crystal (kJ∕mol∕unit cell)"].to_numpy()
+        S_vib_crystal = df_vib["S_vib_crystal (J∕K∕mol∕unit cell)"].to_numpy()
+        E_vib_crystal = df_vib["E_vib_crystal (kJ∕mol∕unit cell)"].to_numpy()
+        C_V_vib_crystal = df_vib["C_V_vib_crystal (J∕K∕mol∕unit cell)"].to_numpy()
         
         F_tot_crystal = E_el_crystal + F_vib_crystal
         E_tot_crystal = E_el_crystal + E_vib_crystal

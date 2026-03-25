@@ -1,0 +1,73 @@
+import numpy as np
+import pandas as pd
+from phonopy.physical_units import get_physical_units
+
+import mbe_automation.configs.refinement
+import mbe_automation.dynamics.harmonic.refinement_v2
+import mbe_automation.dynamics.harmonic.thermodynamics
+import mbe_automation.storage
+
+
+def run(config: mbe_automation.configs.refinement.NormalModeRefinement) -> pd.DataFrame:
+    """
+    Perform normal mode refinement and compute thermodynamic properties.
+
+    Args:
+        config: Configuration parameters for the refinement workflow.
+
+    Returns:
+        Pandas DataFrame with thermodynamic properties as a function of temperature.
+    """
+    # 1. Run the frequency refinement
+    refinement_result = mbe_automation.dynamics.harmonic.refinement_v2.run(
+        cif_path=config.cif_path,
+        calculator=config.calculator,
+        n_refined=config.n_refined
+    )
+
+    initial_freqs_cm1 = refinement_result["initial_frequencies"]
+    refined_freqs_cm1 = refinement_result["frequencies"]
+
+    # 2. Convert refined frequencies from cm⁻¹ to THz
+    units = get_physical_units()
+    cm1_to_thz = 1.0 / units.THzToCm
+    refined_freqs_thz = refined_freqs_cm1 * cm1_to_thz
+
+    gamma_point_frequencies = pd.DataFrame({
+        "ω_initial (cm⁻¹)": initial_freqs_cm1,
+        "ω_refined (cm⁻¹)": refined_freqs_cm1
+    })
+
+    # 3. Compute thermodynamic properties
+    # For a gamma-point calculation, the weight of the single q-point is 1.0.
+    # thermodynamics.run expects weights for each frequency or per q-point.
+    # Here we provide a weight of 1.0 for each mode.
+    weights = np.ones_like(refined_freqs_thz)
+
+    df_thermo = mbe_automation.dynamics.harmonic.thermodynamics.run(
+        freqs_THz=refined_freqs_thz,
+        weights=weights,
+        temperatures_K=config.temperatures_K
+    )
+
+    # 4. Save results
+    mbe_automation.storage.save_data_frame(
+        df=df_thermo,
+        dataset=config.dataset,
+        key=f"{config.root}/thermodynamics_nomore"
+    )
+
+    mbe_automation.storage.save_data_frame(
+        df=gamma_point_frequencies,
+        dataset=config.dataset,
+        key=f"{config.root}/gamma_point_frequencies"
+    )
+
+    if config.save_csv:
+        csv_path = config.work_dir / "thermodynamics_nomore.csv"
+        df_thermo.to_csv(csv_path, index=False)
+
+        freq_csv_path = config.work_dir / "gamma_point_frequencies.csv"
+        gamma_point_frequencies.to_csv(freq_csv_path, index=False)
+
+    return df_thermo

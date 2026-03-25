@@ -35,3 +35,5 @@ from .api import (
     EOSMetadata,
     run,
 )
+
+read = AnySystem.read

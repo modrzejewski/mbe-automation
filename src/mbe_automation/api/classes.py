@@ -1871,10 +1871,11 @@ class AnySystem:
         "FiniteSubsystem": FiniteSubsystem,
         "MolecularCrystal": MolecularCrystal,
         "ForceConstants": ForceConstants,
+        "AtomicReference": AtomicReference,
     }
 
     @staticmethod
-    def read(dataset: str, key: str) -> Structure | Trajectory | FiniteSubsystem | MolecularCrystal | ForceConstants:
+    def read(dataset: str, key: str) -> Structure | Trajectory | FiniteSubsystem | MolecularCrystal | ForceConstants | AtomicReference:
         """
         Reads the object at the given key, automatically determining its type.
         """
