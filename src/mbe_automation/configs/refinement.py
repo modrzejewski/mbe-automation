@@ -42,7 +42,7 @@ class NormalModeRefinement:
     #
     # Root location in the dataset hierarchical structure.
     #
-    root: str = "quasi_harmonic"
+    root_key: str = "quasi_harmonic"
     #
     # Whether to save the resulting thermodynamic properties
     # to a CSV file.
