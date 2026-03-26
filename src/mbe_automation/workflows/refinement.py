@@ -1,4 +1,4 @@
-import numpy as np
+
 import pandas as pd
 from phonopy.physical_units import get_physical_units
 
@@ -40,14 +40,8 @@ def run(
         "ω_refined (cm⁻¹)": refined_freqs_cm1
     })
 
-    # For a gamma-point calculation, the weight of the single q-point is 1.0.
-    # thermodynamics.run expects weights for each frequency or per q-point.
-    # Here we provide a weight of 1.0 for each mode.
-    weights = np.ones_like(refined_freqs_thz)
-
     df_thermo = mbe_automation.dynamics.harmonic.thermodynamics.run(
         freqs_THz=refined_freqs_thz,
-        weights=weights,
         temperatures_K=config.temperatures_K
     )
 

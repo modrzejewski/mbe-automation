@@ -41,20 +41,22 @@ class ThermalExpansionProperties:
 
 def run(
     freqs_THz: npt.NDArray[np.float64],
-    weights: npt.NDArray[np.float64],
-    temperatures_K: npt.NDArray[np.float64]
+    temperatures_K: npt.NDArray[np.float64],
+    weights: npt.NDArray[np.float64] | None = None,
 ) -> pd.DataFrame:
     """
     Compute crystal vibrational thermodynamic functions.
     
     Args:
         freqs_THz: Phonon frequencies in THz.
-            Shape: (n_qpoints, n_bands) or (n_frequencies,)
-        weights: Geometric weights of q-points.
-            Shape: (n_qpoints,) or same shape as freqs_THz if flattened.
-            If freqs_THz is (n_qpoints, n_bands), weights should be (n_qpoints,).
+            Shape: (n_qpoints, n_bands) when weights are provided.
+            Shape: (n_modes,) when weights=None (gamma-point calculation).
         temperatures_K: Temperatures in Kelvin.
             Shape: (n_temperatures,)
+        weights: Geometric weights of q-points.
+            Shape: (n_qpoints,).
+            If None, a single gamma-point calculation is assumed
+            and freqs_THz must be 1D (n_modes,).
 
     Returns:
         Pandas DataFrame with columns:
@@ -65,21 +67,35 @@ def run(
         - "F_vib_crystal (kJ∕mol∕unit cell)"
     """
     freqs = np.array(freqs_THz, dtype=np.float64)
-    weights = np.array(weights, dtype=np.float64)
     temps = np.array(temperatures_K, dtype=np.float64)
 
-    # Check for shape mismatch in 1D case
-    if freqs.ndim == 1 and weights.ndim == 1 and freqs.shape[0] != weights.shape[0]:
-        raise ValueError(f"Shape mismatch: freqs {freqs.shape}, weights {weights.shape}")
-
-    if freqs.ndim == 2 and weights.ndim == 1:
-        # Standard case: freqs (n_q, n_bands), weights (n_q,)
-        total_weight = np.sum(weights)
-        weights_expanded = np.broadcast_to(weights[:, None], freqs.shape)
+    if weights is None:
+        assert freqs.ndim == 1, (
+            f"When weights=None (gamma-point), freqs_THz must be 1D (N_modes,), "
+            f"got shape {freqs.shape}"
+        )
+        weights_arr = np.array([1.0])
+        freqs = freqs.reshape(1, -1)
     else:
-        # Fallback: assume weights are per-element or already broadcasted
-        total_weight = np.sum(weights)
-        weights_expanded = weights
+        weights_arr = np.array(weights, dtype=np.float64)
+
+    assert freqs.ndim == 2, (
+        f"freqs_THz must be 2D (n_qpoints, n_bands), got shape {freqs.shape}"
+    )
+    assert weights_arr.ndim == 1, (
+        f"weights must be 1D (n_qpoints,), got shape {weights_arr.shape}"
+    )
+    assert freqs.shape[0] == weights_arr.shape[0], (
+        f"Shape mismatch: freqs has {freqs.shape[0]} q-points "
+        f"but weights has {weights_arr.shape[0]} entries"
+    )
+    assert temps.ndim == 1, (
+        f"temperatures_K must be 1D (n_temperatures,), got shape {temps.shape}"
+    )
+
+    total_weight = np.sum(weights_arr)
+    # (n_qpoints,) -> (n_qpoints, 1) -> broadcast to (n_qpoints, n_bands)
+    weights_expanded = np.broadcast_to(weights_arr[:, None], freqs.shape)
 
     # Constants
     units = get_physical_units()
