@@ -9,38 +9,6 @@
 # `mbe-automation`
 
 Automate the modeling of thermodynamic properties in organic molecular crystals using machine-learning interatomic potentials (MLIPs). 
-The general computational scheme facilitated by this program involves the following steps:
-
-```
-+-------------------------------------------------------------+
-| Generate training set configurations for a periodic system  |
-| using a baseline MLIP (e.g., MACE).                         |
-+--------------------------+----------------------------------+
-                           |
-                           v
-+--------------------------+----------------------------------+
-| Extract finite subsystems composed of one or more molecules.|
-+--------------------------+----------------------------------+
-                           |
-                           v
-+--------------------------+----------------------------------+
-| Use these finite subsystems to generate high-accuracy data  |
-| points using quantum chemical wave function methods.        |
-+--------------------------+----------------------------------+
-                           |
-                           v
-+--------------------------+----------------------------------+
-| Perform training of a delta-learning layer on top of the    |
-| baseline model.                                             |
-+--------------------------+----------------------------------+
-                           |
-                           v
-+--------------------------+----------------------------------+
-| Carry out the final calculation (e.g., quasi-harmonic       |
-| thermodynamics or molecular dynamics) using the newly       |
-| trained model.                                              |
-+-------------------------------------------------------------+
-```
 
 The program integrates several scientific codes into a unified workflow, including:
 

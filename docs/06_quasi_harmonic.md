@@ -4,7 +4,6 @@
 - [Phonon calculation](#phonon-calculation)
 - [Empirical Electronic Energy Correction (EEC)](#empirical-electronic-energy-correction-eec)
 - [Adjustable parameters](#adjustable-parameters)
-- [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [How to read the results](#how-to-read-the-results)
 - [Complete Input Files](#complete-input-files)
@@ -135,64 +134,6 @@ Detailed descriptions of the configuration classes can be found in the [Configur
 *   **[`FreeEnergy`](./03_configuration_classes.md#freeenergy-class)**: Main configuration for the quasi-harmonic workflow.
 *   **[`Minimum`](./03_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
 *   **[`EEC`](./03_configuration_classes.md#eec-class)**: Configuration for the Empirical Electronic Energy Correction (EEC).
-
-## Function Call Overview
-
-```
-+----------------------------------------+
-|            mbe_automation              |
-|                 run                    |
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|      workflows.quasi_harmonic          |
-|                 run                    |
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|           structure.clusters           |   Extracts and relaxes unique
-|    extract_relaxed_unique_molecules    |   molecules from the crystal.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|           structure.relax              |   Relaxes the geometry of the
-|    isolated_molecule (optional)        |   isolated gas-phase molecule.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|         dynamics.harmonic.core         |   Computes the vibrational
-|          molecular_vibrations          |   frequencies of the molecule.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|           structure.relax              |   Relaxes the crystal structure
-|                crystal                 |   to find the equilibrium volume.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|          structure.crystal             |   Determines the supercell matrix
-|            supercell_matrix            |   for phonon calculations.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|         dynamics.harmonic.core         |   Computes phonon frequencies and
-|                phonons                 |   thermodynamic properties.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|         dynamics.harmonic.core         |   Determines the equilibrium volume
-|           equilibrium_curve            |   at each temperature.
-+----------------------------------------+
-
-```
 
 ## Computational Bottlenecks
 
