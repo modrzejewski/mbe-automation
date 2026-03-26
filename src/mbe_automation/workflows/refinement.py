@@ -33,7 +33,7 @@ def run(config: mbe_automation.configs.refinement.NormalModeRefinement) -> pd.Da
     cm1_to_thz = 1.0 / units.THzToCm
     refined_freqs_thz = refined_freqs_cm1 * cm1_to_thz
 
-    gamma_point_frequencies = pd.DataFrame({
+    frequencies_at_Γ = pd.DataFrame({
         "ω_initial (cm⁻¹)": initial_freqs_cm1,
         "ω_refined (cm⁻¹)": refined_freqs_cm1
     })
@@ -58,16 +58,16 @@ def run(config: mbe_automation.configs.refinement.NormalModeRefinement) -> pd.Da
     )
 
     mbe_automation.storage.save_data_frame(
-        df=gamma_point_frequencies,
+        df=frequencies_at_Γ,
         dataset=config.dataset,
-        key=f"{config.root}/gamma_point_frequencies"
+        key=f"{config.root}/frequencies_at_Γ"
     )
 
     if config.save_csv:
         csv_path = config.work_dir / "thermodynamics_nomore.csv"
         df_thermo.to_csv(csv_path, index=False)
 
-        freq_csv_path = config.work_dir / "gamma_point_frequencies.csv"
-        gamma_point_frequencies.to_csv(freq_csv_path, index=False)
+        freq_csv_path = config.work_dir / "frequencies_at_Γ.csv"
+        frequencies_at_Γ.to_csv(freq_csv_path, index=False)
 
     return df_thermo
