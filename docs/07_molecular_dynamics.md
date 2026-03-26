@@ -3,7 +3,6 @@
 - [Setup](#setup)
 - [NPT/NVT Propagation](#nptnvt-propagation)
 - [Adjustable parameters](#adjustable-parameters)
-- [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
 
@@ -68,58 +67,6 @@ Detailed descriptions of the configuration classes can be found in the [Configur
 
 *   **[`Enthalpy`](./03_configuration_classes.md#enthalpy-class)**: Main configuration for the molecular dynamics workflow.
 *   **[`ClassicalMD`](./03_configuration_classes.md#classicalmd-class)**: Configuration for the MD simulation parameters.
-
-## Function Call Overview
-
-```
-+--------------------------------------+
-|           mbe_automation             |
-|                run                   |
-+--------------------------------------+
-                   |
-                   |
-+--------------------------------------+
-|             workflows.md             |
-|                 run                  |
-+--------------------------------------+
-                   |
-                   |
-+--------------------------------------+
-|           dynamics.md.core           |   Runs a molecular dynamics
-|             run (molecule)           |   simulation for the isolated molecule.
-+--------------------------------------+
-                   |
-                   |
-+--------------------------------------+
-|           dynamics.md.data           |   Processes the molecule's trajectory
-|               molecule               |   to extract thermodynamic properties.
-+--------------------------------------+
-                   |
-                   |
-+--------------------------------------+
-|         structure.crystal            |   Determines the supercell matrix
-|            supercell_matrix          |   for the crystal simulation.
-+--------------------------------------+
-                   |
-                   |
-+--------------------------------------+
-|           dynamics.md.core           |   Runs a molecular dynamics
-|             run (crystal)            |   simulation for the crystal supercell.
-+--------------------------------------+
-                   |
-                   |
-+--------------------------------------+
-|           dynamics.md.data           |   Processes the crystal's trajectory
-|                crystal               |   to extract thermodynamic properties.
-+--------------------------------------+
-                   |
-                   |
-+--------------------------------------+
-|           dynamics.md.data           |   Calculates the sublimation enthalpy
-|              sublimation             |   from the molecule and crystal data.
-+--------------------------------------+
-
-```
 
 ## Computational Bottlenecks
 

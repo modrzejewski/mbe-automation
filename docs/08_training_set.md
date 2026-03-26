@@ -14,7 +14,6 @@
   - [`PhononFilter`](#phononfilter-class)
 - [Subsampling](#subsampling)
 - [Updates to and Existing Dataset](#updates-to-an-existing-dataset)
-- [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
 
@@ -211,76 +210,6 @@ traj.save(
     dataset="training_set.hdf5",
     key="training/md_sampling/trajectories/crystal[dyn:T=298.15,p=0.00010]",
 )
-```
-
-## Function Call Overview
-
-### MD Sampling
-
-```
-+------------------------------------+
-|          mbe_automation            |
-|               run                  |
-+------------------------------------+
-                    |
-                    |
-+------------------------------------+
-|         workflows.training         |
-|            md_sampling             |
-+------------------------------------+
-                    |
-                    |
-+------------------------------------+
-|          dynamics.md.core          |   Runs a molecular dynamics
-|                run                 |   simulation.
-+------------------------------------+
-                    |
-                    |
-+------------------------------------+
-|         structure.clusters         |   Identifies molecules within
-|           detect_molecules         |   the crystal structure.
-+------------------------------------+
-                    |
-                    |
-+------------------------------------+
-|         structure.clusters         |   Extracts finite molecular clusters
-|      extract_finite_subsystem      |   from the periodic trajectory.
-+------------------------------------+
-
-```
-
-### Phonon Sampling
-
-```
-+------------------------------------+
-|          mbe_automation            |
-|               run                  |
-+------------------------------------+
-                    |
-                    |
-+------------------------------------+
-|         workflows.training         |
-|          phonon_sampling           |
-+------------------------------------+
-                    |
-                    |
-+------------------------------------+
-|      dynamics.harmonic.modes       |   Generates a trajectory by
-|             trajectory             |   sampling from phonon modes.
-+------------------------------------+
-                    |
-                    |
-+------------------------------------+
-|         structure.clusters         |   Identifies molecules within
-|           detect_molecules         |   the crystal structure.
-+------------------------------------+
-                    |
-                    |
-+------------------------------------+
-|         structure.clusters         |   Extracts finite molecular clusters
-|      extract_finite_subsystem      |   from the periodic trajectory.
-+------------------------------------+
-
 ```
 
 ## Computational Bottlenecks
