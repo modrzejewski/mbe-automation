@@ -5,6 +5,7 @@ import platform
 import getpass
 import time
 import math
+from pathlib import Path
 
 import numpy as np
 
@@ -169,6 +170,41 @@ def framed(text: str | list[str], padding: int = 10, min_width: int = 30) -> Non
     
     # Print bottom border
     print("└" + horizontal_line + "┘", flush=True)
+
+
+def shorten_path(path: str | Path, max_length: int = 60) -> str:
+    """
+    Shorten a filesystem path for display by keeping full segment names from the right.
+    
+    Example: /very/long/path/to/file.xyz -> .../path/to/file.xyz
+    """
+    p = Path(path).resolve()
+    parts = p.parts
+    if not parts:
+        return str(p)
+        
+    full_path_str = str(p)
+    if len(full_path_str) <= max_length:
+        return full_path_str
+
+    # Start with the filename (last part)
+    res_parts = [parts[-1]]
+    # Initial length includes ".../" prefix
+    current_length = len(parts[-1]) + 4 
+    
+    # Add parents from right to left as long as they fit
+    # skip root parts[0] for Linux absolute paths
+    start_idx = 1 if parts[0] == "/" else 0
+    
+    for i in range(len(parts) - 2, start_idx - 1, -1):
+        part = parts[i]
+        if current_length + len(part) + 1 <= max_length:
+            res_parts.insert(0, part)
+            current_length += len(part) + 1
+        else:
+            break
+            
+    return ".../" + "/".join(res_parts)
 
 
 def mace_summary(calculator: MACECalculator) -> None:
