@@ -25,6 +25,11 @@ class NormalModeRefinement:
     #
     n_refined: int | None = None
     #
+    # Threshold for maximum residual force after geometry 
+    # relaxation during refinement (eV/Angs).
+    #
+    max_force_on_atom_eV_A: float = 1.0E-4
+    #
     # Range of temperatures (K) at which phonons
     # and thermodynamic properties are computed.
     #

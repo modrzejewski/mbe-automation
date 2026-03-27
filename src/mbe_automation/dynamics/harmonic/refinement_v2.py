@@ -84,7 +84,12 @@ def _print_comparison(initial_freqs, refined_freqs):
             print("-" * 50)
 
 
-def run(cif_path: str, calculator, n_refined: int | None = None):
+def run(
+    cif_path: str,
+    calculator,
+    n_refined: int | None = None,
+    max_force_on_atom_eV_A: float | None = None
+):
     """
     Compute refined gamma-point phonon frequencies using NoMoRe against
     experimental ADPs (ADP-only fit, no crystallographic Chi²).
@@ -100,7 +105,9 @@ def run(cif_path: str, calculator, n_refined: int | None = None):
         dict with 'frequencies' (refined, cm⁻¹), 'u_calc', and full fit_to_adps result.
     """
     if n_refined is None:
-        n_refined = 3
+        n_refined = 6
+    if max_force_on_atom_eV_A is None:
+        max_force_on_atom_eV_A = 1.0E-4
     # ------------------------------------------------------------------
     # 1. Load CIF via CCTBX – expand ASU to P1 to get all atoms
     # ------------------------------------------------------------------
@@ -128,7 +135,7 @@ def run(cif_path: str, calculator, n_refined: int | None = None):
     sym_phonons = sym_ph_mod.SymmetricPhonons(
         atoms, calculator, supercell=(1, 1, 1)
     )
-    sym_phonons.optimize_geometry(fmax=1.0E-4)
+    sym_phonons.optimize_geometry(fmax=max_force_on_atom_eV_A)
     sym_phonons.run()
 
     # ------------------------------------------------------------------
