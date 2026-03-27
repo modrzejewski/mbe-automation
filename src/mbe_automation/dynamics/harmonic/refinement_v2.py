@@ -1,14 +1,20 @@
+from __future__ import annotations
 import numpy as np
 from ase import Atoms
 
-import nomore_ase.core.symmetric_phonons as sym_ph_mod
-import nomore_ase.core.ase_adapter as ase_adapter_mod
-import nomore_ase.core.calculator as calc_mod
-import nomore_ase.optimization.engine as engine_mod
-import nomore_ase.crystallography.cctbx_adapter as cctbx_mod
-from nomore_ase.analysis.validation import extract_adps_from_structure
+try:
+    import nomore_ase.core.symmetric_phonons as sym_ph_mod
+    import nomore_ase.core.ase_adapter as ase_adapter_mod
+    import nomore_ase.core.calculator as calc_mod
+    import nomore_ase.optimization.engine as engine_mod
+    import nomore_ase.crystallography.cctbx_adapter as cctbx_mod
+    from nomore_ase.analysis.validation import extract_adps_from_structure
+    _NOMORE_AVAILABLE = True
+except ImportError:
+    _NOMORE_AVAILABLE = False
 
-def _cctbx_to_ase_atoms(adapter: cctbx_mod.CctbxAdapter) -> Atoms:
+
+def _cctbx_to_ase_atoms(adapter: "cctbx_mod.CctbxAdapter") -> Atoms:
     """
     Build a P1 ASE Atoms from a CctbxAdapter by expanding the ASU.
 
@@ -104,6 +110,12 @@ def run(
     Returns:
         dict with 'frequencies' (refined, cm⁻¹), 'u_calc', and full fit_to_adps result.
     """
+    if not _NOMORE_AVAILABLE:
+        raise ImportError(
+            "The `run` function requires the `nomore_ase` package. "
+            "Install it in your environment to use this functionality."
+        )
+
     if n_refined is None:
         n_refined = 6
     if max_force_on_atom_eV_A is None:

@@ -8,9 +8,10 @@ from . import brillouin_zone
 from . import thermodynamics
 
 try:
-    import cctbx
     import nomore_ase
     from . import refinement
+    from . import refinement_v2
     from . import bands
+    _NOMORE_AVAILABLE = True
 except ImportError:
-    pass
+    _NOMORE_AVAILABLE = False

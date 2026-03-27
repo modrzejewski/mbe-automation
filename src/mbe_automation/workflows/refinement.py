@@ -1,8 +1,9 @@
-
+from __future__ import annotations
 import pandas as pd
 from phonopy.physical_units import get_physical_units
 
 import mbe_automation.configs.refinement
+from mbe_automation.dynamics.harmonic.refinement_v2 import _NOMORE_AVAILABLE
 import mbe_automation.dynamics.harmonic.refinement_v2
 import mbe_automation.dynamics.harmonic.thermodynamics
 import mbe_automation.storage
@@ -20,6 +21,12 @@ def run(
     Returns:
         Pandas DataFrame with thermodynamic properties as a function of temperature.
     """
+    if not _NOMORE_AVAILABLE:
+        raise ImportError(
+            "The `refinement.run` workflow requires the `nomore_ase` package. "
+            "Install it in your environment to use this functionality."
+        )
+
     config.work_dir.mkdir(parents=True, exist_ok=True)
 
     refinement_result = mbe_automation.dynamics.harmonic.refinement_v2.run(
