@@ -1,5 +1,14 @@
 # Installation
 
+The program integrates several scientific codes into a unified workflow, including:
+
+*   **MACE:** Primary MLIP model for energies and forces.
+*   **phonopy:** Phonon calculations and vibrational properties.
+*   **pymatgen:** Crystal structure analysis and manipulation.
+*   **ASE:** Geometry relaxation and molecular dynamics simulations.
+*   **PySCF** and **GPU4PySCF:** Mean-field electronic structure calculations.
+*   **MRCC** and **beyond-rpa**: High-fidelity data points from correlated wave-function theory.
+
 - [Create a Virtual Environment](#1-create-a-virtual-environment)
 - [Clone the Repository](#2-clone-the-repository)
 - [Install the Program](#3-install-the-program)
