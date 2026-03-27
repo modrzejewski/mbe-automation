@@ -8,7 +8,7 @@
 
 # `mbe-automation`
 
-Library for automated workflows computing thermodynamic properties from machine-learning interatomic potentials (MLIPs), highly specialized for organic molecular crystals.
+Library for high-level automation of thermodynamics modeling with machine-learning interatomic potentials (MLIPs), highly specialized for organic molecular crystals.
 
 ## Setup & Installation
 
