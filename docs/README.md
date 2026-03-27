@@ -8,7 +8,9 @@
 
 # `mbe-automation`
 
-Automate the modeling of thermodynamic properties in organic molecular crystals using machine-learning interatomic potentials (MLIPs). 
+This framework automates the modeling of thermodynamic properties in organic molecular crystals using machine-learning interatomic potentials (MLIPs).
+
+## Setup & Installation
 
 The program integrates several scientific codes into a unified workflow, including:
 
@@ -19,13 +21,9 @@ The program integrates several scientific codes into a unified workflow, includi
 *   **PySCF** and **GPU4PySCF:** Mean-field electronic structure calculations.
 *   **MRCC** and **beyond-rpa**: High-fidelity data points from correlated wave-function theory.
 
-## Table of Contents
-
-### Setup
-
 *   [Installation Guide](./00_installation.md)
 
-### Basics
+## Basics
 
 *   [API Data Classes](./01_api_classes.md)
 *   [Calculators](./02_calculators.md)
@@ -33,13 +31,13 @@ The program integrates several scientific codes into a unified workflow, includi
 *   [Working with HDF5 Datasets](./04_working_with_hdf5_datasets.md)
 *   [Computational Bottlenecks](./05_bottlenecks.md)
 
-### Workflows
+## Workflows
 
 *   [Quasi-Harmonic Calculation](./06_quasi_harmonic.md)
 *   [Molecular Dynamics](./07_molecular_dynamics.md)
 *   [MD sampling and phonon sampling](./08_training_set.md)
 
-### Cookbooks
+## Cookbooks
 
 *   [Extracting frequencies and eigenvectors of the dynamical matrix](./09_cookbook_frequencies_eigenvectors.md)
 *   [Training Set from MACE MD + r2SCAN Energies & Forces](./10_cookbook_mace_md_dftb_energies.md)
