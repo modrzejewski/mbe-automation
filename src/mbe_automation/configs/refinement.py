@@ -25,6 +25,11 @@ class NormalModeRefinement:
     #
     n_refined: int | None = None
     #
+    # Temperature at which the experimental data (e.g. ADPs) were collected.
+    # If None, the temperature will be read from the CIF file.
+    #
+    reference_temperature_K: float | None = None
+    #
     # Threshold for maximum residual force after geometry 
     # relaxation during refinement (eV/Angs).
     #

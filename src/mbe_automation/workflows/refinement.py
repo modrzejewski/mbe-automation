@@ -33,7 +33,8 @@ def run(
         cif_path=config.cif_path,
         calculator=config.calculator,
         n_refined=config.n_refined,
-        max_force_on_atom_eV_A=config.max_force_on_atom_eV_A
+        max_force_on_atom_eV_A=config.max_force_on_atom_eV_A,
+        reference_temperature_K=config.reference_temperature_K
     )
 
     initial_freqs_cm1 = refinement_result["initial_frequencies"]

@@ -94,7 +94,8 @@ def run(
     cif_path: str,
     calculator,
     n_refined: int | None = None,
-    max_force_on_atom_eV_A: float | None = None
+    max_force_on_atom_eV_A: float | None = None,
+    reference_temperature_K: float | None = None
 ):
     """
     Compute refined gamma-point phonon frequencies using NoMoRe against
@@ -106,6 +107,9 @@ def run(
         calculator: ASE-compatible force calculator.
         n_refined:  Number of lowest-frequency groups to optimize individually.
                     Frequencies above this threshold remain fixed.
+        max_force_on_atom_eV_A: Threshold for maximum residual force.
+        reference_temperature_K: Temperature in K to use for refinement.
+                                 If None, the temperature is read from the CIF.
 
     Returns:
         dict with 'frequencies' (refined, cm⁻¹), 'u_calc', and full fit_to_adps result.
@@ -130,7 +134,18 @@ def run(
     # explicitly expand to P1 here to get u_exp consistent with atoms.
     p1 = adapter.xray_structure.expand_to_p1(sites_mod_positive=True)
     u_exp_all = extract_adps_from_structure(p1)   # (N_atoms_p1, 3, 3) Å²
-    temp   = adapter.get_temperature()         # K
+    
+    # Priority: reference_temperature_K > CIF temperature
+    if reference_temperature_K is not None:
+        temp = reference_temperature_K
+    else:
+        temp = adapter.get_temperature()         # K
+
+    if temp is None:
+        raise ValueError(
+            f"Temperature not found in CIF '{cif_path}' and "
+            "no `reference_temperature_K` provided."
+        )
 
     elements = [sc.element_symbol() for sc in p1.scatterers()]
     non_h_mask = np.array([el.upper() != 'H' for el in elements])
