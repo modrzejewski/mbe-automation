@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import os
+import time
 import ase.thermochemistry
 import ase.units
 import pandas as pd
@@ -81,8 +82,8 @@ def detect_imaginary_modes(
     
 def generate_fbz_path(
         phonons,
-        n_points=101,
-        band_connection=True
+        n_points=70,
+        band_connection=False
 ):
     """
     Determine the high-symmetry path through
@@ -90,12 +91,14 @@ def generate_fbz_path(
     library.
 
     """
-    
+    import time
+    t0 = time.time()
     bands, labels, path_connections = get_band_qpoints_by_seekpath(
         phonons.primitive,
         n_points,
         is_const_interval=True
     )
+    print(f"Symmetry k-path generated ({len(labels)} high-symmetry points)", flush=True)
     #
     # Compute frequencies along the high-symmetry path.
     # The computation of eigenvectors is disabled
@@ -105,6 +108,7 @@ def generate_fbz_path(
     # path in the k space, but the resulting dispersion
     # curves were often misaligned.
     #
+    print(f"Calculating band structure...", end="", flush=True)
     phonons.run_band_structure(
         bands,
         with_eigenvectors=False,
@@ -113,6 +117,7 @@ def generate_fbz_path(
         path_connections=path_connections,
         labels=labels
     )
+    print(f" done (Δt={time.time() - t0:.1f} s)", flush=True)
         
 
 def molecule(
@@ -267,7 +272,13 @@ def crystal(
     assert n_atoms_unit_cell == structure.n_atoms
     assert n_atoms_primitive_cell == structure.n_atoms
     
+    n_qpoints = len(phonons.mesh.qpoints) if phonons.mesh is not None else 0
+    print(f"Processing harmonic crystal data ({n_atoms_primitive_cell} atoms, {3*n_atoms_primitive_cell} bands)...", flush=True)
+    
+    t0 = time.time()
+    print(f"Computing thermal properties on {n_qpoints} q-points...", end="", flush=True)
     phonons.run_thermal_properties(temperatures=temperatures)
+    print(f" done (Δt={time.time() - t0:.1f} s)", flush=True)
     #
     # Phonopy units:
     # F_vib_crystal     kJ/mol/unit cell
@@ -285,7 +296,10 @@ def crystal(
     cell_length_a, cell_length_b, cell_length_c = lattice.lengths # Å
     cell_angle_alpha, cell_angle_beta, cell_angle_gamma = lattice.angles # deg
     
+    t0 = time.time()
+    print(f"Analyzing symmetry of the cell...", end="", flush=True)
     n_atoms_conv_cell, conv_lattice, _ = mbe_automation.structure.crystal.conventional_cell_params(unit_cell)
+    print(f" done (Δt={time.time() - t0:.1f} s)", flush=True)
     conv_cell_length_a, conv_cell_length_b, conv_cell_length_c = conv_lattice.abc
     conv_cell_angle_alpha, conv_cell_angle_beta, conv_cell_angle_gamma = conv_lattice.angles
     V_conv = conv_lattice.volume # Å³
@@ -310,6 +324,9 @@ def crystal(
         phonons,
         imaginary_mode_threshold
     )
+    
+    t0 = time.time()
+    print(f"Saving phonon data to HDF5...", end="", flush=True)
     mbe_automation.storage.save_force_constants(
         dataset=dataset,
         key=f"{root_key}/phonons/force_constants/{system_label}",
@@ -330,6 +347,7 @@ def crystal(
         dataset=dataset,
         key=f"{root_key}/structures/{system_label}"
     )
+    print(f" done (Δt={time.time() - t0:.1f} s)", flush=True)
     interp_mesh = phonons.mesh.mesh_numbers
     
     df = pd.DataFrame({

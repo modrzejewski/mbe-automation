@@ -10,26 +10,20 @@ import numpy.typing as npt
 from typing import Any, Optional, Literal, List
 import phonopy.physical_units
 import mbe_automation.dynamics.harmonic.modes
-from scipy.spatial.distance import cdist
 import mbe_automation.common.display
 from mbe_automation.dynamics.harmonic.display import print_frequency_comparison, print_adps_comparison
 from phonopy.structure.atoms import symbol_map
 
 try:
-    import cctbx
+    import cctbx  # noqa: F401
     from nomore_ase.crystallography.cctbx_adapter import CctbxAdapter
     from nomore_ase.crystallography.smtbx_adapter import SmtbxAdapter
     from nomore_ase.core.calculator import NoMoReCalculator
     from nomore_ase.core.phonon_data import PhononData
     from nomore_ase.optimization.engine import RefinementEngine
-    from nomore_ase.core.frequency_partition import (
-        create_pre_groups,
-        FrequencyPartitionStrategy,
-        SensitivityBasedStrategy
-    )
-    from nomore_ase.optimization.restraints import BayesianFrequencyRestraint
     from nomore_ase.analysis.validation import extract_adps_from_structure
     from nomore_ase.analysis.s12_similarity import calculate_s12_per_atom
+    from nomore_ase.utils.geometry import build_atom_mapping_periodic
 
     from mbe_automation.dynamics.harmonic.bands import (
         track_from_gamma,
@@ -42,70 +36,39 @@ try:
 except ImportError:
     _NOMORE_AVAILABLE = False
     from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING, DEFAULT_DEGENERATE_FREQS_TOL
-    class FrequencyPartitionStrategy:
-        pass
 
 
-@dataclass
-class LowestNBands(FrequencyPartitionStrategy):
+def _select_refined_freqs(phonon_data: Any, n_refined: int) -> Any:
     """
-    Partition modes by assigning independent scaling factors to the lowest n bands.
-
-    Fix all higher bands.
+    Build refinement groups using FixedThresholdStrategy, determining the
+    high_limit frequency so that modes beyond the n_refined lowest-frequency 
+    groups are strictly fixed rather than falling into a shared MFSF (MEDIUM) tier.
     """
-    n: int
+    from nomore_ase.core.frequency_partition import (
+        FixedThresholdStrategy, create_pre_groups
+    )
+    pre_groups = create_pre_groups(phonon_data)
+    
+    if pre_groups is None:
+        # If no degeneracy or band grouping is needed, every mode is its own group.
+        pre_groups = [[i] for i in range(len(phonon_data.frequencies_cm1))]
 
-    def compute_groups(
-        self,
-        phonon_data: Any,
-        pre_groups: Optional[List[List[int]]] = None
-    ) -> Any:
-        from nomore_ase.core.frequency_partition import RefinementGroups
+    if n_refined >= len(pre_groups):
+        high_limit_val = np.inf
+    else:
+        # Sort by mean group frequency (like FixedThresholdStrategy does internally)
+        group_means = [(np.mean(phonon_data.frequencies_cm1[g]), g) for g in pre_groups]
+        group_means.sort(key=lambda x: x[0])
+        
+        remaining_groups = group_means[n_refined:]
+        min_remaining_freq = min(np.min(phonon_data.frequencies_cm1[g]) for _, g in remaining_groups)
+        high_limit_val = min_remaining_freq - 1e-4
 
-        band_indices = phonon_data.band_indices
-        n_modes = len(band_indices)
-        group_ids = np.full(n_modes, -1, dtype=int)
-        metadata = {}
-
-        if pre_groups is None:
-            # Fallback to individual band IDs if no pre_groups
-            mask = (band_indices >= 0) & (band_indices < self.n)
-            group_ids[mask] = band_indices[mask]
-            
-            metadata[-1] = {"type": "fixed", "n_modes": int(np.sum(group_ids == -1))}
-            for b in range(self.n):
-                metadata[b] = {
-                    "type": "band",
-                    "band_index": b,
-                    "n_modes": int(np.sum(band_indices == b))
-                }
-        else:
-            # Assign single group ID to each pre_group that falls within the lowest n bands
-            next_group_id = 0
-            for pre_group in pre_groups:
-                # Get the bands corresponding to these modes
-                bands_in_group = band_indices[pre_group]
-                # A pre_group is considered 'active' if any of its modes belongs to a band < n
-                # (typically all modes in a degeneracy group belong to the same band, or set of degenerate bands)
-                if np.any((bands_in_group >= 0) & (bands_in_group < self.n)):
-                    group_ids[pre_group] = next_group_id
-                    
-                    band_idx = int(bands_in_group[0]) if len(bands_in_group) > 0 else -1
-                    metadata[next_group_id] = {
-                        "type": "degenerate_band",
-                        "band_index": band_idx,
-                        "n_modes": len(pre_group)
-                    }
-                    next_group_id += 1
-                else:
-                    group_ids[pre_group] = -1
-
-            metadata[-1] = {"type": "fixed", "n_modes": int(np.sum(group_ids == -1))}
-
-        return RefinementGroups(
-            group_ids=group_ids,
-            group_metadata=metadata
-        )
+    strategy = FixedThresholdStrategy(
+        n_refined=n_refined,
+        high_limit=max(0.0, high_limit_val)
+    )
+    return strategy.compute_groups(phonon_data, pre_groups)
 
 
 @dataclass
@@ -286,8 +249,6 @@ def to_phonon_data(
         final_symbols = ph.primitive.symbols
         final_masses = ph.primitive.masses
 
-    flat_weights = np.repeat(q_weights, n_modes_total)
-
     print(f"Computing band assignment for {len(irr_q_frac)} q-points...")
     band_indices = track_from_gamma(
         phonopy_object=ph,
@@ -315,7 +276,6 @@ def to_phonon_data(
         eigenvectors=flat_eigenvectors,
         q_points=irr_q_frac,
         mode_q_indices=mode_q_indices,
-        weights=flat_weights,
         degeneracy_groups=degeneracy_groups,
         positions_frac=final_positions,
         cell=ph.primitive.cell,
@@ -424,39 +384,42 @@ def compute_atom_permutation(phonopy_primitive: Any, cif_adapter: "CctbxAdapter"
     Returns:
         permutation: Array of indices such that permutation[i_fc] = i_target.
     """
-    p1_structure = cif_adapter.xray_structure.expand_to_p1()
+    # sites_mod_positive=True wraps generated fractional coordinates to the [0, 1) range
+    p1_structure = cif_adapter.xray_structure.expand_to_p1(sites_mod_positive=True)
     uc = p1_structure.unit_cell()
     n_target = p1_structure.scatterers().size()
     
-    target_frac = np.array([sc.site for sc in p1_structure.scatterers()]) % 1.0
-    target_cart = np.array([uc.orthogonalize(f) for f in target_frac])
-    
     n_atoms_fc = len(phonopy_primitive)
-    fc_frac = phonopy_primitive.scaled_positions % 1.0
     fc_cell = phonopy_primitive.cell
     
     if n_atoms_fc != n_target:
         raise ValueError(f"Atom count mismatch: FC has {n_atoms_fc}, CIF has {n_target}")
 
     _assert_equal_cells(fc_cell, uc)
-    fc_cart_wrapped = (fc_frac @ fc_cell)
-    
-    distances = cdist(fc_cart_wrapped, target_cart)
-    fc_to_target = distances.argmin(axis=1)
-    
-    used_targets = set()
-    source_to_target_indices = np.zeros(n_atoms_fc, dtype=int)
-    
-    for i_fc, i_target in enumerate(fc_to_target):
-        if i_target in used_targets:
-            print(f"WARNING: Duplicate matching for target atom {i_target}. Check if atoms are overlapping or tolerance issue.")
-        used_targets.add(i_target)
-        source_to_target_indices[i_fc] = i_target
 
-    if len(used_targets) != n_target:
-        print(f"WARNING: Not all target atoms matched! Used {len(used_targets)} of {n_target}")
+    target_frac = np.array([sc.site for sc in p1_structure.scatterers()])
+    target_symbols = np.array([sc.element_symbol() for sc in p1_structure.scatterers()])
+    
+    fc_frac = phonopy_primitive.scaled_positions
+    fc_symbols = np.array(phonopy_primitive.symbols)
+    
+    indices, distances = build_atom_mapping_periodic(
+        source_positions=fc_frac,
+        target_positions=target_frac,
+        unit_cell=uc,
+        tolerance=2.0,
+        source_elements=fc_symbols,
+        target_elements=target_symbols
+    )
 
-    return source_to_target_indices
+    return indices
+
+def _get_atom_mask(symbols: list[str], exclude_hydrogen: bool) -> npt.NDArray[np.bool_]:
+    """Return a boolean mask array excluding hydrogen atoms if requested."""
+    n = len(symbols)
+    if exclude_hydrogen:
+        return np.array([s.upper() != "H" for s in symbols], dtype=bool)
+    return np.ones(n, dtype=bool)
 
 def _s12_per_atom(
     u_comp: npt.NDArray[np.float64],
@@ -476,14 +439,11 @@ def _s12_per_atom(
     Returns:
         Per-atom S12 array (n_atoms,). H atoms are NaN if excluded.
     """
-    n = len(symbols)
-    s12 = np.full(n, np.nan)
-    if exclude_hydrogen:
-        mask = np.array([s != "H" for s in symbols])
-    else:
-        mask = np.ones(n, dtype=bool)
-    vals, _ = calculate_s12_per_atom(u_comp[mask], u_exp[mask])
-    s12[mask] = vals
+    s12 = np.full(len(symbols), np.nan)
+    mask = _get_atom_mask(symbols, exclude_hydrogen)
+    if np.any(mask):
+        vals, _ = calculate_s12_per_atom(u_comp[mask], u_exp[mask])
+        s12[mask] = vals
     return s12
 
 
@@ -508,14 +468,11 @@ def _u_diff_squared_per_atom(
     Returns:
         Per-atom squared distance array (n_atoms,).
     """
-    n = len(symbols)
-    u_diff_sq = np.full(n, np.nan)
-    if exclude_hydrogen:
-        mask = np.array([s != "H" for s in symbols])
-    else:
-        mask = np.ones(n, dtype=bool)
-    diff = u_comp[mask] - u_exp[mask]
-    u_diff_sq[mask] = np.sum(diff**2, axis=(1, 2))
+    u_diff_sq = np.full(len(symbols), np.nan)
+    mask = _get_atom_mask(symbols, exclude_hydrogen)
+    if np.any(mask):
+        diff = u_comp[mask] - u_exp[mask]
+        u_diff_sq[mask] = np.sum(diff**2, axis=(1, 2))
     return u_diff_sq
 
 
@@ -626,17 +583,87 @@ def _get_asu_atoms(smtbx_adapter) -> npt.NDArray[np.int64]:
     return indices
 
 
+def _fit_to_adps(
+    phonons: Any,
+    U_cart_exp_p1: npt.NDArray[np.float64],
+    initial_freqs: npt.NDArray[np.float64],
+    groups: Any,
+    total_q: float
+) -> dict[str, Any]:
+    """Perform ADP-only fitting with hydrogen exclusion."""
+    print("Performing ADP-only fitting")
+    print("Hydrogens are excluded from the ADP-only fit and the displayed metrics.")
+    non_h_mask = np.array([sym.upper() != 'H' for sym in phonons.symbols])
+    u_exp_heavy = U_cart_exp_p1[non_h_mask]
+
+    adp_only_calc = NoMoReCalculator(
+        eigenvectors=phonons.eigenvectors[:, non_h_mask, :],
+        masses=phonons.masses[non_h_mask],
+        temperature=phonons.temperature, 
+        normalization_factor=float(total_q),
+        degeneracy_groups=phonons.degeneracy_groups
+    )
+    engine_adp_only = RefinementEngine(
+        calculator=adp_only_calc,
+        smtbx_adapter=None,
+    )
+
+    result = engine_adp_only.fit_to_adps(
+        initial_frequencies=initial_freqs,
+        u_exp=u_exp_heavy,
+        groups=groups,
+        smoothness_weight=0.0, # Not exposed in run() yet
+    )
+    
+    # Compute scale factors for compatibility
+    final_freqs_flat = result["frequencies"]
+    scale_factors = np.ones(groups.n_parameters())
+    unique_gids = sorted(np.unique(groups.group_ids[groups.group_ids >= 0]))
+    for i, gid in enumerate(unique_gids):
+        mode_idx = groups.get_group_modes(gid)[0]
+        if initial_freqs[mode_idx] > 1e-3:
+            scale_factors[i] = final_freqs_flat[mode_idx] / initial_freqs[mode_idx]
+    
+    result["scale_factors"] = scale_factors
+    result["groups"] = groups
+    return result
+
+
+def _fit_to_intensities(
+    calculator: Any,
+    smtbx_adapter: Any,
+    initial_freqs: npt.NDArray[np.float64],
+    groups: Any,
+    optimizer_options: dict[str, Any],
+    optimizer_method: str,
+    fix_positions: bool,
+    exclude_hydrogen_positions: bool
+) -> dict[str, Any]:
+    """Perform joint refinement against X-ray intensities."""
+    print("Performing joint refinement against X-ray intensities")
+    
+    engine = RefinementEngine(calculator, smtbx_adapter)
+
+    return engine.run_joint(
+        initial_frequencies=initial_freqs,
+        groups=groups,
+        optimizer_options=optimizer_options,
+        optimizer_method=optimizer_method,
+        fix_positions=fix_positions,
+        exclude_hydrogen_positions=exclude_hydrogen_positions
+    )
+
+
 def run(
     force_constants,
     cif_path: str | None = None,
     U_cart_ref: npt.NDArray[np.float64] | None = None,
+    adp_only_fit: bool = False,
     mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
-    restraint_weight: float | None = None,
-    band_selection_strategy: Optional["FrequencyPartitionStrategy"] = None,
+    n_refined: int | None = None,
     weighting_scheme: Literal["sigma", "unit"] = "sigma",
     fix_positions: bool = True,
     exclude_hydrogen_positions: bool = True,
-    use_irreducible_fbz: bool = False,
     temperature_K: float | None = None,
     q_spacing: float = DEFAULT_Q_SPACING,
     reasonable_range: tuple[float, float] | None = None,
@@ -653,8 +680,7 @@ def run(
         cif_path: Path to experimental CIF. Optional if U_cart_ref is provided.
         U_cart_ref: Reference Cartesian ADPs (n_atoms, 3, 3) for direct fitting.
         mesh_size: k-point mesh size.
-        restraint_weight: Weight for restraining to initial frequencies.
-        band_selection_strategy: Strategy for frequency partitioning. Defaults to SensitivityBased.
+        n_refined: Number of lowest-frequency groups to optimize individually.
         weighting_scheme: Weighting scheme for refinement ('sigma' or 'unit').
         q_spacing: Spacing for path interpolation in Å⁻¹ along q-point paths.
         reasonable_range: Allowed range for optimized scaling factors.
@@ -684,10 +710,10 @@ def run(
 
     optimizer_options = {"maxiter": 300, "ftol": 1e-9}
     optimizer_method = "SLSQP"
+    use_irreducible_fbz = False
 
-    # Strategy applied to determine which frequencies to refine
-    if band_selection_strategy is None:
-        band_selection_strategy = SensitivityBasedStrategy(low_threshold=0.75, high_threshold=0.90)
+    if n_refined is None:
+        n_refined = 6
 
     mbe_automation.common.display.framed([
         "Normal mode refinement",
@@ -695,8 +721,7 @@ def run(
     print("Using interface to the nomore library of Paul Niklas Ruth")
     print("https://github.com/Niolon")
     print(f"mesh_size                {mesh_size}")
-    print(f"restraint_weight         {restraint_weight}")
-    print(f"strategy                 {band_selection_strategy.__class__.__name__}")
+    print(f"n_refined                {n_refined}")
     print(f"max_iter                 {optimizer_options['maxiter']}")
     print(f"optimizer_method         {optimizer_method}")
     print(f"weighting_scheme         {weighting_scheme}")
@@ -706,6 +731,7 @@ def run(
     print(f"temperature_K            {temperature_K if temperature_K is not None else 'from CIF'}")
     print(f"degenerate_freqs_tol     {degenerate_freqs_tol_cm1} cm⁻¹")
     print(f"symmetry_tolerance       {symmetry_tolerance}")
+    print(f"adp_only_fit             {adp_only_fit}")
 
     if isinstance(mesh_size, (list, tuple, np.ndarray)):
         mesh_size = np.array(mesh_size)
@@ -762,7 +788,7 @@ def run(
     phonons.temperature = temperature
     
     # Calculate normalization factor (total weight of q-points in BZ)
-    total_q = np.sum(q_weights)
+    total_q = float(np.sum(q_weights))
     
     print(f"  Normalization factor (Total Q): {total_q}")
     print(f"  Temperature: {temperature} K")
@@ -778,12 +804,11 @@ def run(
         masses=phonons.masses,
         temperature=phonons.temperature, 
         normalization_factor=float(total_q),
-        weights=phonons.weights,
         degeneracy_groups=phonons.degeneracy_groups
     )
 
-    # Initialize SmtbxAdapter if cif_path is provided
-    if cctbx_adapter is not None:
+    # Initialize SmtbxAdapter if cif_path is provided and not adp_only_fit
+    if cctbx_adapter is not None and not adp_only_fit:
         smtbx_adapter = SmtbxAdapter(
             xray_structure=cctbx_adapter.xray_structure,
             reflections=cctbx_adapter.get_reflections(),
@@ -793,53 +818,46 @@ def run(
         print(f"  Reflections: {smtbx_adapter.observations.size()} observations")
     else:
         smtbx_adapter = None
+
+    # Extract experimental ADPs and ASU mappings before engine run
+    if cctbx_adapter is not None:
+        U_cart_exp_p1 = extract_adps_from_structure(
+            cctbx_adapter.xray_structure.expand_to_p1(
+                sites_mod_positive=True
+            )
+        )
+        if smtbx_adapter is not None:
+            asu_atoms = _get_asu_atoms(smtbx_adapter)
+            asu_symbols = [sc.element_symbol() for sc in smtbx_adapter.structure.scatterers()]
+        else:
+            asu_atoms = np.arange(len(phonons.symbols))
+            asu_symbols = phonons.symbols
+    else:
+        U_cart_exp_p1 = U_cart_ref
+        asu_atoms = np.arange(len(phonons.symbols))
+        asu_symbols = phonons.symbols
     
     # Create mode groups to handle degeneracies and bands
-    pre_groups = create_pre_groups(phonons)
-    groups = band_selection_strategy.compute_groups(phonons, pre_groups)
+    groups = _select_refined_freqs(phonons, n_refined)
     
-    engine = RefinementEngine(calculator, smtbx_adapter)
-    
-    if restraint_weight is None:
-        restraint_weight = 0.0
-        
     initial_freqs = phonons.frequencies_cm1
     initial_freqs = _clamp_acoustic_frequencies(initial_freqs)
-    
-    restraint_instance = None
-    if restraint_weight > 0.0:
-        restraint_instance = BayesianFrequencyRestraint(
-            initial_freqs=initial_freqs,
-            temperature=temperature
-        )
 
-    if U_cart_ref is not None:
-        print("Performing ADP-only fitting")
-        result = engine.fit_to_adps(
-            initial_frequencies=initial_freqs,
-            u_exp=U_cart_ref,
+    is_adp_only = (U_cart_ref is not None) or adp_only_fit
+
+    if is_adp_only:
+        result = _fit_to_adps(
+            phonons=phonons,
+            U_cart_exp_p1=U_cart_exp_p1,
+            initial_freqs=initial_freqs,
             groups=groups,
-            restraint_weight=restraint_weight,
-            smoothness_weight=0.0, # Not exposed in run() yet
+            total_q=total_q
         )
-        # fit_to_adps returns a dict with 'frequencies', 'success', etc.
-        # Joint refinement returns 'scale_factors' and 'groups' for mapping.
-        # We compute them here for compatibility.
-        final_freqs_flat = result["frequencies"]
-        scale_factors = np.ones(groups.n_parameters())
-        unique_gids = sorted(np.unique(groups.group_ids[groups.group_ids >= 0]))
-        for i, gid in enumerate(unique_gids):
-            mode_idx = groups.get_group_modes(gid)[0]
-            if initial_freqs[mode_idx] > 1e-3:
-                scale_factors[i] = final_freqs_flat[mode_idx] / initial_freqs[mode_idx]
-        
-        result["scale_factors"] = scale_factors
-        result["groups"] = groups
     else:
-        result = engine.run_joint(
-            initial_frequencies=initial_freqs,
-            restraint=restraint_instance,
-            restraint_weight=restraint_weight,
+        result = _fit_to_intensities(
+            calculator=calculator,
+            smtbx_adapter=smtbx_adapter,
+            initial_freqs=initial_freqs,
             groups=groups,
             optimizer_options=optimizer_options,
             optimizer_method=optimizer_method,
@@ -882,22 +900,11 @@ def run(
     U_cart_comp_initial_p1 = calculator.calculate_u_cart(initial_freqs)
     U_cart_comp_final_p1 = calculator.calculate_u_cart(result["frequencies"])
     
-    if cctbx_adapter is not None:
-        U_cart_exp_p1 = extract_adps_from_structure(
-            cctbx_adapter.xray_structure.expand_to_p1(
-                sites_mod_positive=True
-            )
-        )
-        asu_atoms = _get_asu_atoms(smtbx_adapter)
-        asu_symbols = [sc.element_symbol() for sc in smtbx_adapter.structure.scatterers()]
-    else:
-        U_cart_exp_p1 = U_cart_ref
-        asu_atoms = np.arange(len(phonons.symbols))
-        asu_symbols = phonons.symbols
-
     U_cart_exp_asu = U_cart_exp_p1[asu_atoms]
     U_cart_comp_initial_asu = U_cart_comp_initial_p1[asu_atoms]
     U_cart_comp_final_asu = U_cart_comp_final_p1[asu_atoms]
+
+    exclude_h_metrics = True if is_adp_only else exclude_hydrogen_positions
 
     refinement = NormalModeRefinement(
         n_bands=n_bands,
@@ -916,32 +923,32 @@ def run(
             U_cart_comp_initial_asu, 
             U_cart_exp_asu, 
             asu_symbols, 
-            exclude_hydrogen_positions
+            exclude_h_metrics
         ),
         s12_final=_s12_per_atom(
             U_cart_comp_final_asu, 
             U_cart_exp_asu, 
             asu_symbols, 
-            exclude_hydrogen_positions
+            exclude_h_metrics
         ),
         U_diff_squared_initial=_u_diff_squared_per_atom(
             U_cart_comp_initial_asu, 
             U_cart_exp_asu, 
             asu_symbols, 
-            exclude_hydrogen_positions
+            exclude_h_metrics
         ),
         U_diff_squared_final=_u_diff_squared_per_atom(
             U_cart_comp_final_asu, 
             U_cart_exp_asu, 
             asu_symbols, 
-            exclude_hydrogen_positions
+            exclude_h_metrics
         )
     )
 
     _display_refinement_summary(
         refinement=refinement,
         asu_symbols=asu_symbols,
-        exclude_hydrogen=exclude_hydrogen_positions
+        exclude_hydrogen=exclude_h_metrics
     )
     #
     # We perform the validation of scaling factors here

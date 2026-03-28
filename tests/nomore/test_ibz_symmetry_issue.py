@@ -105,14 +105,13 @@ def compute_nomore_adps(force_constants, mesh_size, temperature_K, cif_path, use
         cif_adapter=cctbx_adapter
     )
     
-    total_q = np.sum(phonons.weights) / (len(phonons.masses) * 3)
+    total_q = np.sum(q_weights)
     
     calculator = NoMoReCalculator(
         eigenvectors=phonons.eigenvectors,
         masses=phonons.masses,
         temperature=temperature_K,
         normalization_factor=float(total_q),
-        weights=phonons.weights,
         degeneracy_groups=phonons.degeneracy_groups
     )
     

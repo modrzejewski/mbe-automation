@@ -80,7 +80,7 @@ key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
 
 fc = ForceConstants.read(dataset=dataset_path, key=key)
 # You can optionally enable dynamical matrix symmetrization by passing symmetrize_Dq=True
-freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_points=np.array([0.0, 0.0, 0.0]))
+freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_points=[0.0, 0.0, 0.0])
 
 print("Frequencies (THz):")
 print(freqs_THz)
@@ -141,12 +141,12 @@ from mbe_automation import ForceConstants
 # ... (load ForceConstants as before) ...
 
 # Define a path that includes Gamma
-k_points = np.array([
+k_points = [
     [0.0, 0.0, 0.0],  # Gamma
     [0.1, 0.0, 0.0],
     [0.2, 0.0, 0.0],
     # ...
-])
+]
 
 # Compute frequencies with band tracking enabled
 # degenerate_freqs_tol_cm1 controls the threshold for detecting degenerate modes (default: 0.5 cm⁻¹)

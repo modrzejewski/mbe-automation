@@ -295,7 +295,7 @@ def from_xyz_file(
 
     mbe_automation.common.display.framed([
         "Reading structure from file",
-        read_path
+        mbe_automation.common.display.shorten_path(read_path)
     ])
 
     if read_path.lower().endswith(".cif"):
