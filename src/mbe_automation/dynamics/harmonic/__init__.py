@@ -11,6 +11,7 @@ try:
     import nomore_ase
     from . import refinement
     from . import refinement_v2
+    from . import refinement_v3
     from . import bands
     _NOMORE_AVAILABLE = True
 except ImportError:

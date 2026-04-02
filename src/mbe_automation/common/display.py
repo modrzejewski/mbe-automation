@@ -172,6 +172,57 @@ def framed(text: str | list[str], padding: int = 10, min_width: int = 30) -> Non
     print("└" + horizontal_line + "┘", flush=True)
 
 
+def box_with_details(
+    title: str,
+    details: list[str],
+    side_content: list[str] | None = None,
+    width: int = 30
+) -> None:
+    """
+    Draw a Unicode box with the title integrated into the top border.
+    Optional side_content is printed to the right of the box.
+    
+    Example:
+        ┌─ title ───────────────────┐
+        │ detail 1                  │  side 1
+        │ detail 2                  │  side 2
+        └───────────────────────────┘
+
+    Args:
+        title (str): The text to be placed in the top border.
+        details (list[str]): Lines of text to be placed inside the box.
+        side_content (list[str]): Optional lines to be printed to the right of the box.
+        width (int): Minimum internal width of the box.
+    """
+    label_part = f" {title} "
+    actual_width = max(width, len(label_part) + 4)
+    
+    top_border = "┌─" + label_part + "─" * (actual_width - len(label_part) - 2) + "┐"
+    bottom_border = "└" + "─" * (actual_width) + "┘"
+    
+    if side_content is None:
+        side_content = []
+        
+    print("\n" + top_border)
+    
+    max_lines = max(len(details), len(side_content))
+    for i in range(max_lines):
+        try:
+            d_txt = details[i]
+        except IndexError:
+            d_txt = ""
+        
+        try:
+            s_txt = side_content[i]
+        except IndexError:
+            s_txt = ""
+            
+        row = f"│ {d_txt:<{actual_width-1}}│  {s_txt}"
+        print(row)
+        
+    print(bottom_border, flush=True)
+
+
 def shorten_path(path: str | Path, max_length: int = 60) -> str:
     """
     Shorten a filesystem path for display by keeping full segment names from the right.

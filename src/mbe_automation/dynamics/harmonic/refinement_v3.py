@@ -1,0 +1,546 @@
+from __future__ import annotations
+import numpy as np
+import ase
+from pathlib import Path
+
+try:
+    import nomore_ase.core.ase_adapter as ase_adapter_mod
+    import nomore_ase.core.calculator as calc_mod
+    import nomore_ase.optimization.engine as engine_mod
+    import nomore_ase.crystallography.cctbx_adapter as cctbx_mod
+    from nomore_ase.workflows.phonon_workflow import get_symmetric_phonons
+    from nomore_ase.core.frequency_partition import (
+        FixedThresholdStrategy,
+        ThermalCutoffStrategy,
+        SensitivityBasedStrategy,
+        create_pre_groups,
+    )
+    from nomore_ase.analysis.validation import extract_adps_from_structure
+    _NOMORE_AVAILABLE = True
+except ImportError:
+    _NOMORE_AVAILABLE = False
+
+import mbe_automation.common.display
+
+MIN_FREQ_CM1 = 10.0
+
+def _p1_to_ase_atoms(p1) -> ase.Atoms:
+    """Build ASE Atoms from an already-expanded CCTBX P1 xray_structure."""
+    uc = p1.unit_cell()
+    symbols = [sc.element_symbol() for sc in p1.scatterers()]
+    frac    = np.array([sc.site for sc in p1.scatterers()])
+    cart    = np.array([uc.orthogonalize(f) for f in frac])
+    cell    = [
+        list(uc.orthogonalize((1, 0, 0))),
+        list(uc.orthogonalize((0, 1, 0))),
+        list(uc.orthogonalize((0, 0, 1))),
+    ]
+    return ase.Atoms(symbols=symbols, positions=cart, cell=cell, pbc=True)
+
+
+def _fixed_groups(
+    phonon_data, 
+    pre_groups: list,
+    n_refined: int, 
+    high_limit_cm1: float = 1000.0
+):
+    """
+    Three-tier FixedThresholdStrategy reproducing the original NoMoRe literature
+    approach (Hoser & Madsen, IUCrJ 2016 / Hoser et al.):
+
+    - LOW   (n_refined individual parameters): the n_refined lowest-frequency modes,
+            each with its own scale factor.
+    - MEDIUM (one shared MFSF):            all modes whose frequency lies between
+            medium_limit and high_limit.  medium_limit is placed halfway between
+            mode[n_refined-1] and mode[n_refined] so that exactly n_refined modes fall in LOW.
+    - HIGH  (fixed at MLIP values):        modes at or above high_limit.
+
+    No pre-group / degeneracy collapsing is applied here — the boundary is set
+    directly in frequency space by individual mode index, as in the paper.
+
+    Args:
+        phonon_data:  PhononData with .frequencies_cm1 already clamped.
+        n_refined:    Number of individually refined LOW modes.
+        high_limit_cm1: Frequency (cm⁻¹) above which modes are strictly fixed.
+                      1000 cm⁻¹ covers all lattice and most intramolecular modes
+                      while excluding C–H stretches (~3000 cm⁻¹).
+    """
+    freqs = phonon_data.frequencies_cm1
+    if n_refined <= 0:
+        raise ValueError("n_refined must be strictly positive (greater than 0).")
+    elif n_refined >= len(pre_groups):
+        medium_limit = np.inf
+    else:
+        group_means = [(np.mean(freqs[g]), g) for g in pre_groups]
+        group_means.sort(key=lambda x: x[0])
+        
+        refined_groups = group_means[:n_refined]
+        max_refined_freq = max(np.max(freqs[g]) for _, g in refined_groups)
+        
+        remaining_groups = group_means[n_refined:]
+        min_remaining_freq = min(np.min(freqs[g]) for _, g in remaining_groups)
+        
+        medium_limit = (max_refined_freq + min_remaining_freq) / 2.0
+
+    strategy = FixedThresholdStrategy(
+        medium_limit=medium_limit,
+        high_limit=high_limit_cm1,
+    )
+    return strategy.compute_groups(phonon_data=phonon_data)
+
+
+def _phonons(
+    cif_path: str | Path, 
+    calculator: ase.calculators.calculator.Calculator, 
+    max_force_on_atom_eV_A: float | None = None,
+    reference_temperature_K: float | None = None,
+) -> dict:
+    """
+    Load CIF, optimize geometry, compute Γ-point phonons.
+
+    Returns a dict with phonon_data, u_exp, raw_frequencies, and temperature.
+    Does NOT run any refinement.
+    """
+    adapter = cctbx_mod.CctbxAdapter(cif_path=cif_path)
+    # Single expand_to_p1 call — reused for both u_exp and ASE Atoms so that
+    # atom ordering is guaranteed to be consistent.
+    p1 = adapter.xray_structure.expand_to_p1(sites_mod_positive=True)
+
+    # Priority: reference_temperature_K > CIF temperature
+    if reference_temperature_K is not None:
+        temp = reference_temperature_K
+    else:
+        temp = adapter.get_temperature() # K
+
+    if temp is None:
+        raise ValueError(
+            f"Temperature not found in CIF '{cif_path}' and "
+            "no `reference_temperature_K` provided."
+        )
+
+    # Exclude H atoms from the ADP fit: their U_exp values are riding-model
+    # constraints (U_iso(H) ≈ 1.2·U_eq(C)), always spherical, while u_calc is
+    # a full anisotropic tensor.  Keeping H biases the frequency refinement.
+    elements = [sc.element_symbol() for sc in p1.scatterers()]
+    non_h_mask = np.array([el.upper() != 'H' for el in elements])
+
+    u_exp = extract_adps_from_structure(structure=p1)[non_h_mask]  # (N_non_H, 3, 3) Å²
+    atoms = _p1_to_ase_atoms(p1=p1)
+
+    sym_phonons = get_symmetric_phonons(
+        atoms=atoms,
+        cif_path=cif_path,
+        calculator=calculator,
+        supercell=(1, 1, 1),
+        max_force_on_atom_eV_A=max_force_on_atom_eV_A,
+    )
+
+    ase_adapter = ase_adapter_mod.AseAdapter(phonons=sym_phonons.phonons)
+    phonon_data = ase_adapter.get_phonon_data(
+        supercell=(1, 1, 1), 
+        symmetrize=True
+    )
+    phonon_data.temperature = temp
+    phonon_data.degeneracy_groups = sym_phonons.find_degeneracy_groups_by_symmetry(
+        eigenvectors=phonon_data.eigenvectors, 
+        q_point=(0, 0, 0)
+    )
+
+    # Save raw (pre-clamping) frequencies for the printed comparison
+    raw_frequencies = phonon_data.frequencies_cm1.copy()
+
+    # Clamp acoustic / imaginary modes to avoid ADP divergence
+    phonon_data.frequencies_cm1 = np.where(
+        phonon_data.frequencies_cm1 < MIN_FREQ_CM1,
+        MIN_FREQ_CM1,
+        phonon_data.frequencies_cm1,
+    )
+
+    return {
+        "phonon_data": phonon_data,
+        "u_exp": u_exp,
+        "non_h_mask": non_h_mask,
+        "raw_frequencies": raw_frequencies,
+        "temperature": temp,
+        "structure_p1": p1
+    }
+
+def _exec_strategy(
+    label: str, 
+    groups, 
+    phonon_data, 
+    u_exp, 
+    non_h_mask,
+    restraint_weight: float = 0.0,
+    adaptive_restraint_weight: float = 0.0
+) -> dict:
+    """
+    Run ADP-only refinement (no crystallographic χ²) with the provided
+    RefinementGroups and optional restraint.  Returns a result dict.
+
+    Args:
+        restraint_weight:          Weight for BayesianFrequencyRestraint.
+        adaptive_restraint_weight: Weight for AdaptiveSensitivityRestraint.
+    """
+    nomore_calc = calc_mod.NoMoReCalculator(
+        eigenvectors=phonon_data.eigenvectors[:, non_h_mask, :],
+        masses=phonon_data.masses[non_h_mask],
+        temperature=phonon_data.temperature,
+        normalization_factor=1.0,   # single Γ-point
+        degeneracy_groups=phonon_data.degeneracy_groups,
+    )
+    refinement = engine_mod.RefinementEngine(
+        calculator=nomore_calc,
+        smtbx_adapter=None,
+    )
+    result = refinement.fit_to_adps(
+        initial_frequencies=phonon_data.frequencies_cm1,
+        u_exp=u_exp,
+        groups=groups,
+        restraint_weight=restraint_weight,
+        adaptive_restraint_weight=adaptive_restraint_weight,
+    )
+    return {
+        "label":         label,
+        "n_params":      groups.n_parameters(),
+        "normalized_residual_norm": result["normalized_residual_norm"],
+        "scale_factor":  result["scale_factor"],
+        "success":       result["success"],
+        "frequencies":   result["full_x"],
+        "u_calc":        result["u_calc"],
+    }
+
+
+def _print_freq_table(
+    winning_result: dict, 
+    raw_frequencies: np.ndarray, 
+    max_modes: int = np.iinfo(np.int64).max
+) -> None:
+    """
+    Wide per-mode table: raw frequency vs refined frequency from the winning strategy.
+    Prints a separator after the last mode that moved by >0.1 cm⁻¹.
+    """
+    print("\n" + "=" * 60)
+    print(f"  Per-mode frequencies - winning strategy: {winning_result['label']} + {winning_result['restraint_label']}")
+    print("=" * 60 + "\n")
+
+    col = 18
+    header = f"{'Mode':>5} | {'ω raw (cm⁻¹)':>{col}} | {'ω refined (cm⁻¹)':>{col}}"
+    print(header)
+    print("-" * len(header))
+
+    n_print = min(max_modes, len(raw_frequencies))
+
+    # Find last mode meaningfully changed by the winning strategy
+    last_changed = -1
+    for i in range(n_print):
+        if abs(winning_result["frequencies"][i] - raw_frequencies[i]) > 0.1:
+            last_changed = i
+
+    for i in range(n_print):
+        row = f"{i:5d} | {raw_frequencies[i]:>{col}.1f} | {winning_result['frequencies'][i]:>{col}.1f}"
+        print(row)
+        if i == last_changed:
+            print("-" * len(header))
+
+    if n_print < len(raw_frequencies):
+        print(f"  ... ({len(raw_frequencies) - n_print} modes omitted, all fixed)")
+
+
+def _print_strategy_specs(
+    strategy_specs: list, 
+    restraint_specs: list, 
+    high_limit_cm1: float
+) -> None:
+    """
+    Print the specs of each strategy combined with all applied restraints.
+    """
+    for s_lbl, groups in strategy_specs:
+        details = []
+        details.append(f"Total parameters: {groups.n_parameters()}")
+        
+        # MFSF info (shared by all current tier-based strategies)
+        fixed_strat_info = next((v for v in groups.group_metadata.values() if isinstance(v, dict) and v.get('type') == 'mfsf'), None)
+        fixed_info = groups.group_metadata.get(-1)
+
+        # Strategy-specific details
+        if s_lbl == "fixed":
+            # In Fixed strategy, n_refined = n_params - 1
+            details.append(f"Individual: {groups.n_parameters() - 1}")
+            details.append(f"Shared factor up to {high_limit_cm1:.1f} cm⁻¹")
+
+        elif s_lbl == "thermal" or s_lbl == "sensitivity":
+            # Show Fixed tier counts/ranges for high-level strategies
+            if fixed_strat_info:
+                details.append(f"Fixed modes: {fixed_strat_info.get('n_modes')}")
+                if 'freq_range' in fixed_strat_info:
+                    fr = fixed_strat_info['freq_range']
+                    details.append(f"Fixed tier range: {fr[0]:.1f}-{fr[1]:.1f} cm⁻¹")
+
+            if s_lbl == "thermal":
+                tf = groups.group_metadata.get('thermal_factors')
+                if tf:
+                    details.append(f"Factors: {tf[0]} kT, {tf[1]} kT")
+                t = groups.group_metadata.get('temperature')
+                if t:
+                    details.append(f"T = {t:.1f} K")
+            elif s_lbl == "sensitivity":
+                if fixed_strat_info and 'sensitivity_threshold' in fixed_strat_info:
+                    st = fixed_strat_info['sensitivity_threshold']
+                    details.append(f"Thresholds: {st[0]}, {st[1]}")
+
+        if fixed_info:
+            # Fixed tier info
+            details.append(f"Fixed modes: {fixed_info.get('n_modes')}")
+            if 'min_freq' in fixed_info and fixed_info['min_freq'] is not None:
+                details.append(f"Fixed from: {fixed_info['min_freq']:.1f} cm⁻¹")
+
+        # Restraint labels
+        side_content = [lbl for lbl, *_ in restraint_specs]
+        
+        mbe_automation.common.display.box_with_details(
+            title=s_lbl, 
+            details=details, 
+            side_content=side_content, 
+            width=32
+        )
+
+
+def _print_results(
+    grid: dict, 
+    strategy_labels: list, 
+    restraint_labels: list
+) -> None:
+    """
+    Print the results of each strategy combined with all applied restraints.
+    """
+    for s_lbl in strategy_labels:
+        # Use first restraint result to get n_params (it's the same for all)
+        n_p = grid[(s_lbl, restraint_labels[0])]["n_params"]
+        
+        details = []
+        for r_lbl in restraint_labels:
+            res = grid[(s_lbl, r_lbl)]
+            flag = "!" if not res["success"] else ""
+            details.append(f"{r_lbl:<20}: {res['normalized_residual_norm']:.6f}{flag}")
+
+        mbe_automation.common.display.box_with_details(
+            title=s_lbl, 
+            details=details, 
+            side_content=[f"n_params: {n_p}"], 
+            width=32
+        )
+
+
+def _attempted_strategies(
+    phonon_data, 
+    pre_groups, 
+    n_refined: int | None = None, 
+    high_limit_cm1: float | None = None,
+    thermal_cutoff_strategy: "ThermalCutoffStrategy" | None = None,
+    sensitivity_based_strategy: "SensitivityBasedStrategy" | None = None
+) -> tuple[list, list, int, float]:
+    """
+    Initialize default strategy parameters and build strategy and restraint
+    specifications.
+    """
+    if n_refined is None:
+        n_refined = 6
+
+    if high_limit_cm1 is None:
+        high_limit_cm1 = 1000.0
+
+    if sensitivity_based_strategy is None:
+        sensitivity_based_strategy = SensitivityBasedStrategy(
+            low_threshold=0.95, 
+            high_threshold=0.999
+        )
+
+    if thermal_cutoff_strategy is None:
+        thermal_cutoff_strategy = ThermalCutoffStrategy(
+            medium_factor=1.5, 
+            high_factor=2.0
+        )
+
+    strategy_specs = [
+        # -- Literature NoMoRe (Hoser & Madsen): n individual LOW modes + one
+        #    shared MFSF for everything up to high_limit cm⁻¹, rest fixed.
+        ("fixed", _fixed_groups(
+            phonon_data=phonon_data, 
+            pre_groups=pre_groups,
+            n_refined=n_refined, 
+            high_limit_cm1=high_limit_cm1
+        )),
+
+        # -- Thermal cutoffs (MFSF tier included).
+        ("thermal", thermal_cutoff_strategy.compute_groups(
+            phonon_data=phonon_data, 
+            pre_groups=pre_groups)),
+
+        # -- Sensitivity-based.
+        ("sensitivity", sensitivity_based_strategy.compute_groups(
+            phonon_data=phonon_data, 
+            pre_groups=pre_groups)),
+    ]
+
+    # ------------------------------------------------------------------
+    # Restraint scheme definitions (columns of the 2D table)
+    # Each entry: (label, restraint_weight, adaptive_restraint_weight)
+    # ------------------------------------------------------------------
+    restraint_specs = [
+        ("no restraints",      0.0,   0.0),
+        ("bayes (1.0E-04)",    1e-4,  0.0),
+        ("bayes (1.0E-03)",    1e-3,  0.0),
+        ("bayes (1.0E-02)",    1e-2,  0.0),
+        ("adaptive (1.0E-04)", 0.0,   1e-4),
+        ("adaptive (1.0E-03)", 0.0,   1e-3),
+        ("adaptive (1.0E-02)", 0.0,   1e-2)
+    ]
+
+    return strategy_specs, restraint_specs, n_refined, high_limit_cm1
+
+
+def _select_winning_result(grid: dict) -> dict | None:
+    """Select the successful result with the lowest normalized_residual_norm."""
+    successful = [res for res in grid.values() if res["success"]]
+    if not successful:
+        return None
+    return min(successful, key=lambda x: x["normalized_residual_norm"])
+
+
+def run(
+    cif_path: str | Path,
+    calculator: ase.calculators.calculator.Calculator,
+    n_refined: int | None = None,
+    high_limit_cm1: float | None = None,
+    thermal_cutoff_strategy: "ThermalCutoffStrategy" | None = None,
+    sensitivity_based_strategy: "SensitivityBasedStrategy" | None = None,
+    max_force_on_atom_eV_A: float | None = None,
+    reference_temperature_K: float | None = None
+) -> dict:
+    """
+    Full pipeline: phonons once, then compare strategies × restraint schemes.
+
+    Returns dict with 'grid' (keyed by (strategy, restraint)), 'phonon_data',
+    and 'u_exp'.
+    """
+    if not _NOMORE_AVAILABLE:
+        raise ImportError(
+            "The `run` function requires the `nomore_ase` package. "
+            "Install it in your environment to use this functionality."
+        )
+
+    mbe_automation.common.display.framed(
+        ["Relaxation + phonons at Γ"]
+    )
+
+    phonons = _phonons(
+        cif_path=cif_path, 
+        calculator=calculator, 
+        max_force_on_atom_eV_A=max_force_on_atom_eV_A,
+        reference_temperature_K=reference_temperature_K,
+    )
+
+    phonon_data = phonons["phonon_data"]
+    u_exp       = phonons["u_exp"]
+    non_h_mask  = phonons["non_h_mask"]
+    raw_freqs   = phonons["raw_frequencies"]
+    temp        = phonons["temperature"]
+
+    n_modes = len(phonon_data.frequencies_cm1)
+    n_non_h = int(non_h_mask.sum())
+    pre_groups = create_pre_groups(phonon_data=phonon_data)
+    if pre_groups is None:
+        pre_groups = [[i] for i in range(n_modes)]
+    n_pre = len(pre_groups)
+
+    print(f"\n  {n_modes} modes  |  T = {temp:.1f} K  |  {n_pre} pre-groups  |  {n_non_h}/{len(non_h_mask)} non-H atoms fitted\n")
+
+    strategy_specs, restraint_specs, n_refined, high_limit_cm1 = _attempted_strategies(
+        phonon_data=phonon_data,
+        pre_groups=pre_groups,
+        n_refined=n_refined,
+        high_limit_cm1=high_limit_cm1,
+        thermal_cutoff_strategy=thermal_cutoff_strategy,
+        sensitivity_based_strategy=sensitivity_based_strategy,
+    )
+
+    strategy_labels  = [s for s, _ in strategy_specs]
+    restraint_labels = [r for r, *_ in restraint_specs]
+    # ------------------------------------------------------------------
+    # Phase 2: run each strategy × restraint combination
+    # ------------------------------------------------------------------
+    mbe_automation.common.display.framed(
+        "ADP refinement  (strategy × restraint)"
+    )
+    _print_strategy_specs(
+        strategy_specs=strategy_specs, 
+        restraint_specs=restraint_specs,
+        high_limit_cm1=high_limit_cm1
+    )
+
+    grid = {}          # (strategy_label, restraint_label) -> result dict
+    # Keep a flat list of "no restraint" results for the freq table
+    no_restraint_results = []
+
+    total = len(strategy_specs) * len(restraint_specs)
+    done  = 0
+    for s_lbl, groups in strategy_specs:
+        for r_lbl, rw, arw in restraint_specs:
+            done += 1
+            print(f"\n  [{done}/{total}]  strategy={s_lbl}  restraint={r_lbl}"
+                  f"  ({groups.n_parameters()} free params)")
+            result = _exec_strategy(
+                label=s_lbl,
+                groups=groups,
+                phonon_data=phonon_data,
+                u_exp=u_exp,
+                non_h_mask=non_h_mask,
+                restraint_weight=rw,
+                adaptive_restraint_weight=arw,
+            )
+            result["restraint_label"] = r_lbl
+            grid[(s_lbl, r_lbl)] = result
+            print(
+                f"    ‖ΔU‖ = {result['normalized_residual_norm']:.6f}"
+                f"  scale = {result['scale_factor']:.4f}"
+                f"  {'converged' if result['success'] else 'DID NOT CONVERGE'}"
+            )
+            if r_lbl == "no restraints":
+                no_restraint_results.append(result)
+
+    # ------------------------------------------------------------------
+    # Summary phases: boxed per-strategy results + 2D table
+    # ------------------------------------------------------------------
+    mbe_automation.common.display.framed(
+        "Refinement results"
+    )
+    _print_results(
+        grid=grid, 
+        strategy_labels=strategy_labels, 
+        restraint_labels=restraint_labels
+    )
+
+    winner = _select_winning_result(grid)
+    if winner is None:
+        raise RuntimeError("Refinement failed: No strategy/restraint combination converged.")
+    
+    mbe_automation.common.display.framed(
+        f"Winning Strategy: {winner['label']} + {winner['restraint_label']} (Residual Error: {winner['normalized_residual_norm']:.6f})"
+    )
+
+    _print_freq_table(
+        winning_result=winner, 
+        raw_frequencies=raw_freqs, 
+        max_modes=np.iinfo(np.int64).max
+    )
+
+    return {
+        "frequencies": winner["frequencies"],
+        "initial_frequencies": raw_freqs,
+        "u_calc_non_h": winner["u_calc"],
+        "u_calc": winner["u_calc"],
+        "result": winner,
+    }
+
+

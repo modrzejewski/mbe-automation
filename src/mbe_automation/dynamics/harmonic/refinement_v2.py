@@ -13,7 +13,6 @@ try:
 except ImportError:
     _NOMORE_AVAILABLE = False
 
-
 def _cctbx_to_ase_atoms(adapter: "cctbx_mod.CctbxAdapter") -> Atoms:
     """
     Build a P1 ASE Atoms from a CctbxAdapter by expanding the ASU.

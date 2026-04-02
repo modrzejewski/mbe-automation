@@ -3,8 +3,8 @@ import pandas as pd
 from phonopy.physical_units import get_physical_units
 
 import mbe_automation.configs.refinement
-from mbe_automation.dynamics.harmonic.refinement_v2 import _NOMORE_AVAILABLE
-import mbe_automation.dynamics.harmonic.refinement_v2
+from mbe_automation.dynamics.harmonic.refinement_v3 import _NOMORE_AVAILABLE
+import mbe_automation.dynamics.harmonic.refinement_v3
 import mbe_automation.dynamics.harmonic.thermodynamics
 import mbe_automation.storage
 
@@ -29,7 +29,7 @@ def run(
 
     config.work_dir.mkdir(parents=True, exist_ok=True)
 
-    refinement_result = mbe_automation.dynamics.harmonic.refinement_v2.run(
+    refinement_result = mbe_automation.dynamics.harmonic.refinement_v3.run(
         cif_path=config.cif_path,
         calculator=config.calculator,
         n_refined=config.n_refined,
