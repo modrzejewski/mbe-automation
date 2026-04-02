@@ -205,7 +205,6 @@ def _exec_strategy(
         "label":         label,
         "n_params":      groups.n_parameters(),
         "normalized_residual_norm": result["normalized_residual_norm"],
-        "scale_factor":  result["scale_factor"],
         "success":       result["success"],
         "frequencies":   result["full_x"],
         "u_calc":        result["u_calc"],
