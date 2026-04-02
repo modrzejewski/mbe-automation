@@ -35,47 +35,6 @@ from ase import Atoms
 from ase.data import atomic_numbers, atomic_masses
 
 
-def _cell_to_openmm_convention(cell: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Convert an arbitrary cell matrix to OpenMM's required convention:
-    - First vector parallel to x-axis: a = (|a|, 0, 0)
-    - Second vector in xy-plane: b = (bx, by, 0)
-    - Third vector: c = (cx, cy, cz)
-    """
-    from scipy import linalg
-    
-    # Gram-Schmidt orthogonalization
-    a = cell[0].copy()
-    b = cell[1].copy()
-    c = cell[2].copy()
-    
-    # First vector: normalize a to x-axis
-    a_norm = np.linalg.norm(a)
-    a_new = np.array([a_norm, 0.0, 0.0])
-    
-    # Second vector: orthogonalize b against a, project onto xy-plane
-    b_proj_a = np.dot(b, a) / np.dot(a, a) * a
-    b_orth = b - b_proj_a
-    b_norm = np.linalg.norm(b_orth)
-    b_new = np.array([np.dot(b, a_new) / a_norm, b_norm, 0.0])
-    
-    # Third vector: orthogonalize c against a and b
-    c_proj_a = np.dot(c, a) / np.dot(a, a) * a
-    c_proj_b = np.dot(c, b_orth) / np.dot(b_orth, b_orth) * b_orth
-    c_orth = c - c_proj_a - c_proj_b
-    c_norm = np.linalg.norm(c_orth)
-    c_new = np.array([np.dot(c, a_new) / a_norm, 
-                      np.dot(c, b_new) / b_norm if b_norm > 1e-10 else 0.0,
-                      c_norm])
-    
-    cell_openmm = np.array([a_new, b_new, c_new])
-    cell_inv = np.linalg.inv(cell)
-    cell_openmm_basis = np.array([a_new, b_new, c_new])
-    rotation_matrix = cell_openmm_basis @ cell_inv
-    
-    return cell_openmm, rotation_matrix
-
-
 # =============================================================================
 # BUILD MAIN SYSTEM
 # =============================================================================
@@ -106,11 +65,9 @@ def build_openmm_system(
     # PERIODIC BOX
     # ---------------------------------------------------------
     if use_pbc:
-        cell = atoms.get_cell().array
-        # CRITICAL: Convert to OpenMM convention BEFORE setting box vectors
-        cell_openmm, _ = _cell_to_openmm_convention(cell)
+        cell = atoms.get_cell()
         system.setDefaultPeriodicBoxVectors(
-            *[(cell_openmm[i] * 0.1) for i in range(3)]
+            *[(cell[i] * 0.1) for i in range(3)]
         )
 
     # ---------------------------------------------------------

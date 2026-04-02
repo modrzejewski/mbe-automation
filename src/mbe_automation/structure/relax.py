@@ -148,6 +148,8 @@ def _crystal_optimizer_ase(
     return relaxed_system
 
 
+# File: src/mbe_automation/structure/relax.py
+
 def crystal(
         unit_cell: ase.Atoms,
         calculator: mbe_automation.calculators.CALCULATORS,
@@ -198,6 +200,22 @@ def crystal(
         optimize_lattice_vectors = False
         optimize_volume = False
 
+    # =========================================================================
+    # AZFF-SPECIFIC HANDLING: Skip symmetry refinement and primitive reduction
+    # =========================================================================
+    # AZFF uses OpenMM which has strict cell vector conventions that are
+    # incompatible with pymatgen's symmetrized primitive cell generation.
+    # Primitive cell reduction can cause OpenMM to reject the cell vectors.
+    #
+    is_azff = (
+        hasattr(calculator, 'level_of_theory') and 
+        calculator.level_of_theory == "AZFF"
+    )
+    
+    if is_azff and config.symmetrize_final_structure:
+        print("(AZFF: Skipping symmetry refinement due to OpenMM cell constraints)")
+        config.symmetrize_final_structure = False
+
     if config.symmetrize_final_structure:
         #
         # Check symmetry of the input structure
@@ -233,7 +251,17 @@ def crystal(
             work_dir=work_dir,
         )
     
-    if config.symmetrize_final_structure:
+    # =========================================================================
+    # AZFF-SPECIFIC: Skip symmetrization after relaxation
+    # =========================================================================
+    if is_azff:
+        # Just get space group info, don't transform to primitive
+        space_group, _ = mbe_automation.structure.crystal.check_symmetry(
+            relaxed_system,
+            symmetry_thresh=config.symmetry_tolerance_strict
+        )
+        print(f"Final space group (no symmetrization): {space_group}")
+    elif config.symmetrize_final_structure:
         print("Transformation to symmetrized primitive cell...")
         relaxed_system = mbe_automation.structure.crystal.to_symmetrized_primitive(
             unit_cell=relaxed_system,
