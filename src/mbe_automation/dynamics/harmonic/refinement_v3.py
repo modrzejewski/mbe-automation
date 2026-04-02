@@ -220,6 +220,7 @@ def _print_freq_table(
     Wide per-mode table: raw frequency vs refined frequency from the winning strategy.
     Prints a separator after the last mode that moved by >0.1 cm⁻¹.
     """
+    assert len(raw_frequencies) > 0
     col = 18
     header = f"{'Mode':>5} | {'ω_initial (cm⁻¹)':>{col}} | {'ω_refined (cm⁻¹)':>{col}}"
     print(header)
