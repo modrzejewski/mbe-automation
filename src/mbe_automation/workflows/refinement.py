@@ -56,6 +56,8 @@ def run(
     if config.reference_temperature_K is not None:
         print(f"{'reference_temperature [K]':<25} {config.reference_temperature_K:.2f} "
               "(will have priority over T in CIF)")
+    else:
+        print(f"{'reference_temperature [K]':<25} (extracted from CIF)")
 
     print(f"{'temperatures [K]':<25} {config.temperatures_K}")
     print(f"{'work_dir':<25} {config.work_dir}")
