@@ -221,12 +221,8 @@ def _print_freq_table(
     Wide per-mode table: raw frequency vs refined frequency from the winning strategy.
     Prints a separator after the last mode that moved by >0.1 cm⁻¹.
     """
-    print("\n" + "=" * 60)
-    print(f"  Per-mode frequencies - winning strategy: {winning_result['label']} + {winning_result['restraint_label']}")
-    print("=" * 60 + "\n")
-
     col = 18
-    header = f"{'Mode':>5} | {'ω raw (cm⁻¹)':>{col}} | {'ω refined (cm⁻¹)':>{col}}"
+    header = f"{'Mode':>5} | {'ω_initial (cm⁻¹)':>{col}} | {'ω_refined (cm⁻¹)':>{col}}"
     print(header)
     print("-" * len(header))
 
@@ -264,19 +260,19 @@ def _print_strategy_specs(
       - Number of modes refined using a common scaling factor (MFSF)
     """
     for s_lbl, groups in strategy_specs:
-        details = []
+        side_content = []
 
-        # ── Strategy-specific parameters ──────────────────────────
+        # ── Strategy-specific parameters (shown on the side) ──────
         if s_lbl == "manual":
-            details.append(f"high_limit = {high_limit_cm1:.0f} cm⁻¹")
+            side_content.append(f"high_limit = {high_limit_cm1:.0f} cm⁻¹")
 
         elif s_lbl == "thermal":
             tf = groups.group_metadata.get('thermal_factors')
             t = groups.group_metadata.get('temperature')
             if tf:
-                details.append(f"factors = {tf[0]} kT, {tf[1]} kT")
+                side_content.append(f"factors = {tf[0]} kT, {tf[1]} kT")
             if t:
-                details.append(f"T = {t:.1f} K")
+                side_content.append(f"T = {t:.1f} K")
 
         elif s_lbl == "sensitivity":
             mfsf_meta = next(
@@ -286,10 +282,10 @@ def _print_strategy_specs(
             )
             if mfsf_meta and 'sensitivity_threshold' in mfsf_meta:
                 st = mfsf_meta['sensitivity_threshold']
-                details.append(f"thresholds = {st[0]}, {st[1]}")
+                side_content.append(f"thresholds = {st[0]}, {st[1]}")
 
-        # Restraint labels shown on the right
-        side_content = [lbl for lbl, *_ in restraint_specs]
+        # Restraint variants shown inside the box
+        details = [lbl for lbl, *_ in restraint_specs]
 
         mbe_automation.common.display.box_with_details(
             title=s_lbl, 
