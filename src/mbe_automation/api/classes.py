@@ -294,7 +294,7 @@ class ForceConstants(_ForceConstants):
                 eigenvectors_storage=eigenvectors_storage,
             )
 
-        if freq_units == "invcm":
+        if freq_units == "cm-1":
             freqs *= phonopy.physical_units.get_physical_units().THzToCm
 
         return freqs, evecs
