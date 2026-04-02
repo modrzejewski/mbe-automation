@@ -238,7 +238,7 @@ class ForceConstants(_ForceConstants):
                 Used only when track_bands=True.
             symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
                 using crystal symmetry operations.
-            freq_units: Units of output frequencies, "invcm" or "THz".
+            freq_units: Units of output frequencies, "THz" or "cm-1".
  
         Returns:
             A tuple containing:
