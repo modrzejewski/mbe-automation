@@ -242,9 +242,11 @@ def _print_freq_table(
         print(row)
         if i == last_changed:
             print("-" * len(header))
+            break
 
-    if n_print < len(raw_frequencies):
-        print(f"  ... ({len(raw_frequencies) - n_print} modes omitted, all fixed)")
+    n_omitted = len(raw_frequencies) - (i + 1)
+    if n_omitted > 0:
+        print(f"  ... (remaining {n_omitted} frequencies remain at their initial values)")
 
 
 def _print_strategy_specs(
@@ -306,7 +308,7 @@ def _print_strategy_specs(
         )
 
 
-def _print_results(
+def _report_on_grid_search(
     grid: dict, 
     strategy_labels: list, 
     restraint_labels: list
@@ -454,8 +456,6 @@ def run(
         pre_groups = [[i] for i in range(n_modes)]
     n_pre = len(pre_groups)
 
-    print(f"\n  {n_modes} modes  |  T = {temp:.1f} K  |  {n_pre} pre-groups  |  {n_non_h}/{len(non_h_mask)} non-H atoms fitted\n")
-
     strategy_specs, restraint_specs, n_refined, high_limit_cm1 = _attempted_strategies(
         phonon_data=phonon_data,
         pre_groups=pre_groups,
@@ -471,7 +471,7 @@ def run(
     # Phase 2: run each strategy × restraint combination
     # ------------------------------------------------------------------
     mbe_automation.common.display.framed(
-        "ADP refinement  (strategy × restraint)"
+        "Grid search: strategy × restraint"
     )
     _print_strategy_specs(
         strategy_specs=strategy_specs, 
@@ -503,7 +503,6 @@ def run(
             grid[(s_lbl, r_lbl)] = result
             print(
                 f"    ‖ΔU‖ = {result['normalized_residual_norm']:.6f}"
-                f"  scale = {result['scale_factor']:.4f}"
                 f"  {'converged' if result['success'] else 'DID NOT CONVERGE'}"
             )
             if r_lbl == "no restraints":
@@ -515,7 +514,7 @@ def run(
     mbe_automation.common.display.framed(
         "Refinement results"
     )
-    _print_results(
+    _report_on_grid_search(
         grid=grid, 
         strategy_labels=strategy_labels, 
         restraint_labels=restraint_labels

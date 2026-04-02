@@ -1,4 +1,5 @@
 import sys
+import itertools
 import datetime
 from datetime import timezone
 import platform
@@ -206,18 +207,7 @@ def box_with_details(
         
     print("\n" + top_border)
     
-    max_lines = max(len(details), len(side_content))
-    for i in range(max_lines):
-        try:
-            d_txt = details[i]
-        except IndexError:
-            d_txt = ""
-        
-        try:
-            s_txt = side_content[i]
-        except IndexError:
-            s_txt = ""
-            
+    for d_txt, s_txt in itertools.zip_longest(details, side_content, fillvalue=""):
         row = f"│ {d_txt:<{actual_width-1}}│  {s_txt}"
         print(row)
         
