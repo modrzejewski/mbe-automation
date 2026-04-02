@@ -99,7 +99,8 @@ def _phonons(
     """
     Load CIF, optimize geometry, compute Γ-point phonons.
 
-    Returns a dict with phonon_data, u_exp, raw_frequencies, and temperature.
+    Returns a dict with phonon_data, u_exp, raw_frequencies, temperature,
+    non_h_mask, n_atoms_p1, and structure_p1.
     Does NOT run any refinement.
     """
     adapter = cctbx_mod.CctbxAdapter(cif_path=cif_path)
@@ -123,7 +124,7 @@ def _phonons(
     # constraints (U_iso(H) ≈ 1.2·U_eq(C)), always spherical, while u_calc is
     # a full anisotropic tensor.  Keeping H biases the frequency refinement.
     elements = [sc.element_symbol() for sc in p1.scatterers()]
-    non_h_mask = np.array([el.upper() != 'H' for el in elements])
+    non_h_mask = np.array([el.upper() not in ("H", "D", "T") for el in elements])
 
     u_exp = extract_adps_from_structure(p1)[non_h_mask]  # (N_non_H, 3, 3) Å²
     atoms = _p1_to_ase_atoms(p1=p1)
@@ -158,12 +159,13 @@ def _phonons(
     )
 
     return {
-        "phonon_data": phonon_data,
-        "u_exp": u_exp,
-        "non_h_mask": non_h_mask,
+        "phonon_data":   phonon_data,
+        "u_exp":         u_exp,
+        "non_h_mask":    non_h_mask,
+        "n_atoms_p1":    len(atoms),
         "raw_frequencies": raw_frequencies,
-        "temperature": temp,
-        "structure_p1": p1
+        "temperature":   temp,
+        "structure_p1":  p1,
     }
 
 def _exec_strategy(
@@ -462,11 +464,10 @@ def run(
 
     n_modes = len(phonon_data.frequencies_cm1)
     n_non_h = int(non_h_mask.sum())
-    assert n_non_h > 0, "No heavy atoms found"
+    assert n_non_h > 0, "No heavy atoms found. Cannot continue with refinement."
     pre_groups = create_pre_groups(phonon_data=phonon_data)
     if pre_groups is None:
         pre_groups = [[i] for i in range(n_modes)]
-    n_pre = len(pre_groups)
 
     strategy_specs, restraint_specs, n_refined, high_limit_cm1 = _attempted_strategies(
         phonon_data=phonon_data,
