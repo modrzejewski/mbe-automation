@@ -38,7 +38,7 @@ def _p1_to_ase_atoms(p1) -> ase.Atoms:
     return ase.Atoms(symbols=symbols, positions=cart, cell=cell, pbc=True)
 
 
-def _fixed_groups(
+def _manual_groups(
     phonon_data, 
     pre_groups: list,
     n_refined: int, 
@@ -48,22 +48,23 @@ def _fixed_groups(
     Three-tier FixedThresholdStrategy reproducing the original NoMoRe literature
     approach (Hoser & Madsen, IUCrJ 2016 / Hoser et al.):
 
-    - LOW   (n_refined individual parameters): the n_refined lowest-frequency modes,
-            each with its own scale factor.
-    - MEDIUM (one shared MFSF):            all modes whose frequency lies between
+    - LOW   (n_refined individual parameters): the n_refined lowest-frequency
+            groups of degenerate modes, each group with its own scale factor.
+    - MEDIUM (one shared MFSF): all modes whose frequency lies between
             medium_limit and high_limit.  medium_limit is placed halfway between
-            mode[n_refined-1] and mode[n_refined] so that exactly n_refined modes fall in LOW.
-    - HIGH  (fixed at MLIP values):        modes at or above high_limit.
-
-    No pre-group / degeneracy collapsing is applied here — the boundary is set
-    directly in frequency space by individual mode index, as in the paper.
+            group[n_refined-1] and group[n_refined] so that exactly n_refined
+            groups fall in LOW.
+    - HIGH  (fixed at MLIP values): modes at or above high_limit.
 
     Args:
-        phonon_data:  PhononData with .frequencies_cm1 already clamped.
-        n_refined:    Number of individually refined LOW modes.
+        phonon_data:   PhononData with .frequencies_cm1 already clamped.
+        pre_groups:    List of degenerate-mode groups from create_pre_groups().
+        n_refined:     Number of lowest-frequency groups of degenerate modes
+                       to refine individually (each group gets its own scale
+                       factor).
         high_limit_cm1: Frequency (cm⁻¹) above which modes are strictly fixed.
-                      1000 cm⁻¹ covers all lattice and most intramolecular modes
-                      while excluding C–H stretches (~3000 cm⁻¹).
+                       1000 cm⁻¹ covers all lattice and most intramolecular
+                       modes while excluding C–H stretches (~3000 cm⁻¹).
     """
     freqs = phonon_data.frequencies_cm1
     if n_refined <= 0:
@@ -246,7 +247,7 @@ def _print_freq_table(
 
     n_omitted = len(raw_frequencies) - (i + 1)
     if n_omitted > 0:
-        print(f"  ... (remaining {n_omitted} frequencies remain at their initial values)")
+        print(f"  ... {n_omitted} frequencies remain at their initial values")
 
 
 def _print_strategy_specs(
@@ -256,50 +257,40 @@ def _print_strategy_specs(
 ) -> None:
     """
     Print the specs of each strategy combined with all applied restraints.
+
+    Each box shows:
+      - Strategy-specific parameters
+      - Number of individually refined modes
+      - Number of modes refined using a common scaling factor (MFSF)
     """
     for s_lbl, groups in strategy_specs:
         details = []
-        details.append(f"Total parameters: {groups.n_parameters()}")
-        
-        # MFSF info (shared by all current tier-based strategies)
-        fixed_strat_info = next((v for v in groups.group_metadata.values() if isinstance(v, dict) and v.get('type') == 'mfsf'), None)
-        fixed_info = groups.group_metadata.get(-1)
 
-        # Strategy-specific details
-        if s_lbl == "fixed":
-            # In Fixed strategy, n_refined = n_params - 1
-            details.append(f"Individual: {groups.n_parameters() - 1}")
-            details.append(f"Shared factor up to {high_limit_cm1:.1f} cm⁻¹")
+        # ── Strategy-specific parameters ──────────────────────────
+        if s_lbl == "manual":
+            details.append(f"high_limit = {high_limit_cm1:.0f} cm⁻¹")
 
-        elif s_lbl == "thermal" or s_lbl == "sensitivity":
-            # Show Fixed tier counts/ranges for high-level strategies
-            if fixed_strat_info:
-                details.append(f"Fixed modes: {fixed_strat_info.get('n_modes')}")
-                if 'freq_range' in fixed_strat_info:
-                    fr = fixed_strat_info['freq_range']
-                    details.append(f"Fixed tier range: {fr[0]:.1f}-{fr[1]:.1f} cm⁻¹")
+        elif s_lbl == "thermal":
+            tf = groups.group_metadata.get('thermal_factors')
+            t = groups.group_metadata.get('temperature')
+            if tf:
+                details.append(f"factors = {tf[0]} kT, {tf[1]} kT")
+            if t:
+                details.append(f"T = {t:.1f} K")
 
-            if s_lbl == "thermal":
-                tf = groups.group_metadata.get('thermal_factors')
-                if tf:
-                    details.append(f"Factors: {tf[0]} kT, {tf[1]} kT")
-                t = groups.group_metadata.get('temperature')
-                if t:
-                    details.append(f"T = {t:.1f} K")
-            elif s_lbl == "sensitivity":
-                if fixed_strat_info and 'sensitivity_threshold' in fixed_strat_info:
-                    st = fixed_strat_info['sensitivity_threshold']
-                    details.append(f"Thresholds: {st[0]}, {st[1]}")
+        elif s_lbl == "sensitivity":
+            mfsf_meta = next(
+                (v for v in groups.group_metadata.values()
+                 if isinstance(v, dict) and v.get('type') == 'mfsf'),
+                None,
+            )
+            if mfsf_meta and 'sensitivity_threshold' in mfsf_meta:
+                st = mfsf_meta['sensitivity_threshold']
+                details.append(f"thresholds = {st[0]}, {st[1]}")
 
-        if fixed_info:
-            # Fixed tier info
-            details.append(f"Fixed modes: {fixed_info.get('n_modes')}")
-            if 'min_freq' in fixed_info and fixed_info['min_freq'] is not None:
-                details.append(f"Fixed from: {fixed_info['min_freq']:.1f} cm⁻¹")
-
-        # Restraint labels
+        # Restraint labels shown on the right
         side_content = [lbl for lbl, *_ in restraint_specs]
-        
+
         mbe_automation.common.display.box_with_details(
             title=s_lbl, 
             details=details, 
@@ -367,7 +358,7 @@ def _attempted_strategies(
     strategy_specs = [
         # -- Literature NoMoRe (Hoser & Madsen): n individual LOW modes + one
         #    shared MFSF for everything up to high_limit cm⁻¹, rest fixed.
-        ("fixed", _fixed_groups(
+        ("manual", _manual_groups(
             phonon_data=phonon_data, 
             pre_groups=pre_groups,
             n_refined=n_refined, 
