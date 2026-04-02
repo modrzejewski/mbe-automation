@@ -34,28 +34,55 @@ def _crystal_optimizer_ase(
 ):
     """
     Optimize atomic positions and lattice vectors simultaneously.
+    
+    AZFF-specific handling:
+    For AZFF calculator, uses StrainFilter instead of FrechetCellFilter
+    because FrechetCellFilter is incompatible with OpenMM's strict cell
+    vector convention (first vector must be parallel to x-axis).
     """
     pressure_eV_A3 = pressure_GPa * ase.units.GPa/(ase.units.eV/ase.units.Angstrom**3)
     relaxed_system = unit_cell.copy()
     relaxed_system.calc = calculator
     
+    # Detect if using AZFF calculator
+    use_strain_filter = False
+    if calculator is not None:
+        calc_level = getattr(calculator, 'level_of_theory', None)
+        if calc_level == "AZFF":
+            use_strain_filter = True
+    
     if optimize_lattice_vectors:
-        print("Applying Frechet cell filter")
-        #
-        # Cell filter is required for simultaneous
-        # optimization of atomic positions and cell vectors.
-        #
-        # Frechet cell filter gives good convergence
-        # for cell relaxation when used with macine-learning
-        # interatomic potentials, see Table 2 in 
-        # ACS Materials Lett. 7, 2105 (2025);
-        # doi: 10.1021/acsmaterialslett.5c00093
-        #
-        system_with_filter = ase.filters.FrechetCellFilter(
-            relaxed_system,
-            constant_volume=(not optimize_volume),
-            scalar_pressure=pressure_eV_A3
-        )
+        if use_strain_filter:
+            print("Applying StrainFilter (AZFF-compatible)")
+            #
+            # StrainFilter is used for AZFF because FrechetCellFilter
+            # is incompatible with OpenMM's strict cell vector convention.
+            #
+            # StrainFilter applies isotropic or anisotropic strain to the cell
+            # without requiring orthogonal vectors, making it compatible with
+            # calculators that enforce cell geometry constraints.
+            #
+            system_with_filter = ase.filters.StrainFilter(
+                relaxed_system,
+                mask=[1, 1, 1, 0, 0, 0] if optimize_volume else [0, 0, 0, 0, 0, 0]
+            )
+        else:
+            print("Applying Frechet cell filter")
+            #
+            # Cell filter is required for simultaneous
+            # optimization of atomic positions and cell vectors.
+            #
+            # Frechet cell filter gives good convergence
+            # for cell relaxation when used with machine-learning
+            # interatomic potentials, see Table 2 in 
+            # ACS Materials Lett. 7, 2105 (2025);
+            # doi: 10.1021/acsmaterialslett.5c00093
+            #
+            system_with_filter = ase.filters.FrechetCellFilter(
+                relaxed_system,
+                constant_volume=(not optimize_volume),
+                scalar_pressure=pressure_eV_A3
+            )
         system_to_optimize = system_with_filter
     else:
         system_to_optimize = relaxed_system
@@ -82,8 +109,8 @@ def _crystal_optimizer_ase(
             
             with warnings.catch_warnings():
                 #
-                # FrechetCellFilter sometimes floods the output with warnings
-                # about slightly inaccurate matrix exponential
+                # Filter sometimes floods the output with warnings
+                # about slightly inaccurate matrix exponential (FrechetCellFilter)
                 #
                 warnings.filterwarnings(
                     "ignore",
@@ -391,4 +418,3 @@ def isolated_molecule(
 
     else:
         raise ValueError("Unsupported object passed to relax.isolated_molecule.")
-
