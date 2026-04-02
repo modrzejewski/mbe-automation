@@ -137,7 +137,7 @@ def _phonons(
 
     ase_adapter = ase_adapter_mod.AseAdapter(phonons=sym_phonons.phonons)
     phonon_data = ase_adapter.get_phonon_data(
-        supercell=(1, 1, 1), 
+        q_mesh=(1, 1, 1), 
         symmetrize=True
     )
     phonon_data.temperature = temp
