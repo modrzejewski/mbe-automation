@@ -1,0 +1,278 @@
+"""
+ASE Calculator wrapper for the AZ-FF (AstraZeneca Force Field).
+
+This calculator:
+    * Reads a CIF / ASE Atoms object
+    * Builds AZ-FF topology (bonds, angles, dihedrals)
+    * Assigns FF types (FF_1, FF_2, …)
+    * Constructs OpenMM System via openmm_builder.py
+    * Computes energy, forces, (optional) stress
+    * Returns results in ASE units (eV, eV/Å, eV/Å³)
+
+This file contains NO force-field parsing logic and NO topology logic.
+Everything is delegated cleanly to other modules.
+
+Key behaviors:
+    * System is lazily built when calculate() is first called.
+    * System is rebuilt on atom number changes or topology changes.
+    * Positions & cell are updated each call.
+    * Results stored in self.results, as ASE expects.
+
+The design matches your MBE-automation workflow and requires no hacks.
+"""
+
+from __future__ import annotations
+from typing import List, Dict, Tuple, Any
+
+import numpy as np
+from ase import Atoms
+from ase.calculators.calculator import Calculator, all_changes
+
+from .ff_parser import parse_opls_ff
+from .typing_rules import assign_types
+from .topology import build_topology
+from .openmm_builder import build_openmm_system
+from .units import (
+    energy_kjmol_to_eV,
+    forces_kjmol_per_nm_to_eV_per_A,
+    stress_kjmol_per_nm3_to_eV_per_A3,
+)
+
+
+import openmm as mm
+
+
+# -------------------------------------------------------------------------
+# Main AZFF Calculator
+# -------------------------------------------------------------------------
+class AZFFCalculator(Calculator):
+    """
+    ASE-compatible calculator for AZ-FF.
+
+    Parameters
+    ----------
+    ff_path : str
+        Path to the AZ-FF / OPLS-AA force-field file.
+    flx_path : str or None
+        Optional file for torsion overrides (not required for crystals).
+    use_pbc : bool
+        Enable periodic boundary conditions.
+    vdw_cut_ang : float
+        LJ cutoff (Angstrom).
+    coul_cut_ang : float
+        Coulomb cutoff (Angstrom).
+    lj14_scale : float
+        Scaling factor for 1–4 LJ.
+    coul14_scale : float
+        Scaling factor for 1–4 Coulomb.
+
+    Notes
+    -----
+    The constructor does NOT take an Atoms object (ASE standard).
+    The Atoms is provided later via calculate().
+    """
+
+    implemented_properties = ["energy", "forces", "stress"]
+
+    def __init__(
+        self,
+        ff_path: str,
+        flx_path: str | None = None,
+        use_pbc: bool = True,
+        vdw_cut_ang: float = 10.0,
+        coul_cut_ang: float = 10.0,
+        lj14_scale: float = 0.5,
+        coul14_scale: float = 1.0,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.ff_path = ff_path
+        self.flx_path = flx_path
+        self.use_pbc = use_pbc
+
+        self.vdw_cut_ang = vdw_cut_ang
+        self.coul_cut_ang = coul_cut_ang
+        self.lj14_scale = lj14_scale
+        self.coul14_scale = coul14_scale
+
+        # Force-field data read once
+        self.ffdata = parse_opls_ff(ff_path)
+
+        # Internal OpenMM objects (lazy creation)
+        self._system_built = False
+        self._sim = None
+        self._omm_system = None
+
+        # Used by your MBE automation
+        self.level_of_theory = "AZFF"
+
+    # ---------------------------------------------------------------------
+    # Required for Ray-based parallelization in MBE-automation
+    # ---------------------------------------------------------------------
+    def serialize(self) -> Tuple[Any, Dict[str, Any]]:
+        """
+        Return class + kwargs so that Ray workers can reconstruct the calculator.
+        """
+        return AZFFCalculator, {
+            "ff_path": self.ff_path,
+            "flx_path": self.flx_path,
+            "use_pbc": self.use_pbc,
+            "vdw_cut_ang": self.vdw_cut_ang,
+            "coul_cut_ang": self.coul_cut_ang,
+            "lj14_scale": self.lj14_scale,
+            "coul14_scale": self.coul14_scale,
+        }
+
+    # ---------------------------------------------------------------------
+    # Core ASE entry point
+    # ---------------------------------------------------------------------
+    def calculate(self, atoms=None, properties=("energy",), system_changes=all_changes):
+        super().calculate(atoms, properties, system_changes)
+
+        if atoms is None:
+            atoms = self.atoms
+
+        # Build or rebuild system if needed
+        if (not self._system_built) or ("numbers" in system_changes):
+            self._build_system(atoms)
+
+        # Update positions & cell
+        self._update_state(atoms, system_changes)
+
+        # Query OpenMM for energy & forces
+        state = self._sim.context.getState(getEnergy=True, getForces=True)
+
+        # Extract in OpenMM native units (kJ/mol, nm)
+        E_kjmol = state.getPotentialEnergy().value_in_unit(mm.unit.kilojoule_per_mole)
+        F_kjmol_nm = state.getForces(asNumpy=True).value_in_unit(
+            mm.unit.kilojoule_per_mole / mm.unit.nanometer
+        )
+
+        # Convert to ASE units
+        self.results["energy"] = energy_kjmol_to_eV(E_kjmol)
+        self.results["forces"] = forces_kjmol_per_nm_to_eV_per_A(F_kjmol_nm)
+
+        # Stress computation (numerical)
+        if "stress" in properties:
+            self.results["stress"] = self._numerical_stress(atoms)
+
+    # ---------------------------------------------------------------------
+    # Build or rebuild OpenMM System
+    # ---------------------------------------------------------------------
+    def _build_system(self, atoms: Atoms):
+        # Step 1: Assign types
+        symbols = atoms.get_chemical_symbols()
+        topology = build_topology(atoms)
+        types = assign_types(symbols, topology["neighbors"], self.ffdata)
+
+        # Step 2: Build OpenMM system
+        sim, omm_sys = build_openmm_system(
+            atoms=atoms,
+            ff=self.ffdata,
+            types=types,
+            topology=topology,
+            use_pbc=self.use_pbc,
+            vdw_cut_ang=self.vdw_cut_ang,
+            coul_cut_ang=self.coul_cut_ang,
+            lj14_scale=self.lj14_scale,
+            coul14_scale=self.coul14_scale,
+        )
+
+        self._sim = sim
+        self._omm_system = omm_sys
+        self._system_built = True
+
+    # ---------------------------------------------------------------------
+    def _update_state(self, atoms: Atoms, system_changes):
+        """
+        Ensure the cell is OpenMM-compatible and update positions.
+        """
+        
+        # --------------------------------------------------------------
+        # 1. Handle periodic cell requirements for OpenMM
+        # --------------------------------------------------------------
+        if self.use_pbc:
+            # Always standardize the box to lower-triangular form
+            cellpar = atoms.get_cell().cellpar()      # (a,b,c,alpha,beta,gamma)
+            atoms.set_cell(cellpar, scale_atoms=False)
+            
+            # Push reduced vectors to OpenMM
+            A, B, C = atoms.get_cell()
+            self._sim.context.setPeriodicBoxVectors(
+                A * 0.1, B * 0.1, C * 0.1
+            )
+        else:
+            # Non-periodic → ensure NonPeriodic method is used in builder
+            pass
+
+        # --------------------------------------------------------------
+        # 2. Update positions
+        # --------------------------------------------------------------
+        pos_nm = atoms.get_positions() * 0.1
+        self._sim.context.setPositions(pos_nm)
+        
+    # ---------------------------------------------------------------------
+    # Numerical stress via central finite differences
+    # ---------------------------------------------------------------------
+    def _numerical_stress(self, atoms: Atoms, d: float = 1e-5) -> np.ndarray:
+        if not self.use_pbc or atoms.get_volume() == 0:
+            raise ValueError("Stress requires periodic boundary conditions and a finite cell.")
+
+        stress = np.zeros(6)
+        cell0 = atoms.get_cell().copy()
+        pos0 = atoms.get_positions().copy()
+        frac0 = atoms.get_scaled_positions()
+        vol = atoms.get_volume()
+
+        voigt = [(0,0),(1,1),(2,2),(1,2),(0,2),(0,1)]
+
+        for i, (j, k) in enumerate(voigt):
+            strain = np.zeros((3,3))
+            strain[j,k] = d
+            strain[k,j] = d
+
+            # +str
+            cell_p = cell0 @ (np.eye(3) + strain)
+            atoms.set_cell(cell_p, scale_atoms=False)
+            atoms.set_cell(atoms.get_cell().cellpar(), scale_atoms=False)
+            atoms.set_scaled_positions(frac0)
+
+            self._sim.context.setPeriodicBoxVectors(
+                *(atoms.get_cell()[m] * 0.1 for m in range(3))
+            )
+            self._sim.context.setPositions(atoms.get_positions() * 0.1)
+            e_plus = (
+                self._sim.context
+                .getState(getEnergy=True)
+                .getPotentialEnergy()
+                .value_in_unit(mm.unit.kilojoule_per_mole)
+            )
+
+            # -str
+            cell_m = cell0 @ (np.eye(3) - strain)
+            atoms.set_cell(cell_m, scale_atoms=False)
+            atoms.set_cell(atoms.get_cell().cellpar(), scale_atoms=False)
+            atoms.set_scaled_positions(frac0)
+
+            self._sim.context.setPeriodicBoxVectors(
+                *(atoms.get_cell()[m] * 0.1 for m in range(3))
+            )
+            self._sim.context.setPositions(atoms.get_positions() * 0.1)
+            e_minus = (
+                self._sim.context
+                .getState(getEnergy=True)
+                .getPotentialEnergy()
+                .value_in_unit(mm.unit.kilojoule_per_mole)
+            )
+
+            stress[i] = (e_plus - e_minus) / (2 * d * vol)
+
+        # restore
+        atoms.set_cell(cell0)
+        atoms.set_positions(pos0)
+        self._sim.context.setPeriodicBoxVectors(*(cell0[i] * 0.1 for i in range(3)))
+        self._sim.context.setPositions(pos0 * 0.1)
+
+        # convert kJ/mol·Å⁻³ → eV/Å³
+        return stress_kjmol_per_nm3_to_eV_per_A3(stress)

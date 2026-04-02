@@ -37,7 +37,7 @@ class FreeEnergy:
                                    # (1) sample volumes/pressures to determine
                                    # points on the F(V) curve.
                                    # (2) perform fit of an analytic formula for
-                                   # F(V)
+                                  # F(V)
                                    # (3) minimize F(V;T) w.r.t. V at each temperature
                                    # to determine the equilibrium V(T)
                                    #

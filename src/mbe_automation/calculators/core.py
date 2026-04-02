@@ -19,11 +19,13 @@ from mbe_automation.storage.core import (
 from mbe_automation.calculators.mace import MACE, DeltaMACE
 from mbe_automation.calculators.pyscf import PySCFCalculator, SCFNotConverged
 from mbe_automation.calculators.dftb import DFTBCalculator
+from mbe_automation.calculators.azff import AZFFCalculator
+
 import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
-CALCULATORS = PySCFCalculator | DFTBCalculator | MACE | DeltaMACE
+CALCULATORS = PySCFCalculator | DFTBCalculator | MACE | DeltaMACE | AZFFCalculator
 
 def _split_work(structure: Structure, n_workers: int):
     assert structure.atomic_numbers.ndim == structure.masses.ndim
@@ -327,7 +329,7 @@ else:
 
 def run_model(
     structure: Structure,
-    calculator: MACE | PySCFCalculator | DFTBCalculator,
+    calculator: MACE | PySCFCalculator | DFTBCalculator | AZFFCalculator,
     compute_energies: bool = True,
     compute_forces: bool = True,
     compute_feature_vectors: bool = True,
@@ -341,6 +343,7 @@ def run_model(
     The coordinates are not modified.
 
     """
+
     if resources is None:
         resources = Resources.auto_detect()
 
@@ -412,4 +415,9 @@ def run_model(
         if n_failed > 0:
             print(f"{n_failed} out of {n_total} frames failed")
 
-    return E_pot, forces, feature_vectors, statuses
+    if isinstance(calculator, MACE):
+        return E_pot, forces, feature_vectors, statuses
+
+    # For AZFFCalculator and all other non-MACE calculators:
+    return E_pot, forces, statuses
+

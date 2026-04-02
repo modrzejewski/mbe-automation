@@ -1,0 +1,340 @@
+"""
+Parser for the customized OPLS-AA / AZ-FF force-field file.
+
+This parser reads the textual force-field definition (e.g., "oplsaa.ff")
+and extracts all bonded and nonbonded parameters required to build the
+OpenMM system:
+
+Sections parsed:
+    - VDW_DIAG_PARAMS
+    - BOND_STRETCH_HARMONIC
+    - ANGLE_BEND_HARMONIC
+    - TORSIONS_COSINE
+    - INVERSIONS_OVERALL     (optional)
+    - HBONDS_LJ_12_10        (optional)
+
+The parsing logic is based directly on the structure in the uploaded
+"oplsaa (1).txt" file. No assumptions are made beyond those patterns.
+
+Outputs a dictionary:
+{
+    "vdw":     { ff_type: {A, B, sigma, epsilon} },
+    "bonds":   { (type_i, type_j): (k, r0) },
+    "angles":  { (ti, tj, tk): (k, theta0_deg) },
+    "diheds":  { (ti, tj, tk, tl): [ (P, S, V), ... ] },
+    "inversions": { (i,j,k,l): k_inv },
+    "hbonds":  [ (H_type, A_type, depth, Req_A) ]
+}
+"""
+
+from __future__ import annotations
+import re
+from typing import Dict, List, Tuple, Optional
+
+
+# -------------------------------------------------------------------------
+# Helper regex pattern
+# -------------------------------------------------------------------------
+_FF_TYPE = re.compile(r"^FF_\d+$")
+
+
+# -------------------------------------------------------------------------
+# Public API
+# -------------------------------------------------------------------------
+def parse_opls_ff(path: str) -> Dict:
+    """
+    Parse a custom OPLS-AA / AZ-FF parameter file.
+
+    Parameters
+    ----------
+    path : str
+        Path to a force-field text file.
+
+    Returns
+    -------
+    dict
+        Dictionary of all FF terms.
+    """
+    with open(path, "r", encoding="utf-8") as fh:
+        txt = fh.read()
+
+    ff = {
+        "vdw": _parse_vdw(txt),
+        "bonds": _parse_bonds(txt),
+        "angles": _parse_angles(txt),
+        "diheds": _parse_torsions(txt),
+        "inversions": _parse_inversions(txt),
+        "hbonds": _parse_hbonds(txt),
+    }
+    return ff
+
+
+# -------------------------------------------------------------------------
+# VDW SECTION
+# -------------------------------------------------------------------------
+def _parse_vdw(txt: str) -> Dict[str, Dict[str, float]]:
+    """
+    Parse the VDW_DIAG_PARAMS block.
+
+    Expected format (example):
+        FF_1  8303460.49   3622.08   # SA   3.631 0.395
+        ^t   ^A            ^B               ^sigma  ^epsilon
+
+    Returns
+    -------
+    dict: { ff_type: {A, B, sigma, epsilon} }
+    """
+    out: Dict[str, Dict[str, float]] = {}
+
+    m = re.search(r"VDW_DIAG_PARAMS(.+?)END", txt, flags=re.S | re.I)
+    if not m:
+        return out
+
+    block = m.group(1).splitlines()
+    for line in block:
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+
+        lhs, *comment = s.split("#", 1)
+        parts = lhs.split()
+        if len(parts) < 3:
+            continue
+
+        t = parts[0]
+        if not _FF_TYPE.match(t):
+            continue
+
+        A = float(parts[1])
+        B = float(parts[2])
+
+        sigma = None
+        epsilon = None
+        if comment:
+            tail = comment[0].split()
+            # last two entries are σ and ε if present
+            if len(tail) >= 2:
+                try:
+                    sigma = float(tail[-2])
+                    epsilon = float(tail[-1])
+                except Exception:
+                    pass
+
+        out[t] = dict(A=A, B=B, sigma=sigma, epsilon=epsilon)
+
+    return out
+
+
+# -------------------------------------------------------------------------
+# BONDS SECTION
+# -------------------------------------------------------------------------
+def _parse_bonds(txt: str) -> Dict[Tuple[str, str], Tuple[float, float]]:
+    """
+    Parse BOND_STRETCH_HARMONIC section.
+
+    Format:
+        FF_i FF_j   k   r0
+
+    Returns
+    -------
+    dict { (ti, tj): (k, r0) }
+    """
+    out = {}
+    m = re.search(r"BOND_STRETCH_HARMONIC(.+?)END", txt, flags=re.S | re.I)
+    if not m:
+        return out
+
+    toks = m.group(1).split()
+    i = 0
+    while i + 3 < len(toks):
+        ti, tj = toks[i], toks[i + 1]
+        if _FF_TYPE.match(ti) and _FF_TYPE.match(tj):
+            k = float(toks[i + 2])
+            r0 = float(toks[i + 3])
+            key = tuple(sorted((ti, tj)))
+            out[key] = (k, r0)
+            i += 4
+        else:
+            i += 1
+    return out
+
+
+# -------------------------------------------------------------------------
+# ANGLES SECTION
+# -------------------------------------------------------------------------
+def _parse_angles(txt: str) -> Dict[Tuple[str, str, str], Tuple[float, float]]:
+    """
+    Parse ANGLE_BEND_HARMONIC section.
+
+    Format:
+        ti tj tk   ktheta   theta0_deg
+
+    Returns
+    -------
+    dict { (ti, tj, tk): (k, theta0_deg) }
+    """
+    out = {}
+    m = re.search(r"ANGLE_BEND_HARMONIC(.+?)END", txt, flags=re.S | re.I)
+    if not m:
+        return out
+
+    toks = m.group(1).split()
+    i = 0
+    while i + 4 < len(toks):
+        ti, tj, tk = toks[i], toks[i + 1], toks[i + 2]
+        if all(_FF_TYPE.match(x) for x in (ti, tj, tk)):
+            ktheta = float(toks[i + 3])
+            theta0 = float(toks[i + 4])
+            out[(ti, tj, tk)] = (ktheta, theta0)
+            i += 5
+        else:
+            i += 1
+
+    return out
+
+
+# -------------------------------------------------------------------------
+# TORSIONS SECTION
+# -------------------------------------------------------------------------
+def _parse_torsions(txt: str) -> Dict[Tuple[str, str, str, str], List[Tuple[int, int, float]]]:
+    """
+    Parse TORSIONS_COSINE section.
+
+    Format lines:
+        ti tj tk tl   V   P   S    # comment
+
+    Returns
+    -------
+    dict { (ti, tj, tk, tl): [ (P, S, V), ... ] }
+    """
+    out: Dict[Tuple[str, str, str, str], List[Tuple[int, int, float]]] = {}
+
+    m = re.search(r"TORSIONS_COSINE(.+?)END", txt, flags=re.S | re.I)
+    if not m:
+        return out
+
+    for line in m.group(1).splitlines():
+        s = line.split("#")[0].strip()
+        if not s:
+            continue
+        parts = s.split()
+        if len(parts) < 7:
+            continue
+        ti, tj, tk, tl = parts[0:4]
+        if not all(_FF_TYPE.match(x) for x in (ti, tj, tk, tl)):
+            continue
+
+        V = float(parts[4])
+        P = int(parts[5])
+        S = int(parts[6])
+
+        key = (ti, tj, tk, tl)
+        out.setdefault(key, []).append((P, S, V))
+
+    return out
+
+
+# -------------------------------------------------------------------------
+# INVERSIONS SECTION
+# -------------------------------------------------------------------------
+def _parse_inversions(txt: str) -> Dict[Tuple[int, int, int, int], float]:
+    """
+    Parse INVERSIONS_OVERALL section.
+
+    Format:
+       FF_i FF_j FF_k FF_l   0 2   0 0 0   k_inv   <comment>
+
+    Only k_inv is needed.
+
+    Returns
+    -------
+    dict { (i,j,k,l): k_inv }
+        where i,j,k,l are ff-type *indices* extracted from "FF_x".
+    """
+    out: Dict[Tuple[int, int, int, int], float] = {}
+
+    m = re.search(r"INVERSIONS_OVERALL(.+?)END", txt, flags=re.S | re.I)
+    if not m:
+        return out
+
+    for line in m.group(1).splitlines():
+        base = line.split("#")[0].strip()
+        if not base:
+            continue
+        parts = base.split()
+        # Need at least 4 FF types + trailing numbers
+        if len(parts) < 7:
+            continue
+
+        ti, tj, tk, tl = parts[:4]
+        if not all(_FF_TYPE.match(x) for x in (ti, tj, tk, tl)):
+            continue
+
+        # k_inv is at the last numeric position before comment
+        # Example pattern: ... 0 0 0 128.000 O1 0 ...
+        # So scan backwards for the last float
+        k_inv = _extract_last_float(parts)
+        if k_inv is None:
+            continue
+
+        idxs = tuple(int(x.split("_")[1]) for x in (ti, tj, tk, tl))
+        out[idxs] = k_inv
+
+    return out
+
+
+def _extract_last_float(parts: List[str]) -> Optional[float]:
+    """Extract the last parsable float from a list of tokens."""
+    for tok in reversed(parts):
+        try:
+            return float(tok)
+        except Exception:
+            continue
+    return None
+
+
+# -------------------------------------------------------------------------
+# HBONDS SECTION
+# -------------------------------------------------------------------------
+def _parse_hbonds(txt: str) -> List[Tuple[str, str, float, float]]:
+    """
+    Parse HBONDS_LJ_12_10 section.
+
+    Example lines:
+        X FF_19 FF_2   1   2.85
+        X FF_19 FF_4   2.1 2.85
+
+    Returns list of:
+        (H_type, A_type, D_depth, Req)
+    """
+    out: List[Tuple[str, str, float, float]] = []
+
+    m = re.search(r"HBONDS_LJ_12_10(.+?)END", txt, flags=re.S | re.I)
+    if not m:
+        return out
+
+    for line in m.group(1).splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+
+        parts = s.split()
+        # Expected minimum: X H_type A_type depth req
+        if len(parts) < 5:
+            continue
+
+        # parts[0] is usually 'X' (ignored)
+        ti = parts[1]
+        tj = parts[2]
+        if not (_FF_TYPE.match(ti) and _FF_TYPE.match(tj)):
+            continue
+
+        try:
+            depth = float(parts[3])
+            req = float(parts[4])
+        except Exception:
+            continue
+
+        out.append((ti, tj, depth, req))
+
+    return out

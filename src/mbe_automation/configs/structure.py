@@ -148,6 +148,12 @@ class Minimum:
         if model_name in SEMIEMPIRICAL_DFTB:
             defaults["backend"] = "dftb"
             defaults["cell_relaxation"] = "full"
+        
+        if model_name == "azff":
+            defaults["backend"] = "ase"
+            defaults["cell_relaxation"] = "full"
+            defaults["max_force_on_atom_eV_A"] = 1e-4
+
 
         defaults.update(kwargs)
         
