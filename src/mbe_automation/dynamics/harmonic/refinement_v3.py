@@ -377,7 +377,7 @@ def _attempted_strategies(
     # Each entry: (label, restraint_weight, adaptive_restraint_weight)
     # ------------------------------------------------------------------
     restraint_specs = [
-        ("no restraints",      0.0,   0.0),
+        # ("no restraints",      0.0,   0.0),
         ("bayes (1.0E-04)",    1e-4,  0.0),
         ("bayes (1.0E-03)",    1e-3,  0.0),
         ("bayes (1.0E-02)",    1e-2,  0.0),
@@ -438,6 +438,7 @@ def run(
 
     n_modes = len(phonon_data.frequencies_cm1)
     n_non_h = int(non_h_mask.sum())
+    assert n_non_h > 0, "No heavy atoms found"
     pre_groups = create_pre_groups(phonon_data=phonon_data)
     if pre_groups is None:
         pre_groups = [[i] for i in range(n_modes)]
