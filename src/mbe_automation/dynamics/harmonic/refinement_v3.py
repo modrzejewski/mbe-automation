@@ -410,8 +410,32 @@ def run(
     """
     Full pipeline: phonons once, then compare strategies × restraint schemes.
 
-    Returns dict with 'grid' (keyed by (strategy, restraint)), 'phonon_data',
-    and 'u_exp'.
+    Returns a dict with the following keys:
+
+    ``frequencies``
+        Refined phonon frequencies (cm⁻¹) from the winning strategy/restraint
+        combination, as a 1-D NumPy array of length *n_modes*.
+
+    ``initial_frequencies``
+        Raw (pre-clamping, pre-refinement) phonon frequencies (cm⁻¹), also a
+        1-D NumPy array of length *n_modes*.  Useful for comparing how much the
+        refinement moved each mode.
+
+    ``u_calc``
+        Calculated ADP tensors for **non-H atoms** from the winning refinement,
+        shape ``(N_non_H, 3, 3)`` in Å².  These are the model ADPs predicted by
+        the adjusted phonon frequencies.
+
+    ``u_exp``
+        Experimental ADP tensors for **non-H atoms** extracted from the CIF
+        structure, shape ``(N_non_H, 3, 3)`` in Å².  The atom ordering matches
+        ``u_calc`` exactly (both are masked with the same ``non_h_mask``).
+
+    ``result``
+        The raw result dict from the winning ``_exec_strategy`` call, containing
+        ``label``, ``restraint_label``, ``n_params``,
+        ``normalized_residual_norm``, ``success``, ``frequencies``, and
+        ``u_calc``.
     """
     if not _NOMORE_AVAILABLE:
         raise ImportError(
@@ -520,7 +544,8 @@ def run(
     return {
         "frequencies": winner["frequencies"],
         "initial_frequencies": raw_freqs,
-        "u_calc": winner["u_calc"], # contains ADPs only for non-H atoms
+        "u_calc": winner["u_calc"],  # (N_non_H, 3, 3) Å² – calculated ADPs for non-H atoms
+        "u_exp": u_exp,              # (N_non_H, 3, 3) Å² – experimental ADPs for non-H atoms
         "result": winner,
     }
 
