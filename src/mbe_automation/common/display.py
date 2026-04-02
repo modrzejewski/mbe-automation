@@ -195,9 +195,10 @@ def box_with_details(
         width (int): Minimum internal width of the box.
     """
     label_part = f" {title} "
-    actual_width = max(width, len(label_part) + 4)
+    max_detail_len = max(len(d) for d in details) if details else 0
+    actual_width = max(width, len(label_part) + 4, max_detail_len + 2)
     
-    top_border = "┌─" + label_part + "─" * (actual_width - len(label_part) - 2) + "┐"
+    top_border = "┌─" + label_part + "─" * (actual_width - len(label_part) - 1) + "┐"
     bottom_border = "└" + "─" * (actual_width) + "┘"
     
     if side_content is None:
