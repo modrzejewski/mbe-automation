@@ -211,7 +211,7 @@ class ForceConstants(_ForceConstants):
             delta_q: float = 0.05,
             symmetrize_Dq: bool = False,
             symprec: float = 1e-5,
-            freq_units: Literal["invcm", "THz"] = "THz",
+            freq_units: Literal["THz", "cm-1"] = "THz",
     ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
         """
         Compute phonon frequencies and eigenvectors at specified k-points.
