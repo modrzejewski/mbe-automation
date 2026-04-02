@@ -124,7 +124,7 @@ def _phonons(
     elements = [sc.element_symbol() for sc in p1.scatterers()]
     non_h_mask = np.array([el.upper() != 'H' for el in elements])
 
-    u_exp = extract_adps_from_structure(structure=p1)[non_h_mask]  # (N_non_H, 3, 3) Å²
+    u_exp = extract_adps_from_structure(p1)[non_h_mask]  # (N_non_H, 3, 3) Å²
     atoms = _p1_to_ase_atoms(p1=p1)
 
     sym_phonons = get_symmetric_phonons(
