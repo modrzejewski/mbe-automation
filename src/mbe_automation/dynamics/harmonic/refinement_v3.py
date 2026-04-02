@@ -471,9 +471,6 @@ def run(
     )
 
     grid = {}          # (strategy_label, restraint_label) -> result dict
-    # Keep a flat list of "no restraint" results for the freq table
-    no_restraint_results = []
-
     total = len(strategy_specs) * len(restraint_specs)
     done  = 0
     for s_lbl, groups in strategy_specs:
@@ -496,8 +493,6 @@ def run(
                 f"    ‖ΔU‖ = {result['normalized_residual_norm']:.6f}"
                 f"  {'converged' if result['success'] else 'DID NOT CONVERGE'}"
             )
-            if r_lbl == "no restraints":
-                no_restraint_results.append(result)
 
     # ------------------------------------------------------------------
     # Summary phases: boxed per-strategy results + 2D table
@@ -528,8 +523,7 @@ def run(
     return {
         "frequencies": winner["frequencies"],
         "initial_frequencies": raw_freqs,
-        "u_calc_non_h": winner["u_calc"],
-        "u_calc": winner["u_calc"],
+        "u_calc": winner["u_calc"], # contains ADPs only for non-H atoms
         "result": winner,
     }
 
