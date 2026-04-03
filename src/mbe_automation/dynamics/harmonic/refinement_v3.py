@@ -343,32 +343,37 @@ def _report_on_grid_search(
     the normalised residual norm and the per-atom heat capacity C_V.
     """
     col_r = 20   # restraint label column width
-    col_u = 8    # ‖ΔU‖ column width
-    col_c = 18   # C_V column width
+    col_u = 10   # ‖ΔU‖ column width (widened to fit "!" flag)
+    col_c = 20   # C_V column width
+    col_f = 20   # F_vib column width
 
     for s_lbl in strategy_labels:
         n_p = grid[(s_lbl, restraint_labels[0])]["n_params"]
 
         header = (
-            f"{'restraint':<{col_r}}  {'‖ΔU‖ (Å²)':>{col_u}}"
-            f"  {'Cv (J∕K∕mol∕atom)':>{col_c}}"
+            f"{'restraint':<{col_r}}  {'RMSD (Å²)':>{col_u}}"
+            f"  {'C_V (J∕K∕mol∕atom)':>{col_c}}"
+            f"  {'F (kJ∕mol∕atom)':>{col_f}}"
         )
         separator = (". " * (len(header) // 2 + 1))[:len(header)]
         details = [header, separator]
 
         for r_lbl in restraint_labels:
             res = grid[(s_lbl, r_lbl)]
-            flag = " !" if not res["success"] else ""
+            residual_str = f"{res['normalized_residual_norm']:.4f}"
+            if not res["success"]:
+                residual_str += " !"
             details.append(
-                f"{r_lbl:<{col_r}}  {res['normalized_residual_norm']:>{col_u}.4f}"
-                f"  {res['C_V_vib_crystal (J∕K∕mol∕atom)']:>{col_c}.4f}{flag}"
+                f"{r_lbl:<{col_r}}  {residual_str:>{col_u}}"
+                f"  {res['C_V_vib_crystal (J∕K∕mol∕atom)']:>{col_c}.4f}"
+                f"  {res['F_vib_crystal (kJ∕mol∕atom)']:>{col_f}.4f}"
             )
 
         mbe_automation.common.display.box_with_details(
             title=s_lbl,
             details=details,
             side_content=[f"n_params: {n_p}"],
-            width=60
+            width=col_r+col_u+col_c+col_f
         )
 
 
