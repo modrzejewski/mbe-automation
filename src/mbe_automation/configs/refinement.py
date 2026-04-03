@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 import numpy as np
 import numpy.typing as npt
 
@@ -63,6 +64,13 @@ class NormalModeRefinement:
     # 0 -> suppressed warnings
     #
     verbose: int = 0
+    #
+    # Criterion used to select the winning combination of refinement
+    # strategy and restraint scheme from the grid search.
+    # "mean_s12"  — minimise the mean s12 similarity index over non-H atoms
+    # "rmsd"      — minimise the normalised ADP residual norm (RMSD)
+    #
+    best_strategy_criterion: Literal["mean_s12", "rmsd"] = "mean_s12"
 
     def __post_init__(self):
         self.work_dir = Path(self.work_dir)
