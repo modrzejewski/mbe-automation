@@ -16,6 +16,7 @@ try:
         create_pre_groups,
     )
     from nomore_ase.analysis.validation import extract_adps_from_structure
+    from nomore_ase.analysis.s12_similarity import calculate_s12_per_atom
     _NOMORE_AVAILABLE = True
 except ImportError:
     _NOMORE_AVAILABLE = False
@@ -196,9 +197,10 @@ def _exec_strategy(
 
     Returns a dict with keys:
         label, n_params, normalized_residual_norm, success, frequencies,
-        u_calc, and the four per-atom thermodynamic scalars:
+        u_calc, the ADP matrix for each atom, the thermodynamic functions:
         E_vib_crystal (kJ∕mol∕atom), F_vib_crystal (kJ∕mol∕atom),
-        C_V_vib_crystal (J∕K∕mol∕atom), S_vib_crystal (J∕K∕mol∕atom).
+        C_V_vib_crystal (J∕K∕mol∕atom), S_vib_crystal (J∕K∕mol∕atom),
+        and the S12 similarity metrics s12_mean and s12_max (both in %).
     """
     nomore_calc = calc_mod.NoMoReCalculator(
         eigenvectors=phonon_data.eigenvectors[:, non_h_mask, :],
@@ -233,6 +235,18 @@ def _exec_strategy(
     C_V   = thermo_df["C_V_vib_crystal (J∕K∕mol∕unit cell)"].iloc[0] / n_atoms_p1
     S_vib = thermo_df["S_vib_crystal (J∕K∕mol∕unit cell)"].iloc[0] / n_atoms_p1
 
+    # ------------------------------------------------------------------
+    # S12 similarity index (Whitten & Spackman 2006)
+    # u_calc from fit_to_adps is already masked to non-H atoms, same
+    # shape as u_exp: (N_non_H, 3, 3).
+    # ------------------------------------------------------------------
+    s12_values, _ = calculate_s12_per_atom(
+        u_calc=result["u_calc"],
+        u_exp=u_exp,
+    )
+    s12_mean = np.mean(s12_values)
+    s12_max  = np.max(s12_values)
+
     return {
         "label":         label,
         "n_params":      groups.n_parameters(),
@@ -240,10 +254,12 @@ def _exec_strategy(
         "success":       result["success"],
         "frequencies":   result["full_x"],
         "u_calc":        result["u_calc"],
-        "E_vib_crystal (kJ∕mol∕atom)": E_vib,
-        "F_vib_crystal (kJ∕mol∕atom)": F_vib,
+        "E_vib_crystal (kJ∕mol∕atom)":   E_vib,
+        "F_vib_crystal (kJ∕mol∕atom)":   F_vib,
         "C_V_vib_crystal (J∕K∕mol∕atom)": C_V,
-        "S_vib_crystal (J∕K∕mol∕atom)": S_vib,
+        "S_vib_crystal (J∕K∕mol∕atom)":  S_vib,
+        "s12_mean": s12_mean,   # mean S12 over non-H atoms (%)
+        "s12_max":  s12_max,    # worst-atom S12 over non-H atoms (%)
     }
 
 
@@ -342,16 +358,18 @@ def _report_on_grid_search(
     Each box shows a header row followed by one row per restraint with
     the normalised residual norm and the per-atom heat capacity C_V.
     """
-    col_r = 20   # restraint label column width
-    col_u = 10   # ‖ΔU‖ column width (widened to fit "!" flag)
-    col_c = 20   # C_V column width
-    col_f = 20   # F_vib column width
+    col_r = 20   # restraint label
+    col_u = 10   # RMSD (Å²)
+    col_c = 20   # C_V (J∕K∕mol∕atom)
+    col_f = 20   # F (kJ∕mol∕atom)
+    col_s = 12   # ⟨s₁₂⟩ (%)
 
     for s_lbl in strategy_labels:
         n_p = grid[(s_lbl, restraint_labels[0])]["n_params"]
 
         header = (
             f"{'restraint':<{col_r}}  {'RMSD (Å²)':>{col_u}}"
+            f"  {'⟨s₁₂⟩ (%)':>{col_s}}"
             f"  {'C_V (J∕K∕mol∕atom)':>{col_c}}"
             f"  {'F (kJ∕mol∕atom)':>{col_f}}"
         )
@@ -365,6 +383,7 @@ def _report_on_grid_search(
                 residual_str += " !"
             details.append(
                 f"{r_lbl:<{col_r}}  {residual_str:>{col_u}}"
+                f"  {res['s12_mean']:>{col_s}.1f}"
                 f"  {res['C_V_vib_crystal (J∕K∕mol∕atom)']:>{col_c}.4f}"
                 f"  {res['F_vib_crystal (kJ∕mol∕atom)']:>{col_f}.4f}"
             )
@@ -373,7 +392,7 @@ def _report_on_grid_search(
             title=s_lbl,
             details=details,
             side_content=[f"n_params: {n_p}"],
-            width=col_r+col_u+col_c+col_f
+            width=col_r+col_u+col_c+col_f+col_s
         )
 
 
