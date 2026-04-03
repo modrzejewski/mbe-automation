@@ -1,4 +1,5 @@
 import sys
+import itertools
 import datetime
 from datetime import timezone
 import platform
@@ -170,6 +171,47 @@ def framed(text: str | list[str], padding: int = 10, min_width: int = 30) -> Non
     
     # Print bottom border
     print("└" + horizontal_line + "┘", flush=True)
+
+
+def box_with_details(
+    title: str,
+    details: list[str],
+    side_content: list[str] | None = None,
+    width: int = 30
+) -> None:
+    """
+    Draw a Unicode box with the title integrated into the top border.
+    Optional side_content is printed to the right of the box.
+    
+    Example:
+        ┌─ title ───────────────────┐
+        │ detail 1                  │  side 1
+        │ detail 2                  │  side 2
+        └───────────────────────────┘
+
+    Args:
+        title (str): The text to be placed in the top border.
+        details (list[str]): Lines of text to be placed inside the box.
+        side_content (list[str]): Optional lines to be printed to the right of the box.
+        width (int): Minimum internal width of the box.
+    """
+    label_part = f" {title} "
+    max_detail_len = max(len(d) for d in details) if details else 0
+    actual_width = max(width, len(label_part) + 4, max_detail_len + 2)
+    
+    top_border = "┌─" + label_part + "─" * (actual_width - len(label_part) - 1) + "┐"
+    bottom_border = "└" + "─" * (actual_width) + "┘"
+    
+    if side_content is None:
+        side_content = []
+        
+    print("\n" + top_border)
+    
+    for d_txt, s_txt in itertools.zip_longest(details, side_content, fillvalue=""):
+        row = f"│ {d_txt:<{actual_width-1}}│  {s_txt}"
+        print(row)
+        
+    print(bottom_border, flush=True)
 
 
 def shorten_path(path: str | Path, max_length: int = 60) -> str:

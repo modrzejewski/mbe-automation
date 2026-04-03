@@ -58,6 +58,11 @@ class NormalModeRefinement:
     # to a CSV file.
     #
     save_csv: bool = True
+    #
+    # Verbosity of the program's output.
+    # 0 -> suppressed warnings
+    #
+    verbose: int = 0
 
     def __post_init__(self):
         self.work_dir = Path(self.work_dir)

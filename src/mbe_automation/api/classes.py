@@ -211,6 +211,7 @@ class ForceConstants(_ForceConstants):
             delta_q: float = 0.05,
             symmetrize_Dq: bool = False,
             symprec: float = 1e-5,
+            freq_units: Literal["THz", "cm-1"] = "THz",
     ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
         """
         Compute phonon frequencies and eigenvectors at specified k-points.
@@ -237,10 +238,11 @@ class ForceConstants(_ForceConstants):
                 Used only when track_bands=True.
             symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
                 using crystal symmetry operations.
+            freq_units: Units of output frequencies, "THz" or "cm-1".
  
         Returns:
             A tuple containing:
-            - frequencies: Frequencies in THz.
+            - frequencies: Frequencies in the specified units.
             - eigenvectors: Eigenvectors of the dynamical matrix.
         """
         ph = mbe_automation.storage.to_phonopy(self)
@@ -262,7 +264,7 @@ class ForceConstants(_ForceConstants):
                 phonopy_object=ph,
                 k_points=k_points,
                 compute_eigenvecs=True,
-                freq_units="THz",
+                freq_units="THz", # We handle units at the end
                 eigenvectors_storage=eigenvectors_storage,
                 symmetrize_Dq=symmetrize_Dq,
                 symprec=symprec,
@@ -291,6 +293,9 @@ class ForceConstants(_ForceConstants):
                 eigenvectors=evecs,
                 eigenvectors_storage=eigenvectors_storage,
             )
+
+        if freq_units == "cm-1":
+            freqs *= phonopy.physical_units.get_physical_units().THzToCm
 
         return freqs, evecs
 
