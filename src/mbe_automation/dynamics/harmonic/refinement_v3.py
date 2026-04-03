@@ -378,18 +378,22 @@ def _report_on_grid_search(
 
         for r_lbl in restraint_labels:
             res = grid[(s_lbl, r_lbl)]
-            residual_str = f"{res['normalized_residual_norm']:.4f}"
+            label_str = r_lbl
             if not res["success"]:
-                residual_str += " !"
+                label_str += " !"
+
             details.append(
-                f"{r_lbl:<{col_r}}  {residual_str:>{col_u}}"
+                f"{label_str:<{col_r}}  {res['normalized_residual_norm']:>{col_u}.4f}"
                 f"  {res['s12_mean']:>{col_s}.2f}"
                 f"  {res['C_V_vib_crystal (J∕K∕mol∕atom)']:>{col_c}.4f}"
                 f"  {res['F_vib_crystal (kJ∕mol∕atom)']:>{col_f}.4f}"
             )
 
+        details.append(separator)
+        details.append(f"{'n_params':<{col_r}}  {n_p}")
+
         mbe_automation.common.display.box_with_details(
-            title=f"{s_lbl} (n_params: {n_p})",
+            title=s_lbl,
             details=details,
             side_content=[],
             width=col_r+col_u+col_c+col_f+col_s
@@ -629,7 +633,7 @@ def run(
         error_str = f"⟨s₁₂⟩ = {winner['s12_mean']:.2f}%"
 
     mbe_automation.common.display.framed(
-        f"Winning Strategy: {winner['label']} + {winner['restraint_label']} ({error_str})"
+        f"Winning Strategy: {winner['label']} + {winner['restraint_label']} | {error_str}"
     )
 
     _print_freq_table(
