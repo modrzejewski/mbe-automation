@@ -10,6 +10,7 @@ import ase.io.trajectory
 import dynasor
 import phonopy
 import pymatgen
+
 from phonopy.structure.atoms import PhonopyAtoms
 
 from . import core
@@ -392,5 +393,4 @@ def to_phonopy(
     ph.force_constants = fc_data.force_constants
 
     return ph
-
 

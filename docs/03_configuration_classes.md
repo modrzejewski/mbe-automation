@@ -4,6 +4,7 @@ This chapter documents the configuration classes used to control the various wor
 
 - [Thermodynamics](#thermodynamics)
     - [`FreeEnergy`](#freeenergy-class)
+    - [`EEC`](#eec-class)
     - [`Enthalpy`](#enthalpy-class)
 - [Molecular Dynamics Propagation](#molecular-dynamics-propagation)
     - [`ClassicalMD`](#classicalmd-class)
@@ -24,6 +25,7 @@ This chapter documents the configuration classes used to control the various wor
 | Parameter                       | Description                                                                                                                                                                                            | Default Value                                   |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
 | `crystal`                       | Initial, non-relaxed crystal structure. The geometry of the crystal unit cell is relaxed prior to the calculation of the harmonic properties.                                                                                                                                                            | -                                               |
+| `electronic_energy_correction`  | Empirical electronic energy correction (EEC) applied to enforce known reference volume ($V_{\text{ref}}$) at reference temperature ($T_{\text{ref}}$). Uses an instance of `EEC`. Requires `equation_of_state` to be `"spline"`. | `EEC(type="none")` |
 | `calculator`                    | MLIP calculator for energies and forces.                                                                                                                                                           | -                                               |
 | `molecule`                      | Initial, non-relaxed structure of the isolated molecule. If set to `None`, sublimation free energy is not computed.                                                                           | `None`                                          |
 | `relaxation`                    | An instance of `Minimum` that configures the geometry relaxation parameters.                                                                                                                       | `Minimum()`                                     |
@@ -51,7 +53,21 @@ This chapter documents the configuration classes used to control the various wor
 | `verbose`                       | Verbosity of the program's output. `0` suppresses warnings.                                                                                                                                      | `0`                                             |
 | `save_plots`                    | If `True`, save plots of the simulation results.                                                                                                                                                 | `True`                                          |
 | `save_csv`                      | If `True`, save CSV files of the simulation results.                                                                                                                                             | `True`                                          |
-| `save_xyz`                      | If `True`, save XYZ files of the simulation results.                                                                                                                                             | `True`                                          |
+
+### `EEC` Class
+
+**Location:** `mbe_automation.configs.quasi_harmonic.EEC` (alias for `mbe_automation.dynamics.harmonic.eec.EECConfig`)
+
+Configuration object for Empirical Electronic Energy Correction (EEC). EEC enforces a known reference volume ($V_{\text{ref}}$) at a specific reference temperature ($T_{\text{ref}}$) by adding an empirical correction term to the crystal's electronic energy.
+
+| Parameter          | Description                                                                                                                                                                                                                                                                                                                         | Default Value      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| `type`             | Type of empirical electronic energy correction: `"linear"`, `"inverse_volume"`, or `"none"`. `"linear"` applies the correction as $\text{param} \cdot (V - V_{\text{ref}})$. `"inverse_volume"` applies the correction as $\text{param} / V$.                                                                                                          | `"inverse_volume"` |
+| `T_ref`            | Reference temperature (in Kelvin) at which the reference volume $V_{\text{ref}}$ is known. Required if `type` is not `"none"`. This temperature must exactly match one of the values in the `temperatures_K` array in the `FreeEnergy` configuration.                                                                             | `None`             |
+| `V_ref`            | Reference volume (in $\text{\AA}^3$ per unit cell) that the system should exhibit at $T_{\text{ref}}$. Required if `type` is not `"none"`. The reference volume must lie strictly within the interval of sampled absolute volumes (i.e., between the minimum and maximum volumes generated by applying `volume_range` to the reference unit cell $V_0$). If it falls outside this interval, an error is raised to prevent extrapolation. | `None`             |
+| `cell`             | Specifies the unit cell type (either `"primitive"` or `"conventional"`) that `V_ref` corresponds to. Computations rescale the reference volume automatically to match the internal conventions of the unit cell.         | `"conventional"`   |
+| `pressure_min_GPa` | Lower bound for the evaluated EEC equivalent pressure (in GPa). If the necessary correction is smaller than this lower bound, an error will be raised. This acts as a safeguard against extrapolating corrections outside physically sound regions.                                                                               | `-5.0`             |
+| `pressure_max_GPa` | Upper bound for the evaluated EEC equivalent pressure (in GPa). If the necessary correction exceeds this bound, an error will be raised.                                                                                                                                                                                          | `5.0`              |
 
 ### `Enthalpy` Class
 
@@ -177,9 +193,10 @@ This chapter documents the configuration classes used to control the various wor
 | `max_force_on_atom_eV_A`     | Maximum residual force threshold for geometry relaxation (eV/Å).                                                                                                      | `1.0E-4`            |
 | `max_n_steps`                | Maximum number of steps in the geometry relaxation.                                                                                                                   | `500`               |
 | `cell_relaxation`            | Relaxation of the input structure: "full" (optimizes atomic positions, cell shape, and volume), "constant_volume" (optimizes atomic positions and cell shape at fixed volume), or "only_atoms" (optimizes only atomic positions). | `"constant_volume"` |
-| `symmetrize_final_structure` | If `True`, refines the space group symmetry after each geometry relaxation.                                                                                           | `True`              |
+| `transform` | Refines the space group symmetry after each geometry relaxation. Can be `"to_symmetrized_primitive_cell"`, `"to_symmetrized_conventional_cell"`, or `"no_transformation"`.             | `"to_symmetrized_primitive_cell"`              |
 | `symmetry_tolerance_loose`   | Tolerance (in Å) used for symmetry detection for imperfect structures after relaxation.                                                                               | `1.0E-2`            |
 | `symmetry_tolerance_strict`  | Tolerance (in Å) used for definite symmetry detection after symmetrization.                                                                                           | `1.0E-5`            |
 | `backend`                    | Software used to perform the geometry relaxation: "ase" or "dftb".                                                                                                    | `"ase"`             |
 | `algo_primary`               | Primary algorithm for structure relaxation ("PreconLBFGS" or "PreconFIRE"). Referenced only if backend="ase".                                                         | `"PreconLBFGS"`     |
 | `algo_fallback`              | Fallback algorithm if the primary relaxation algorithm fails. Referenced only if backend="ase".                                                                       | `"PreconFIRE"`      |
+| `save_structure_files`       | If `True`, save the final relaxed structure as `relaxed_structure.xyz` (for molecules) or `relaxed_structure.cif` (for crystals) in the active `work_dir`.            | `True`              |

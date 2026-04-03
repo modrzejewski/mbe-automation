@@ -10,7 +10,8 @@ from mbe_automation import (
     Trajectory,
     MolecularCrystal,
     FiniteSubsystem,
-    Dataset
+    Dataset,
+    AnySystem
 )
 ```
 
@@ -27,6 +28,7 @@ This chapter provides an overview of the physical content each class represents 
 | **`FiniteSubsystem`** | Finite clusters of molecules extracted from a periodic structure or trajectory. Includes all geometric information of `Structure`, supplemented with extra data which enables tracing back the cleaved molecules to their positions in the cell of the original `MolecularCrystal`. Used to generate training data for fragment-based methods. |
 | **`Dataset`** | A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets. |
 | **`AtomicReference`** | Isolated atom energies required to generate reference energy for machine-learning interatomic potentials. Can store data at multiple levels of theory. |
+| **`AnySystem`** | Helper class to read any supported system type from a dataset based on the stored `dataclass` attribute. |
 
 ## Methods Summary
 
@@ -34,7 +36,7 @@ The following table summarizes the key methods available across these classes.
 
 | Method | Description | Available In |
 | :--- | :--- | :--- |
-| **`read`** | Method to load the object from an HDF5 dataset. | `AtomicReference`, `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
+| **`read`** | Method to load the object from an HDF5 dataset. | `AtomicReference`, `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem`, `AnySystem` |
 | **`save`** | Saves the object to an HDF5 dataset. Supports `update_properties` mode to update energies, forces, and feature vectors (if missing), without overwriting geometry. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`from_xyz_file`** | Creates a structure object from an XYZ file. | `Structure` |
 | **`from_atomic_numbers`** | Creates an `AtomicReference` from a list of atomic numbers and a calculator. | `AtomicReference` |
@@ -53,7 +55,14 @@ The following table summarizes the key methods available across these classes.
 | **`extract_finite_subsystems`** | Extracts finite clusters of molecules (e.g., dimers, trimers) based on distance or number of molecules. | `MolecularCrystal` |
 | **`positions`** | Returns positions of specific molecules in the crystal. | `MolecularCrystal` |
 | **`atomic_numbers`** | Returns atomic numbers of specific molecules in the crystal. | `MolecularCrystal` |
-| **`frequencies_and_eigenvectors`** | Calculates phonon frequencies and eigenvectors at a given k-point. | `ForceConstants` |
+| **`frequencies_and_eigenvectors`** | Calculates phonon frequencies and eigenvectors at specific k-points (provided as list or numpy array, defaults to Gamma point). Supports band tracking via `track_bands=True` and dynamical matrix symmetrization via `symmetrize_Dq=True`. | `ForceConstants` |
+| **`k_point_grid`** | Generates a k-point mesh for the system. | `ForceConstants` |
+| **`to_phonopy`** | Converts the object to a Phonopy object. | `ForceConstants` |
+| **`thermal_displacements`** | Computes thermal displacement properties (ADPs). | `ForceConstants` |
+| **`to_cif_file`** | Saves the primitive cell to a CIF file (can include ADPs). | `ForceConstants` |
+| **`gruneisen_parameters`** | Computes Gruneisen parameters at a given k-point. | `ForceConstants` |
+| **`refine`** | Refines phonon frequencies against experimental ADPs using the NoMoRe library. | `ForceConstants` |
+| **`thermodynamics`** | Computes thermodynamic properties (vib energy, entropy, etc.) at given temperatures. | `ForceConstants` |
 | **`append`** | Adds a structure or subsystem to the dataset collection. | `Dataset` |
 | **`statistics`** | Prints statistical summaries of the dataset (e.g. mean/std of energies). | `Dataset` |
 | **`display`** | Visualizes properties of the object (e.g. energy fluctuations). | `Trajectory` |
@@ -64,6 +73,16 @@ The following table summarizes the key methods available across these classes.
 | **`unique_elements`** | Returns a sorted array of unique atomic numbers present in the object. | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem`, `Dataset` |
 | **`atomic_reference`** | Calculates ground-state energies for all unique isolated atoms (used for generating MLIP baselines). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem`, `Dataset` |
 | **`levels_of_theory`** | Lists the levels of theory available in the atomic reference. | `AtomicReference` |
+
+### `from_xyz_file` Method
+
+Available in `Structure`. Loads an atomistic system from an `.xyz` or `.cif` file.
+
+| Argument | Description | Default |
+| :--- | :--- | :--- |
+| `read_path` | Path to the input file. | - |
+| `transform` | Symmetry transformation applied after loading: `"to_symmetrized_conventional_cell"`, `"to_symmetrized_primitive_cell"`, or `"no_transformation"`. | `"to_symmetrized_primitive_cell"` |
+| `symprec` | Symmetry tolerance for transformation (Å). | `1.0E-2` |
 
 ### Usage Notes
 *   **`subsample`**: Requires feature vectors to be present (computed via `run` or during an MD simulation) to calculate distances in chemical space.

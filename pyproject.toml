@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mbe-automation"
-version = "0.3.0"
+version = "0.4.0"
 requires-python = ">=3.11"
 dependencies = [
   "torch>=2.9.0",
@@ -16,12 +16,14 @@ dependencies = [
   "mace-torch>=0.3.14",
   "matplotlib",
   "pymatgen",
-  "pyscf>=2.11.0",
+  "pyscf>=2.12.0",
   "pyscf-dispersion",
   "scikit-learn",
   "spglib",
   "seekpath",
+  "euphonic",
   "phonopy>=2.43.1",
+  "symfc>=1.6.1",
   "tqdm",
   "joblib",
   "h5py",
@@ -32,6 +34,7 @@ dependencies = [
   "nglview",
   "pymatviz",
   "chemiscope",
+  "gemmi",
 ]
 
 [project.optional-dependencies]

@@ -4,3 +4,9 @@
 [submodule "src/mbdf"]
 	path = src/mbdf
 	url = https://github.com/dkhan42/cMBDF.git
+[submodule "src/graph_electrostatics"]
+	path = src/graph_electrostatics
+	url = https://github.com/WillBaldwin0/graph_electrostatics.git
+[submodule "src/mace"]
+	path = src/mace
+	url = https://github.com/ACEsuit/mace.git

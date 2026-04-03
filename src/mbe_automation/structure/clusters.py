@@ -417,12 +417,12 @@ def detect_molecules(
             #
             # For debugging
             #
-            rmsd = mbe_automation.structure.crystal.match(
+            match_result = mbe_automation.structure.crystal.match(
                 positions_a, atomic_numbers_a, cell_a,
                 positions_b, atomic_numbers_b, cell_b
             )
-            assert rmsd is not None
-            assert rmsd < 1.0E-8
+            assert match_result is not None
+            assert match_result.rmsd < 1.0E-8
 
     return mbe_automation.storage.MolecularCrystal(
         supercell=system_unwrapped,
@@ -577,7 +577,7 @@ def extract_all_molecules(
 
     if calculator is not None:
         for molecule in molecules:
-            E_pot, _, _ = mbe_automation.calculators.core.run_model(
+            E_pot, _, _, _ = mbe_automation.calculators.core.run_model(
                 structure=molecule,
                 calculator=calculator,
                 compute_energies=True,
@@ -666,7 +666,7 @@ def extract_relaxed_unique_molecules(
         relaxed_molecules.append(relaxed_molecule)
 
     for molecule in relaxed_molecules:
-        E_pot, _, _ = mbe_automation.calculators.core.run_model(
+        E_pot, _, _, _ = mbe_automation.calculators.core.run_model(
                 structure=molecule,
                 calculator=calculator,
                 compute_energies=True,

@@ -1,10 +1,12 @@
 import sys
+import itertools
 import datetime
 from datetime import timezone
 import platform
 import getpass
 import time
 import math
+from pathlib import Path
 
 import numpy as np
 
@@ -169,6 +171,82 @@ def framed(text: str | list[str], padding: int = 10, min_width: int = 30) -> Non
     
     # Print bottom border
     print("└" + horizontal_line + "┘", flush=True)
+
+
+def box_with_details(
+    title: str,
+    details: list[str],
+    side_content: list[str] | None = None,
+    width: int = 30
+) -> None:
+    """
+    Draw a Unicode box with the title integrated into the top border.
+    Optional side_content is printed to the right of the box.
+    
+    Example:
+        ┌─ title ───────────────────┐
+        │ detail 1                  │  side 1
+        │ detail 2                  │  side 2
+        └───────────────────────────┘
+
+    Args:
+        title (str): The text to be placed in the top border.
+        details (list[str]): Lines of text to be placed inside the box.
+        side_content (list[str]): Optional lines to be printed to the right of the box.
+        width (int): Minimum internal width of the box.
+    """
+    label_part = f" {title} "
+    max_detail_len = max(len(d) for d in details) if details else 0
+    actual_width = max(width, len(label_part) + 4, max_detail_len + 2)
+    
+    top_border = "┌─" + label_part + "─" * (actual_width - len(label_part) - 1) + "┐"
+    bottom_border = "└" + "─" * (actual_width) + "┘"
+    
+    if side_content is None:
+        side_content = []
+        
+    print("\n" + top_border)
+    
+    for d_txt, s_txt in itertools.zip_longest(details, side_content, fillvalue=""):
+        row = f"│ {d_txt:<{actual_width-1}}│  {s_txt}"
+        print(row)
+        
+    print(bottom_border, flush=True)
+
+
+def shorten_path(path: str | Path, max_length: int = 60) -> str:
+    """
+    Shorten a filesystem path for display by keeping full segment names from the right.
+    
+    Example: /very/long/path/to/file.xyz -> .../path/to/file.xyz
+    """
+    p = Path(path).resolve()
+    parts = p.parts
+    if not parts:
+        return str(p)
+        
+    full_path_str = str(p)
+    if len(full_path_str) <= max_length:
+        return full_path_str
+
+    # Start with the filename (last part)
+    res_parts = [parts[-1]]
+    # Initial length includes ".../" prefix
+    current_length = len(parts[-1]) + 4 
+    
+    # Add parents from right to left as long as they fit
+    # skip root parts[0] for Linux absolute paths
+    start_idx = 1 if parts[0] == "/" else 0
+    
+    for i in range(len(parts) - 2, start_idx - 1, -1):
+        part = parts[i]
+        if current_length + len(part) + 1 <= max_length:
+            res_parts.insert(0, part)
+            current_length += len(part) + 1
+        else:
+            break
+            
+    return ".../" + "/".join(res_parts)
 
 
 def mace_summary(calculator: MACECalculator) -> None:

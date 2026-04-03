@@ -31,11 +31,65 @@ CALCULATION_STATUS_FAILED = 3
 
 @dataclass
 class BrillouinZonePath:
-    kpoints: List[npt.NDArray[np.floating]]
-    frequencies: List[npt.NDArray[np.floating]]
+    """
+    Data container for phonon band structures along a path in the Brillouin zone.
+
+    The path is defined as a sequence of segments. Each segment is a sequence of k-points.
+    The segments may be disconnected.
+
+    Parameters
+    ----------
+    kpoints : List[npt.NDArray[np.float64]]
+        List of k-points for each segment.
+        Length: n_segments
+        Shape of each element: (n_kpoints_in_segment, 3)
+    frequencies : List[npt.NDArray[np.float64]]
+        List of phonon frequencies for each segment.
+        Length: n_segments
+        Shape of each element: (n_kpoints_in_segment, n_bands)
+        Units: THz
+    path_connections : npt.NDArray[np.bool_]
+        Connection status between segments.
+        Length: n_segments
+        If path_connections[i] is True, the end of segment i is connected to the start of segment i+1.
+        The last element is always False.
+    labels : npt.NDArray[np.str_]
+        Labels for special k-points.
+        Length: n_symbols.
+        Note that the number of labels is NOT equal to the number of segments + 1.
+        It depends on the connectivity of the path.
+        If all segments are connected, n_labels = n_segments + 1.
+        If no segments are connected, n_labels = 2 * n_segments.
+    distances : List[npt.NDArray[np.float64]]
+        Distances along the path in reciprocal space, used for plotting.
+        Length: n_segments
+        Shape of each element: (n_kpoints_in_segment,)
+        These are cumulative distances. If segments are connected, the distance
+        continues increasing. If disconnected, there might be a jump or reset depending
+        on the implementation, but usually for plotting, we handle discontinuities
+        based on `path_connections`.
+
+    Examples
+    --------
+    Consider a path G-X-M-G with 3 segments: G-X, X-M, M-G.
+    All segments are connected.
+    
+    n_segments = 3
+    path_connections = [True, True, False]
+    labels = ["G", "X", "M", "G"] (4 labels)
+
+    Consider a disconnected path G-X (segment 0) and M-G (segment 1).
+    
+    n_segments = 2
+    path_connections = [False, False]
+    labels = ["G", "X", "M", "G"] (4 labels)
+    
+    """
+    kpoints: List[npt.NDArray[np.float64]]
+    frequencies: List[npt.NDArray[np.float64]]
     path_connections: npt.NDArray[np.bool_]
     labels: npt.NDArray[np.str_]
-    distances: List[npt.NDArray[np.floating]]
+    distances: List[npt.NDArray[np.float64]]
 
 @dataclass
 class EOSCurves:
@@ -130,7 +184,7 @@ class Structure:
 
     Structure.ground_truth
 
-    It is expected that ground truth object is populated by
+    It is expected that the ground truth object is populated by
     data points from expensive models which cannot be used
     for structure generation.
     """
@@ -252,7 +306,7 @@ class Structure:
     def to_pymatgen(self, frame_index: int = 0) -> pymatgen.core.Structure | pymatgen.core.Molecule:
         from .views import to_pymatgen
         return to_pymatgen(structure=self, frame_index=frame_index)
-    
+
     def lattice(self, frame_index: int = 0) -> pymatgen.core.Lattice:
         assert self.periodic, "Structure must be periodic."
         if self.variable_cell:
@@ -684,6 +738,146 @@ def read_eos_curves(
 
     return eos_curves
 
+
+def _save_eec(group: h5py.Group, eec) -> None:
+    """Save an EEC instance into the provided group."""
+    group.attrs["dataclass"] = "EEC"
+    group.attrs["type"] = eec.config.type
+    
+    if eec.config.is_enabled:
+        group.attrs["T_ref (K)"] = eec.config.T_ref
+        group.attrs["V_ref (Å³∕unit cell)"] = eec.config.V_ref
+        group.attrs["cell"] = eec.config.cell
+        group.attrs["pressure_min (GPa)"] = eec.config.pressure_min_GPa
+        group.attrs["pressure_max (GPa)"] = eec.config.pressure_max_GPa
+        
+        if eec.config.type == "linear":
+            group.attrs["param (kJ∕mol∕Å³)"] = eec.param
+        elif eec.config.type == "inverse_volume":
+            group.attrs["param (kJ∕mol*Å³)"] = eec.param
+    else:
+        group.attrs["param"] = eec.param
+
+
+def _read_eec(group: h5py.Group):
+    """Read an EEC instance from the provided group."""
+    from mbe_automation.dynamics.harmonic.eec import EECConfig, EEC
+    eec_type = group.attrs["type"]
+    
+    if eec_type != "none":
+        eec_config = EECConfig(
+            type=eec_type,
+            T_ref=group.attrs["T_ref (K)"],
+            V_ref=group.attrs["V_ref (Å³∕unit cell)"],
+            cell=group.attrs["cell"],
+            pressure_min_GPa=group.attrs["pressure_min (GPa)"],
+            pressure_max_GPa=group.attrs["pressure_max (GPa)"],
+        )
+        if eec_type == "linear":
+            param = group.attrs.get("param (kJ∕mol∕Å³)", group.attrs.get("param"))
+        else:
+            param = group.attrs.get("param (kJ∕mol*Å³)", group.attrs.get("param"))
+    else:
+        eec_config = EECConfig(type="none")
+        param = group.attrs["param"]
+        
+    return EEC(config=eec_config, param=param)
+
+
+def save_eos_metadata(
+        eos_metadata,
+        dataset: str,
+        key: str,
+):
+    """
+    Save an EOSMetadata object to an HDF5 dataset.
+    """
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
+    with dataset_file(dataset, "a") as f:
+        if key in f:
+            del f[key]
+
+        group = f.create_group(key)
+        group.attrs["dataclass"] = "EOSMetadata"
+
+        group.create_dataset(
+            name="T (K)",
+            data=eos_metadata.temperatures_K
+        )
+        group.create_dataset(
+            name="V_sampled (Å³∕unit cell)",
+            data=eos_metadata.sampled_volumes
+        )
+        group.create_dataset(
+            name="force_constants_keys",
+            data=np.array([s.encode("utf-8") for s in eos_metadata.force_constants_keys]),
+            dtype=h5py.string_dtype(encoding="utf-8")
+        )
+
+        select_T_stacked = np.vstack(eos_metadata.select_T)
+        group.create_dataset(
+            name="select_T",
+            data=select_T_stacked
+        )
+
+        eec_subgroup = group.create_group("eec")
+        _save_eec(eec_subgroup, eos_metadata.eec)
+
+    # Save DataFrames outside the main dataset_file block to prevent 
+    # deadlocks if save_data_frame also acquires a lock 
+    # (though save_data_frame also uses dataset_file internally).
+    save_data_frame(
+        dataset=dataset,
+        key=f"{key}/interpolated_at_equilibrium_volume",
+        df=eos_metadata.interpolated_at_equilibrium_volume
+    )
+    save_data_frame(
+        dataset=dataset,
+        key=f"{key}/exact_at_sampled_volume",
+        df=eos_metadata.exact_at_sampled_volume
+    )
+
+
+def read_eos_metadata(
+        dataset: str,
+        key: str,
+) -> EOSMetadata:
+    """
+    Read an EOSMetadata object from an HDF5 dataset.
+    """
+    from mbe_automation.dynamics.harmonic.core import EOSMetadata
+    
+    with dataset_file(dataset, "r") as f:
+        group = f[key]
+        
+        temperatures_K = group["T (K)"][...]
+        sampled_volumes = group["V_sampled (Å³∕unit cell)"][...]
+        force_constants_keys = group["force_constants_keys"][...].astype(str).tolist()
+        
+        select_T_stacked = group["select_T"][...]
+        select_T = [row for row in select_T_stacked]
+
+        eec = _read_eec(group["eec"])
+
+    interpolated_df = read_data_frame(
+        dataset=dataset,
+        key=f"{key}/interpolated_at_equilibrium_volume"
+    )
+    exact_df = read_data_frame(
+        dataset=dataset,
+        key=f"{key}/exact_at_sampled_volume"
+    )
+
+    return EOSMetadata(
+        interpolated_at_equilibrium_volume=interpolated_df,
+        exact_at_sampled_volume=exact_df,
+        select_T=select_T,
+        temperatures_K=temperatures_K,
+        sampled_volumes=sampled_volumes,
+        dataset=dataset,
+        force_constants_keys=force_constants_keys,
+        eec=eec
+    )
 
 def _save_structure(
         dataset: str,

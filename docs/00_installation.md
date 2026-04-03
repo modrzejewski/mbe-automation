@@ -1,9 +1,18 @@
 # Installation
 
+The program integrates several scientific codes into a unified workflow, including:
+
+*   **MACE:** Primary MLIP model for energies and forces.
+*   **phonopy:** Phonon calculations and vibrational properties.
+*   **pymatgen:** Crystal structure analysis and manipulation.
+*   **ASE:** Geometry relaxation and molecular dynamics simulations.
+*   **PySCF** and **GPU4PySCF:** Mean-field electronic structure calculations.
+*   **MRCC** and **beyond-rpa**: High-fidelity data points from correlated wave-function theory.
+
 - [Create a Virtual Environment](#1-create-a-virtual-environment)
 - [Clone the Repository](#2-clone-the-repository)
 - [Install the Program](#3-install-the-program)
-- [Supported Methods](#4-supported-methods)
+- [Supported Backends](#4-supported-backends)
 
 ## 1. Create a Virtual Environment
 
@@ -35,16 +44,23 @@ Your shell prompt should now be prefixed with `(mbe_env)`, indicating that the v
 Navigate to the directory where you want to store the project and clone the `mbe-automation` repository from GitHub:
 
 ```bash
-git clone https://github.com/modrzejewski/mbe-automation.git
+git clone --recurse-submodules https://github.com/modrzejewski/mbe-automation.git
 cd mbe-automation
 ```
-The repository uses git submodules for external dependencies. Download these dependencies by running:
+
+The repository depends on several git submodules located in `src/`:
+
+| Submodule | Path |
+| :--- | :--- |
+| `mace` | `src/mace` |
+| `graph_electrostatics` | `src/graph_electrostatics` |
+| `nomore_ase` | `src/nomore_ase` |
+
+The `--recurse-submodules` flag initializes and downloads them automatically. If you cloned without it, run:
 
 ```bash
 git submodule update --init --recursive
 ```
-
-Failure to run this command will result in errors, such as missing parameter files during DFTB calculations.
 
 ## 3. Install the Program
 
@@ -69,7 +85,7 @@ The installation process may take several minutes.
 
 Once the installation is complete, the `mbe-automation` program is ready to use.
 
-## 4. Supported Methods
+## 4. Supported Backends
 
 The `mbe-automation` package supports several calculation methods. While some dependencies are installed automatically via `pip`, others (like binary executables) must be installed separately and made available in your system's PATH.
 
@@ -81,4 +97,4 @@ The `mbe-automation` package supports several calculation methods. While some de
 | DFTB+MBD, DFTB3-D4 | `dftb+` (Executable) |
 | GFN1-xTB, GFN2-xTB | `dftb+` (Executable) |
 
-† These methods are available on both GPUs (via `gpu4pyscf`) and CPUs (via `pyscf`). The CPU implementation is significantly slower and should only be used for debugging. To use GPU, you must [install the optional `gpu-cuda` dependencies](#3-install-the-program) defined in `pyproject.toml` (e.g., `gpu-cuda12` for CUDA 12). Supported functionals for DFT are: `wb97m-v`, `wb97x-d3/d4`, `b3lyp-d3/d4`, `pbe-d3/d4`, `pbe0-d3/d4`, `r2scan-d4`.
+† These methods are available on both GPUs (via `gpu4pyscf`) and CPUs (via `pyscf`). The CPU implementation is significantly slower and should only be used for debugging. To use GPU, you must [install the optional `gpu-cuda` dependencies](#3-install-the-program) defined in `pyproject.toml` (e.g., `gpu-cuda12` for CUDA 12). See [Supported DFT Methods](02_calculators.md#supported-dft-methods) for a list of available functionals.

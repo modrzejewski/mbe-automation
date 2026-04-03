@@ -7,6 +7,7 @@ from ase.optimize.precon import Exp
 from ase.optimize.precon.lbfgs import PreconLBFGS
 from ase.optimize.precon.fire import PreconFIRE
 from ase.calculators.calculator import Calculator as ASECalculator
+from pymatgen.io.ase import AseAtomsAdaptor
 import ase.filters
 import ase.units
 import numpy as np
@@ -127,7 +128,7 @@ def crystal(
         config: mbe_automation.configs.structure.Minimum,
         work_dir: Path | str = Path("./"),
         key: str | None = None
-) -> ase.Atoms:
+) -> tuple[ase.Atoms, int]:
 
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -144,7 +145,8 @@ def crystal(
     print(f"max_force_on_atom             {config.max_force_on_atom_eV_A:.1e} eV/Å")
     if config.cell_relaxation == "full":
         print(f"pressure                      {config.pressure_GPa} GPa")
-    print(f"symmetrize_final_structure    {config.symmetrize_final_structure}")
+    print(f"transform                     {config.transform}")
+    print(f"align_to_input                {config.align_to_input}")
 
     cuda_available = torch.cuda.is_available()
     if cuda_available:
@@ -171,7 +173,7 @@ def crystal(
         optimize_lattice_vectors = False
         optimize_volume = False
 
-    if config.symmetrize_final_structure:
+    if config.transform != "no_transformation":
         #
         # Check symmetry of the input structure
         # with tight tolerance
@@ -206,12 +208,40 @@ def crystal(
             work_dir=work_dir,
         )
     
-    if config.symmetrize_final_structure:
+    if config.transform == "to_symmetrized_primitive_cell":
         print("Transformation to symmetrized primitive cell...")
-        relaxed_system = mbe_automation.structure.crystal.to_symmetrized_primitive(
-            unit_cell=relaxed_system,
-            symprec=config.symmetry_tolerance_loose
+        cell_vectors, atomic_numbers, scaled_positions = (
+            mbe_automation.structure.crystal.to_symmetrized_primitive_cell(
+                cell_vectors=relaxed_system.cell.array,
+                atomic_numbers=relaxed_system.get_atomic_numbers(),
+                scaled_positions=relaxed_system.get_scaled_positions(),
+                symprec=config.symmetry_tolerance_loose
+            )
         )
+        relaxed_system = ase.Atoms(
+            numbers=atomic_numbers,
+            scaled_positions=scaled_positions,
+            cell=cell_vectors,
+            pbc=True,
+        )
+    elif config.transform == "to_symmetrized_conventional_cell":
+        print("Transformation to symmetrized conventional cell...")
+        cell_vectors, atomic_numbers, scaled_positions = (
+            mbe_automation.structure.crystal.to_symmetrized_conventional_cell_spglib(
+                cell_vectors=relaxed_system.cell.array,
+                atomic_numbers=relaxed_system.get_atomic_numbers(),
+                scaled_positions=relaxed_system.get_scaled_positions(),
+                symprec=config.symmetry_tolerance_loose
+            )
+        )
+        relaxed_system = ase.Atoms(
+            numbers=atomic_numbers,
+            scaled_positions=scaled_positions,
+            cell=cell_vectors,
+            pbc=True,
+        )
+
+    if config.transform != "no_transformation":
         space_group, hmsymbol = mbe_automation.structure.crystal.check_symmetry(
             unit_cell=relaxed_system,
             symmetry_thresh=config.symmetry_tolerance_strict
@@ -222,7 +252,7 @@ def crystal(
                 f"[{input_hmsymbol}][{input_space_group}] → [{hmsymbol}][{space_group}]"
             )
         else:
-            print(f"No refinement needed")
+            print(f"No symmetry change")
             print(f"Symmetry under strict tolerance: [{input_hmsymbol}][{input_space_group}]")
     else:
         space_group, _ = mbe_automation.structure.crystal.check_symmetry(
@@ -230,14 +260,52 @@ def crystal(
             symmetry_thresh=config.symmetry_tolerance_strict
         )
 
-    relaxed_system.calc = calculator
-    max_force = np.abs(relaxed_system.get_forces()).max()
-    print(f"Final max residual force = {max_force:.1e} eV/Å", flush=True)
     
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
-    
+        
+    match_result = mbe_automation.structure.crystal.match(
+        positions_a=relaxed_system.get_positions(),
+        atomic_numbers_a=relaxed_system.get_atomic_numbers(),
+        cell_vectors_a=relaxed_system.cell.array,
+        positions_b=unit_cell.get_positions(),
+        atomic_numbers_b=unit_cell.get_atomic_numbers(),
+        cell_vectors_b=unit_cell.cell.array,
+        compute_atom_to_atom_mapping=True,
+    )
+    if match_result is None:
+        print("RMSD could not be computed (structures did not match within tolerances)")
+    else:
+        if config.align_to_input:
+            print("Aligning relaxed structure to input structure...")
+            relaxed_system = ase.Atoms(
+                numbers=match_result.aligned_atomic_numbers_a,
+                positions=match_result.aligned_positions_a,
+                cell=match_result.aligned_cell_vectors_a,
+                pbc=True,
+            )
+
+    mbe_automation.structure.crystal.compare_conventional_cells(
+        structure_initial=unit_cell,
+        structure_final=relaxed_system,
+        label_initial="initial",
+        label_final="relaxed",
+        symprec=config.symmetry_tolerance_loose
+    )
+
+    relaxed_system.calc = calculator
+    max_force = np.abs(relaxed_system.get_forces()).max()
+    print(f"Final max residual force = {max_force:.1e} eV/Å", flush=True)
+
+    if config.save_structure_files:
+        cif_path = str(work_dir / "relaxed_structure.cif")
+        print(f"Saving relaxed crystal to {cif_path}")
+        mbe_automation.storage.xyz_formats.to_cif_file(
+            save_path=cif_path,
+            system=relaxed_system,
+        )
+
     return relaxed_system, space_group
     
 
@@ -376,12 +444,10 @@ def isolated_molecule(
             n_atoms=molecule.n_atoms,
             level_of_theory=calculator.level_of_theory,
         )
-        
-        return relaxed_molecule
 
     elif isinstance(molecule, ase.Atoms):
         
-        return _isolated_molecule(
+        relaxed_molecule = _isolated_molecule(
             molecule=molecule,
             calculator=calculator,
             config=config,
@@ -391,4 +457,15 @@ def isolated_molecule(
 
     else:
         raise ValueError("Unsupported object passed to relax.isolated_molecule.")
+
+    if config.save_structure_files:
+        xyz_path = str(Path(work_dir) / "relaxed_structure.xyz")
+        print(f"Saving relaxed molecule to {xyz_path}")
+        mbe_automation.storage.xyz_formats.to_xyz_file(
+            save_path=xyz_path,
+            system=relaxed_molecule,
+        )
+
+    return relaxed_molecule
+
 

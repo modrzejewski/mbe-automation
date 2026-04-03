@@ -337,7 +337,10 @@ def relax(
         # from_xyz_file automatically detects
         # the DFTB+ gen format from ".gen" extension
         #
-        relaxed_system = mbe_automation.storage.from_xyz_file(str(output_file))
+        relaxed_system = mbe_automation.storage.from_xyz_file(
+            str(output_file),
+            transform="no_transformation"
+        )
     else:
         raise RuntimeError("Relaxation with dftb+ failed. No output geometry was generated.")
         

@@ -12,18 +12,27 @@ from mbe_automation.calculators import MACE
 
 import mbe_automation
 from mbe_automation import Structure
+from mbe_automation.configs.structure import Minimum
 
-xyz_solid = "solid.xyz"
+cif_path = "experiment.cif"
 
 mace_calc = MACE(model_path="mace.model")
 
+# Use "only_atoms" cell relaxation to keep the experimental cell parameters
+relaxation_config = Minimum(
+    cell_relaxation="only_atoms",
+    max_force_on_atom_eV_A=1.0E-4,
+    transform="no_transformation"
+)
+
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file(xyz_solid),
+    crystal=Structure.from_xyz_file(cif_path, transform="no_transformation"),
     temperatures_K=np.array([300.0]),
     calculator=mace_calc,
     supercell_radius=24.0,
     thermal_expansion=False,
+    relaxation=relaxation_config,
     dataset="properties.hdf5"
 )
 
@@ -50,7 +59,7 @@ properties.hdf5
 └── quasi_harmonic
     ├── phonons
     │   └── force_constants
-    │       └── crystal[opt:atoms,shape]  <-- This group contains the data
+    │       └── crystal[opt:atoms]  <-- This group contains the data
     │           ├── force_constants (eV∕Å²)
     │           └── supercell_matrix
     ├── structures
@@ -67,10 +76,11 @@ import numpy as np
 from mbe_automation import ForceConstants
 
 dataset_path = "properties.hdf5"
-key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]"
+key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
 
 fc = ForceConstants.read(dataset=dataset_path, key=key)
-freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_point=np.array([0.0, 0.0, 0.0]))
+# You can optionally enable dynamical matrix symmetrization by passing symmetrize_Dq=True
+freqs_THz, eigenvecs = fc.frequencies_and_eigenvectors(k_points=[0.0, 0.0, 0.0])
 
 print("Frequencies (THz):")
 print(freqs_THz)
@@ -83,12 +93,82 @@ is_orthonormal = np.allclose(identity_check, np.eye(len(freqs_THz)))
 print(f"\nEigenvectors are orthonormal: {is_orthonormal}")
 ```
 
+### Step 3: Normal Mode Refinement
+
+You can refine the calculated phonon frequencies to better match the experimental data using the `refine` method, which utilizes the NoMoRe library.
+
+This is possible if:
+1.  You have a CIF file containing the experimental data (anisotropic displacement parameters and structure factors).
+2.  The corresponding structure was optimized without changing the lattice vectors and cell volume (i.e., using the `cell_relaxation="only_atoms"` in the [Minimum](03_configuration_classes.md#minimum-configuration) configuration class).
+
+```python
+import numpy as np
+from mbe_automation import ForceConstants
+
+dataset_path = "properties.hdf5"
+key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
+cif_path = "experiment.cif"
+
+fc = ForceConstants.read(dataset=dataset_path, key=key)
+
+# Run refinement
+# mesh_size should be a list of 3 odd integers
+# temperature is extracted automatically from the CIF file
+refinement_result = fc.refine(
+    cif_path=cif_path,
+    mesh_size=[3, 3, 3],
+    symmetrize_Dq=True, # enabled by default
+)
+
+# The refinement_result object contains initial and final frequencies,
+# as well as initial and final ADPs.
+print("Initial Frequencies (THz):", refinement_result.freqs_initial_THz)
+print("Refined Frequencies (THz):", refinement_result.freqs_final_THz)
+```
+
+The `refine` method will also print a summary table comparing the initial and refined frequencies, as well as the agreement with experimental ADPs.
+
+### Step 4: Band Tracking
+
+When computing phonon bands along a high-symmetry path, you can enable band tracking to ensure that the bands are continuous and correctly ordered based on eigenvector overlap.
+
+**Note:** Band tracking requires the Gamma point `[0, 0, 0]` to be included in your k-point path.
+
+```python
+import numpy as np
+from mbe_automation import ForceConstants
+
+# ... (load ForceConstants as before) ...
+
+# Define a path that includes Gamma
+k_points = [
+    [0.0, 0.0, 0.0],  # Gamma
+    [0.1, 0.0, 0.0],
+    [0.2, 0.0, 0.0],
+    # ...
+]
+
+# Compute frequencies with band tracking enabled
+# degenerate_freqs_tol_cm1 controls the threshold for detecting degenerate modes (default: 0.5 cm⁻¹)
+freqs_tracked, eigenvecs_tracked = fc.frequencies_and_eigenvectors(
+    k_points=k_points,
+    track_bands=True,
+    degenerate_freqs_tol_cm1=0.5,
+    symmetrize_Dq=True, # optionally symmetrize the dynamical matrix
+)
+
+# resulting freqs_tracked will have bands continuous in index j across k-points i
+```
+
 ## Output Explanation
 
-*   **`freqs_THz`**: A 1D NumPy array containing the phonon frequencies (THz).
-    *   The size is `3N`, where `N` is the number of atoms in the primitive cell.
+*   **`freqs_THz`**: An array containing the phonon frequencies (THz).
+    *   If a single k-point was requested, it is a 1D array of size `3N`, where `N` is the number of atoms in the primitive cell.
+    *   If multiple k-points were requested, it is a 2D array of shape `(n_kpoints, 3N)`. The value `freqs_THz[i, j]` is the frequency of the `j`-th band at the `i`-th k-point.
     *   The first 3 modes are acoustic modes with frequencies near zero at the Gamma point. It is normal that the acoustic mode frequencies are slightly negative at the Gamma point due to numerical inaccuracies.
 
-*   **`eigenvecs`**: A 2D NumPy array containing the eigenvectors of the dynamical matrix.
-    *   Shape: `(3N, 3N)`.
-    *   Each **column** `j` corresponds to the eigenvector for the frequency `freqs_THz[j]`.
+*   **`eigenvecs`**: An array containing the eigenvectors of the dynamical matrix.
+    *   Shape (for a single k-point): `(3N, 3N)`.
+    *   Shape (for multiple k-points): `(n_kpoints, 3N, 3N)`.
+    *   If `eigenvectors_storage="columns"` (default), each **column** `j` corresponds to the eigenvector for the frequency `freqs_THz[j]` (single k-point) or `freqs_THz[i, j]` (at k-point index `i`). For multiple k-points, `eigenvecs[i, :, j]` is the eigenvector for the `j`-th band at the `i`-th k-point.
+    *   If `eigenvectors_storage="rows"`, each **row** `j` corresponds to the eigenvector for the frequency `freqs_THz[j]` (single k-point) or `freqs_THz[i, j]` (at k-point index `i`). For multiple k-points, `eigenvecs[i, j, :]` is the eigenvector for the `j`-th band at the `i`-th k-point.

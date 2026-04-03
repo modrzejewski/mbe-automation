@@ -1,13 +1,16 @@
 from __future__ import annotations
 from collections import defaultdict
-from typing import Any
+from typing import Any, Literal
 from typing import TYPE_CHECKING
 import pymatgen
+from pymatgen.io.cif import CifParser
+import pymatgen.core
 import ase.io
 import ase
 import numpy as np
 import numpy.typing as npt
 import warnings
+import gemmi
 
 if TYPE_CHECKING:
     import mbe_automation.dynamics.harmonic.modes
@@ -17,12 +20,80 @@ import mbe_automation.storage.core
 import mbe_automation.storage.views
 import mbe_automation.common.display
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
+from mbe_automation.dynamics.harmonic.modes import symmetrize_adps
+
+def _read_cif_pymatgen(filepath: str) -> pymatgen.core.Structure:
+    """Read a structure from a file."""
+    parser = CifParser(
+        filepath,
+        site_tolerance=0.1,
+        occupancy_tolerance=np.inf
+    )
+    structures = parser.parse_structures()
+    return structures[0]
+
+def _read_cif_gemmi(
+        filepath: str
+    ) -> pymatgen.core.Structure:
+    """
+    Read periodic structure and expand asymmetric unit to P1 unit cell.
+    
+    Args:
+        filepath: Path to the structure file.
+        
+    Returns:
+        Periodic structure with expanded atomic positions.
+    """
+    document = gemmi.cif.read_file(filepath)
+    block = document.sole_block()
+    asymmetric_unit = gemmi.make_small_structure_from_block(block)
+    
+    unit_cell_sites = asymmetric_unit.get_all_unit_cell_sites()
+    unit_cell_sites = sorted(unit_cell_sites, key=lambda site: site.occ, reverse=True)
+    
+    crystal_lattice = pymatgen.core.Lattice.from_parameters(
+        a=asymmetric_unit.cell.a,
+        b=asymmetric_unit.cell.b,
+        c=asymmetric_unit.cell.c,
+        alpha=asymmetric_unit.cell.alpha,
+        beta=asymmetric_unit.cell.beta,
+        gamma=asymmetric_unit.cell.gamma
+    )
+    
+    atomic_symbols = [site.element.name for site in unit_cell_sites]
+    
+    fractional_positions = [
+        [site.fract.x, site.fract.y, site.fract.z]
+        for site in unit_cell_sites
+    ]
+    
+    structure = pymatgen.core.Structure(
+        lattice=crystal_lattice,
+        species=atomic_symbols,
+        coords=fractional_positions,
+        coords_are_cartesian=False
+    )
+    
+    structure.merge_sites(tol=0.1, mode="delete")
+    
+    return structure
+
+def _read_cif(
+    filepath: str,
+    backend: Literal["gemmi", "pymatgen"] = "gemmi"
+):
+    if backend == "gemmi":
+        return _read_cif_gemmi(filepath)
+    elif backend == "pymatgen":
+        return _read_cif_pymatgen(filepath)
+    else:
+        raise ValueError("Invalid backend requested in _read_cif.")        
 
 def _cif_with_adps(
         save_path: str,
         struct: pymatgen.core.Structure,
         adps_cif: npt.NDArray[np.floating] | None = None,
-        symprec: float = 1.0E-5,
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
         significant_figures: int = 8,
     ) -> None:
     """
@@ -163,7 +234,15 @@ def _cif_with_adps(
     loops.append(loop_labels)
 
     if adps_cif is not None:
-        adps_asymmetric_unit = adps_cif[original_indices]
+        if symprec is not None:
+            #
+            # Compute averaged ADPs for symmetry-equivalent atoms
+            #        
+            adps_to_use = symmetrize_adps(struct, adps_cif, symprec=symprec)
+        else:
+            adps_to_use = adps_cif
+
+        adps_asymmetric_unit = adps_to_use[original_indices]
         blocks["_atom_site_aniso_label"] = atom_site_label
         blocks["_atom_site_aniso_U_11"] = [format_str.format(adp[0, 0]) for adp in adps_asymmetric_unit]
         blocks["_atom_site_aniso_U_22"] = [format_str.format(adp[1, 1]) for adp in adps_asymmetric_unit]
@@ -187,58 +266,85 @@ def _cif_with_adps(
     return None
 
 
+def _print_cell_summary(system: ase.Atoms, label: str) -> None:
+    """Print lattice parameters and atom count for a periodic system."""
+    space_group, hmsymbol = mbe_automation.structure.crystal.check_symmetry(
+        unit_cell=system,
+        symmetry_thresh=SYMMETRY_TOLERANCE_STRICT,
+    )
+    lengths = system.cell.lengths()
+    angles = system.cell.angles()
+    print(label)
+    print(f"  Symmetry          [{hmsymbol}][{space_group}]")
+    print(f"  Lattice lengths   a={lengths[0]:.4f}, b={lengths[1]:.4f}, c={lengths[2]:.4f} Å")
+    print(f"  Lattice angles    alpha={angles[0]:.4f}, beta={angles[1]:.4f}, gamma={angles[2]:.4f} °")
+    print(f"  Cell volume       {system.get_volume():.4f} Å³")
+    print(f"  Number of atoms   {len(system)}")
+
+
 def from_xyz_file(
         read_path: str,
-        transform_to_symmetrized_primitive: bool = True,
-        symprec: float = SYMMETRY_TOLERANCE_LOOSE
+        transform: Literal[
+            "to_symmetrized_conventional_cell",
+            "to_symmetrized_primitive_cell",
+            "no_transformation"
+        ] = "to_symmetrized_primitive_cell",
+        symprec: float = SYMMETRY_TOLERANCE_LOOSE,
+        cif_backend: Literal["gemmi", "pymatgen"] = "gemmi"
 ) -> ase.Atoms:
 
     mbe_automation.common.display.framed([
-        "Loading Structure",
-        f"Path: {read_path}"
+        "Reading structure from file",
+        mbe_automation.common.display.shorten_path(read_path)
     ])
-    
+
     if read_path.lower().endswith(".cif"):
-        structure = pymatgen.core.Structure.from_file(read_path)
+        structure = _read_cif(read_path, backend=cif_backend)
         system = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
     else:
         system = ase.io.read(read_path)
 
-    if transform_to_symmetrized_primitive and np.all(system.pbc):
-        input_space_group, input_hmsymbol = mbe_automation.structure.crystal.check_symmetry(
-            unit_cell=system,
-            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT,
-        )
-
-        print("Reduction to standardized primitive cell (pymatgen)...")
-        system = mbe_automation.structure.crystal.to_symmetrized_primitive(
-            unit_cell=system,
-            symprec=symprec
-        )
-
-        space_group, hmsymbol = mbe_automation.structure.crystal.check_symmetry(
-            unit_cell=system,
-            symmetry_thresh=SYMMETRY_TOLERANCE_STRICT
-        )
-
-        if space_group != input_space_group:
-            print(
-                f"Performed symmetry refinement: "
-                f"[{input_hmsymbol}][{input_space_group}] → [{hmsymbol}][{space_group}]"
-            )
-        else:
-            print(f"No symmetry refinement needed")
-            print(f"Symmetry under strict tolerance: [{input_hmsymbol}][{input_space_group}]")
-
-        lengths = system.cell.lengths()
-        print(f"Lattice lengths   a={lengths[0]:.4f}, b={lengths[1]:.4f}, c={lengths[2]:.4f} Å")
-        angles = system.cell.angles()
-        print(f"Lattice angles    alpha={angles[0]:.4f}, beta={angles[1]:.4f}, gamma={angles[2]:.4f} °")
-        print(f"Cell volume       {system.get_volume():.4f} Å³")
-        print(f"Number of atoms   {len(system)}")
+    if np.all(system.pbc):
+        do_transform = transform != "no_transformation"
         
-    return system
+        if do_transform:
+            print(f"Input cell will be symmetrized with tolerance {symprec:.6f} Å")
+            system_initial = system
+            if transform == "to_symmetrized_primitive_cell":
+                cell_vectors, atomic_numbers, scaled_positions = (
+                    mbe_automation.structure.crystal.to_symmetrized_primitive_cell(
+                        cell_vectors=system.cell.array,
+                        atomic_numbers=system.get_atomic_numbers(),
+                        scaled_positions=system.get_scaled_positions(),
+                        symprec=symprec,
+                    )
+                )
+            elif transform == "to_symmetrized_conventional_cell":
+                cell_vectors, atomic_numbers, scaled_positions = (
+                    mbe_automation.structure.crystal.to_symmetrized_conventional_cell(
+                        cell_vectors=system.cell.array,
+                        atomic_numbers=system.get_atomic_numbers(),
+                        scaled_positions=system.get_scaled_positions(),
+                        symprec=symprec,
+                    )
+                )
+            else:
+                raise ValueError(f"Unknown transformation: {transform}")
+                
+            system = ase.Atoms(
+                numbers=atomic_numbers,
+                scaled_positions=scaled_positions,
+                cell=cell_vectors,
+                pbc=True,
+            )
 
+        mbe_automation.structure.crystal.display_conventional_cell(
+            structure=system,
+            label="symmetrized input structure" if do_transform else "input structure",
+            symprec=symprec,
+        )
+
+    return system
 
 def to_xyz_file(
         save_path: str,

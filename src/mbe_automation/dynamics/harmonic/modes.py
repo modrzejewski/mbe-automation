@@ -1,11 +1,12 @@
 from __future__ import annotations
-from typing import Literal, Tuple, List
+from typing import Literal, Tuple
 from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
-import ase
 import math
 import phonopy
+import pymatgen.core
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from ase.calculators.calculator import Calculator as ASECalculator
 try:
     from mace.calculators import MACECalculator
@@ -14,10 +15,22 @@ except ImportError:
     MACECalculator = None
     mace_available = False
 
+try:
+    from mbe_automation.dynamics.harmonic.bands import track_from_gamma, reorder
+    _NOMORE_AVAILABLE = True
+except ImportError:
+    _NOMORE_AVAILABLE = False
+
 import mbe_automation.common
 import mbe_automation.storage
 from mbe_automation.storage.core import ForceConstants
 import mbe_automation.structure
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, Minimum
+import mbe_automation.structure.relax
+import mbe_automation.dynamics.harmonic.core
+from mbe_automation.dynamics.harmonic.symmetry import symmetrized_dynamical_matrix
+from copy import deepcopy
+from pathlib import Path
 
 AMPLITUDE_SCAN_MODES = [
     "time_propagation",
@@ -55,8 +68,7 @@ class PhononFilter:
 @dataclass
 class ThermalDisplacements:
     """
-    Coordinate displacements due to vibrational
-    motion.
+    Coordinate displacements due to vibrational motion.
 
     1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
        multi-temperature anisotropic displacement parameters. I. Theory
@@ -66,29 +78,47 @@ class ThermalDisplacements:
        anisotropic displacement parameters, J. Appl. Cryst. 35, 477 (2002);
        doi: 10.1107/S0021889802008580
     
+    Attributes:
+        mean_square_displacements_matrix_diagonal: rank (n_temperatures, n_atoms, 3, 3).
+            Contains anisotropic displacement parameters U in Cartesian coordinates (Å²).
+            Eq 5 in ref 1.
+        mean_square_displacements_matrix_diagonal_cif: rank (n_temperatures, n_atoms, 3, 3).
+            Contains anisotropic displacement parameters U in the CIF format (Å²).
+            Eq 4a in ref 2.
+        mean_square_displacements_matrix_full: rank (n_temperatures, n_atoms, n_atoms, 3, 3).
+            Full variance-covariance matrix of atomic displacements (Å²).
+            Eq 6 in ref 1.
+        instantaneous_displacements: rank (n_temperatures, n_time_points, n_atoms, 3)
+            or None. Instantaneous atomic displacements (Å). Eq 2 in ref 1.
     """
-    mean_square_displacements_matrix_diagonal: npt.NDArray[np.float64] # eq 5 in ref 1
-    mean_square_displacements_matrix_diagonal_cif: npt.NDArray[np.float64] # eq 4a in ref 2
-    mean_square_displacements_matrix_full: npt.NDArray[np.float64] # eq 6 in ref 1
-    instantaneous_displacements: npt.NDArray[np.float64] | None # eq 2 in ref 1
+    mean_square_displacements_matrix_diagonal: npt.NDArray[np.float64]
+    mean_square_displacements_matrix_diagonal_cif: npt.NDArray[np.float64]
+    mean_square_displacements_matrix_full: npt.NDArray[np.float64]
+    instantaneous_displacements: npt.NDArray[np.float64] | None
 
 def at_k_point(
-    dynamical_matrix: phonopy.DynamicalMatrix,
-    k_point: npt.NDArray[np.floating],
-) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
+    phonopy_object: phonopy.Phonopy,
+    k_point: npt.NDArray[np.float64],
+    symmetrize_Dq: bool = False,
+    symprec: float = 1e-5,
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
     """
     Compute phonon frequencies and eigenvectors at a specified k-point.
         
     Args:
-    dynamical_matrix: Phonopy dynamical matrix object.
+    phonopy_object: Phonopy object.
     k_point: The k-point coordinates in reciprocal space (fractional coordinates).
     Returns:
     A tuple containing:
     - frequencies (in THz)
-    - eigenvectors stored as columns
+    - eigenvectors (n_modes, n_modes) stored as columns. The column v[:, i] is the
+      normalized eigenvector corresponding to the eigenvalue w[i].
     """
-    dynamical_matrix.run(k_point)
-    D = dynamical_matrix.dynamical_matrix # mass-weighted dynamical matrix
+    if symmetrize_Dq:
+        D = symmetrized_dynamical_matrix(phonopy_object, k_point, tolerance=symprec)
+    else:
+        phonopy_object.dynamical_matrix.run(k_point)
+        D = phonopy_object.dynamical_matrix.dynamical_matrix # mass-weighted dynamical matrix
     eigenvals, eigenvecs = np.linalg.eigh(D) # eigenvectors ejk are dimensionless
     freqs_THz = (
         np.sqrt(abs(eigenvals)) * np.sign(eigenvals)
@@ -97,10 +127,257 @@ def at_k_point(
     return freqs_THz, eigenvecs
 
 
+def at_k_points(
+    phonopy_object: phonopy.Phonopy,
+    k_points: npt.NDArray[np.float64],
+    compute_eigenvecs: bool = False,
+    freq_units: Literal["THz", "invcm"] = "THz",
+    eigenvectors_storage: Literal["columns", "rows"] = "columns",
+    symmetrize_Dq: bool = False,
+    symprec: float = 1e-5,
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128] | None]:
+    """
+    Compute phonon frequencies and optionally eigenvectors at specified k-points.
+
+    Args:
+        phonopy_object: Phonopy object.
+        k_points: The k-point coordinates in reciprocal space (fractional coordinates).
+        compute_eigenvecs: Whether to compute and return eigenvectors.
+        freq_units: Units for return frequencies, "THz" or "invcm".
+        eigenvectors_storage: Convention for storing eigenvectors, "columns" or "rows".
+            - "columns": Eigenvectors are stored in columns (n_kpoints, n_bands, n_bands).
+              v[k, :, i] is the eigenvector for the i-th band at k-point k.
+            - "rows": Eigenvectors are stored in rows (n_kpoints, n_bands, n_bands).
+              v[k, i, :] is the eigenvector for the i-th band at k-point k.
+            Default is "columns".
+
+    Returns:
+        A tuple containing:
+        - frequencies: (n_kpoints, n_bands) array of frequencies in specified units.
+        - eigenvectors: (n_kpoints, n_bands, n_bands) array of eigenvectors, or None 
+          if compute_eigenvecs is False.
+    """
+    physical_units = phonopy.physical_units.get_physical_units()
+    to_THz = physical_units.DefaultToTHz
+    
+    n_kpoints = len(k_points)
+    n_modes = len(phonopy_object.primitive) * 3
+    
+    all_freqs = np.zeros((n_kpoints, n_modes), dtype=np.float64)
+    if compute_eigenvecs:
+        all_eigenvecs = np.zeros((n_kpoints, n_modes, n_modes), dtype=np.complex128)
+    else:
+        all_eigenvecs = None
+    
+    for i, k in enumerate(k_points):
+        if symmetrize_Dq:
+            D = symmetrized_dynamical_matrix(phonopy_object, k, tolerance=symprec)
+        else:
+            phonopy_object.dynamical_matrix.run(k)
+            D = phonopy_object.dynamical_matrix.dynamical_matrix
+        if compute_eigenvecs:
+            evals, evecs = np.linalg.eigh(D)
+            if eigenvectors_storage == "rows":
+                all_eigenvecs[i] = evecs.T
+            else:
+                all_eigenvecs[i] = evecs
+        else:
+            evals = np.linalg.eigvalsh(D)
+            
+        freqs = (np.sqrt(np.abs(evals)) * np.sign(evals)) * to_THz
+        all_freqs[i] = freqs
+        
+    if freq_units == "invcm":
+        all_freqs *= physical_units.THzToCm
+        
+    return all_freqs, all_eigenvecs
+
+def gruneisen_parameters(
+        force_constants: ForceConstants,
+        mesh_size: npt.NDArray[np.integer] | str | float,
+        calculator: ASECalculator,
+        relaxation_config: Minimum,
+        delta_V: float = 0.02,
+        supercell_displacement: float = 0.01,
+        work_dir: Path | str = Path("./"),
+        degenerate_freqs_tol_cm1: float = 0.5,
+):
+    """
+    Compute Gruneisen parameters on a given k-point mesh.
+    
+    Args:
+        force_constants: The ForceConstants object.
+        mesh_size: The k-points for sampling the Brillouin zone. Can be:
+            - "gamma": Use only the [0, 0, 0] k-point.
+            - A floating point number: Defines a supercell of radius R.
+            - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
+        Note: The number of k-points in each direction must be odd to ensure
+        the include the Gamma point required for band tracking.
+        calculator: Calculator for optimization and phonon calculations.
+        relaxation_config: Configuration for structure relaxation.
+        delta_V: Fractional volume change for numerical differentiation (e.g. 0.01 for 1%).
+        supercell_displacement: Displacement distance for phonon calculations.
+        work_dir: Working directory for intermediate files.
+            
+    Returns:
+        A tuple containing:
+        - gruneisen_parameters: Gruneisen parameters for each q-point and band (N_q, N_bands)
+        - qpoints: Array of q-points in fractional coordinates (N_q, 3)
+        - frequencies: Frequencies for each q-point and band (N_q, N_bands)
+        - volume: Equilibrium volume (Å³)
+        - volume_plus: Volume at V * (1 + delta_V) (Å³)
+        - volume_minus: Volume at V * (1 - delta_V) (Å³)
+    """
+    # 1. Structure
+    structure = force_constants.primitive
+    volume = structure.lattice().volume
+    
+    physical_units = phonopy.physical_units.get_physical_units()
+    to_THz = physical_units.DefaultToTHz
+    
+    # 2. Dynamic matrix
+    ph = mbe_automation.storage.to_phonopy(force_constants)
+    
+    # 3. Setup mesh
+    qpoints, _ = phonopy_k_point_grid(
+        phonopy_object=ph,
+        mesh_size=mesh_size,
+        use_symmetry=False,
+        center_at_gamma=False,
+        odd_numbers=True # odd numbers are required to include the Gamma point for band tracking
+    )
+    
+    # Step 2: Optimization at V * (1 +/- delta_V)
+    
+    work_dir = Path(work_dir)
+    unit_cell_V0 = mbe_automation.storage.views.to_ase(structure)
+    
+    factors = [1.0 + delta_V, 1.0 - delta_V]
+    results_displaced = []
+    
+    for factor in factors:
+        V_new = volume * factor
+        scaling_factor = (V_new / volume) ** (1/3)
+        
+        unit_cell_V = unit_cell_V0.copy()
+        unit_cell_V.set_cell(
+            unit_cell_V0.cell * scaling_factor,
+            scale_atoms=True
+        )
+        
+        label = f"gruneisen_V={V_new/volume:.4f}"
+        
+        optimizer = deepcopy(relaxation_config)
+        optimizer.cell_relaxation = "constant_volume"
+        optimizer._pressure_GPa = 0.0
+        
+        unit_cell_optimized, space_group_optimized = mbe_automation.structure.relax.crystal(
+            unit_cell=unit_cell_V,
+            calculator=calculator,
+            config=optimizer,
+            work_dir=work_dir / "relaxation" / label,
+            key=None 
+        )
+        
+        ph_new = mbe_automation.dynamics.harmonic.core.phonons(
+            unit_cell=unit_cell_optimized,
+            calculator=calculator,
+            # The same supercell_matrix must be used for all volumes to avoid
+            # changing both the volume and the quality of the harmonic model.
+            supercell_matrix=force_constants.supercell_matrix,
+            supercell_displacement=supercell_displacement,
+            key=None
+        )
+        
+        results_displaced.append({
+            "volume": unit_cell_optimized.get_volume(),
+            "phonopy_object": ph_new
+        })
+        
+    V_plus = results_displaced[0]["volume"]
+    ph_plus = results_displaced[0]["phonopy_object"]
+    
+    V_minus = results_displaced[1]["volume"]
+    ph_minus = results_displaced[1]["phonopy_object"]
+
+    # Step 3: Calculation of Gruneisen parameters
+    delta_V_val = V_plus - V_minus
+    
+    all_omegas, all_evecs = at_k_points(
+        phonopy_object=ph,
+        k_points=qpoints,
+        compute_eigenvecs=True,
+        eigenvectors_storage="columns"
+    )
+
+    if len(qpoints) > 1:
+        if _NOMORE_AVAILABLE:
+            band_indices = track_from_gamma(
+                phonopy_object=ph,
+                q_points=qpoints,
+                degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+            )
+            # Reorder frequencies and eigenvectors such that the j-th column
+            # always corresponds to the j-th phonon branch, regardless of
+            # band crossings. Reordered eigenvectors v[k, :, j] always
+            # belong to the j-th branch, regardless of the q-point index k.
+            all_omegas, all_evecs = reorder(
+                band_indices=band_indices,
+                frequencies=all_omegas,
+                eigenvectors=all_evecs,
+                eigenvectors_storage="columns"
+            )
+        else:
+            print(
+                "WARNING: More than one k-point used but `nomore_ase` library is not available. "
+                "Band tracking and reordering will be skipped. Results might be incorrect. "
+                "Installation of `nomore_ase` is recommended."
+            )
+    
+    all_gammas = []
+      
+    for i, q in enumerate(qpoints):
+        # 3a. Equilibrium properties at q
+        omega = all_omegas[i]
+        e = all_evecs[i]
+        
+        # 3b. Perturbed dynamical matrices at q
+        ph_plus.dynamical_matrix.run(q)
+        D_plus = ph_plus.dynamical_matrix.dynamical_matrix # Internal units
+        
+        ph_minus.dynamical_matrix.run(q)
+        D_minus = ph_minus.dynamical_matrix.dynamical_matrix # Internal units
+        
+        delta_D = D_plus - D_minus
+        
+        # Project the change in dynamical matrix onto the equilibrium eigenvectors
+        proj_matrix = e.conj().T @ delta_D @ e
+        
+        # delta_lambda is now in internal units (e.g. squared freq without factor)
+        # We must multiply by to_THz**2 so it matches the units of omega**2 (THz^2)
+        delta_lambda = np.diagonal(proj_matrix).real * (to_THz ** 2)
+        
+        with np.errstate(divide='ignore', invalid='ignore'):
+            numerator = delta_lambda / delta_V_val
+            denominator = 2 * (omega ** 2)
+            
+            gamma = - volume * (numerator / denominator)
+        
+        all_gammas.append(gamma)
+
+    return (
+        np.array(all_gammas), 
+        qpoints, 
+        np.array(all_omegas), 
+        volume, 
+        V_plus, 
+        V_minus
+    )
+
 def _Ejq_eq_3(
-        freqs_THz: npt.NDArray[np.floating],
-        temperature_K: np.floating
-) -> npt.NDArray[np.floating]: # eV
+        freqs_THz: npt.NDArray[np.float64],
+        temperature_K: np.float64
+) -> npt.NDArray[np.float64]: # eV
     """
     Average anergy of a quantum harmonic oscillator E_j(q)
     at temperature T (eq 3 in Ref. 1). Computed for a series
@@ -121,10 +398,10 @@ def _Ejq_eq_3(
     return Ejq # rank (n_freqs, )
 
 def _absolute_amplitude_eq_2(
-        freqs_THz: npt.NDArray[np.floating],
-        temperature_K: np.floating,
-        masses_AMU: npt.NDArray[np.floating] # rank (n_atoms_primitive, )
-) -> npt.NDArray[np.floating]: # Angs, rank (n_freqs, n_atoms_primitive * 3)
+        freqs_THz: npt.NDArray[np.float64],
+        temperature_K: np.float64,
+        masses_AMU: npt.NDArray[np.float64] # rank (n_atoms_primitive, )
+) -> npt.NDArray[np.float64]: # Angs, rank (n_freqs, n_atoms_primitive * 3)
     """
     Amplitude Ajk needed to compute the average thermal displacement
     vector u for mode jk at temperature T.
@@ -151,7 +428,7 @@ def _absolute_amplitude_eq_2(
     the definition of A_jq, but should be incuded later depending on
     the definition of e_jq.
 
-    The result is in the units of Angstrom.
+    The result is in the units of Å.
 
     1. H. B. Bürgi and S. C. Capelli, Dynamics of molecules in crystals from
        multi-temperature anisotropic displacement parameters. I. Theory
@@ -171,12 +448,12 @@ def _absolute_amplitude_eq_2(
     return Ajk_Angs # rank (n_freqs, n_atoms_primitive * 3)
 
 def _to_cif(
-        U_cart: npt.NDArray[np.floating],
-        lattice_vectors=npt.NDArray[np.floating] # lattice vectors stored in columns
+        U_cart: npt.NDArray[np.float64],
+        lattice_vectors=npt.NDArray[np.float64] # lattice vectors stored in columns
 ):
     """
     Convert the mean square displacement matrix U(k) to the CIF format.
-    Based on the implementation in phonopy. Different conventions of U(k)
+    Based on the implementation in phonopy. Conventions of U(k)
     are explained in ref 1.
 
     1. R. W. Grosse-Kunstleve and P. D. Adams, On the handling of atomic
@@ -195,10 +472,10 @@ def _to_cif(
     return U_cif
 
 def _thermal_displacements(
-        dynamical_matrix: phonopy.DynamicalMatrix,
+        phonopy_object: phonopy.Phonopy,
         qpoints: npt.NDArray, # rank (n_qpoints, 3), scaled coordinates of sampling points in the FBZ        
-        temperatures_K: npt.NDArray[np.floating], # temperature points in K, rank (n_temperatures, )
-        time_points_fs: npt.NDArray[np.floating] = np.array([0.0]), # time points in fs, rank (n_time_points, )
+        temperatures_K: npt.NDArray[np.float64], # temperature points in K, rank (n_temperatures, )
+        time_points_fs: npt.NDArray[np.float64] = np.array([0.0]), # time points in fs, rank (n_time_points, )
         selected_modes: npt.NDArray[np.integer] | None = None,
         freq_min_THz: float = 0.0,
         freq_max_THz: float | None = None,
@@ -206,6 +483,8 @@ def _thermal_displacements(
         amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
         n_random_samples: int = 1, # ignored unless amplitude_scan=="random" or amplitude_scan=="equidistant"
         rng: np.random.Generator | None = None,
+        symmetrize_Dq: bool = True,
+        symprec: float = 1e-5,
 ) -> ThermalDisplacements:
     """
     Compute thermal displacement vectors of atoms
@@ -257,8 +536,8 @@ def _thermal_displacements(
 
     assert n_time_points > 0
 
-    n_atoms_primitive = len(dynamical_matrix.primitive)
-    n_atoms_supercell = len(dynamical_matrix.supercell)
+    n_atoms_primitive = len(phonopy_object.primitive)
+    n_atoms_supercell = len(phonopy_object.supercell)
     n_modes = n_atoms_primitive * 3
 
     if selected_modes is not None:
@@ -270,9 +549,8 @@ def _thermal_displacements(
         mask = np.zeros(n_atoms_primitive * 3, dtype=bool)
         mask[selected_modes-1] = True # shifting by 1 because the index of the first mode is 1
         
-    p2s_map = np.array(dynamical_matrix.primitive.p2s_map, dtype=np.int64)
-    s2p_map = np.array(dynamical_matrix.primitive.s2p_map, dtype=np.int64)
-    p2p_map = dynamical_matrix.primitive.p2p_map
+    s2p_map = np.array(phonopy_object.primitive.s2p_map, dtype=np.int64)
+    p2p_map = phonopy_object.primitive.p2p_map
     supercell_to_primitive = np.array(
         [p2p_map[s2p_map[i]] for i in range(n_atoms_supercell)],
         dtype=np.int64
@@ -308,8 +586,10 @@ def _thermal_displacements(
 
     for q in qpoints:
         all_freqs_THz, eigenvecs = at_k_point(
-            dynamical_matrix=dynamical_matrix,
+            phonopy_object=phonopy_object,
             k_point=q,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
         if selected_modes is None:
             mask = (all_freqs_THz > freq_min_THz)
@@ -336,7 +616,7 @@ def _thermal_displacements(
             Ajk_primitive[temp_idx] = _absolute_amplitude_eq_2(
                 freqs_THz=freqs_THz,
                 temperature_K=temp_K,
-                masses_AMU=dynamical_matrix.primitive.masses
+                masses_AMU=phonopy_object.primitive.masses
             )
         Ajk_ejk_primitive = Ajk_primitive * ejk_primitive[np.newaxis, :, :]
         #
@@ -377,7 +657,7 @@ def _thermal_displacements(
         elif amplitude_scan == "equidistant":
             #
             # Equidistant points between -1 and +1.
-            # The resulting phonon coordinates will
+            # The resulting phonon coordinates will be
             # distributed uniformly between -Akj
             # and +Akj.
             #
@@ -393,8 +673,8 @@ def _thermal_displacements(
         if cell_type == "supercell":
             ejk = ejk_primitive[:, primitive_to_supercell_coords]
             Ajk = Ajk_primitive[:, :, primitive_to_supercell_coords]
-            scaled_positions = dynamical_matrix.supercell.scaled_positions
-            supercell_matrix = dynamical_matrix.supercell.supercell_matrix
+            scaled_positions = phonopy_object.supercell.scaled_positions
+            supercell_matrix = phonopy_object.supercell.supercell_matrix
             #
             # Position-dependent part of the phase factor
             # Exp(i * q * r)
@@ -406,7 +686,7 @@ def _thermal_displacements(
 
         if cell_type == "primitive":
             ejk, Ajk = ejk_primitive, Ajk_primitive
-            scaled_positions = dynamical_matrix.primitive.scaled_positions
+            scaled_positions = phonopy_object.primitive.scaled_positions
             exp_iqr = np.repeat(
                 np.exp(2j * np.pi * np.dot(scaled_positions, q)),
                 3
@@ -456,21 +736,92 @@ def _thermal_displacements(
         mean_square_displacements_matrix_diagonal=mean_sq_disp_diagonal,
         mean_square_displacements_matrix_diagonal_cif=_to_cif(
             U_cart=mean_sq_disp_diagonal,
-            lattice_vectors=dynamical_matrix.primitive.cell.T
+            lattice_vectors=phonopy_object.primitive.cell.T
         ),
         mean_square_displacements_matrix_full=mean_sq_disp_full,
         instantaneous_displacements=instant_disp
     )
 
+def phonopy_k_point_grid(
+        phonopy_object: phonopy.Phonopy,
+        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+        use_symmetry: bool = False,
+        center_at_gamma: bool = False,
+        odd_numbers: bool = False,
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
+    """
+    Generate a k-point mesh for a Phonopy object.
+    
+    Args:
+        phonopy_object: The Phonopy object.
+        mesh_size: The k-points for sampling the Brillouin zone. Can be:
+            - "gamma": Use only the [0, 0, 0] k-point.
+            - A floating point number: Defines a supercell of radius R,
+              which corresponds to the Mohkhorst-Pack sampling grid.
+            - array of 3 integers: Defines an explicit Monkhorst-Pack
+              mesh for Brillouin zone integration.
+        use_symmetry: Whether to use mesh symmetry (reduces number of k-points).
+        center_at_gamma: Whether to center the mesh at Gamma (shift=0).
+        odd_numbers: Whether to enforce odd numbers in the mesh dimensions.
+                     If mesh_size is a float, dimensions are rounded up to the nearest odd number.
+                     If mesh_size is an array, raises ValueError if any dimension is even.
+
+    Returns:
+        A tuple containing:
+        - qpoints: Array of q-points in fractional coordinates (N, 3)
+        - weights: Array of weights for each q-point (N,)
+    """
+
+    if isinstance(mesh_size, float):
+        mesh = phonopy.structure.grid_points.length2mesh(
+            length=mesh_size,
+            lattice=phonopy_object.primitive.cell,
+            rotations=phonopy_object.primitive_symmetry.pointgroup_operations
+        )
+        if odd_numbers:
+             # Ensure all dimensions are odd. Increment even numbers by 1.
+             mesh = np.where(mesh % 2 == 0, mesh + 1, mesh)
+    elif isinstance(mesh_size, str) and mesh_size == "gamma":
+        mesh = np.array([1, 1, 1])
+    elif isinstance(mesh_size, (list, np.ndarray)):
+        mesh = np.array(mesh_size, dtype=np.int64)
+    else:
+        raise TypeError(
+            f"Invalid type for mesh_size: {type(mesh_size)}. "
+            "Expected float, 'gamma', or list/array."
+        )
+    
+    if odd_numbers:
+            if np.any(mesh % 2 == 0):
+                raise ValueError(
+                    f"odd_numbers=True was requested, but the supplied mesh {mesh} "
+                    f"contains even numbers."
+                )
+
+    phonopy_object.init_mesh(
+        mesh=mesh,
+        shift=None,
+        is_time_reversal=True, # will be ignored by phonopy if use_symmetry=False
+        is_mesh_symmetry=use_symmetry,
+        is_gamma_center=center_at_gamma,
+        with_eigenvectors=False, 
+        with_group_velocities=False,
+        use_iter_mesh=True,
+    )
+    
+    return phonopy_object.mesh.qpoints, phonopy_object.mesh.weights
+
 def thermal_displacements(
         force_constants: ForceConstants,
-        temperatures_K: npt.NDArray[np.floating],
+        temperatures_K: npt.NDArray[np.float64],
         phonon_filter: PhononFilter,
         time_points_fs: npt.NDArray = np.array([0.0]),
         cell_type: Literal["primitive", "supercell"] = "supercell",
         amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
         n_random_samples: int = 1, # ignored unless random_scan=="random" or random_scan=="equidistant"
         rng: np.random.Generator | None = None,
+        symmetrize_Dq: bool = True,
+        symprec: float = 1e-5,
 ) -> ThermalDisplacements:
     """
     Compute thermal displacement properties of atoms in a crystal lattice.
@@ -522,30 +873,13 @@ def thermal_displacements(
     ph = mbe_automation.storage.to_phonopy(
         force_constants=force_constants
     )
-    if isinstance(phonon_filter.k_point_mesh, float):
-        k_point_mesh = phonopy.structure.grid_points.length2mesh(
-            length=phonon_filter.k_point_mesh,
-            lattice=ph.primitive.cell,
-            rotations=ph.primitive_symmetry.pointgroup_operations
-        )
-        
-    elif isinstance(phonon_filter.k_point_mesh, str) and phonon_filter.k_point_mesh == "gamma":
-        k_point_mesh = np.array([1, 1, 1])
-        
-    else:
-        k_point_mesh = phonon_filter.k_point_mesh
-
-    ph.init_mesh(
-        mesh=k_point_mesh,
-        shift=None,
-        is_time_reversal=True,
-        is_mesh_symmetry=False,
-        with_eigenvectors=True,
-        with_group_velocities=False,
-        is_gamma_center=False,
-        use_iter_mesh=True
+    
+    qpoints, _ = phonopy_k_point_grid(
+        phonopy_object=ph,
+        mesh_size=phonon_filter.k_point_mesh,
+        use_symmetry=False,
+        center_at_gamma=False
     )
-    qpoints = ph.mesh.qpoints
 
     mbe_automation.common.display.framed("Thermal displacements")
     print(f"temperatures_K      {np.array2string(temperatures_K,precision=1,separator=',')}")
@@ -553,7 +887,7 @@ def thermal_displacements(
     if phonon_filter.freq_max_THz is not None:
         print(f"freq_max            {phonon_filter.freq_max_THz:.1f} THz")
     else:
-        print(f"freq_max            unlimited")
+        print("freq_max            unlimited")
     nx, ny, nz = ph.mesh.mesh_numbers
     print(f"k_points_mesh       {nx}×{ny}×{nz}")
     print(f"amplitude_scan      {amplitude_scan}")
@@ -566,7 +900,7 @@ def thermal_displacements(
     print("Diagonalization of dynamic matrix at each k point...", flush=True)
     
     disp = _thermal_displacements(
-        dynamical_matrix=ph.dynamical_matrix,
+        phonopy_object=ph,
         qpoints=qpoints,
         temperatures_K=temperatures_K,
         time_points_fs=time_points_fs,
@@ -577,11 +911,102 @@ def thermal_displacements(
         amplitude_scan=amplitude_scan,
         n_random_samples=n_random_samples,
         rng=rng,
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
     )
     
     print("Thermal displacements completed", flush=True)
     return disp
 
+
+def symmetrize_adps(
+        structure: pymatgen.core.Structure,
+        adps: npt.NDArray[np.float64],
+        symprec: float = SYMMETRY_TOLERANCE_STRICT
+):
+    """
+    Averages ADP tensors (U_cart) according to crystal symmetry.
+    
+    Args:
+        structure: A pymatgen.core.Structure object
+        adps: Numpy array (N_atoms, 3, 3) containing raw ADPs
+        symprec: Symmetry precision
+        
+    Returns:
+        symmetrized_adps: Matrix (N_atoms, 3, 3) with correctly averaged tensors in Å².
+    """
+    sga = SpacegroupAnalyzer(structure, symprec=symprec)
+    symmetrized_structure = sga.get_symmetrized_structure()
+    
+    adps_final = np.zeros_like(adps)
+    
+    # Iterate over groups of equivalent atoms (Wyckoff positions)
+    # equivalent_indices is a list of lists, e.g. [[0, 1], [2, 3, 4, 5]]
+    for group_indices in symmetrized_structure.equivalent_indices:
+        
+        # 1. Select a representative (first atom in the group)
+        ref_index = group_indices[0]
+        ref_site = structure[ref_index]
+        
+        # Container for tensors transformed to the representative's frame
+        rotated_tensors = []
+        
+        # 2. Transform all tensors to the representative's reference frame
+        for idx in group_indices:
+            target_site = structure[idx]
+            original_tensor = adps[idx]
+            
+            # Find the symmetry operation R that maps ref_site -> target_site
+            # Pymatgen does not provide this directly for a pair of atoms, so we search in the group operations:
+            op = None
+            for symm_op in sga.get_symmetry_operations():
+                # Check if this operation maps the representative to the target
+                transformed_coords = symm_op.operate(ref_site.frac_coords)
+                if np.allclose(structure.lattice.get_distance_and_image(
+                        transformed_coords,
+                        target_site.frac_coords
+                )[0], 0, atol=symprec):
+                    op = symm_op
+                    break
+            
+            if op is None:
+                raise ValueError(f"No symmetry operation found between atom {ref_index} and {idx}")
+            
+            # R is the rotation matrix (Cartesian part of the operation)
+            R = op.rotation_matrix
+            
+            # Rotate the tensor back: U_ref = R.T @ U_target @ R
+            # (R.T is the inverse for orthogonal matrices)
+            U_rotated_back = R.T @ original_tensor @ R
+            rotated_tensors.append(U_rotated_back)
+            
+        # 3. Compute the average in the representative's frame
+        # np.mean is safe here because all are "oriented" the same way
+        U_avg_ref = np.mean(rotated_tensors, axis=0)
+        
+        # 4. Propagate the average back to all atoms in the group
+        for idx in group_indices:
+            # We need to find the same operation R again (could be optimized by caching R above)
+            op = None
+            target_site = structure[idx]
+            for symm_op in sga.get_symmetry_operations():
+                transformed_coords = symm_op.operate(ref_site.frac_coords)
+                if np.allclose(structure.lattice.get_distance_and_image(
+                        transformed_coords,
+                        target_site.frac_coords
+                )[0], 0, atol=symprec):
+                    op = symm_op
+                    break
+            
+            if op is None:
+                raise ValueError(f"No symmetry operation found between atom {ref_index} and {idx}")
+
+            R = op.rotation_matrix
+
+            # Rotate the average to the target position: U_target = R @ U_avg_ref @ R.T
+            adps_final[idx] = R @ U_avg_ref @ R.T
+            
+    return adps_final
 
 def trajectory(
         dataset: str,

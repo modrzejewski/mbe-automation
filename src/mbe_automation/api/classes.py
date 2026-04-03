@@ -1,12 +1,12 @@
 from __future__ import annotations
+import phonopy
 from dataclasses import dataclass, field
 import typing
-from typing import Tuple, Literal, Sequence, List
+from typing import Tuple, Literal, Sequence, List, TYPE_CHECKING
 from pathlib import Path
 import pandas as pd
 import numpy as np
 import numpy.typing as npt
-import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
 
@@ -22,8 +22,11 @@ from mbe_automation.storage import Trajectory as _Trajectory
 from mbe_automation.storage import MolecularCrystal as _MolecularCrystal
 from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 from mbe_automation.storage import AtomicReference as _AtomicReference
+from mbe_automation.storage import BrillouinZonePath as _BrillouinZonePath
+from mbe_automation.dynamics.harmonic.core import EOSMetadata as _EOSMetadata
 import mbe_automation.dynamics.harmonic.modes
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, ThermalDisplacements
+from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING, DEFAULT_DEGENERATE_FREQS_TOL
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
 import mbe_automation.calculators
@@ -36,8 +39,99 @@ from mbe_automation.storage.core import (
     CALCULATION_STATUS_COMPLETED,
     CALCULATION_STATUS_SCF_NOT_CONVERGED,
     CALCULATION_STATUS_FAILED,
+    read_attribute,
 )
-from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
+from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_LOOSE
+import mbe_automation.structure.relax
+import mbe_automation.dynamics.harmonic.core
+import mbe_automation.dynamics.harmonic.thermodynamics
+import mbe_automation.dynamics.harmonic.brillouin_zone
+import mbe_automation.dynamics.harmonic.gruneisen
+
+
+if TYPE_CHECKING:
+    from mbe_automation.dynamics.harmonic.refinement import NormalModeRefinement
+
+@dataclass(kw_only=True)
+class EOSMetadata(_EOSMetadata):
+    @classmethod
+    def read(cls, dataset: str, key: str) -> EOSMetadata:
+        return cls(**vars(
+            mbe_automation.storage.core.read_eos_metadata(dataset, key)
+        ))
+
+    def gruneisen_model(
+        self,
+        reference_volume_idx: int,
+        mesh_size: npt.NDArray[np.integer] | str | float,
+        temperature_K: float,
+        polynomial_degree: Literal[1, 2] = 2,
+        freq_min_THz: float = 1e-3,
+        n_refined: int | None = None,
+        external_freqs_THz: npt.NDArray[np.float64] | None = None,
+        symmetry_tolerance: float | None = None,
+    ) -> mbe_automation.dynamics.harmonic.gruneisen.GammaPointGruneisenModel:
+        """
+        Construct a Gamma-point Gruneisen model from the equation of state data.
+        
+        Args:
+            reference_volume_idx: Index of the reference unit cell volume in `sampled_volumes`.
+            mesh_size: The k-point mesh used to compute atomic displacement parameters.
+            temperature_K: Temperature in Kelvin used for computing atomic displacements.
+            polynomial_degree: Degree of the polynomial fit for the volume-dependent 
+                Gruneisen parameter.
+            freq_min_THz: Minimum frequency threshold. Bands with frequencies below 
+                this value will not be scaled.
+            n_refined: Number of lowest-frequency groups to optimize individually.
+            external_freqs_THz: Custom effective frequencies to propagate.
+                
+        Returns:
+            GammaPointGruneisenModel object capable of scaling effective 
+            Gamma-point frequencies to arbitrary volumes.
+        """
+        return mbe_automation.dynamics.harmonic.gruneisen.GammaPointGruneisenModel.from_eos_metadata(
+            harmonic_properties=self,
+            reference_volume_idx=reference_volume_idx,
+            mesh_size=mesh_size,
+            temperature_K=temperature_K,
+            polynomial_degree=polynomial_degree,
+            freq_min_THz=freq_min_THz,
+            n_refined=n_refined,
+            external_freqs_THz=external_freqs_THz,
+            symmetry_tolerance=symmetry_tolerance,
+        )
+
+@dataclass(kw_only=True)
+class BrillouinZonePath(_BrillouinZonePath):
+    @classmethod
+    def read(cls, dataset: str, key: str) -> BrillouinZonePath:
+        return cls(**vars(
+            mbe_automation.storage.read_brillouin_zone_path(dataset, key)
+        ))
+
+    def plot(
+            self,
+            save_path: str | None = None,
+            freq_max_THz: float | None = None,
+            color_map: str = "plasma",
+            freq_units: Literal["THz", "cm-1"] = "THz"
+    ):
+        """
+        Plot the band structure.
+        
+        Args:
+            save_path: Path to save the plot. If None, returns the figure.
+            freq_max_THz: Maximum frequency limit for the plot in THz.
+            color_map: Matplotlib colormap name.
+            freq_units: Units for frequency axis, "THz" or "cm-1".
+        """
+        return mbe_automation.dynamics.harmonic.display.band_structure(
+            fbz_path=self,
+            save_path=save_path,
+            freq_max_THz=freq_max_THz,
+            color_map=color_map,
+            freq_units=freq_units
+        )
 
 class _TrainingStructure:
     def to_mace_dataset(
@@ -110,18 +204,143 @@ class ForceConstants(_ForceConstants):
     
     def frequencies_and_eigenvectors(
             self,
-            k_point: npt.NDArray[np.floating],
-    ) -> Tuple[npt.NDArray[np.floating], npt.NDArray[np.complex128]]:
+            k_points: npt.NDArray[np.float64] | list | None = None,
+            eigenvectors_storage: Literal["columns", "rows"] = "columns",
+            track_bands: bool = False,
+            degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
+            delta_q: float = 0.05,
+            symmetrize_Dq: bool = False,
+            symprec: float = 1e-5,
+            freq_units: Literal["THz", "cm-1"] = "THz",
+    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
+        """
+        Compute phonon frequencies and eigenvectors at specified k-points.
+
+        Args:
+            k_points: The k-point coordinates in reciprocal space (fractional 
+                coordinates). Can be a single k-point (rank 1 array of 3 floats)
+                or multiple k-points (rank 2 array of shape (N, 3)). Defaults to the
+                Gamma point `[0.0, 0.0, 0.0]`.
+            eigenvectors_storage: Convention for storing eigenvectors, "columns" or "rows".
+                - "columns": v[:, i] is the i-th eigenvector (for a single k-point)
+                   or v[k, :, i] (for multiple k-points).
+                - "rows": v[i, :] is the i-th eigenvector (for a single k-point)
+                   or v[k, i, :] (for multiple k-points).
+                Default is "columns".
+            track_bands: Whether to track bands using non-adiabatic overlap.
+                If True, reorders frequencies and eigenvectors to follow band continuity.
+                Requires k_points to include Gamma [0, 0, 0].
+            degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
+                Used only when track_bands=True. This threshold is needed because the
+                band tracking algorithm needs to apply degenerate perturbation theory
+                when some of the frequencies form a degenerate subset.
+            delta_q: Displacement distance for perturbation theory in Å⁻¹
+                Used only when track_bands=True.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
+            freq_units: Units of output frequencies, "THz" or "cm-1".
+ 
+        Returns:
+            A tuple containing:
+            - frequencies: Frequencies in the specified units.
+            - eigenvectors: Eigenvectors of the dynamical matrix.
+        """
         ph = mbe_automation.storage.to_phonopy(self)
-        return mbe_automation.dynamics.harmonic.modes.at_k_point(
-            dynamical_matrix=ph.dynamical_matrix,
-            k_point=k_point,
+        if k_points is None:
+            k_points = [0.0, 0.0, 0.0]
+        k_points = np.asarray(k_points, dtype=np.float64)
+
+        if k_points.ndim == 1:
+            freqs, evecs = mbe_automation.dynamics.harmonic.modes.at_k_point(
+                phonopy_object=ph,
+                k_point=k_points,
+                symmetrize_Dq=symmetrize_Dq,
+                symprec=symprec,
+            )
+            if eigenvectors_storage == "rows":
+                evecs = evecs.T
+        else:
+            freqs, evecs = mbe_automation.dynamics.harmonic.modes.at_k_points(
+                phonopy_object=ph,
+                k_points=k_points,
+                compute_eigenvecs=True,
+                freq_units="THz", # We handle units at the end
+                eigenvectors_storage=eigenvectors_storage,
+                symmetrize_Dq=symmetrize_Dq,
+                symprec=symprec,
+            )
+
+        if track_bands:
+            if k_points.ndim == 1 or (k_points.ndim == 2 and len(k_points) == 1):
+                raise ValueError("Band tracking requires multiple k-points, but only one was provided.")
+
+            gamma_indices = np.where(np.all(np.isclose(k_points, [0, 0, 0], atol=1e-5), axis=1))[0]
+            if len(gamma_indices) == 0:
+                raise ValueError("k_points must include the Gamma point [0, 0, 0] when track_bands=True.")
+            
+            band_indices = mbe_automation.dynamics.harmonic.bands.track_from_gamma(
+                phonopy_object=ph,
+                q_points=k_points,
+                degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+                delta_q=delta_q,
+                symmetrize_Dq=symmetrize_Dq,
+                symprec=symprec,
+            )
+            
+            freqs, evecs = mbe_automation.dynamics.harmonic.bands.reorder(
+                band_indices=band_indices,
+                frequencies=freqs,
+                eigenvectors=evecs,
+                eigenvectors_storage=eigenvectors_storage,
+            )
+
+        if freq_units == "cm-1":
+            freqs *= phonopy.physical_units.get_physical_units().THzToCm
+
+        return freqs, evecs
+
+    def k_point_grid(
+            self,
+            k_point_mesh: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+            use_symmetry: bool = False,
+            center_at_gamma: bool = False,
+    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
+        """
+        Generate a k-point mesh for the system.
+        
+        Args:
+            k_point_mesh: The k-points for sampling the Brillouin zone. Can be:
+                - "gamma": Use only the [0, 0, 0] k-point.
+                - A floating point number: Defines a supercell of radius R.
+                - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
+            use_symmetry: Whether to use mesh symmetry (reduces number of k-points).
+            center_at_gamma: Whether to center the mesh at Gamma (shift=0).
+
+        Returns:
+            A tuple containing:
+            - qpoints: Array of q-points in fractional coordinates (N, 3)
+            - weights: Array of weights for each q-point (N,)
+        """
+        ph = mbe_automation.storage.to_phonopy(self)
+        return mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
+            phonopy_object=ph,
+            mesh_size=k_point_mesh,
+            use_symmetry=use_symmetry,
+            center_at_gamma=center_at_gamma,
         )
+
+    def to_phonopy(self) -> phonopy.Phonopy:
+        """
+        Convert this ForceConstants object to a Phonopy object.
+        """
+        return mbe_automation.storage.to_phonopy(self)
 
     def thermal_displacements(
             self,
             temperature_K: float,
-            phonon_filter: PhononFilter | None = None
+            phonon_filter: PhononFilter | None = None,
+            symmetrize_Dq: bool = True,
+            symprec: float = 1e-5,
     ) -> ThermalDisplacements:
         """
         Compute thermal displacement properties of atoms in the primitive cell.
@@ -130,11 +349,15 @@ class ForceConstants(_ForceConstants):
             temperature_K: Temperature in Kelvin.
             phonon_filter: A PhononFilter object which defines the subset
                 of phonons. If None, all phonons up to infinite frequency are included.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
         """
         return _thermal_displacements(
             force_constants=self,
             temperature_K=temperature_K,
-            phonon_filter=phonon_filter
+            phonon_filter=phonon_filter,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
         
     def to_cif_file(
@@ -143,6 +366,9 @@ class ForceConstants(_ForceConstants):
             save_adps: bool = False,
             temperature_K: float | None = None,
             phonon_filter: PhononFilter | None = None,
+            check_roundtrip: bool = True,
+            symmetrize_Dq: bool = False,
+            symprec: float = 1e-5,
     ) -> None:
         """
         Save the primitive cell to a CIF file.
@@ -152,15 +378,227 @@ class ForceConstants(_ForceConstants):
             save_adps: Whether to calculate and include anisotropic displacement parameters.
             temperature_K: Temperature in Kelvin (required if save_adps is True).
             phonon_filter: Optional filter for phonons (used if save_adps is True).
+            check_roundtrip: Whether to verify that ADPs are correctly saved (roundtrip check).
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
         """
         _to_cif_file(
             force_constants=self,
             save_path=save_path,
             save_adps=save_adps,
             temperature_K=temperature_K,
-            phonon_filter=phonon_filter
+            phonon_filter=phonon_filter,
+            check_roundtrip=check_roundtrip,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
 
+    def brillouin_zone_path(
+            self,
+            n_points: int = 20,
+            symmetrize_Dq: bool = True,
+            symprec: float = 1e-5,
+    ) -> BrillouinZonePath:
+        """
+        Determine high-symmetry path and calculate phonon dispersion.
+
+        Args:
+            n_points: Requested number of q-points along a single segment of the path.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
+
+        Returns:
+            BrillouinZonePath object containing the calculated dispersion, q-points, labels, and distances.
+        """
+        ph = self.to_phonopy()
+        return BrillouinZonePath(**vars(
+            mbe_automation.dynamics.harmonic.brillouin_zone.init_fbz_path(
+                phonopy_object=ph,
+                n_points=n_points,
+                symmetrize_Dq=symmetrize_Dq,
+                symprec=symprec,
+            )
+        ))
+
+    def refine(
+        self,
+        cif_path: str | None = None,
+        U_cart_ref: npt.NDArray[np.float64] | None = None,
+        adp_only_fit: bool = False,
+        mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float = "gamma",
+        n_refined: int | None = None,
+        weighting_scheme: Literal["sigma", "unit"] = "sigma",
+        fix_positions: bool = True,
+        exclude_hydrogen_positions: bool = True,
+        temperature_K: float | None = None,
+        q_spacing: float = DEFAULT_Q_SPACING,
+        reasonable_range: tuple[float, float] | None = None,
+        degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
+        symmetry_tolerance: float | None = None,
+        symmetrize_Dq: bool = True,
+        symprec: float = 1e-5,
+    ) -> NormalModeRefinement:
+        """
+        Refine phonon frequencies using the NoMoRe refinement API.
+        
+        Args:
+            cif_path: Path to experimental CIF. Optional if U_cart_ref is provided.
+            U_cart_ref: Reference Cartesian ADPs (n_atoms, 3, 3) for direct fitting.
+            adp_only_fit: Whether to restrict to an ADP-only fit when a CIF path is provided.
+            mesh_size: k-point mesh size ("gamma", float radius, or [Nx, Ny, Nz]).
+            n_refined: Number of lowest-frequency groups to optimize individually.
+            weighting_scheme: Weighting scheme ('sigma' or 'unit').
+            fix_positions: Whether to fix atomic positions during refinement.
+            exclude_hydrogen_positions: Whether to exclude hydrogens from position 
+                refinement.
+            temperature_K: Temperature in Kelvin used to compute ADPs.
+                If provided, overrides CIF metadata. Required if U_cart_ref is provided.
+            q_spacing: The target spacing for path interpolation in Å⁻¹ along 
+                q-point paths. Used for band tracking.
+            reasonable_range: Allowed range for optimized scaling factors.
+            degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
+                This threshold is needed because the band tracking algorithm needs to
+                apply degenerate perturbation theory when some of the frequencies form
+                a degenerate subset.
+            symmetry_tolerance: Tolerance used by nomore_ase to determine if two 
+                normal modes are degenerate. It defines the minimum required inner product 
+                (overlap) between their eigenvectors after applying a lattice 
+                symmetry operation.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
+        
+        Returns:
+            NormalModeRefinement object with frequencies, ADPs, and mesh data.
+        """
+        try:
+            # we're importing nomore only to check
+            # if this library is available in the environment
+            import cctbx
+            import nomore_ase
+            from mbe_automation.dynamics.harmonic import refinement
+        except ImportError:
+            raise ImportError(
+                "The `ForceConstants.refine` method requires the `nomore_ase` and `cctbx` packages. "
+                "Install them in your environment to use this functionality."
+            )
+        if isinstance(mesh_size, list):
+            mesh_size = np.array(mesh_size, dtype=np.int64)
+        return refinement.run(
+            force_constants=self,
+            cif_path=cif_path,
+            U_cart_ref=U_cart_ref,
+            adp_only_fit=adp_only_fit,
+            mesh_size=mesh_size,
+            n_refined=n_refined,
+            weighting_scheme=weighting_scheme,
+            fix_positions=fix_positions,
+            exclude_hydrogen_positions=exclude_hydrogen_positions,
+            temperature_K=temperature_K,
+            q_spacing=q_spacing,
+            reasonable_range=reasonable_range,
+            degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
+            symmetry_tolerance=symmetry_tolerance,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
+        )
+
+    def effective_gamma_point_freqs(
+        self,
+        temperature_K: float,
+        n_refined: int | None = None,
+        phonon_filter: PhononFilter | None = None,
+        symmetrize_Dq: bool = True,
+        symprec: float = 1e-5,
+    ) -> npt.NDArray[np.float64]:
+        """
+        Compute effective Gamma-point frequencies using normal mode refinement.
+
+        Improve the Gamma-only model by calculating effective frequencies 
+        recovering ADPs computed with first Brillouin zone sampling (defined 
+        in phonon_filter). By default, a dense mesh applies.
+
+        Args:
+            temperature_K: Temperature in Kelvin.
+            n_refined: Number of lowest-frequency groups to optimize individually.
+            phonon_filter: Optional filter for phonons passed to thermal displacement calculation.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
+
+        Returns:
+            f_gamma: Effective Gamma-point frequencies in THz.
+        """
+        try:
+            import cctbx
+        except ImportError:
+            raise ImportError(
+                "The `ForceConstants.effective_gamma_point_freqs` method requires "
+                "the `nomore_ase` and `cctbx` packages. Install them in your environment to use "
+                "this functionality."
+            )
+
+        adps = self.thermal_displacements(
+            temperature_K=temperature_K,
+            phonon_filter=phonon_filter,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
+        )
+        U_cart_ref = adps.mean_square_displacements_matrix_diagonal[0]
+
+        refinement = self.refine(
+            U_cart_ref=U_cart_ref,
+            temperature_K=temperature_K,
+            mesh_size="gamma",
+            n_refined=n_refined,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
+        )
+
+        return refinement.freqs_final_reordered_THz[0]
+
+    def thermodynamics(
+            self,
+            mesh_size: npt.NDArray[np.int64] | Literal["gamma"] | float,
+            temperatures_K: npt.NDArray[np.float64],
+            symmetrize_Dq: bool = True,
+            symprec: float = 1e-5,
+    ) -> pd.DataFrame:
+        """
+        Compute thermodynamic properties (vib energy, entropy, etc.) at given temperatures.
+        
+        Args:
+            mesh_size: The k-points for sampling the Brillouin zone. Can be:
+                - "gamma": Use only the [0, 0, 0] k-point.
+                - A floating point number: Defines a supercell of radius R.
+                - array of 3 integers: Defines an explicit Monkhorst-Pack mesh.
+            temperatures_K: Array of temperatures in Kelvin.
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
+            
+        Returns:
+            Pandas DataFrame with thermodynamic properties.
+        """
+        ph = self.to_phonopy()
+        
+        q_points, weights = mbe_automation.dynamics.harmonic.modes.phonopy_k_point_grid(
+            phonopy_object=ph,
+            mesh_size=mesh_size,
+            use_symmetry=True 
+        )
+        
+        freqs_THz, _ = mbe_automation.dynamics.harmonic.modes.at_k_points(
+            phonopy_object=ph,
+            k_points=q_points,
+            compute_eigenvecs=False,
+            freq_units="THz",
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
+        )
+        
+        return mbe_automation.dynamics.harmonic.thermodynamics.run(
+            freqs_THz=freqs_THz,
+            weights=weights,
+            temperatures_K=temperatures_K
+        )
 
 @dataclass(kw_only=True)
 class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
@@ -178,16 +616,31 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
     def from_xyz_file(
             cls,
             read_path: str,
-            transform_to_symmetrized_primitive: bool = True,
+            transform: Literal[
+                "to_symmetrized_conventional_cell",
+                "to_symmetrized_primitive_cell",
+                "no_transformation"
+            ] = "to_symmetrized_primitive_cell",
             symprec: float = SYMMETRY_TOLERANCE_LOOSE,
     ):
+        """
+        Read a structure from a coordinate file.
+
+        Args:
+            read_path: Path to the coordinate file.
+            transform: Symmetrization applied to the periodic structure.
+            symprec: Tolerance used for symmetry detection (in Å).
+
+        Returns:
+            Structure object.
+        """
         ase_atoms = mbe_automation.storage.from_xyz_file(
             read_path=read_path,
-            transform_to_symmetrized_primitive=transform_to_symmetrized_primitive,
+            transform=transform,
             symprec=symprec,
-        )        
+        )
         return cls(**vars(mbe_automation.storage.from_ase_atoms(ase_atoms)))
-        
+
     def subsample(
             self,
             n: int,
@@ -699,8 +1152,10 @@ def _completed_frames(structure: _Structure, level_of_theory: str | dict | None)
 
     targets = []
     if isinstance(level_of_theory, dict):
-        if "target" in level_of_theory: targets.append(level_of_theory["target"])
-        if "baseline" in level_of_theory: targets.append(level_of_theory["baseline"])
+        if "target" in level_of_theory:
+            targets.append(level_of_theory["target"])
+        if "baseline" in level_of_theory:
+            targets.append(level_of_theory["baseline"])
     else:
         targets.append(level_of_theory)
 
@@ -1353,6 +1808,8 @@ def _thermal_displacements(
         force_constants: ForceConstants,
         temperature_K: float,
         phonon_filter: PhononFilter | None = None,
+        symmetrize_Dq: bool = True,
+        symprec: float = 1e-5,
 ) -> ThermalDisplacements:
     
     if phonon_filter is None:
@@ -1365,7 +1822,9 @@ def _thermal_displacements(
         force_constants=force_constants,
         temperatures_K=np.array([temperature_K]),
         phonon_filter=phonon_filter,
-        cell_type="primitive"
+        cell_type="primitive",
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
     )
 
 def _to_cif_file(
@@ -1374,6 +1833,9 @@ def _to_cif_file(
     save_adps: bool = False,
     temperature_K: float | None = None,
     phonon_filter: PhononFilter | None = None,
+    check_roundtrip: bool = True,
+    symmetrize_Dq: bool = True,
+    symprec: float = 1e-5,
 ) -> None:
     disp = None
     if save_adps:
@@ -1381,7 +1843,9 @@ def _to_cif_file(
             raise ValueError("temperature_K must be provided to save thermal displacements (ADPs).")
         disp = force_constants.thermal_displacements(
             temperature_K=temperature_K,
-            phonon_filter=phonon_filter
+            phonon_filter=phonon_filter,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
         )
     
     mbe_automation.storage.to_cif_file(
@@ -1390,3 +1854,43 @@ def _to_cif_file(
         thermal_displacements=disp,
         temperature_idx=0 
     )
+
+    if check_roundtrip and save_adps and disp is not None:
+        from mbe_automation.storage.verification import verify_adps_roundtrip
+        verify_adps_roundtrip(
+            cif_path=save_path,
+            original_structure=force_constants.primitive,
+            thermal_displacements=disp,
+            temperature_idx=0
+        )
+
+class AnySystem:
+    """
+    Helper class to read any supported system type from a dataset
+    based on the stored 'dataclass' attribute.
+    """
+
+    _CLASS_MAP = {
+        "Structure": Structure,
+        "Trajectory": Trajectory,
+        "FiniteSubsystem": FiniteSubsystem,
+        "MolecularCrystal": MolecularCrystal,
+        "ForceConstants": ForceConstants,
+        "AtomicReference": AtomicReference,
+    }
+
+    @staticmethod
+    def read(dataset: str, key: str) -> Structure | Trajectory | FiniteSubsystem | MolecularCrystal | ForceConstants | AtomicReference:
+        """
+        Reads the object at the given key, automatically determining its type.
+        """
+        dataclass_name = read_attribute(dataset, key, "dataclass")
+
+        cls_to_read = AnySystem._CLASS_MAP.get(dataclass_name)
+        if cls_to_read:
+            return cls_to_read.read(dataset, key)
+        else:
+            raise ValueError(
+                f"Unknown or missing 'dataclass' attribute '{dataclass_name}' "
+                f"at key '{key}' in dataset '{dataset}'."
+            )

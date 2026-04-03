@@ -2,8 +2,8 @@
 
 - [Setup](#setup)
 - [Phonon calculation](#phonon-calculation)
+- [Empirical Electronic Energy Correction (EEC)](#empirical-electronic-energy-correction-eec)
 - [Adjustable parameters](#adjustable-parameters)
-- [Function Call Overview](#function-call-overview)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [How to read the results](#how-to-read-the-results)
 - [Complete Input Files](#complete-input-files)
@@ -48,13 +48,82 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     calculator=mace_calc,
     supercell_radius=25.0,
     dataset="properties.hdf5",
-    relaxation=relaxation_config
+    relaxation=relaxation_config,
+    volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 )
 ```
+
+### Volume Range
+
+The `volume_range` parameter defines the set of scaling factors applied to the equilibrium volume $V_0$ to sample the equation of state (EOS). The code enforces a minimum number of points depending on the selected `equation_of_state`:
+
+*   **Polynomial**: 3 points
+*   **Spline, Vinet, Birch-Murnaghan**: 4 points
+
+While these are the minimums required to run the calculation, a denser sampling is recommended for robust numerical computation of second-order thermodynamic derivatives, such as the coefficient of thermal expansion ($\alpha_V$) and the heat capacity at constant pressure ($C_p$).
 
 The workflow is executed by passing the configuration object to the `run` function.
 
 ```python
+mbe_automation.run(properties_config)
+```
+
+## Empirical Electronic Energy Correction (EEC)
+
+The Empirical Electronic Energy Correction (EEC) option can be applied to enforce a known reference volume ($V_{\text{ref}}$) for a specific unit cell geometry (either primitive or conventional) at a specific reference temperature ($T_{\text{ref}}$). The EEC contribution is added to the crystal's electronic energy and accounted for in all derived thermodynamic functions.
+
+Two types of EEC are supported:
+1.  **Linear**: $E_{\text{el,corrected}} = E_{\text{el}} + \text{param} \cdot (V - V_{\text{ref}})$
+2.  **Inverse Volume**: $E_{\text{el,corrected}} = E_{\text{el}} + \text{param} / V$
+
+The parameter (`param`) is calculated analytically using a cubic spline fit of the raw Gibbs free energy vs. volume curve to ensure the corrected equilibrium volume matches $V_{\text{ref}}$ at $T_{\text{ref}}$.
+
+To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the [`EEC`](./03_configuration_classes.md#eec-class) dataclass from `mbe_automation.configs.quasi_harmonic`.
+
+The equation of state must be set to `"spline"` (which is the default) to use the EEC option. Additionally, $T_{\text{ref}}$ must be present in the `temperatures_K` array.
+
+```python
+import numpy as np
+from mbe_automation.calculators import MACE
+
+import mbe_automation.configs
+from mbe_automation.configs.structure import Minimum
+from mbe_automation import Structure
+
+# Import EEC
+from mbe_automation.configs.quasi_harmonic import EEC
+
+xyz_solid = "path/to/your/solid.xyz"
+xyz_molecule = "path/to/your/molecule.xyz"
+
+mace_calc = MACE(model_path="path/to/your/mace.model")
+
+relaxation_config = Minimum(
+    cell_relaxation="constant_volume",
+    max_force_on_atom_eV_A=1.0E-4
+)
+
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
+    model_name="mace",
+    crystal=Structure.from_xyz_file(xyz_solid),
+    molecule=Structure.from_xyz_file(xyz_molecule),
+    temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
+    calculator=mace_calc,
+    supercell_radius=25.0,
+    dataset="properties.hdf5",
+    relaxation=relaxation_config,
+    volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
+
+    # Enable EEC targeting a reference conventional cell volume of 145.80 A^3 at 123 K
+    electronic_energy_correction=EEC(
+        type="inverse_volume",
+        T_ref=123.0,
+        V_ref=145.80,
+        cell="conventional"
+    ),
+    equation_of_state="spline" # Required for EEC
+)
+
 mbe_automation.run(properties_config)
 ```
 
@@ -64,64 +133,7 @@ Detailed descriptions of the configuration classes can be found in the [Configur
 
 *   **[`FreeEnergy`](./03_configuration_classes.md#freeenergy-class)**: Main configuration for the quasi-harmonic workflow.
 *   **[`Minimum`](./03_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
-
-## Function Call Overview
-
-```
-+----------------------------------------+
-|            mbe_automation              |
-|                 run                    |
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|      workflows.quasi_harmonic          |
-|                 run                    |
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|           structure.clusters           |   Extracts and relaxes unique
-|    extract_relaxed_unique_molecules    |   molecules from the crystal.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|           structure.relax              |   Relaxes the geometry of the
-|    isolated_molecule (optional)        |   isolated gas-phase molecule.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|         dynamics.harmonic.core         |   Computes the vibrational
-|          molecular_vibrations          |   frequencies of the molecule.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|           structure.relax              |   Relaxes the crystal structure
-|                crystal                 |   to find the equilibrium volume.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|          structure.crystal             |   Determines the supercell matrix
-|            supercell_matrix            |   for phonon calculations.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|         dynamics.harmonic.core         |   Computes phonon frequencies and
-|                phonons                 |   thermodynamic properties.
-+----------------------------------------+
-                    |
-                    |
-+----------------------------------------+
-|         dynamics.harmonic.core         |   Determines the equilibrium volume
-|           equilibrium_curve            |   at each temperature.
-+----------------------------------------+
-
-```
+*   **[`EEC`](./03_configuration_classes.md#eec-class)**: Configuration for the Empirical Electronic Energy Correction (EEC).
 
 ## Computational Bottlenecks
 
@@ -224,6 +236,7 @@ from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
+from mbe_automation.configs.quasi_harmonic import EEC
 from mbe_automation import Structure
 
 xyz_solid = "path/to/your/solid.xyz"
@@ -241,11 +254,21 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     model_name="mace",
     crystal=Structure.from_xyz_file(xyz_solid),
     molecule=Structure.from_xyz_file(xyz_molecule),
-    temperatures_K=np.array([5.0, 200.0, 300.0]),
+    temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
     dataset="properties.hdf5",
-    relaxation=relaxation_config
+    relaxation=relaxation_config,
+    volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
+
+    # Enable EEC targeting a reference conventional cell volume of 145.80 A^3 at 123 K
+    electronic_energy_correction=EEC(
+        type="inverse_volume",
+        T_ref=123.0,
+        V_ref=145.80,
+        cell="conventional"
+    ),
+    equation_of_state="spline" # Required for EEC
 )
 
 mbe_automation.run(properties_config)

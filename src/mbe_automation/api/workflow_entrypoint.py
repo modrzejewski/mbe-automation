@@ -1,9 +1,11 @@
 from functools import singledispatch
 
 import mbe_automation.configs.md
+import mbe_automation.configs.refinement
 import mbe_automation.configs.quasi_harmonic
 import mbe_automation.configs.training
 import mbe_automation.workflows.md
+import mbe_automation.workflows.refinement
 import mbe_automation.workflows.quasi_harmonic
 import mbe_automation.workflows.training
 from mbe_automation.configs.execution import Resources
@@ -31,3 +33,7 @@ def _(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 @_dispatch.register
 def _(config: mbe_automation.configs.training.MDSampling | mbe_automation.configs.training.PhononSampling):
     return mbe_automation.workflows.training.run(config)
+
+@_dispatch.register
+def _(config: mbe_automation.configs.refinement.NormalModeRefinement):
+    return mbe_automation.workflows.refinement.run(config)

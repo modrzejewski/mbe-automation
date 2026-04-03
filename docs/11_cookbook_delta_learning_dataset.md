@@ -38,7 +38,9 @@ calc_target = DFT(
 
 Generating the ground truth data involves calculating the energies and forces for both the baseline and target methods on the structures.
 
-The example below processes an input HDF5 file (`md_trajectories.hdf5`) containing raw MD trajectories and finite structures. It subsamples frames, executes the calculations, and saves the results to `ground_truth.hdf5`.
+> **Prerequisite:** This workflow requires an input HDF5 dataset containing molecular dynamics trajectories and extracted finite subsystems (clusters). Please refer to the [Molecular Dynamics](./07_molecular_dynamics.md) and [Training Set Creation](./08_training_set.md) chapters for instructions on how to generate these data.
+
+The example below processes an input HDF5 file (`md_trajectories.hdf5`) containing these raw MD trajectories and finite structures. It subsamples frames, executes the calculations, and saves the results to `ground_truth.hdf5`.
 
 ```python
 input_dataset = "md_trajectories.hdf5"
@@ -163,24 +165,30 @@ print("Export completed.")
 
 The following Bash script trains a Delta Learning MACE model using the generated files.
 
+> **Attention:** The `DeltaMACE` calculator requires the baseline and delta models to have the same head name. Ensure the head name in `train.yaml` matches your baseline model's head. If mismatched, correct `train.yaml` and restart training from the checkpoint to update the head name.
+
 **Configuration File:** `train.yaml`
 
 ```yaml
 name: "urea_r2scan_d4_delta"
-train_file: "delta_learning/train.xyz"
-valid_file: "delta_learning/validate.xyz"
-test_file: "delta_learning/test.xyz"
+
 model: "MACE"
-plot_frequency: 10
 num_interactions: 2
 hidden_irreps: "32x0e + 32x1o"
 correlation: 2
 r_max: 6.0
+
+heads:
+  omol:
+    train_file: "delta_learning/train.xyz"
+    valid_file: "delta_learning/validate.xyz"
+    test_file: "delta_learning/test.xyz"
+    energy_key: "REF_energy"
+    forces_key: "REF_forces"
+
 forces_weight: 1000
 energy_weight: 10
 stress_weight: 0
-energy_key: "REF_energy"
-forces_key: "REF_forces"
 batch_size: 8
 valid_batch_size: 8
 max_num_epochs: 300
@@ -191,6 +199,7 @@ eval_interval: 1
 ema: True
 swa: True
 error_table: "PerAtomRMSE"
+plot_frequency: 10
 default_dtype: "float64"
 device: cuda
 save_cpu: True

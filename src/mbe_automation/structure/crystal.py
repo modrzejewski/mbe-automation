@@ -14,10 +14,16 @@ import numpy.typing as npt
 from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
 from pymatgen.analysis.structure_matcher import StructureMatcher
 import pymatgen
+import pymatgen.core
+import pymatgen.io.ase
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+import spglib
 
 import mbe_automation.storage
 import mbe_automation.common
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
+
+DEFAULT_SYMMETRIZATION_BACKEND: Literal["spglib", "pymatgen"] = "pymatgen"
 
 try:
     from doped.generation import get_ideal_supercell_matrix
@@ -27,6 +33,17 @@ except ImportError:
     get_ideal_supercell_matrix = None
     get_min_image_distance = None
     doped_available = False
+
+@dataclass
+class CrystalMatch:
+    """Result of matching two crystal structures."""
+    rmsd: float
+    lattice_transformation: npt.NDArray[np.int64] | None
+    fractional_translation: npt.NDArray[np.float64] | None
+    atom_permutation: list[int | None] | None
+    aligned_positions_a: npt.NDArray[np.float64]
+    aligned_atomic_numbers_a: npt.NDArray[np.int64]
+    aligned_cell_vectors_a: npt.NDArray[np.float64]
 
 def display(unit_cell: ase.Atoms, key: str | None=None) -> None:
     """
@@ -71,7 +88,7 @@ def to_symmetrized_primitive(
     a loose threshold (SYMMETRY_TOLERANCE_LOOSE) if your structure
     comes immediately from geometry optimization.
     """
-    
+
     pmg_unit_cell = pymatgen.io.ase.AseAtomsAdaptor.get_structure(unit_cell)
     spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(
         structure=pmg_unit_cell,
@@ -79,8 +96,159 @@ def to_symmetrized_primitive(
     )
     pmg_primitive = spg_analyzer.get_primitive_standard_structure()
     return pymatgen.io.ase.AseAtomsAdaptor.get_atoms(pmg_primitive)
+
+
+def to_symmetrized(
+        unit_cell: ase.Atoms,
+        symprec: float = SYMMETRY_TOLERANCE_STRICT
+) -> ase.Atoms:
+    """
+    Refine unit cell to the conventional standard structure.
+    Snaps atomic positions and cell parameters to symmetry-ideal values
+    without converting to a primitive cell.
+    Apply with a loose threshold (SYMMETRY_TOLERANCE_LOOSE) if the structure
+    comes immediately from geometry optimization.
+    """
+    pmg_unit_cell = pymatgen.io.ase.AseAtomsAdaptor.get_structure(unit_cell)
+    spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(
+        structure=pmg_unit_cell,
+        symprec=symprec
+    )
+    pmg_refined = spg_analyzer.get_refined_structure()
+    return pymatgen.io.ase.AseAtomsAdaptor.get_atoms(pmg_refined)
+
+def _standardize_cell_spglib(
+        cell_vectors: npt.NDArray[np.float64],
+        atomic_numbers: npt.NDArray[np.int64],
+        scaled_positions: npt.NDArray[np.float64],
+        to_primitive: bool,
+        symprec: float,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    """Call spglib.standardize_cell. Return (cell_vectors (3,3), atomic_numbers (N,), scaled_positions (N,3))."""
+
+    result = spglib.standardize_cell(
+        (cell_vectors, scaled_positions, atomic_numbers),
+        to_primitive=to_primitive,
+        no_idealize=False,
+        symprec=symprec,
+    )
+    if result is None:
+        raise RuntimeError("spglib failed to standardize the cell.")
+    new_lattice, new_positions, new_numbers = result
+    return new_lattice, new_numbers, new_positions
+
+
+def to_symmetrized_primitive_cell_spglib(
+        cell_vectors: npt.NDArray[np.float64],
+        atomic_numbers: npt.NDArray[np.int64],
+        scaled_positions: npt.NDArray[np.float64],
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    """
+    Standardize to the primitive cell and idealize positions using spglib.
+    Return (cell_vectors (3,3), atomic_numbers (N,), scaled_positions (N,3)).
+    """
+    return _standardize_cell_spglib(
+        cell_vectors, 
+        atomic_numbers, 
+        scaled_positions, 
+        to_primitive=True, 
+        symprec=symprec
+    )
+
+def _standardize_cell_pymatgen(
+        cell_vectors: npt.NDArray[np.float64],
+        atomic_numbers: npt.NDArray[np.int64],
+        scaled_positions: npt.NDArray[np.float64],
+        to_primitive: bool,
+        symprec: float,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    """Standardize cell using pymatgen SpacegroupAnalyzer."""
+    struct = pymatgen.core.Structure(
+        lattice=cell_vectors,
+        species=atomic_numbers,
+        coords=scaled_positions,
+        coords_are_cartesian=False
+    )
+    sga = SpacegroupAnalyzer(struct, symprec=symprec)
     
+    if to_primitive:
+        new_struct = sga.get_primitive_standard_structure()
+    else:
+        new_struct = sga.get_conventional_standard_structure(
+            international_monoclinic=True
+        )
+        
+    new_lattice = new_struct.lattice.matrix
+    new_numbers = np.array(new_struct.atomic_numbers, dtype=np.int64)
+    new_positions = new_struct.frac_coords
     
+    return new_lattice, new_numbers, new_positions
+
+def _standardize_cell(
+    cell_vectors: npt.NDArray[np.float64],
+    atomic_numbers: npt.NDArray[np.int64],
+    scaled_positions: npt.NDArray[np.float64],
+    to_primitive: bool,
+    symprec: float,
+    backend: Literal["spglib", "pymatgen"] = DEFAULT_SYMMETRIZATION_BACKEND
+):
+    if backend == "spglib":
+        standarize_func = _standardize_cell_spglib
+    elif backend == "pymatgen":
+        standarize_func = _standardize_cell_pymatgen
+    else:
+        raise ValueError("Invalid backend requested in _standarize_cell.")
+
+    return standarize_func(
+        cell_vectors=cell_vectors,
+        atomic_numbers=atomic_numbers,
+        scaled_positions=scaled_positions,
+        to_primitive=to_primitive,
+        symprec=symprec
+    )
+
+def to_symmetrized_conventional_cell(
+        cell_vectors: npt.NDArray[np.float64],
+        atomic_numbers: npt.NDArray[np.int64],
+        scaled_positions: npt.NDArray[np.float64],
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
+        backend: Literal["spglib", "pymatgen"] = DEFAULT_SYMMETRIZATION_BACKEND
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    """
+    Standardize to the conventional cell and idealize positions using spglib.
+    Does not reduce to the primitive cell.
+    Return (cell_vectors (3,3), atomic_numbers (N,), scaled_positions (N,3)).
+    """
+    return _standardize_cell(
+        cell_vectors, 
+        atomic_numbers, 
+        scaled_positions, 
+        to_primitive=False, 
+        symprec=symprec,
+        backend=backend,
+    )
+
+def to_symmetrized_primitive_cell(
+        cell_vectors: npt.NDArray[np.float64],
+        atomic_numbers: npt.NDArray[np.int64],
+        scaled_positions: npt.NDArray[np.float64],
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
+        backend: Literal["spglib", "pymatgen"] = DEFAULT_SYMMETRIZATION_BACKEND
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    """
+    Standardize to the primitive cell and idealize positions using pymatgen.
+    Return (cell_vectors (3,3), atomic_numbers (N,), scaled_positions (N,3)).
+    """
+    return _standardize_cell(
+        cell_vectors, 
+        atomic_numbers, 
+        scaled_positions, 
+        to_primitive=True, 
+        symprec=symprec,
+        backend=backend
+    )
+
 def check_symmetry(
         unit_cell: ase.Atoms,
         symmetry_thresh = SYMMETRY_TOLERANCE_STRICT # tight symmetry tolerance used in Phonopy
@@ -104,36 +272,36 @@ def check_symmetry(
     return space_group_number, space_group_symbol
 
 
-def symmetrize(unit_cell: ase.Atoms, symmetrization_thresh: float = 1.0E-2) -> tuple[Atoms, int]:
+def get_equivalent_indices(
+    structure: ase.Atoms | pymatgen.core.Structure,
+    symprec: float = SYMMETRY_TOLERANCE_STRICT
+) -> list[list[int]]:
     """
-    Use spglib to remove the geometry optimization artifacts 
-    and refine the unit cell to the closest space group.
-
+    Groups atoms by their symmetry equivalence.
+    
+    Args:
+        structure: Input structure (ASE Atoms or Pymatgen Structure).
+        symprec: Symmetry precision for SpacegroupAnalyzer.
+        
+    Returns:
+        List of lists, where each inner list contains indices of equivalent atoms.
     """
-    #
-    # Check the symmetry of the input unit cell
-    # with tight tolerance
-    #
-    input_spacegroup_index, input_hmsymbol = check_symmetry(unit_cell)
-    #
-    # Find the closest space group using
-    # lower symmetrization tolerance
-    #
-    sym_unit_cell = unit_cell.copy()
-    ase.spacegroup.symmetrize.refine_symmetry(sym_unit_cell, symprec=symmetrization_thresh)
-    #
-    # Check the symmetry of the symmetrized
-    # cell with tight tolerance
-    #
-    sym_spacegroup_index, sym_hmsymbol = check_symmetry(sym_unit_cell)
-
-    if sym_spacegroup_index != input_spacegroup_index:
-        print(f"Refined space group: [{input_hmsymbol}][{input_spacegroup_index}] → [{sym_hmsymbol}][{sym_spacegroup_index}]")
+    if isinstance(structure, ase.Atoms):
+        pmg_structure = pymatgen.io.ase.AseAtomsAdaptor.get_structure(structure)
     else:
-        print(f"Perfect symmetry, no refinement: [{input_hmsymbol}][{input_spacegroup_index}]")
+        pmg_structure = structure
         
-    return sym_unit_cell, sym_spacegroup_index
-        
+    spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(
+        structure=pmg_structure,
+        symprec=symprec
+    )
+    symmetrized_structure = spg_analyzer.get_symmetrized_structure()
+    
+    # helper to convert numpy array to standard python list of ints
+    return [
+        [int(idx) for idx in group] 
+        for group in symmetrized_structure.equivalent_indices
+    ]
 
 def DetermineSpaceGroupSymmetry(UnitCell, XYZDirs, SymmetrizationThresh = 1.0E-2):
     print("Unit cell symmetry")
@@ -175,7 +343,7 @@ def supercell_matrix(
         r_point_image: float,
         diagonal: bool = False,
         backend: Literal["doped", "pymatgen", "auto"] = "auto"
-) -> npt.NDArray[np.integer]:
+) -> npt.NDArray[np.int64]:
     """
     Find the transformation of the unit cell vectors
     which generates a super cell with the following
@@ -190,7 +358,13 @@ def supercell_matrix(
     By default, the transformation matrix is non-diagonal,
     which means that the lattice vectors of the super cell
     can be linear combinations of the lattice vectors of
-    the unit cell with integer coefficients.
+    the unit cell with integer coefficients. A non-diagonal
+    supercell might cause deviations from the perfect
+    symmetry of the dynamical matrix, leading to
+    non-degenerate frequencies (e.g., urea). Use functions
+    accepting the "symmetrize_Dq" argument to restore the
+    correct symmetry of the dynamical matrix before
+    computing physical properties.
 
     Use diagonal=True to get the standard
     n1 x n2 x n3 super cell with condition 1 satisfied.
@@ -281,21 +455,39 @@ def density(unit_cell: Atoms):
 
 
 def match(
-    positions_a: npt.NDArray[np.floating],
-    atomic_numbers_a: npt.NDArray[np.integer],
-    cell_vectors_a: npt.NDArray[np.floating],
-    positions_b: npt.NDArray[np.floating],
-    atomic_numbers_b: npt.NDArray[np.integer],
-    cell_vectors_b: npt.NDArray[np.floating],
+    positions_a: npt.NDArray[np.float64],
+    atomic_numbers_a: npt.NDArray[np.int64],
+    cell_vectors_a: npt.NDArray[np.float64],
+    positions_b: npt.NDArray[np.float64],
+    atomic_numbers_b: npt.NDArray[np.int64],
+    cell_vectors_b: npt.NDArray[np.float64],
     ltol: float = 0.2,
     stol: float = 0.3,
-    angle_tol: float = 5.0
-) -> float | None:
+    angle_tol: float = 5.0,
+    compute_atom_to_atom_mapping: bool = False,
+) -> CrystalMatch | None:
     """
     Calculate minimum RMSD between two periodic structures.
 
     Verifies identical atom count and elemental composition before matching.
     The function reorders atoms to find the optimal fit.
+
+    Returns a `CrystalMatch` containing:
+    1. `rmsd`: The minimum RMSD between the two structures.
+    2. `lattice_transformation`: The matrix transforming the lattice basis of A to match B.
+    3. `fractional_translation`: The fractional shift vector applied to atoms.
+    4. `atom_permutation`: The index mapping of atoms from A to align with B.
+    5. `aligned_positions_a`: Cartesian coordinates of A aligned to B and folded to the nearest periodic image of B.
+    6. `aligned_atomic_numbers_a`: Atomic numbers of A aligned to B.
+    7. `aligned_cell_vectors_a`: Lattice vectors of A aligned to B.
+
+    Example:
+        match_result = match(...)
+        if match_result is not None:
+            # The aligned parameters are readily available inside match_result:
+            positions = match_result.aligned_positions_a
+            atomic_numbers = match_result.aligned_atomic_numbers_a
+            cell_vectors = match_result.aligned_cell_vectors_a
 
     Args:
         positions_a: Atomic positions for structure A. Shape: (n_atoms, 3).
@@ -309,18 +501,8 @@ def match(
         angle_tol: Angle tolerance for lattice matching in degrees.
 
     Returns:
-        The minimum RMSD between the two structures in Å, or None if they
-        do not match within the given tolerances.
+        A CrystalMatch dataclass, or None if the structures do not match within the given tolerances.
     """
-    if atomic_numbers_a.shape[0] != atomic_numbers_b.shape[0]:
-         raise ValueError("Structures must have the same number of atoms.")
-
-    max_z = max(np.max(atomic_numbers_a), np.max(atomic_numbers_b))
-    composition_a = np.bincount(atomic_numbers_a, minlength=max_z + 1)
-    composition_b = np.bincount(atomic_numbers_b, minlength=max_z + 1)
-    if not np.array_equal(composition_a, composition_b):
-        raise ValueError("Structures have different elemental compositions.")
-
     pmg_struct_a = pymatgen.core.Structure(
         lattice=cell_vectors_a,
         species=atomic_numbers_a,
@@ -333,9 +515,219 @@ def match(
         coords=positions_b,
         coords_are_cartesian=True
     )
+    #
+    # primitive_cell=False prevents reduction to the primitive cell before matching.
+    # This is required so that the returned atom permutation array corresponds
+    # exactly to the original atoms in the provided input structures.
+    #
+    matcher = StructureMatcher(
+        ltol=ltol, 
+        stol=stol, 
+        angle_tol=angle_tol,
+        primitive_cell=(not compute_atom_to_atom_mapping)
+    )
+    
+    if compute_atom_to_atom_mapping:
+        pmg_aligned_a = matcher.get_s2_like_s1(pmg_struct_b, pmg_struct_a)
+        trans = matcher.get_transformation(pmg_struct_b, pmg_struct_a)
+        assert (trans is not None), "Failed to compute mapping between structures. Check the tolerances."
+        lattice_transformation, fractional_translation, atom_permutation = trans
+        aligned_positions_a=pmg_aligned_a.cart_coords
+        aligned_atomic_numbers_a=np.array(pmg_aligned_a.atomic_numbers, dtype=np.int64)
+        aligned_cell_vectors_a=pmg_aligned_a.lattice.matrix
+    else:
+        lattice_transformation, fractional_translation, atom_permutation = None, None, None
+        aligned_positions_a, aligned_atomic_numbers_a, aligned_cell_vectors_a = None, None, None
+    
+    rmsd_tuple = matcher.get_rms_dist(pmg_struct_b, pmg_struct_a)
+    if rmsd_tuple is None:
+        return None
+        
+    rmsd = rmsd_tuple[0]
 
-    matcher = StructureMatcher(ltol=ltol, stol=stol, angle_tol=angle_tol)
-    # get_rms_dist returns (rmsd, mapping)
-    rmsd, _ = matcher.get_rms_dist(pmg_struct_a, pmg_struct_b)
+    return CrystalMatch(
+        rmsd=rmsd,
+        lattice_transformation=lattice_transformation,
+        fractional_translation=fractional_translation,
+        atom_permutation=atom_permutation,
+        aligned_positions_a=aligned_positions_a,
+        aligned_atomic_numbers_a=aligned_atomic_numbers_a,
+        aligned_cell_vectors_a=aligned_cell_vectors_a,
+    )
 
-    return rmsd
+
+def compare_lattice_params(
+    initial_cell_vectors: npt.NDArray[np.float64], 
+    match_result: CrystalMatch,
+    label_initial_structure: str,
+    label_final_structure: str
+) -> None:
+    """
+    Print a side-by-side comparison of lattice parameters.
+
+    `match_result` is from a call to `crystal.match` where the final 
+    periodic structure is aligned to match closely the initial structure.
+
+    Args:
+        initial_cell_vectors: Lattice vectors of the initial structure.
+            Stored in rows: [[ax, ay, az], [bx, by, bz], [cx, cy, cz]].
+        match_result: Result of the crystal matching.
+        label_initial_structure: Label for the initial structure display.
+        label_final_structure: Label for the final structure display.
+    """
+
+    initial_lattice = pymatgen.core.Lattice(initial_cell_vectors)
+    initial_lengths = initial_lattice.abc
+    initial_angles = initial_lattice.angles
+    initial_vol = initial_lattice.volume
+
+    aligned_lattice = pymatgen.core.Lattice(match_result.aligned_cell_vectors_a)
+    aligned_lengths = aligned_lattice.abc
+    aligned_angles = aligned_lattice.angles
+    aligned_vol = aligned_lattice.volume
+
+    print(f"Lattice parameter comparison: {label_initial_structure} -> {label_final_structure}")
+    print(f"  Lattice lengths (a, b, c) [Å]   {initial_lengths[0]:.4f}, {initial_lengths[1]:.4f}, {initial_lengths[2]:.4f} -> {aligned_lengths[0]:.4f}, {aligned_lengths[1]:.4f}, {aligned_lengths[2]:.4f}")
+    print(f"  Lattice angles (α, β, γ) [°]    {initial_angles[0]:.1f}, {initial_angles[1]:.1f}, {initial_angles[2]:.1f} -> {aligned_angles[0]:.1f}, {aligned_angles[1]:.1f}, {aligned_angles[2]:.1f}")
+    print(f"  Cell volume [Å³]                {initial_vol:.2f} -> {aligned_vol:.2f}")
+    print(f"  RMSD [Å]                        {match_result.rmsd:.6f}")
+    print("")
+
+
+def compare_conventional_cells(
+    structure_initial: ase.Atoms | pymatgen.core.Structure,
+    structure_final: ase.Atoms | pymatgen.core.Structure,
+    label_initial: str,
+    label_final: str,
+    symprec: float = SYMMETRY_TOLERANCE_LOOSE
+) -> None:
+    """
+    Print a side-by-side comparison of conventional unit cell parameters.
+    """
+    if isinstance(structure_initial, ase.Atoms):
+        pmg_struct_initial = pymatgen.io.ase.AseAtomsAdaptor.get_structure(structure_initial)
+    else:
+        pmg_struct_initial = structure_initial
+
+    if isinstance(structure_final, ase.Atoms):
+        pmg_struct_final = pymatgen.io.ase.AseAtomsAdaptor.get_structure(structure_final)
+    else:
+        pmg_struct_final = structure_final
+
+    sga_i = SpacegroupAnalyzer(pmg_struct_initial, symprec=symprec)
+    sga_f = SpacegroupAnalyzer(pmg_struct_final, symprec=symprec)
+
+    conv_i = sga_i.get_conventional_standard_structure(international_monoclinic=True)
+    conv_f = sga_f.get_conventional_standard_structure(international_monoclinic=True)
+
+    lat_i, lat_f = conv_i.lattice, conv_f.lattice
+    abc_i, abc_f = np.array(lat_i.abc), np.array(lat_f.abc)
+    ang_i, ang_f = np.array(lat_i.angles), np.array(lat_f.angles)
+    
+    vol_i, vol_f = lat_i.volume, lat_f.volume
+    percent_change_abc = (abc_f - abc_i) / abc_i * 100
+    percent_change_vol = (vol_f - vol_i) / vol_i * 100
+
+    sg_i = f"{sga_i.get_space_group_symbol()} ({sga_i.get_space_group_number()})"
+    sg_f = f"{sga_f.get_space_group_symbol()} ({sga_f.get_space_group_number()})"
+
+    print(f"Comparison of conventional cells")
+    print(f"Space Group: {sg_i} -> {sg_f}")
+    print(f"{'-' * 75}")
+    print(f"{'Parameter':<15} | {label_initial:<15} | {label_final:<15} | {'Change [%]':<10}")
+    print(f"{'-' * 75}")
+
+    params = ["a [Å]", "b [Å]", "c [Å]"]
+    for i, p in enumerate(params):
+        print(f"{p:<15} | {abc_i[i]:<15.3f} | {abc_f[i]:<15.3f} | {percent_change_abc[i]:<+10.2f}")
+
+    angles = ["α [°]", "β [°]", "γ [°]"]
+    for i, a in enumerate(angles):
+        print(f"{a:<15} | {ang_i[i]:<15.1f} | {ang_f[i]:<15.1f} | {'-':<10}")
+
+    print(f"{'Volume [Å³]':<15} | {vol_i:<15.1f} | {vol_f:<15.1f} | {percent_change_vol:<+10.2f}")
+    print(f"{'-' * 75}\n")
+
+
+def conventional_cell_params(
+    structure: ase.Atoms | pymatgen.core.Structure,
+    symprec: float = SYMMETRY_TOLERANCE_LOOSE,
+    backend: Literal["spglib", "pymatgen"] = DEFAULT_SYMMETRIZATION_BACKEND
+) -> tuple[int, pymatgen.core.Lattice, SpacegroupAnalyzer]:
+    """
+    Compute conventional cell parameters from an input structure.
+    
+    Args:
+        structure: Input structure as either ase.Atoms or pymatgen Structure.
+        symprec: Symmetry tolerance for spacegroup analysis.
+        
+    Returns:
+        A tuple containing:
+        - The number of atoms in the conventional cell.
+        - Pymatgen Lattice object corresponding to the conventional cell.
+        - The SpacegroupAnalyzer instance used for symmetry analysis.
+    """
+    if isinstance(structure, ase.Atoms):
+        pmg_struct = pymatgen.io.ase.AseAtomsAdaptor.get_structure(structure)
+    else:
+        pmg_struct = structure
+
+    lat_matrix, numbers, scaled_positions_conv = to_symmetrized_conventional_cell(
+        pmg_struct.lattice.matrix,
+        np.array(pmg_struct.atomic_numbers, dtype=np.int64),
+        pmg_struct.frac_coords,
+        symprec,
+        backend
+    )
+
+    n_atoms = len(numbers)
+    lattice = pymatgen.core.Lattice(lat_matrix)
+    
+    symmetrized_struct = pymatgen.core.Structure(
+        lattice=lattice,
+        species=numbers,
+        coords=scaled_positions_conv,
+        coords_are_cartesian=False
+    )
+    sga = SpacegroupAnalyzer(symmetrized_struct, symprec=symprec)
+    
+    return n_atoms, lattice, sga
+
+
+def display_conventional_cell(
+    structure: ase.Atoms | pymatgen.core.Structure,
+    label: str = "Structure",
+    symprec: float = SYMMETRY_TOLERANCE_LOOSE,
+    backend: Literal["spglib", "pymatgen"] = DEFAULT_SYMMETRIZATION_BACKEND
+) -> None:
+    """
+    Print conventional unit cell parameters of a single structure.
+    """
+    n_atoms, lat, sga = conventional_cell_params(
+        structure, 
+        symprec=symprec, 
+        backend=backend
+    )
+    
+    abc = lat.abc
+    ang = lat.angles
+    
+    sg_string = f"{sga.get_space_group_symbol()} ({sga.get_space_group_number()})"
+
+    print(f"conventional cell parameters: {label}")
+    print(f"space group: {sg_string}")
+    print(f"{'-' * 40}")
+    print(f"{'parameter':<15} | {'value':<15}")
+    print(f"{'-' * 40}")
+    
+    params = ["a [Å]", "b [Å]", "c [Å]"]
+    for i, p in enumerate(params):
+        print(f"{p:<15} | {abc[i]:<15.3f}")
+
+    angles = ["α [°]", "β [°]", "γ [°]"]
+    for i, a in enumerate(angles):
+        print(f"{a:<15} | {ang[i]:<15.1f}")
+
+    print(f"{'volume [Å³]':<15} | {lat.volume:<15.1f}")
+    print(f"{'atoms':<15} | {n_atoms:<15}")
+    print(f"{'-' * 40}\n")

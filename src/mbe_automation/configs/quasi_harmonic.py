@@ -9,11 +9,12 @@ import numpy.typing as npt
 
 from mbe_automation.configs.recommended import KNOWN_MODELS
 from mbe_automation.configs.structure import Minimum
+import mbe_automation.structure.crystal
 import mbe_automation.calculators
 import mbe_automation.storage
 
-EOS_SAMPLING_ALGOS = ["volume", "pressure", "uniform_scaling"]
-EQUATIONS_OF_STATE = ["birch_murnaghan", "vinet", "polynomial", "spline"]
+from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
+from mbe_automation.dynamics.harmonic.eec import ELECTRONIC_ENERGY_CORRECTION, EECConfig as EEC
 
 @dataclass(kw_only=True)
 class FreeEnergy:
@@ -31,6 +32,29 @@ class FreeEnergy:
                                    #
     crystal: ase.Atoms | mbe_automation.storage.Structure
     molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
+                                   #
+                                   # Empirical electronic energy correction applied
+                                   # to enforce known reference volume (V_ref)
+                                   # at reference temperature (T_ref). The EEC contribution
+                                   # is added to the crystal electronic energy (E_el_crystal)
+                                   # and accounted for in all thermodynamic functions derived
+                                   # from E_el_crystal. Two types of ECC are implemented:
+                                   #
+                                   # (1) linear: E_el_crystal(corrected) = E_el_crystal + param * (V - V_ref)
+                                   # (2) inverse_volume: E_el_crystal(corrected) = E_el_crystal + param / V
+                                   #
+                                   # Literature with definitions:
+                                   # 1. A. Otero-de-la-Roza and V. Lunana, Treatment of first-principles data
+                                   #    for predictive quasiharmonic thermodynamics of solids: The case of MgO
+                                   #    Phys. Rev. B 84, 024109 (2011); doi: 10.1103/PhysRevB.84.024109
+                                   # 2. F. Luo, Y. Cheng, L.-C. Cai, and X.-R. Chen, Structure and thermodynamics properties
+                                   #    of BeO: Empirical corrections in the quasiharmonic approximation,
+                                   #    J. Appl. Phys. 113, 033517 (2013); doi: 10.1063/1.4776679
+                                   # 3. X. Bidault and S. Chaudhuri, Improved predictions of thermomechanical properties of
+                                   #    molecular crystals from energy and dispersion corrected DFT,
+                                   #    J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
+                                   #
+    electronic_energy_correction: EEC = field(default_factory=lambda: EEC(type="none"))
                                    #
                                    # Volumetric thermal expansion
                                    #
@@ -262,9 +286,17 @@ class FreeEnergy:
     verbose: int = 0
     save_plots: bool = True
     save_csv: bool = True
-    save_xyz: bool = True
 
     def __post_init__(self):
+        import mbe_automation.dynamics.harmonic.eos
+
+        if self.relaxation.transform != "to_symmetrized_primitive_cell":
+            raise ValueError(
+                f"Quasi-harmonic workflows require the Minimum configuration "
+                f"to set transform='to_symmetrized_primitive_cell'. "
+                f"Got: '{self.relaxation.transform}'"
+            )
+
         if isinstance(self.crystal, mbe_automation.storage.Structure):
             self.crystal = mbe_automation.storage.to_ase(self.crystal)
         if isinstance(self.molecule, mbe_automation.storage.Structure):
@@ -276,6 +308,19 @@ class FreeEnergy:
             if np.any(diffs < 1.0E-5):
                  raise ValueError("Numerically close temperatures detected in temperatures_K.")
         
+        if self.electronic_energy_correction.is_enabled:
+            if not np.any(np.isclose(self.temperatures_K, self.electronic_energy_correction.T_ref, atol=1.0E-5)):
+                raise ValueError("EECConfig.T_ref must be exactly present in temperatures_K.")
+            if self.equation_of_state != "spline":
+                raise ValueError("Electronic energy correction is only supported with the 'spline' equation of state.")
+        
+        self.volume_range = np.sort(np.atleast_1d(self.volume_range))
+        if len(self.volume_range) > 1:
+            #
+            # Remove duplicate volumes
+            #
+            self.volume_range = self.volume_range[np.insert(np.diff(self.volume_range) >= 1.0E-3, 0, True)]
+
         if (
                 self.thermal_expansion and
                 self.relaxation.backend == "dftb"
@@ -286,6 +331,24 @@ class FreeEnergy:
                     f"dftb backend does not support eos_sampling={self.eos_sampling}. "
                     f"Use eos_sampling=uniform_scaling instead."
                 )
+
+        if self.eos_sampling == "pressure":
+            n_points = len(self.thermal_pressures_GPa)
+        else:
+            n_points = len(self.volume_range)
+        
+        min_points = mbe_automation.dynamics.harmonic.eos.get_minimum_points_for_eos(self.equation_of_state)
+        
+        if n_points < min_points:
+            msg = [
+                f"Insufficient number of sampling points ({n_points}) for the requested EOS '{self.equation_of_state}' (requires {min_points}).",
+                "Minimum number of points required for each EOS type:"
+            ]
+            for eos in EQUATIONS_OF_STATE:
+                req = mbe_automation.dynamics.harmonic.eos.get_minimum_points_for_eos(eos)
+                msg.append(f" - {eos}: {req}")
+            
+            raise ValueError("\n".join(msg))
 
     @classmethod
     def recommended(

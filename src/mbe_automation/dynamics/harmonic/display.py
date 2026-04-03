@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 import os
 import os.path
 from typing import Literal
@@ -99,15 +100,13 @@ def potential_energy_curve(
         return fig
 
     
-def band_structure(
-        dataset: str,
-        key: str,
+def _band_structure(
+        fbz_path: mbe_automation.storage.core.BrillouinZonePath,
         save_path: str | None = None,
         freq_max_THz: float | None = None,
         color_map: str = "plasma",
         freq_units: Literal["THz", "cm-1"] = "THz"
 ):
-    fbz_path = mbe_automation.storage.read_brillouin_zone_path(dataset, key)
     frequencies = fbz_path.frequencies
     distances = fbz_path.distances
     path_connections = fbz_path.path_connections
@@ -145,12 +144,22 @@ def band_structure(
         for start, end in zip(break_indices, break_indices[1:])
     ]
 
-    fig, axes = plt.subplots(
-        1, len(breaks), sharey=True,
-        gridspec_kw={'width_ratios': width_ratios, 'wspace': 0.05}
-    )
-    if len(breaks) == 1:
+    # By definition of BrillouinZonePath (following Seekpath/Phonopy conventions),
+    # the last element of path_connections should be False, so breaks should not be empty.
+    # However, we handle the case where it might be True (e.g. manually constructed paths)
+    # to prevent crashes.
+    if len(breaks) == 0:
+        fig, axes = plt.subplots(
+            1, 1, sharey=True,
+        )
         axes = [axes]
+    else:
+        fig, axes = plt.subplots(
+            1, len(breaks), sharey=True,
+            gridspec_kw={'width_ratios': width_ratios, 'wspace': 0.05}
+        )
+        if len(breaks) == 1:
+             axes = [axes]
 
     label_count = 0
     continuous_segments = [
@@ -207,6 +216,29 @@ def band_structure(
         plt.close(fig)
     else:
         return fig
+
+
+def band_structure(
+        fbz_path: mbe_automation.storage.core.BrillouinZonePath | None = None,
+        dataset: str | None = None,
+        key: str | None = None,
+        save_path: str | None = None,
+        freq_max_THz: float | None = None,
+        color_map: str = "plasma",
+        freq_units: Literal["THz", "cm-1"] = "THz"
+):
+    if fbz_path is None:
+        if dataset is None or key is None:
+            raise ValueError("Either 'fbz_path' or both 'dataset' and 'key' must be provided.")
+        fbz_path = mbe_automation.storage.read_brillouin_zone_path(dataset, key)
+
+    return _band_structure(
+        fbz_path,
+        save_path=save_path,
+        freq_max_THz=freq_max_THz,
+        color_map=color_map,
+        freq_units=freq_units
+    )
 
 
 def eos_curves(
@@ -309,5 +341,220 @@ def eos_curves(
         plt.close(fig)
     else:
         return fig
+
+
+def print_adps_comparison(
+    adps_1: npt.NDArray[np.float64],
+    adps_2: npt.NDArray[np.float64],
+    labels: list[str],
+    symbols: list[str] | None = None,
+    adps_3: npt.NDArray[np.float64] | None = None,
+    s12_12: float | None = None,
+    s12_13: float | None = None,
+    rmsd_12: float | None = None,
+    rmsd_13: float | None = None,
+    exclude_hydrogen: bool = False,
+) -> None:
+    """
+    Compare sets of ADPs and display 3x3 matrices side-by-side.
+
+    Args:
+        adps_1: First set of ADPs (N, 3, 3).
+        adps_2: Second set of ADPs (N, 3, 3).
+        labels: List of strings identifying the datasets.
+        symbols: Optional list of atom symbols (N,).
+        adps_3: Optional third set of ADPs (N, 3, 3).
+        s12_12: Pre-computed mean S12 for adps_1 vs adps_2.
+        s12_13: Pre-computed mean S12 for adps_1 vs adps_3.
+        rmsd_12: Pre-computed RMSD for adps_1 vs adps_2.
+        rmsd_13: Pre-computed RMSD for adps_1 vs adps_3.
+        exclude_hydrogen: If True, filter out H atoms from display and stats.
+    """
+    if adps_1.shape != adps_2.shape:
+        raise ValueError(f"Shape mismatch 1 vs 2: {adps_1.shape} vs {adps_2.shape}")
+    
+    if adps_3 is not None:
+        if adps_3.shape != adps_1.shape:
+            raise ValueError(f"Shape mismatch 1 vs 3: {adps_1.shape} vs {adps_3.shape}")
+        if len(labels) < 3:
+            raise ValueError("Insufficient labels for 3 ADP sets.")
+
+    # Apply hydrogen exclusion if requested
+    if exclude_hydrogen and symbols is not None:
+        mask = np.array([s != "H" for s in symbols])
+        adps_1 = adps_1[mask]
+        adps_2 = adps_2[mask]
+        if adps_3 is not None:
+            adps_3 = adps_3[mask]
+        symbols = [s for s, m in zip(symbols, mask) if m]
+
+    n_atoms = adps_1.shape[0]
+    if symbols is None:
+        symbols = [f"Atom{i}" for i in range(n_atoms)]
+
+    label1, label2 = labels[0], labels[1]
+    label3 = labels[2] if adps_3 is not None else None
+    
+    def format_matrix_row(m: np.ndarray, row: int) -> str:
+        """Format a single row of a 3x3 matrix with spanning brackets."""
+        left = ["⎛", "⎜", "⎝"][row]
+        right = ["⎞", "⎟", "⎠"][row]
+        return f"{left} {m[row, 0]:8.5f} {m[row, 1]:8.5f} {m[row, 2]:8.5f} {right}"
+    
+    print("\n" + "=" * 100)
+    print("ADP Comparison (3×3 Cartesian U tensors, Å²)")
+    print("=" * 100)
+    
+    for i in range(n_atoms):
+        u1 = adps_1[i]
+        u2 = adps_2[i]
+        u3 = adps_3[i] if adps_3 is not None else None
+        
+        print(f"\n{symbols[i]}")
+        print("-" * 100)
+        
+        if u3 is not None:
+            print(f"{'':4} {label1:^30} {label2:^30} {label3:^30}")
+        else:
+            print(f"{'':4} {label1:^30} {label2:^30}")
+        
+        for row in range(3):
+            row1 = format_matrix_row(u1, row)
+            row2 = format_matrix_row(u2, row)
+            if u3 is not None:
+                row3 = format_matrix_row(u3, row)
+                print(f"    {row1}  {row2}  {row3}")
+            else:
+                print(f"    {row1}  {row2}")
+    
+    # Summary statistics
+    print("\n" + "=" * 100)
+    print("Summary")
+    print("=" * 100)
+    
+    if s12_12 is not None:
+        print(f"Mean S12({label1}-{label2}): {s12_12:.3f}%")
+    
+    if rmsd_12 is not None:
+        print(f"RMSD({label1}-{label2}): {rmsd_12:.5f}")
+    
+    if adps_3 is not None:
+        if s12_13 is not None:
+            print(f"Mean S12({label1}-{label3}): {s12_13:.3f}%")
+        if rmsd_13 is not None:
+            print(f"RMSD({label1}-{label3}): {rmsd_13:.5f}")
+    
+    print("=" * 100)
+
+
+def print_frequency_comparison(
+    freqs_initial_gamma: npt.NDArray[np.float64],
+    freqs_refined_gamma: npt.NDArray[np.float64],
+    freqs_initial_avg: npt.NDArray[np.float64],
+    freqs_refined_avg: npt.NDArray[np.float64],
+    scaling_factors: npt.NDArray[np.float64],
+    optimize_mask: npt.NDArray[np.bool_] | None = None,
+    unit: Literal["THz", "cm1"] = "THz"
+) -> None:
+    """Helper to print starting vs refined frequencies with Gamma and average metrics."""
+    if freqs_initial_gamma.ndim != 1 or freqs_refined_gamma.ndim != 1:
+        raise ValueError("Frequencies must be 1D arrays.")
+
+    to_cm = 1.0
+    if unit == "THz":
+        to_cm = phonopy.physical_units.get_physical_units().THzToCm
+        
+    print("\nComparison of Frequencies (cm⁻¹)\n")
+    header = (
+        f"{'band':<7} {'initial (Γ)':>14} {'refined (Γ)':>14} "
+        f"{'initial (avg)':>14} {'refined (avg)':>14} "
+        f"{'scaling':>10} {'shift (Γ)':>10}"
+    )
+    print(header)
+    print("-" * len(header))
+            
+    n_bands = len(freqs_initial_gamma)
+    f_init_g = freqs_initial_gamma * to_cm
+    f_ref_g = freqs_refined_gamma * to_cm
+    f_init_a = freqs_initial_avg * to_cm
+    f_ref_a = freqs_refined_avg * to_cm
+    shift_g = f_ref_g - f_init_g
+    
+    for b in range(n_bands):
+        opt_mark = "*" if optimize_mask is not None and optimize_mask[b] else " "
+        band_str = f"{b}{opt_mark}"
+        print(
+            f"{band_str:<7} "
+            f"{f_init_g[b]:>14.1f} "
+            f"{f_ref_g[b]:>14.1f} "
+            f"{f_init_a[b]:>14.1f} "
+            f"{f_ref_a[b]:>14.1f} "
+            f"{scaling_factors[b]:>10.3f} "
+            f"{shift_g[b]:>10.1f}"
+        )
+
+
+def eos_fitting_summary(
+    df_crystal_eos: pd.DataFrame,
+    filter_out_extrapolated_minimum: bool
+):
+    """
+    Print a summary of the EOS fitting results across all temperatures.
+    """
+    
+    print("\n" + "=" * 80)
+    print(f"{'Gibbs free energy minimization summary':^80}")
+    print("=" * 80)
+    
+    #
+    # Construct the summary table
+    #
+    summary_rows = []
+    for _, row in df_crystal_eos.iterrows():
+        T = row["T (K)"]
+        V = row["V_eos (Å³∕unit cell)"]
+        min_found = row["min_found"]
+        min_extrapolated = row["min_extrapolated"]
+        
+        if not min_found:
+            status = "skipped (no minimum found)"
+        elif min_extrapolated and filter_out_extrapolated_minimum:
+            status = "skipped (minimum beyond scanned range)"
+        else:
+            status = "proceed"
+            
+        summary_rows.append({
+            "T (K)": f"{T:8.1f}",
+            "V (Å³)": f"{V:8.1f}" if not np.isnan(V) else f"{'N/A':>8}",
+            "min_found": f"{str(min_found):^10}",
+            "min_extrapolated": f"{str(min_extrapolated):^16}",
+            "status": status
+        })
+        
+    df_summary = pd.DataFrame(summary_rows)
+    print(df_summary.to_string(index=False), flush=True)
+    print("-" * 80)
+    
+    #
+    # Diagnostic information
+    #
+    n_total = len(df_crystal_eos)
+    n_proceed = sum(1 for r in summary_rows if r["status"] == "proceed")
+    
+    if n_proceed == 0:
+        print("\n[!] CRITICAL: No valid minima found for any temperature.")
+        print("    The workflow cannot proceed with equilibrium-volume calculations.")
+    elif n_proceed < n_total:
+        print(f"\n[!] WARNING: Valid minima found for only {n_proceed}/{n_total} temperature points.")
+    
+    if n_proceed < n_total:
+        print("\nSuggestions:")
+        print("1. Inspect the volume sampling range (volume_range/thermal_pressures_GPa).")
+        print("   The current range might not bracket the equilibrium volume at all temperatures.")
+        print("2. Check phonon dispersion plots for imaginary frequencies.")
+        print("3. Consider if the filtering criteria (filter_out_imaginary_*) are too strict.")
+        
+    print("=" * 80 + "\n", flush=True)
+
 
 

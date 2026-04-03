@@ -77,7 +77,11 @@ class Minimum:
                                    # symmetrization may introduce significant
                                    # residual forces on atoms.
                                    #
-    symmetrize_final_structure: bool = True
+    transform: Literal[
+        "to_symmetrized_primitive_cell",
+        "to_symmetrized_conventional_cell",
+        "no_transformation"
+    ] = "to_symmetrized_primitive_cell"
                                    #
                                    # Tolerance (in Angstrom) used for symmetry detection
                                    # for imperfect structures after relaxation with a finite
@@ -115,6 +119,16 @@ class Minimum:
                                    #
     algo_primary: Literal["PreconLBFGS", "PreconFIRE"] = "PreconLBFGS"
     algo_fallback: Literal["PreconLBFGS", "PreconFIRE"] = "PreconFIRE"
+                                   #
+                                   # Save final relaxed structure as an .xyz
+                                   # or .cif file in the working directory
+                                   #
+    save_structure_files: bool = True
+                                   #
+                                   # Construct the relaxed structure aligned to the
+                                   # input structure using StructureMatcher from pymatgen
+                                   #
+    align_to_input: bool = False
 
     @property
     def pressure_GPa(self) -> float:

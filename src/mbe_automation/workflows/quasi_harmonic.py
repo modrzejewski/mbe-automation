@@ -6,6 +6,7 @@ import ase.units
 import numpy as np
 import pandas as pd
 import warnings
+import functools
 
 import mbe_automation.common
 import mbe_automation.configs
@@ -26,6 +27,11 @@ except ImportError:
 
 def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
+    assert config.relaxation.transform == "to_symmetrized_primitive_cell", (
+        "Quasi-harmonic workflows require the Minimum configuration to set "
+        "transform='to_symmetrized_primitive_cell'."
+    )
+
     datetime_start = mbe_automation.common.display.timestamp_start()
     
     if config.verbose == 0:
@@ -40,9 +46,10 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     else:
         mbe_automation.common.display.framed("Harmonic properties")
         
-    os.makedirs(config.work_dir, exist_ok=True)
+    Path(config.work_dir).mkdir(parents=True, exist_ok=True)
     geom_opt_dir = Path(config.work_dir) / "relaxation"
-    os.makedirs(geom_opt_dir, exist_ok=True)
+    vibrations_dir = Path(config.work_dir) / "vibrations"
+    geom_opt_dir.mkdir(parents=True, exist_ok=True)
 
     input_space_group, _ = mbe_automation.structure.crystal.check_symmetry(
         config.crystal
@@ -84,8 +91,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             key=f"{config.root_key}/structures/{relaxed_molecule_label}"
         )
         vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
-            molecule,
-            config.calculator
+            molecule=molecule,
+            calculator=config.calculator,
+            work_dir=vibrations_dir/relaxed_molecule_label
         )
 
     if config.relaxation.cell_relaxation == "full":
@@ -166,6 +174,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         root_key=config.root_key,
         system_label=relaxed_crystal_label,
         level_of_theory=config.calculator.level_of_theory,
+        unit_cell_type="primitive",
     )
     
     if config.molecule is not None:
@@ -213,7 +222,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     #
     interp_mesh = phonons.mesh.mesh_numbers # enforce the same mesh for all systems
 
-    df_crystal_eos = mbe_automation.dynamics.harmonic.core.equilibrium_curve(
+    interpolated_harmonic_props = mbe_automation.dynamics.harmonic.core.equilibrium_curve(
         unit_cell_V0,
         space_group_V0,
         config.calculator,
@@ -232,10 +241,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.filter_out_imaginary_acoustic,
         config.filter_out_imaginary_optical,
         config.filter_out_broken_symmetry,
+        config.filter_out_extrapolated_minimum,
+        config.electronic_energy_correction,
         config.dataset,
         config.root_key,
         config.save_plots,
     )
+    df_crystal_eos = interpolated_harmonic_props.interpolated_at_equilibrium_volume
     #
     # Harmonic properties for unit cells with temperature-dependent
     # equilibrium volumes V(T). Data points where eos fit failed
@@ -262,7 +274,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             # forces QHA equilibrium value
             #
             optimizer = deepcopy(config.relaxation)
-            optimizer._pressure_GPa = row["p_thermal_crystal (GPa)"] + config.pressure_GPa
+            p_effective = (
+                    row["p_thermal_crystal (GPa)"] + 
+                    config.pressure_GPa
+                )
+            if config.electronic_energy_correction.is_enabled:
+                p_effective += interpolated_harmonic_props.eec.evaluate_pressure(V)
+            optimizer._pressure_GPa = p_effective
             optimizer.cell_relaxation = "full"
             unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
                 unit_cell=unit_cell_T,
@@ -315,15 +333,27 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             root_key=config.root_key,
             system_label=label_crystal,
             level_of_theory=config.calculator.level_of_theory,
+            unit_cell_type="primitive",
         )
+        
+        if config.electronic_energy_correction.is_enabled:
+            df_crystal_T = mbe_automation.dynamics.harmonic.data.update_with_eec(
+                df_crystal=df_crystal_T,
+                eec=interpolated_harmonic_props.eec
+            )
+
+        interpolator = interpolated_harmonic_props.S_vib_at_T(T, derivative=True)
+        df_crystal_T["dSdV_vib_crystal (J∕K∕mol∕Å³∕unit cell)"] = interpolator(V)
         df_crystal_T.index = [i] # map current dataframe to temperature T
         data_frames_at_T.append(df_crystal_T)
 
     if not data_frames_at_T:
-        warnings.warn(
-            "Thermal expansion analysis could not find a valid free energy minimum "
-            "at any temperature. Halting workflow."
-        )
+        print("\n" + "!" * 80)
+        print("HALTING WORKFLOW".center(80))
+        print("!" * 80)
+        print("No valid free energy minimum was found at any temperature.")
+        print("Check the 'Gibbs free energy minimization summary' above for details.")
+        print("!" * 80 + "\n")
         mbe_automation.common.display.timestamp_finish(datetime_start)
         return
     #
@@ -340,7 +370,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # The numerical algorithm chosen for dX/dT depends on the number of available
     # temperature points.
     #
-    df_thermal_expansion = mbe_automation.dynamics.harmonic.eos.fit_thermal_expansion_properties(
+    df_thermal_expansion = mbe_automation.dynamics.harmonic.thermodynamics.fit_thermal_expansion_properties(
         df_crystal_equilibrium=df_crystal_qha
     )
     if config.molecule is not None:

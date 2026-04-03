@@ -1,15 +1,19 @@
 from dataclasses import dataclass
 import os
+import time
 import ase.thermochemistry
 import ase.units
 import pandas as pd
 import numpy as np
+import numpy.typing as npt
 from phonopy.phonon.band_structure import get_band_qpoints_by_seekpath
+from typing import Literal
 
 import mbe_automation.structure.molecule
 import mbe_automation.structure.crystal
 import mbe_automation.dynamics.harmonic.display
 import mbe_automation.storage
+from mbe_automation.dynamics.harmonic.eec import EEC
 
 @dataclass
 class FBZAnalysis:
@@ -78,8 +82,8 @@ def detect_imaginary_modes(
     
 def generate_fbz_path(
         phonons,
-        n_points=101,
-        band_connection=True
+        n_points=70,
+        band_connection=False
 ):
     """
     Determine the high-symmetry path through
@@ -87,12 +91,14 @@ def generate_fbz_path(
     library.
 
     """
-    
+    import time
+    t0 = time.time()
     bands, labels, path_connections = get_band_qpoints_by_seekpath(
         phonons.primitive,
         n_points,
         is_const_interval=True
     )
+    print(f"Symmetry k-path generated ({len(labels)} high-symmetry points)", flush=True)
     #
     # Compute frequencies along the high-symmetry path.
     # The computation of eigenvectors is disabled
@@ -102,6 +108,7 @@ def generate_fbz_path(
     # path in the k space, but the resulting dispersion
     # curves were often misaligned.
     #
+    print(f"Calculating band structure...", end="", flush=True)
     phonons.run_band_structure(
         bands,
         with_eigenvectors=False,
@@ -110,6 +117,7 @@ def generate_fbz_path(
         path_connections=path_connections,
         labels=labels
     )
+    print(f" done (Δt={time.time() - t0:.1f} s)", flush=True)
         
 
 def molecule(
@@ -180,6 +188,55 @@ def molecule(
     return df
 
 
+def update_with_eec(
+    df_crystal: pd.DataFrame,
+    eec: EEC,
+    good_points: npt.NDArray[np.bool_] | None = None
+) -> pd.DataFrame:
+    """
+    Update crystal thermodynamic data with the Empirical Electronic Energy Correction (EEC).
+    
+    The energy correction is evaluated based on the crystal volume and added
+    to the electronic energy and all derived total energy functions.
+    """
+    if "ΔE_el_crystal (kJ∕mol∕unit cell)" in df_crystal:
+        raise ValueError("Cannot update a data frame which already contains EEC.")
+
+    if not eec.is_enabled:
+        return df_crystal.copy()
+        
+    df = df_crystal.copy()
+    #
+    # EEC is evaluated directly in kJ/mol/unit cell
+    #
+    if good_points is None:
+        V_array = df["V_crystal (Å³∕unit cell)"].to_numpy()
+        E_el_correction = eec.evaluate(V=V_array)
+        p_eec = eec.evaluate_pressure(V=V_array)
+        
+        df["E_el_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df["ΔE_el_crystal (kJ∕mol∕unit cell)"] = E_el_correction
+        df["E_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df["F_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df["G_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df["H_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df["p_eec_crystal (GPa)"] = p_eec
+    else:
+        V_array = df.loc[good_points, "V_crystal (Å³∕unit cell)"].to_numpy()
+        E_el_correction = eec.evaluate(V=V_array)
+        p_eec = eec.evaluate_pressure(V=V_array)
+        
+        df.loc[good_points, "E_el_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df.loc[good_points, "ΔE_el_crystal (kJ∕mol∕unit cell)"] = E_el_correction
+        df.loc[good_points, "E_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df.loc[good_points, "F_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df.loc[good_points, "G_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df.loc[good_points, "H_tot_crystal (kJ∕mol∕unit cell)"] += E_el_correction
+        df.loc[good_points, "p_eec_crystal (GPa)"] = p_eec
+
+    return df
+
+
 def crystal(
         unit_cell,
         phonons,
@@ -192,6 +249,7 @@ def crystal(
         root_key,
         system_label,
         level_of_theory,
+        unit_cell_type: Literal["primitive", "conventional", "unknown"] = "unknown",
 ):
     """
     Physical properties derived from the harmonic model
@@ -214,7 +272,13 @@ def crystal(
     assert n_atoms_unit_cell == structure.n_atoms
     assert n_atoms_primitive_cell == structure.n_atoms
     
+    n_qpoints = len(phonons.mesh.qpoints) if phonons.mesh is not None else 0
+    print(f"Processing harmonic crystal data ({n_atoms_primitive_cell} atoms, {3*n_atoms_primitive_cell} bands)...", flush=True)
+    
+    t0 = time.time()
+    print(f"Computing thermal properties on {n_qpoints} q-points...", end="", flush=True)
     phonons.run_thermal_properties(temperatures=temperatures)
+    print(f" done (Δt={time.time() - t0:.1f} s)", flush=True)
     #
     # Phonopy units:
     # F_vib_crystal     kJ/mol/unit cell
@@ -231,6 +295,14 @@ def crystal(
     lattice = structure.lattice()
     cell_length_a, cell_length_b, cell_length_c = lattice.lengths # Å
     cell_angle_alpha, cell_angle_beta, cell_angle_gamma = lattice.angles # deg
+    
+    t0 = time.time()
+    print(f"Analyzing symmetry of the cell...", end="", flush=True)
+    n_atoms_conv_cell, conv_lattice, _ = mbe_automation.structure.crystal.conventional_cell_params(unit_cell)
+    print(f" done (Δt={time.time() - t0:.1f} s)", flush=True)
+    conv_cell_length_a, conv_cell_length_b, conv_cell_length_c = conv_lattice.abc
+    conv_cell_angle_alpha, conv_cell_angle_beta, conv_cell_angle_gamma = conv_lattice.angles
+    V_conv = conv_lattice.volume # Å³
     
     V = lattice.volume # Å³/unit cell
     rho = mbe_automation.structure.crystal.density(unit_cell) # g/cm**3
@@ -252,6 +324,9 @@ def crystal(
         phonons,
         imaginary_mode_threshold
     )
+    
+    t0 = time.time()
+    print(f"Saving phonon data to HDF5...", end="", flush=True)
     mbe_automation.storage.save_force_constants(
         dataset=dataset,
         key=f"{root_key}/phonons/force_constants/{system_label}",
@@ -272,6 +347,7 @@ def crystal(
         dataset=dataset,
         key=f"{root_key}/structures/{system_label}"
     )
+    print(f" done (Δt={time.time() - t0:.1f} s)", flush=True)
     interp_mesh = phonons.mesh.mesh_numbers
     
     df = pd.DataFrame({
@@ -287,22 +363,31 @@ def crystal(
         "G_tot_crystal (kJ∕mol∕unit cell)": G_tot_crystal,
         "H_tot_crystal (kJ∕mol∕unit cell)": H_tot_crystal,
         "V_crystal (Å³∕unit cell)": V,
+        "V_crystal (Å³∕conventional cell)": V_conv,
+        "n_atoms_conventional_cell": n_atoms_conv_cell,
+        "n_atoms_primitive_cell": n_atoms_primitive_cell,
         "p_external_crystal (GPa)": external_pressure_GPa,
         "pV_crystal (kJ∕mol∕unit cell)": pV_crystal,
         "ρ_crystal (g∕cm³)": rho,
-        "cell_length_a (Å)": cell_length_a,
-        "cell_length_b (Å)": cell_length_b,
-        "cell_length_c (Å)": cell_length_c,
-        "cell_angle_α (deg)": cell_angle_alpha,
-        "cell_angle_β (deg)": cell_angle_beta,
-        "cell_angle_γ (deg)": cell_angle_gamma,
-        "n_atoms_unit_cell": n_atoms_unit_cell,
+        "primitive_cell_length_a (Å)": cell_length_a,
+        "primitive_cell_length_b (Å)": cell_length_b,
+        "primitive_cell_length_c (Å)": cell_length_c,
+        "primitive_cell_angle_α (deg)": cell_angle_alpha,
+        "primitive_cell_angle_β (deg)": cell_angle_beta,
+        "primitive_cell_angle_γ (deg)": cell_angle_gamma,
+        "conventional_cell_length_a (Å)": conv_cell_length_a,
+        "conventional_cell_length_b (Å)": conv_cell_length_b,
+        "conventional_cell_length_c (Å)": conv_cell_length_c,
+        "conventional_cell_angle_α (deg)": conv_cell_angle_alpha,
+        "conventional_cell_angle_β (deg)": conv_cell_angle_beta,
+        "conventional_cell_angle_γ (deg)": conv_cell_angle_gamma,
         "space_group": space_group,
         "acoustic_freqs_real_crystal": fbz_analysis.acoustic_freqs_real,
         "optical_freqs_real_crystal": fbz_analysis.optical_freqs_real,
         "acoustic_freq_min (THz)": fbz_analysis.acoustic_freq_min_thz,
         "optical_freq_min (THz)": fbz_analysis.optical_freq_min_thz,
         "system_label_crystal": system_label,
+        "unit_cell_type": unit_cell_type,
         "Fourier_interp_mesh": f"{interp_mesh[0]}×{interp_mesh[1]}×{interp_mesh[2]}"
     })
     return df
@@ -333,7 +418,15 @@ def sublimation(df_crystal, df_molecule):
     """
     
     n_atoms_molecule = df_molecule["n_atoms_molecule"]
-    n_atoms_unit_cell = df_crystal["n_atoms_unit_cell"]
+    
+    assert df_crystal["unit_cell_type"].nunique() == 1
+    unit_cell_type = df_crystal["unit_cell_type"].iloc[0]
+    
+    if unit_cell_type == "conventional":
+        n_atoms_unit_cell = df_crystal["n_atoms_conventional_cell"]
+    else:
+        n_atoms_unit_cell = df_crystal["n_atoms_primitive_cell"]
+        
     beta = n_atoms_molecule / n_atoms_unit_cell
     
     V_Ang3 = df_crystal["V_crystal (Å³∕unit cell)"]

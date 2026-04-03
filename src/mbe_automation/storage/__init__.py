@@ -32,6 +32,8 @@ from mbe_automation.storage.core import (
     read_finite_subsystem,
     save_attribute,
     read_attribute,
+    save_eos_metadata,
+    read_eos_metadata,
 )
 
 from .tools import (
@@ -53,4 +55,5 @@ from mbe_automation.storage.views import from_ase_atoms
 from mbe_automation.storage.xyz_formats import from_xyz_file
 from mbe_automation.storage.xyz_formats import to_xyz_file
 from mbe_automation.storage.xyz_formats import to_cif_file
+
 
