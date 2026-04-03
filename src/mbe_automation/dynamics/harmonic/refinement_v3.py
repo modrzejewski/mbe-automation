@@ -390,7 +390,7 @@ def _report_on_grid_search(
             )
 
         mbe_automation.common.display.box_with_details(
-            title=f"{s_lbl} (n_params: {n_p})",
+            title=f"{s_lbl} ({n_p})",
             details=details,
             side_content=[],
             width=col_r+col_u+col_c+col_f+col_s
