@@ -83,6 +83,7 @@ def run(
 
     units = get_physical_units()
     cm1_to_thz = 1.0 / units.THzToCm
+    initial_freqs_thz = initial_freqs_cm1 * cm1_to_thz
     refined_freqs_thz = refined_freqs_cm1 * cm1_to_thz
 
     frequencies_at_Γ = pd.DataFrame({
@@ -90,15 +91,26 @@ def run(
         "ω_refined (cm⁻¹)": refined_freqs_cm1
     })
 
+    df_thermo_gamma = mbe_automation.dynamics.harmonic.thermodynamics.run(
+        freqs_THz=initial_freqs_thz,
+        temperatures_K=config.temperatures_K
+    )
+
     df_thermo = mbe_automation.dynamics.harmonic.thermodynamics.run(
         freqs_THz=refined_freqs_thz,
         temperatures_K=config.temperatures_K
     )
 
     mbe_automation.storage.save_data_frame(
+        df=df_thermo_gamma,
+        dataset=config.dataset,
+        key=f"{config.root_key}/thermodynamics_Γ_raw"
+    )
+
+    mbe_automation.storage.save_data_frame(
         df=df_thermo,
         dataset=config.dataset,
-        key=f"{config.root_key}/thermodynamics_nomore"
+        key=f"{config.root_key}/thermodynamics_Γ_refined"
     )
 
     mbe_automation.storage.save_data_frame(
@@ -108,8 +120,11 @@ def run(
     )
 
     if config.save_csv:
-        csv_path = config.work_dir / "thermodynamics_nomore.csv"
+        csv_path = config.work_dir / "thermodynamics_Γ_refined.csv"
         df_thermo.to_csv(csv_path, index=False)
+
+        gamma_csv_path = config.work_dir / "thermodynamics_Γ_raw.csv"
+        df_thermo_gamma.to_csv(gamma_csv_path, index=False)
 
         freq_csv_path = config.work_dir / "frequencies_at_Γ.csv"
         frequencies_at_Γ.to_csv(freq_csv_path, index=False)
