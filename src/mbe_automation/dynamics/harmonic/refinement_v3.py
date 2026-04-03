@@ -368,7 +368,7 @@ def _report_on_grid_search(
         n_p = grid[(s_lbl, restraint_labels[0])]["n_params"]
 
         header = (
-            f"{'restraint':<{col_r}}  {'RMSD (Å²)':>{col_u}}"
+            f"{'':<{col_r}}  {'RMSD (Å²)':>{col_u}}"
             f"  {'⟨s₁₂⟩ (%)':>{col_s}}"
             f"  {'C_V (J∕K∕mol∕atom)':>{col_c}}"
             f"  {'F (kJ∕mol∕atom)':>{col_f}}"
@@ -389,11 +389,8 @@ def _report_on_grid_search(
                 f"  {res['F_vib_crystal (kJ∕mol∕atom)']:>{col_f}.4f}"
             )
 
-        details.append(separator)
-        details.append(f"{'n_params':<{col_r}}  {n_p}")
-
         mbe_automation.common.display.box_with_details(
-            title=s_lbl,
+            title=f"{s_lbl} (n_params: {n_p})",
             details=details,
             side_content=[],
             width=col_r+col_u+col_c+col_f+col_s
