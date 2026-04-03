@@ -16,6 +16,7 @@ try:
         create_pre_groups,
     )
     from nomore_ase.analysis.validation import extract_adps_from_structure
+    from nomore_ase.analysis.s12_similarity import calculate_s12_per_atom
     _NOMORE_AVAILABLE = True
 except ImportError:
     _NOMORE_AVAILABLE = False
@@ -196,9 +197,10 @@ def _exec_strategy(
 
     Returns a dict with keys:
         label, n_params, normalized_residual_norm, success, frequencies,
-        u_calc, and the four per-atom thermodynamic scalars:
+        u_calc, the ADP matrix for each atom, the thermodynamic functions:
         E_vib_crystal (kJ∕mol∕atom), F_vib_crystal (kJ∕mol∕atom),
-        C_V_vib_crystal (J∕K∕mol∕atom), S_vib_crystal (J∕K∕mol∕atom).
+        C_V_vib_crystal (J∕K∕mol∕atom), S_vib_crystal (J∕K∕mol∕atom),
+        and the S12 similarity metrics s12_mean and s12_max (both in %).
     """
     nomore_calc = calc_mod.NoMoReCalculator(
         eigenvectors=phonon_data.eigenvectors[:, non_h_mask, :],
@@ -233,6 +235,18 @@ def _exec_strategy(
     C_V   = thermo_df["C_V_vib_crystal (J∕K∕mol∕unit cell)"].iloc[0] / n_atoms_p1
     S_vib = thermo_df["S_vib_crystal (J∕K∕mol∕unit cell)"].iloc[0] / n_atoms_p1
 
+    # ------------------------------------------------------------------
+    # S12 similarity index (Whitten & Spackman 2006)
+    # u_calc from fit_to_adps is already masked to non-H atoms, same
+    # shape as u_exp: (N_non_H, 3, 3).
+    # ------------------------------------------------------------------
+    s12_values, _ = calculate_s12_per_atom(
+        u_calc=result["u_calc"],
+        u_exp=u_exp,
+    )
+    s12_mean = np.mean(s12_values)
+    s12_max  = np.max(s12_values)
+
     return {
         "label":         label,
         "n_params":      groups.n_parameters(),
@@ -240,10 +254,12 @@ def _exec_strategy(
         "success":       result["success"],
         "frequencies":   result["full_x"],
         "u_calc":        result["u_calc"],
-        "E_vib_crystal (kJ∕mol∕atom)": E_vib,
-        "F_vib_crystal (kJ∕mol∕atom)": F_vib,
+        "E_vib_crystal (kJ∕mol∕atom)":   E_vib,
+        "F_vib_crystal (kJ∕mol∕atom)":   F_vib,
         "C_V_vib_crystal (J∕K∕mol∕atom)": C_V,
-        "S_vib_crystal (J∕K∕mol∕atom)": S_vib,
+        "S_vib_crystal (J∕K∕mol∕atom)":  S_vib,
+        "s12_mean": s12_mean,   # mean S12 over non-H atoms (%)
+        "s12_max":  s12_max,    # worst-atom S12 over non-H atoms (%)
     }
 
 
@@ -342,16 +358,18 @@ def _report_on_grid_search(
     Each box shows a header row followed by one row per restraint with
     the normalised residual norm and the per-atom heat capacity C_V.
     """
-    col_r = 20   # restraint label column width
-    col_u = 10   # ‖ΔU‖ column width (widened to fit "!" flag)
-    col_c = 20   # C_V column width
-    col_f = 20   # F_vib column width
+    col_r = 20   # restraint label
+    col_u = 10   # RMSD (Å²)
+    col_c = 20   # C_V (J∕K∕mol∕atom)
+    col_f = 20   # F (kJ∕mol∕atom)
+    col_s = 12   # ⟨s₁₂⟩ (%)
 
     for s_lbl in strategy_labels:
         n_p = grid[(s_lbl, restraint_labels[0])]["n_params"]
 
         header = (
-            f"{'restraint':<{col_r}}  {'RMSD (Å²)':>{col_u}}"
+            f"{'':<{col_r}}  {'RMSD (Å²)':>{col_u}}"
+            f"  {'⟨s₁₂⟩ (%)':>{col_s}}"
             f"  {'C_V (J∕K∕mol∕atom)':>{col_c}}"
             f"  {'F (kJ∕mol∕atom)':>{col_f}}"
         )
@@ -360,20 +378,22 @@ def _report_on_grid_search(
 
         for r_lbl in restraint_labels:
             res = grid[(s_lbl, r_lbl)]
-            residual_str = f"{res['normalized_residual_norm']:.4f}"
+            label_str = r_lbl
             if not res["success"]:
-                residual_str += " !"
+                label_str += " !"
+
             details.append(
-                f"{r_lbl:<{col_r}}  {residual_str:>{col_u}}"
+                f"{label_str:<{col_r}}  {res['normalized_residual_norm']:>{col_u}.4f}"
+                f"  {res['s12_mean']:>{col_s}.2f}"
                 f"  {res['C_V_vib_crystal (J∕K∕mol∕atom)']:>{col_c}.4f}"
                 f"  {res['F_vib_crystal (kJ∕mol∕atom)']:>{col_f}.4f}"
             )
 
         mbe_automation.common.display.box_with_details(
-            title=s_lbl,
+            title=f"{s_lbl} ({n_p})",
             details=details,
-            side_content=[f"n_params: {n_p}"],
-            width=col_r+col_u+col_c+col_f
+            side_content=[],
+            width=col_r+col_u+col_c+col_f+col_s
         )
 
 
@@ -445,12 +465,22 @@ def _attempted_strategies(
     return strategy_specs, restraint_specs, n_refined, high_limit_cm1
 
 
-def _select_winning_result(grid: dict) -> dict | None:
-    """Select the successful result with the lowest normalized_residual_norm."""
+def _select_winning_result(
+    grid: dict, 
+    criterion: Literal["mean_s12", "rmsd"] = "mean_s12"
+) -> dict | None:
+    """Select the successful result with the lowest value for the specified criterion."""
+
+    assert criterion in ("mean_s12", "rmsd"), f"Invalid selection criterion '{criterion}'"
+    
     successful = [res for res in grid.values() if res["success"]]
     if not successful:
         return None
-    return min(successful, key=lambda x: x["normalized_residual_norm"])
+    
+    if criterion == "mean_s12":
+        return min(successful, key=lambda x: x["s12_mean"])
+    else:
+        return min(successful, key=lambda x: x["normalized_residual_norm"])
 
 
 def run(
@@ -461,7 +491,8 @@ def run(
     thermal_cutoff_strategy: "ThermalCutoffStrategy" | None = None,
     sensitivity_based_strategy: "SensitivityBasedStrategy" | None = None,
     max_force_on_atom_eV_A: float | None = None,
-    reference_temperature_K: float | None = None
+    reference_temperature_K: float | None = None,
+    best_strategy_criterion: Literal["mean_s12", "rmsd"] = "mean_s12"
 ) -> dict:
     """
     Full pipeline: phonons once, then compare strategies × restraint schemes.
@@ -470,7 +501,8 @@ def run(
 
     ``frequencies``
         Refined phonon frequencies (cm⁻¹) from the winning strategy/restraint
-        combination, as a 1-D NumPy array of length *n_modes*.
+        combination (using the ``best_strategy_criterion``), as a 1-D NumPy 
+        array of length *n_modes*.
 
     ``initial_frequencies``
         Raw (pre-clamping, pre-refinement) phonon frequencies (cm⁻¹), also a
@@ -576,7 +608,7 @@ def run(
     # Summary phases: boxed per-strategy results + 2D table
     # ------------------------------------------------------------------
     mbe_automation.common.display.framed(
-        "Refinement results"
+        "Grid search: summary"
     )
     _report_on_grid_search(
         grid=grid, 
@@ -584,12 +616,21 @@ def run(
         restraint_labels=restraint_labels
     )
 
-    winner = _select_winning_result(grid)
+    winner = _select_winning_result(
+        grid, 
+        criterion=best_strategy_criterion
+    )
     if winner is None:
         raise RuntimeError("Refinement failed: No strategy/restraint combination converged.")
     
+    if best_strategy_criterion == "rmsd":
+        error_str = f"RMSD = {winner['normalized_residual_norm']:.4f} Å²"
+    else:
+        # ⟨s₁₂⟩ mean similarity index
+        error_str = f"⟨s₁₂⟩ = {winner['s12_mean']:.2f}%"
+
     mbe_automation.common.display.framed(
-        f"Winning Strategy: {winner['label']} + {winner['restraint_label']} (Residual Error: {winner['normalized_residual_norm']:.6f})"
+        f"Winning Strategy: {winner['label']} + {winner['restraint_label']} | {error_str}"
     )
 
     _print_freq_table(

@@ -60,6 +60,7 @@ def run(
         print(f"{'reference_temperature [K]':<25} (extracted from CIF)")
 
     print(f"{'temperatures [K]':<25} {config.temperatures_K}")
+    print(f"{'best_strategy_criterion':<25} {config.best_strategy_criterion}")
     print(f"{'work_dir':<25} {config.work_dir}")
 
     if _MACE_AVAILABLE:
@@ -73,7 +74,8 @@ def run(
         calculator=config.calculator,
         n_refined=config.n_refined,
         max_force_on_atom_eV_A=config.max_force_on_atom_eV_A,
-        reference_temperature_K=config.reference_temperature_K
+        reference_temperature_K=config.reference_temperature_K,
+        best_strategy_criterion=config.best_strategy_criterion
     )
 
     initial_freqs_cm1 = refinement_result["initial_frequencies"]
