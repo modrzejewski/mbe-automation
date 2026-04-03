@@ -608,7 +608,7 @@ def run(
     # Summary phases: boxed per-strategy results + 2D table
     # ------------------------------------------------------------------
     mbe_automation.common.display.framed(
-        "Refinement results"
+        "Grid search: summary"
     )
     _report_on_grid_search(
         grid=grid, 
