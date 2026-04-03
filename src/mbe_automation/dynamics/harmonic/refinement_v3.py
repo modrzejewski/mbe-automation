@@ -383,15 +383,15 @@ def _report_on_grid_search(
                 residual_str += " !"
             details.append(
                 f"{r_lbl:<{col_r}}  {residual_str:>{col_u}}"
-                f"  {res['s12_mean']:>{col_s}.1f}"
+                f"  {res['s12_mean']:>{col_s}.2f}"
                 f"  {res['C_V_vib_crystal (J∕K∕mol∕atom)']:>{col_c}.4f}"
                 f"  {res['F_vib_crystal (kJ∕mol∕atom)']:>{col_f}.4f}"
             )
 
         mbe_automation.common.display.box_with_details(
-            title=s_lbl,
+            title=f"{s_lbl} (n_params: {n_p})",
             details=details,
-            side_content=[f"n_params: {n_p}"],
+            side_content=[],
             width=col_r+col_u+col_c+col_f+col_s
         )
 
@@ -464,12 +464,22 @@ def _attempted_strategies(
     return strategy_specs, restraint_specs, n_refined, high_limit_cm1
 
 
-def _select_winning_result(grid: dict) -> dict | None:
-    """Select the successful result with the lowest normalized_residual_norm."""
+def _select_winning_result(
+    grid: dict, 
+    criterion: Literal["mean_s12", "rmsd"] = "mean_s12"
+) -> dict | None:
+    """Select the successful result with the lowest value for the specified criterion."""
+
+    assert criterion in ("mean_s12", "rmsd"), f"Invalid selection criterion '{criterion}'"
+    
     successful = [res for res in grid.values() if res["success"]]
     if not successful:
         return None
-    return min(successful, key=lambda x: x["normalized_residual_norm"])
+    
+    if criterion == "mean_s12":
+        return min(successful, key=lambda x: x["s12_mean"])
+    else:
+        return min(successful, key=lambda x: x["normalized_residual_norm"])
 
 
 def run(
@@ -480,7 +490,8 @@ def run(
     thermal_cutoff_strategy: "ThermalCutoffStrategy" | None = None,
     sensitivity_based_strategy: "SensitivityBasedStrategy" | None = None,
     max_force_on_atom_eV_A: float | None = None,
-    reference_temperature_K: float | None = None
+    reference_temperature_K: float | None = None,
+    best_strategy_criterion: Literal["mean_s12", "rmsd"] = "mean_s12"
 ) -> dict:
     """
     Full pipeline: phonons once, then compare strategies × restraint schemes.
@@ -489,7 +500,8 @@ def run(
 
     ``frequencies``
         Refined phonon frequencies (cm⁻¹) from the winning strategy/restraint
-        combination, as a 1-D NumPy array of length *n_modes*.
+        combination (using the ``best_strategy_criterion``), as a 1-D NumPy 
+        array of length *n_modes*.
 
     ``initial_frequencies``
         Raw (pre-clamping, pre-refinement) phonon frequencies (cm⁻¹), also a
@@ -603,12 +615,21 @@ def run(
         restraint_labels=restraint_labels
     )
 
-    winner = _select_winning_result(grid)
+    winner = _select_winning_result(
+        grid, 
+        criterion=best_strategy_criterion
+    )
     if winner is None:
         raise RuntimeError("Refinement failed: No strategy/restraint combination converged.")
     
+    if best_strategy_criterion == "rmsd":
+        error_str = f"RMSD = {winner['normalized_residual_norm']:.4f} Å²"
+    else:
+        # ⟨s₁₂⟩ mean similarity index
+        error_str = f"⟨s₁₂⟩ = {winner['s12_mean']:.2f}%"
+
     mbe_automation.common.display.framed(
-        f"Winning Strategy: {winner['label']} + {winner['restraint_label']} (Residual Error: {winner['normalized_residual_norm']:.6f})"
+        f"Winning Strategy: {winner['label']} + {winner['restraint_label']} ({error_str})"
     )
 
     _print_freq_table(
