@@ -21,8 +21,11 @@ except ImportError:
     _NOMORE_AVAILABLE = False
 
 import mbe_automation.common.display
+import mbe_automation.dynamics.harmonic.thermodynamics
 
+from phonopy.physical_units import get_physical_units as _get_physical_units
 MIN_FREQ_CM1 = 10.0
+_CM1_TO_THZ: float = 1.0 / _get_physical_units().THzToCm
 
 def _p1_to_ase_atoms(p1) -> ase.Atoms:
     """Build ASE Atoms from an already-expanded CCTBX P1 xray_structure."""
@@ -174,16 +177,28 @@ def _exec_strategy(
     phonon_data, 
     u_exp, 
     non_h_mask,
+    n_atoms_p1: int,
     restraint_weight: float = 0.0,
     adaptive_restraint_weight: float = 0.0
 ) -> dict:
     """
     Run ADP-only refinement (no crystallographic χ²) with the provided
-    RefinementGroups and optional restraint.  Returns a result dict.
+    RefinementGroups and optional restraint.  Computes vibrational
+    thermodynamics at the refinement temperature and normalises the
+    quantities per atom of the P1 unit cell.
 
     Args:
+        n_atoms_p1:                Total number of atoms in the P1 unit cell
+                                   (including H/D/T).  Used as the per-atom
+                                   normalisation divisor for thermodynamics.
         restraint_weight:          Weight for BayesianFrequencyRestraint.
         adaptive_restraint_weight: Weight for AdaptiveSensitivityRestraint.
+
+    Returns a dict with keys:
+        label, n_params, normalized_residual_norm, success, frequencies,
+        u_calc, and the four per-atom thermodynamic scalars:
+        E_vib_crystal (kJ∕mol∕atom), F_vib_crystal (kJ∕mol∕atom),
+        C_V_vib_crystal (J∕K∕mol∕atom), S_vib_crystal (J∕K∕mol∕atom).
     """
     nomore_calc = calc_mod.NoMoReCalculator(
         eigenvectors=phonon_data.eigenvectors[:, non_h_mask, :],
@@ -203,6 +218,21 @@ def _exec_strategy(
         restraint_weight=restraint_weight,
         adaptive_restraint_weight=adaptive_restraint_weight,
     )
+
+    # ------------------------------------------------------------------
+    # Vibrational thermodynamics at the refinement temperature
+    # ------------------------------------------------------------------
+    freqs_THz = result["full_x"] * _CM1_TO_THZ   # (n_modes,) cm⁻¹ → THz
+    thermo_df = mbe_automation.dynamics.harmonic.thermodynamics.run(
+        freqs_THz=freqs_THz,
+        temperatures_K=np.array([phonon_data.temperature]),
+        weights=None,   # single Γ-point
+    )
+    E_vib = thermo_df["E_vib_crystal (kJ∕mol∕unit cell)"].iloc[0] / n_atoms_p1
+    F_vib = thermo_df["F_vib_crystal (kJ∕mol∕unit cell)"].iloc[0] / n_atoms_p1
+    C_V   = thermo_df["C_V_vib_crystal (J∕K∕mol∕unit cell)"].iloc[0] / n_atoms_p1
+    S_vib = thermo_df["S_vib_crystal (J∕K∕mol∕unit cell)"].iloc[0] / n_atoms_p1
+
     return {
         "label":         label,
         "n_params":      groups.n_parameters(),
@@ -210,6 +240,10 @@ def _exec_strategy(
         "success":       result["success"],
         "frequencies":   result["full_x"],
         "u_calc":        result["u_calc"],
+        "E_vib_crystal (kJ∕mol∕atom)": E_vib,
+        "F_vib_crystal (kJ∕mol∕atom)": F_vib,
+        "C_V_vib_crystal (J∕K∕mol∕atom)": C_V,
+        "S_vib_crystal (J∕K∕mol∕atom)": S_vib,
     }
 
 
@@ -304,22 +338,37 @@ def _report_on_grid_search(
 ) -> None:
     """
     Print the results of each strategy combined with all applied restraints.
+
+    Each box shows a header row followed by one row per restraint with
+    the normalised residual norm and the per-atom heat capacity C_V.
     """
+    col_r = 20   # restraint label column width
+    col_u = 8    # ‖ΔU‖ column width
+    col_c = 18   # C_V column width
+
     for s_lbl in strategy_labels:
-        # Use first restraint result to get n_params (it's the same for all)
         n_p = grid[(s_lbl, restraint_labels[0])]["n_params"]
-        
-        details = []
+
+        header = (
+            f"{'restraint':<{col_r}}  {'‖ΔU‖ (Å²)':>{col_u}}"
+            f"  {'Cv (J∕K∕mol∕atom)':>{col_c}}"
+        )
+        separator = (". " * (len(header) // 2 + 1))[:len(header)]
+        details = [header, separator]
+
         for r_lbl in restraint_labels:
             res = grid[(s_lbl, r_lbl)]
-            flag = "!" if not res["success"] else ""
-            details.append(f"{r_lbl:<20}: {res['normalized_residual_norm']:.6f}{flag}")
+            flag = " !" if not res["success"] else ""
+            details.append(
+                f"{r_lbl:<{col_r}}  {res['normalized_residual_norm']:>{col_u}.4f}"
+                f"  {res['C_V_vib_crystal (J∕K∕mol∕atom)']:>{col_c}.4f}{flag}"
+            )
 
         mbe_automation.common.display.box_with_details(
-            title=s_lbl, 
-            details=details, 
-            side_content=[f"n_params: {n_p}"], 
-            width=32
+            title=s_lbl,
+            details=details,
+            side_content=[f"n_params: {n_p}"],
+            width=60
         )
 
 
@@ -459,6 +508,7 @@ def run(
     phonon_data = phonons["phonon_data"]
     u_exp       = phonons["u_exp"]
     non_h_mask  = phonons["non_h_mask"]
+    n_atoms_p1  = phonons["n_atoms_p1"]
     raw_freqs   = phonons["raw_frequencies"]
     temp        = phonons["temperature"]
 
@@ -506,6 +556,7 @@ def run(
                 phonon_data=phonon_data,
                 u_exp=u_exp,
                 non_h_mask=non_h_mask,
+                n_atoms_p1=n_atoms_p1,
                 restraint_weight=rw,
                 adaptive_restraint_weight=arw,
             )
@@ -549,5 +600,3 @@ def run(
         "u_exp": u_exp,              # (N_non_H, 3, 3) Å² – experimental ADPs for non-H atoms
         "result": winner,
     }
-
-
