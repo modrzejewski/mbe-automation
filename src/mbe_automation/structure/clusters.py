@@ -249,9 +249,6 @@ def _generate_covalent_bond_graph(
 
     if bonding_algo is None:
         bonding_algo = CutOffDictNN.from_preset("vesta_2019")
-    
-    print(f"n_frames                {system.n_frames}")
-    print(f"reference_frame_index   {reference_frame_index}")
 
     assert system.atomic_numbers.ndim == 1
     assert system.masses.ndim == 1
