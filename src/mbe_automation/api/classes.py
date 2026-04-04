@@ -731,7 +731,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             self,
             calculator: ASECalculator | None = None,
             energy_thresh: float = 1.0E-5, # eV/atom
-            assert_identical_composition: bool = True,
+            assert_identical_composition: bool = False,
             bonding_algo: NearNeighbors | None = None,
             reference_frame_index: int = 0,
     ) -> mbe_automation.structure.clusters.MolecularComposition:

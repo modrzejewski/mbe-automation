@@ -240,7 +240,7 @@ def _generate_covalent_bond_graph(
         system: mbe_automation.storage.Structure,
         bonding_algo: NearNeighbors,
         reference_frame_index: int = 0,
-        assert_identical_composition: bool = True,
+        assert_identical_composition: bool = False,
         validate_pbc_structure: bool = False
 ) -> mbe_automation.storage.MolecularCrystal:
     """
@@ -620,7 +620,7 @@ def identify_molecules(
         crystal: mbe_automation.storage.Structure,
         calculator: ASECalculator | None = None,
         energy_thresh: float = 1.0E-5, # eV/atom
-        assert_identical_composition: bool = True,
+        assert_identical_composition: bool = False,
         bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
 ) -> MolecularComposition:
@@ -667,9 +667,9 @@ def identify_molecules(
         )
         n_molecules_unique = len(molecules_unique)
 
-    print(f"Nonunique molecules:  {len(molecules_nonunique)}/unit cell")
+    print(f"Total molecules detected:  {len(molecules_nonunique)}")
     if molecules_unique is not None:
-        print(f"Unique molecules (energy criterion): {n_molecules_unique}/unit cell")
+        print(f"Symmetry-unique molecules: {n_molecules_unique}")
 
     return MolecularComposition(
         molecular_crystal=molecular_crystal,
@@ -700,7 +700,6 @@ def extract_relaxed_unique_molecules(
         crystal=crystal,
         calculator=calculator,
         energy_thresh=energy_thresh,
-        assert_identical_composition=False,
         bonding_algo=bonding_algo,
         reference_frame_index=reference_frame_index,
     )
