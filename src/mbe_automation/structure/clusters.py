@@ -540,8 +540,7 @@ def _group_molecules_by_energy(
 
 
 def _extract_nonunique_molecules(
-        crystal: mbe_automation.storage.Structure | mbe_automation.storage.MolecularCrystal,
-        bonding_algo: NearNeighbors,
+        molecular_crystal: mbe_automation.storage.MolecularCrystal,
         reference_frame_index: int = 0,
         calculator: ASECalculator | None = None,
 ) -> List[mbe_automation.storage.Structure]:
@@ -549,18 +548,6 @@ def _extract_nonunique_molecules(
     Extract all molecules present in a unit cell as a list of separate
     Structures.
     """
-    if isinstance(crystal, mbe_automation.storage.MolecularCrystal):
-        molecular_crystal = crystal
-    else:
-        assert crystal.atomic_numbers.ndim == 1
-        assert crystal.masses.ndim == 1
-        molecular_crystal = _generate_covalent_bond_graph(
-            system=crystal,
-            reference_frame_index=reference_frame_index,
-            assert_identical_composition=False,
-            bonding_algo=bonding_algo,
-        )
-
     molecules = []
     for atom_indices in molecular_crystal.index_map:
 
@@ -650,8 +637,7 @@ def identify_molecules(
     )
 
     molecules_nonunique = _extract_nonunique_molecules(
-        crystal=molecular_crystal,
-        bonding_algo=bonding_algo,
+        molecular_crystal=molecular_crystal,
         reference_frame_index=reference_frame_index,
         calculator=calculator,
     )
