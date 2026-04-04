@@ -499,7 +499,6 @@ def _extract_finite_subsystem(
 def _group_molecules_by_energy(
         molecules: List[mbe_automation.storage.Structure],
         thresh: float = 1.0E-5, # eV/atom
-        reference_frame_index: int = 0,
 ) -> list[npt.NDArray[np.int64]]:
     """
     Group molecules based on energy similarity.
@@ -509,9 +508,10 @@ def _group_molecules_by_energy(
     assert thresh > 0.0
     for molecule in molecules:
         assert molecule.E_pot is not None
+        assert len(molecule.E_pot) == 1
 
     n_molecules = len(molecules)
-    energies = np.array([molecules[i].E_pot[reference_frame_index] for i in range(n_molecules)])
+    energies = np.array([molecules[i].E_pot[0] for i in range(n_molecules)])
     
     sort_order = np.argsort(energies)
     sorted_energies = energies[sort_order]
@@ -581,13 +581,11 @@ def _extract_nonunique_molecules(
 def _extract_unique_molecules(
         molecules_nonunique: List[mbe_automation.storage.Structure],
         energy_thresh: float = 1.0E-5, # eV/atom
-        reference_frame_index: int = 0,
 ) -> list[mbe_automation.storage.Structure]:
     
     grouped_molecules = _group_molecules_by_energy(
         molecules=molecules_nonunique,
         thresh=energy_thresh,
-        reference_frame_index=reference_frame_index,
     )
     n_unique_molecules = len(grouped_molecules)
     assert n_unique_molecules > 0
@@ -649,7 +647,6 @@ def identify_molecules(
         molecules_unique = _extract_unique_molecules(
             molecules_nonunique=molecules_nonunique,
             energy_thresh=energy_thresh,
-            reference_frame_index=reference_frame_index,
         )
         n_molecules_unique = len(molecules_unique)
 
