@@ -45,7 +45,6 @@ class MolecularComposition:
     n_molecules_nonunique: int
     molecules_unique: List[mbe_automation.storage.Structure] | None = None
     n_molecules_unique: int | None = None
-    molecules_unique_relaxed: List[mbe_automation.storage.Structure] | None = None
 
 
 def Label(Constituents, NMonomers):
