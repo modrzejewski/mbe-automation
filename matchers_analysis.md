@@ -83,3 +83,18 @@ Often, atoms of the same element might be ordered differently in the two molecul
 
 3. **Update Tests:**
    The tests currently flag large discrepancies as a problem with the matching API. In reality, the Pymatgen result (once multiplied by $\sqrt{3}$) is the true optimal RMSD, and the ASE result is higher because its moment-of-inertia alignment and greedy permutation fail to find the global minimum. The tests should be updated to account for this.
+
+---
+
+## 4. Q&A: Refactoring `thresh_for_mirror_check` to a Boolean
+
+**Question:** Can `thresh_for_mirror_check` be safely changed to a boolean (e.g., `check_mirror: bool = False`) without affecting other parts of the code?
+
+**Answer:** Yes, it can be safely changed, but it comes with a **performance trade-off** and requires a minor update to one other file.
+
+1.  **Codebase Impact:**
+    *   The argument is currently only passed explicitly in one place within the codebase: `src/mbe_automation/structure/clusters.py` (line ~986).
+    *   If you change the signature to `check_mirror: bool = False`, you will simply need to update the call in `clusters.py` from `thresh_for_mirror_check=(... if ... else None)` to `check_mirror=unique_cluster_filter.align_mirror_images`. No external users or tests will break since the argument defaults to `None` everywhere else.
+2.  **Performance Implication:**
+    *   Currently, the code uses `thresh_for_mirror_check` as a short-circuit optimization. If the standard RMSD is already very small (below the threshold), the code skips calculating the mirrored RMSD.
+    *   If you change it to a pure boolean, you lose this threshold check. The algorithm will *always* compute the RMSD for both the standard and mirrored molecules whenever `check_mirror=True`, doubling the computational cost for molecules that were already perfectly matched in their non-mirrored state.
