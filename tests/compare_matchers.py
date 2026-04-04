@@ -1,5 +1,6 @@
 import numpy as np
 from ase.build import molecule
+from scipy.spatial.transform import Rotation
 import sys
 import os
 
@@ -27,22 +28,36 @@ def create_system(system_name, R=5.0):
     else:
         return molecule(system_name)
 
+def _optimal_rmsd(pos_a, pos_b):
+    # Center positions
+    center_a = np.mean(pos_a, axis=0)
+    center_b = np.mean(pos_b, axis=0)
+
+    pos_a_centered = pos_a - center_a
+    pos_b_centered = pos_b - center_b
+
+    # Find optimal rotation using scipy
+    rot, _ = Rotation.align_vectors(pos_a_centered, pos_b_centered)
+    pos_b_aligned = rot.apply(pos_b_centered)
+
+    # Calculate RMSD
+    diff = pos_a_centered - pos_b_aligned
+    dist_sq = np.sum(diff**2, axis=1)
+    return np.sqrt(np.mean(dist_sq))
+
 def compute_exact_rmsd(mol_a, mol_b, align_mirror_images=False):
     """
-    Computes exact RMSD between mol_a and mol_b without permutations.
+    Compute exact RMSD between mol_a and mol_b without permutations,
+    using scipy to find optimal translation and rotation.
     """
     pos_a = mol_a.positions
     pos_b = mol_b.positions
 
-    diff = pos_a - pos_b
-    dist_sq = np.sum(diff**2, axis=1)
-    rmsd = np.sqrt(np.mean(dist_sq))
+    rmsd = _optimal_rmsd(pos_a, pos_b)
 
     if align_mirror_images:
         pos_b_mirror = pos_b * [1, -1, 1]
-        diff_mirror = pos_a - pos_b_mirror
-        dist_sq_mirror = np.sum(diff_mirror**2, axis=1)
-        rmsd_mirror = np.sqrt(np.mean(dist_sq_mirror))
+        rmsd_mirror = _optimal_rmsd(pos_a, pos_b_mirror)
         rmsd = min(rmsd, rmsd_mirror)
 
     return rmsd
