@@ -3,9 +3,10 @@
 ## Overview
 An investigation was conducted to understand why the Root Mean Square Deviation (RMSD) values computed by the `ase` and `pymatgen` algorithms in `mbe_automation.structure.molecule.match` do not agree, as demonstrated in `tests/compare_matchers.py`.
 
-The findings reveal that the discrepancies are caused by two distinct differences in how the libraries define and calculate RMSD:
+The findings reveal that the discrepancies are caused by three distinct differences in how the libraries define and calculate RMSD:
 1. **Mathematical Definition of RMSD (Normalization by $N$ vs $3N$)**
-2. **Alignment Strategy (Moments of Inertia vs Kabsch Algorithm)**
+2. **Alignment Strategy (Moments of Inertia vs Optimal Rotation)**
+3. **Permutation Matching (Hungarian Algorithm)**
 
 ---
 
@@ -40,27 +41,27 @@ $$ \text{RMSD}_{\text{pymatgen}} = \sqrt{ \frac{1}{3N} \sum_{i=1}^N \left( \Delt
 
 RMSD requires the two molecules to be optimally aligned (translated and rotated) to minimize the distance between them.
 
-### Pymatgen's Alignment (Optimal)
+### Pymatgen's Alignment (Optimal Kabsch)
 Pymatgen uses the **Kabsch algorithm**, which mathematically guarantees the optimal rotation matrix to minimize the RMSD between two paired sets of points.
 
-### ASE's Alignment (Heuristic)
-`ase.geometry.distance` does **not** use the Kabsch algorithm. Instead, it translates the center of mass to the origin and then aligns the **principal moments of inertia** of both molecules with the Cartesian coordinate axes (x, y, z).
-```python
-# From ase.geometry.distance source
-def align(struct, xaxis='x', yaxis='y'):
-    """Align moments of inertia with the coordinate system."""
-    Is, Vs = struct.get_moments_of_inertia(True)
-    IV = list(zip(Is, Vs))
-    IV.sort(key=lambda x: x[0])
-    struct.rotate(IV[0][1], xaxis)
-    # ...
-```
+### ASE's Alignment in `geometry.distance` (Heuristic)
+The `ase.geometry.distance` function currently used in `mbe_automation.structure.molecule._match_ase` does **not** use an optimal alignment algorithm. Instead, it translates the center of mass to the origin and aligns the **principal moments of inertia** of both molecules with the Cartesian coordinate axes (x, y, z).
 
-While aligning moments of inertia often brings molecules close to optimal alignment, it is a heuristic and fails to find the true minimum RMSD in several cases:
+While aligning moments of inertia often brings molecules close to optimal alignment, it fails to find the true minimum RMSD in several cases:
 1. **Symmetric molecules:** For molecules like Methane ($CH_4$), the moments of inertia are identical (spherical top), making the principal axes degenerate and arbitrarily chosen by the eigenvector solver. This leads to drastically sub-optimal alignments.
-2. **Near-symmetric molecules or numerical noise:** Small changes in geometry can cause the principal axes to suddenly swap, leading to poor alignment.
+2. **Near-symmetric molecules or numerical noise:** Small changes in geometry can cause the principal axes to swap.
 
-This explains why, for instance, `CH4` shows an ASE RMSD of ~0.73 but a Pymatgen RMSD of ~0.06 in the tests.
+### ASE's Optimal Alignment (Quaternion)
+It should be noted that ASE *does* contain a mathematically optimal alignment algorithm equivalent to Kabsch, implemented in `ase.build.rotate.rotation_matrix_from_points` (used by `ase.build.minimize_rotation_and_translation`). This computes the optimal rotation using quaternion algebra. However, `ase.geometry.distance` does not use it.
+
+---
+
+## 3. Permutation Matching
+
+Often, atoms of the same element might be ordered differently in the two molecules.
+
+*   **Pymatgen** (`HungarianOrderMatcher`): Performs an optimal assignment of atoms of the same species to minimize the RMSD, utilizing the Hungarian algorithm.
+*   **ASE** (`ase.geometry.distance` with `permute=True`): Performs a greedy, non-optimal permutation assignment. It iterates over the atoms in the first molecule and eagerly matches them to the closest available atom of the same species in the second molecule. This greedy approach is not guaranteed to find the global minimum RMSD. (Furthermore, `ase.build.minimize_rotation_and_translation` performs *no* permutation matching at all).
 
 ---
 
@@ -74,8 +75,10 @@ This explains why, for instance, `CH4` shows an ASE RMSD of ~0.73 but a Pymatgen
    rmsd = rmsd * np.sqrt(3)  # Convert 3N normalization to N normalization
    ```
 
-2. **Prefer Pymatgen (Kabsch) for Alignment:**
-   The `ase` algorithm is unreliable for calculating true RMSD due to its reliance on moment of inertia alignment, which regularly fails for symmetric molecules. It is strongly recommended to deprecate or avoid `algorithm="ase"` in favor of `algorithm="pymatgen"` (after applying the $\sqrt{3}$ correction), or replace the ASE path with a custom Kabsch implementation if dependency minimization is desired.
+2. **Prefer Pymatgen for Matching:**
+   Because `mbe_automation.structure.molecule.match` explicitly asserts that the structures can correspond to permuted lists of atoms, **Pymatgen is the mathematically correct choice**. It optimally solves both the rotational alignment (Kabsch) and the permutation matching (Hungarian algorithm).
+
+   The ASE path should either be deprecated, documented as a fast but approximate fallback, or rewritten to use `ase.build.minimize_rotation_and_translation` combined with `scipy.optimize.linear_sum_assignment` to properly mimic the Hungarian Kabsch matcher.
 
 3. **Update Tests:**
-   Update the tests to reflect the chosen standard. If you implement the $\sqrt{3}$ correction, `RMSD (Pymatgen)` and `RMSD (ASE)` will still disagree on symmetric molecules due to ASE's heuristic alignment. The tests should be updated to account for this known limitation of ASE, perhaps by removing ASE as a baseline or comparing against a known good Kabsch implementation.
+   The tests currently flag large discrepancies as a problem with the matching API. In reality, the Pymatgen result (once multiplied by $\sqrt{3}$) is the true optimal RMSD, and the ASE result is higher because its moment-of-inertia alignment and greedy permutation fail to find the global minimum. The tests should be updated to account for this.
