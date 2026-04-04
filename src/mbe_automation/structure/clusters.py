@@ -238,17 +238,14 @@ def _test_identical_composition(
 
 def _generate_covalent_bond_graph(
         system: mbe_automation.storage.Structure,
+        bonding_algo: NearNeighbors,
         reference_frame_index: int = 0,
         assert_identical_composition: bool = True,
-        bonding_algo: NearNeighbors | None = None,
         validate_pbc_structure: bool = False
 ) -> mbe_automation.storage.MolecularCrystal:
     """
     Identify molecules in a periodic Structure.
     """
-
-    if bonding_algo is None:
-        bonding_algo = CutOffDictNN.from_preset("vesta_2019")
 
     assert system.atomic_numbers.ndim == 1
     assert system.masses.ndim == 1
@@ -544,7 +541,7 @@ def _group_molecules_by_energy(
 
 def _extract_all_molecules(
         crystal: mbe_automation.storage.Structure | mbe_automation.storage.MolecularCrystal,
-        bonding_algo: NearNeighbors | None = None,
+        bonding_algo: NearNeighbors,
         reference_frame_index: int = 0,
         calculator: ASECalculator | None = None,
 ) -> List[mbe_automation.storage.Structure]:
@@ -552,9 +549,6 @@ def _extract_all_molecules(
     Extract all molecules present in a unit cell as a list of separate
     Structures.
     """
-    if bonding_algo is None:
-        bonding_algo = CutOffDictNN.from_preset("vesta_2019")
-
     if isinstance(crystal, mbe_automation.storage.MolecularCrystal):
         molecular_crystal = crystal
     else:
@@ -603,14 +597,11 @@ def _extract_all_molecules(
 def _extract_unique_molecules(
         crystal: mbe_automation.storage.Structure | mbe_automation.storage.MolecularCrystal,
         calculator: ASECalculator,
+        bonding_algo: NearNeighbors,
         energy_thresh: float = 1.0E-5, # eV/atom
-        bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
 ) -> list[mbe_automation.storage.Structure]:
     
-    if bonding_algo is None:
-        bonding_algo = CutOffDictNN.from_preset("vesta_2019")
-
     all_molecules = _extract_all_molecules(
         crystal=crystal,
         bonding_algo=bonding_algo,

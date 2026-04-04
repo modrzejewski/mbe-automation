@@ -57,7 +57,8 @@ def phonon_sampling(
     #
     composition = mbe_automation.structure.clusters.identify_molecules(
         crystal=traj_pbc,
-        reference_frame_index=0
+        reference_frame_index=0,
+        assert_identical_composition=config.finite_subsystem_filter.assert_identical_composition,
     )
     molecular_crystal = composition.molecular_crystal
     finite_subsystems = mbe_automation.structure.clusters.extract_finite_subsystem(
