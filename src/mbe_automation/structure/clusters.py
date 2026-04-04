@@ -983,10 +983,7 @@ def extract_unique_clusters(
                         atomic_numbers_a=atomic_numbers_current,
                         positions_b=positions_ref,
                         atomic_numbers_b=atomic_numbers_ref,
-                        thresh_for_mirror_check=(
-                            unique_cluster_filter.alignment_thresh
-                            if unique_cluster_filter.align_mirror_images else None
-                        ),
+                        align_mirror_images=unique_cluster_filter.align_mirror_images,
                         algorithm=unique_cluster_filter.algorithm,
                     )
                     if rmsd < unique_cluster_filter.alignment_thresh:

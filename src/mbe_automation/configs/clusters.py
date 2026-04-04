@@ -84,7 +84,7 @@ class UniqueClustersFilter:
     )
     alignment_thresh: float = 1.0e-4 # Å
     align_mirror_images: bool = True
-    algorithm: Literal["ase", "pymatgen"] = "ase"
+    algorithm: Literal["ase", "pymatgen"] | None = None
 
     def __post_init__(self):
         missing_keys = [
