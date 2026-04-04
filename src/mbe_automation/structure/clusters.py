@@ -247,9 +247,6 @@ def _generate_covalent_bond_graph(
     Identify molecules in a periodic Structure.
     """
 
-    assert system.atomic_numbers.ndim == 1
-    assert system.masses.ndim == 1
-    
     if not system.periodic:
         raise ValueError("_generate_covalent_bond_graph is designed for periodic systems.")
 
@@ -628,6 +625,9 @@ def identify_molecules(
     if crystal.n_frames > 1:
         print(f"reference_frame_index       {reference_frame_index}")
     print()
+
+    assert crystal.atomic_numbers.ndim == 1
+    assert crystal.masses.ndim == 1
 
     molecular_crystal = _generate_covalent_bond_graph(
         system=crystal,

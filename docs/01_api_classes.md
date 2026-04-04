@@ -49,9 +49,7 @@ The following table summarizes the key methods available across these classes.
 | **`to_ase_atoms`** | Converts a specific frame into an `ase.Atoms` object. | `Structure`, `Trajectory` |
 | **`to_pymatgen`** | Converts the structure (or a frame) to a Pymatgen object. | `Structure`, `Trajectory` |
 | **`lattice`** | Returns the Pymatgen lattice object for a given frame. | `Structure`, `Trajectory` |
-| **`extract_all_molecules`** | Extracts all molecules from a periodic structure. | `Structure` |
-| **`extract_unique_molecules`** | Extracts symmetry-unique molecules from a periodic structure. | `Structure` |
-| **`extract_relaxed_unique_molecules`** | Extracts and relaxes symmetry-unique molecules from a periodic structure. | `Structure` |
+| **`identify_molecules`** | Identifies molecules, groups them by symmetry, and creates a `MolecularCrystal` representation. | `Structure` |
 | **`extract_finite_subsystems`** | Extracts finite clusters of molecules (e.g., dimers, trimers) based on distance or number of molecules. | `MolecularCrystal` |
 | **`positions`** | Returns positions of specific molecules in the crystal. | `MolecularCrystal` |
 | **`atomic_numbers`** | Returns atomic numbers of specific molecules in the crystal. | `MolecularCrystal` |

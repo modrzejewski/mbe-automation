@@ -770,33 +770,6 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
 
         return composition
 
-    def extract_relaxed_unique_molecules(
-            self,
-            dataset: str,
-            key: str,
-            calculator: ASECalculator,
-            config: Minimum,
-            energy_thresh: float = 1.0E-5, # eV/atom
-            bonding_algo: NearNeighbors | None = None,
-            reference_frame_index: int = 0,
-            work_dir: Path | str = Path("./")
-    ) -> None:
-
-        if bonding_algo is None:
-            bonding_algo = CutOffDictNN.from_preset("vesta_2019")
-        
-        mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
-            dataset=dataset,
-            key=key,
-            crystal=self,
-            calculator=calculator,
-            config=config,
-            energy_thresh=energy_thresh,
-            bonding_algo=bonding_algo,
-            reference_frame_index=reference_frame_index,
-            work_dir=work_dir,
-        )
-
 @dataclass(kw_only=True)
 class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
     @classmethod
