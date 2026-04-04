@@ -114,7 +114,7 @@ def _match_pymatgen(
         species=atomic_numbers_b,
         coords=positions_b,
     )
-    algo = pymatgen.analysis.molecule_matcher.BruteForceOrderMatcher(
+    algo = pymatgen.analysis.molecule_matcher.HungarianOrderMatcher(
         molecule_a
     )
     _, _, _, rmsd = algo.match(molecule_b)
