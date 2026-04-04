@@ -727,6 +727,32 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
 
     run_model = run # synonym
 
+    def identify_molecules(
+            self,
+            calculator: ASECalculator | None = None,
+            energy_thresh: float = 1.0E-5, # eV/atom
+            assert_identical_composition: bool = True,
+            bonding_algo: NearNeighbors | None = None,
+            reference_frame_index: int = 0,
+    ) -> mbe_automation.structure.clusters.MolecularComposition:
+
+        composition = mbe_automation.structure.clusters.identify_molecules(
+            crystal=self,
+            calculator=calculator,
+            energy_thresh=energy_thresh,
+            assert_identical_composition=assert_identical_composition,
+            bonding_algo=bonding_algo,
+            reference_frame_index=reference_frame_index,
+        )
+
+        composition.molecular_crystal = MolecularCrystal(**vars(composition.molecular_crystal))
+        composition.molecules_nonunique = [Structure(**vars(mol)) for mol in composition.molecules_nonunique]
+
+        if composition.molecules_unique is not None:
+            composition.molecules_unique = [Structure(**vars(mol)) for mol in composition.molecules_unique]
+
+        return composition
+
     def to_molecular_crystal(
             self,
             reference_frame_index: int = 0,
@@ -737,14 +763,11 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
         if not self.periodic:
             raise ValueError("Cannot convert a finite structure to a molecular crystal.")
         
-        return MolecularCrystal(**vars(
-            mbe_automation.structure.clusters.detect_molecules(
-                system=self,
-                reference_frame_index=reference_frame_index,
-                assert_identical_composition=assert_identical_composition,
-                bonding_algo=bonding_algo,
-            )
-        ))
+        return self.identify_molecules(
+            reference_frame_index=reference_frame_index,
+            assert_identical_composition=assert_identical_composition,
+            bonding_algo=bonding_algo,
+        ).molecular_crystal
 
     detect_molecules = to_molecular_crystal # synonym
 
@@ -755,16 +778,12 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             calculator: ASECalculator | None = None,
     ) -> List[Structure]:
 
-        if bonding_algo is None:
-            bonding_algo = CutOffDictNN.from_preset("vesta_2019")
-        
-        return [Structure(**vars(molecule)) for molecule in
-                mbe_automation.structure.clusters.extract_all_molecules(
-                    crystal=self,
-                    bonding_algo=bonding_algo,
-                    reference_frame_index=reference_frame_index,
-                    calculator=calculator,
-                )]
+        return self.identify_molecules(
+            calculator=calculator,
+            bonding_algo=bonding_algo,
+            reference_frame_index=reference_frame_index,
+            assert_identical_composition=False,
+        ).molecules_nonunique
 
     def extract_unique_molecules(
             self,
@@ -774,17 +793,13 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             reference_frame_index: int = 0,
     ) -> List[Structure]:
 
-        if bonding_algo is None:
-            bonding_algo = CutOffDictNN.from_preset("vesta_2019")
-
-        return [Structure(**vars(molecule)) for molecule in
-                mbe_automation.structure.clusters.extract_unique_molecules(
-                    crystal=self,
-                    calculator=calculator,
-                    energy_thresh=energy_thresh,
-                    bonding_algo=bonding_algo,
-                    reference_frame_index=reference_frame_index,
-                )]
+        return self.identify_molecules(
+            calculator=calculator,
+            energy_thresh=energy_thresh,
+            bonding_algo=bonding_algo,
+            reference_frame_index=reference_frame_index,
+            assert_identical_composition=False,
+        ).molecules_unique
 
     def extract_relaxed_unique_molecules(
             self,

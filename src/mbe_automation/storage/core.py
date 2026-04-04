@@ -453,7 +453,7 @@ class MolecularCrystal:
     index_map: List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
     #
     # COM locations for molecules *in the reference frame*
-    # which was used in a call to structure.clusters.detect_molecules.
+    # which was used in a call to structure.clusters.identify_molecules.
     # Note that the reference frame may no longer be present as
     # one of the frames in a MoleculeCrystal object returned
     # by MolecularCrystal.subsample.

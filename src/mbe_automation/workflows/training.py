@@ -55,10 +55,11 @@ def phonon_sampling(
     # model. Thus, the covalent bonds are identified only
     # at a single frame.
     #
-    molecular_crystal = mbe_automation.structure.clusters.detect_molecules(
-        system=traj_pbc,
+    composition = mbe_automation.structure.clusters.identify_molecules(
+        crystal=traj_pbc,
         reference_frame_index=0
     )
+    molecular_crystal = composition.molecular_crystal
     finite_subsystems = mbe_automation.structure.clusters.extract_finite_subsystem(
         system=molecular_crystal,
         filter=config.finite_subsystem_filter
@@ -179,11 +180,12 @@ def _finite_system_at_pT(
 ) -> None:
 
     md_molecular_crystal_key = f"{config.root_key}/molecular_crystals/{system_label}"
-    md_molecular_crystal = mbe_automation.structure.clusters.detect_molecules(
-        system=pbc_md_frames,
+    composition = mbe_automation.structure.clusters.identify_molecules(
+        crystal=pbc_md_frames,
         reference_frame_index=0,
         assert_identical_composition=config.finite_subsystem_filter.assert_identical_composition,
     )
+    md_molecular_crystal = composition.molecular_crystal
     mbe_automation.storage.save_molecular_crystal(
         dataset=config.dataset,
         key=md_molecular_crystal_key,
