@@ -654,7 +654,14 @@ def identify_molecules(
     if bonding_algo is None:
         bonding_algo = CutOffDictNN.from_preset("vesta_2019")
 
-    mbe_automation.common.display.framed("Molecular composition")
+    mbe_automation.common.display.framed("Molecule detection")
+    print(f"bonding_algo                {type(bonding_algo).__name__}")
+    if calculator is not None:
+        print(f"energy_thresh               {energy_thresh} eV/atom")
+    print(f"assert_identical_comp       {assert_identical_composition}")
+    if crystal.n_frames > 1:
+        print(f"reference_frame_index       {reference_frame_index}")
+    print()
 
     molecular_crystal = _generate_covalent_bond_graph(
         system=crystal,
