@@ -47,7 +47,7 @@ def _optimal_rmsd(pos_a, pos_b):
 
 def compute_exact_rmsd(mol_a, mol_b, align_mirror_images=False):
     """
-    Computes exact RMSD between mol_a and mol_b without permutations,
+    Compute exact RMSD between mol_a and mol_b without permutations,
     using scipy to find optimal translation and rotation.
     """
     pos_a = mol_a.positions
