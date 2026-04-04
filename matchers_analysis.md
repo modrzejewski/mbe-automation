@@ -61,7 +61,8 @@ It should be noted that ASE *does* contain a mathematically optimal alignment al
 Often, atoms of the same element might be ordered differently in the two molecules.
 
 *   **Pymatgen** (`HungarianOrderMatcher`): Performs an optimal assignment of atoms of the same species to minimize the RMSD, utilizing the Hungarian algorithm.
-*   **ASE** (`ase.geometry.distance` with `permute=True`): Performs a greedy, non-optimal permutation assignment. It iterates over the atoms in the first molecule and eagerly matches them to the closest available atom of the same species in the second molecule. This greedy approach is not guaranteed to find the global minimum RMSD. (Furthermore, `ase.build.minimize_rotation_and_translation` performs *no* permutation matching at all).
+*   **ASE** (`ase.geometry.distance` with `permute=True`): Yes, it **does** perform permutation matching (this is enabled by default). However, it uses a greedy, non-optimal permutation assignment. It iterates over the atoms in the first molecule and eagerly matches them to the closest available atom of the same species in the second molecule. While fast, this greedy approach is not guaranteed to find the true global minimum RMSD for complex permutations.
+    *   *Note on ASE's Kabsch algorithm:* As mentioned above, ASE does contain an optimal Kabsch rotation algorithm (`ase.build.minimize_rotation_and_translation`). However, this algorithm performs **no permutation matching at all**. It relies strictly on the order of atoms in the arrays matching perfectly.
 
 ---
 
