@@ -735,6 +735,23 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             bonding_algo: NearNeighbors | None = None,
             reference_frame_index: int = 0,
     ) -> mbe_automation.structure.clusters.MolecularComposition:
+        """
+        Identify molecules in the periodic structure, returning a MolecularComposition
+        object that contains the full MolecularCrystal, a list of all detected molecules,
+        and (if a calculator is provided) a list of symmetry-unique molecules.
+
+        Args:
+            calculator: Used to compute single-point energies for symmetry uniqueness checking.
+            energy_thresh: Energy threshold in eV/atom to group symmetry-unique molecules.
+            assert_identical_composition: Raise error if molecules with varying composition are found.
+            bonding_algo: NearNeighbors strategy for generating covalent bond graph.
+            reference_frame_index: Which frame to use as reference geometry for bond detection.
+
+        Returns:
+            MolecularComposition dataclass containing identified components.
+        """
+        if not self.periodic:
+            raise ValueError("identify_molecules is designed for periodic systems.")
 
         composition = mbe_automation.structure.clusters.identify_molecules(
             crystal=self,
@@ -752,54 +769,6 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             composition.molecules_unique = [Structure(**vars(mol)) for mol in composition.molecules_unique]
 
         return composition
-
-    def to_molecular_crystal(
-            self,
-            reference_frame_index: int = 0,
-            assert_identical_composition: bool = True,
-            bonding_algo: NearNeighbors | None = None,
-    ) -> MolecularCrystal:
-
-        if not self.periodic:
-            raise ValueError("Cannot convert a finite structure to a molecular crystal.")
-        
-        return self.identify_molecules(
-            reference_frame_index=reference_frame_index,
-            assert_identical_composition=assert_identical_composition,
-            bonding_algo=bonding_algo,
-        ).molecular_crystal
-
-    detect_molecules = to_molecular_crystal # synonym
-
-    def extract_all_molecules(
-            self,
-            bonding_algo: NearNeighbors | None = None,
-            reference_frame_index: int = 0,
-            calculator: ASECalculator | None = None,
-    ) -> List[Structure]:
-
-        return self.identify_molecules(
-            calculator=calculator,
-            bonding_algo=bonding_algo,
-            reference_frame_index=reference_frame_index,
-            assert_identical_composition=False,
-        ).molecules_nonunique
-
-    def extract_unique_molecules(
-            self,
-            calculator: ASECalculator,
-            energy_thresh: float = 1.0E-5, # eV/atom
-            bonding_algo: NearNeighbors | None = None,
-            reference_frame_index: int = 0,
-    ) -> List[Structure]:
-
-        return self.identify_molecules(
-            calculator=calculator,
-            energy_thresh=energy_thresh,
-            bonding_algo=bonding_algo,
-            reference_frame_index=reference_frame_index,
-            assert_identical_composition=False,
-        ).molecules_unique
 
     def extract_relaxed_unique_molecules(
             self,
