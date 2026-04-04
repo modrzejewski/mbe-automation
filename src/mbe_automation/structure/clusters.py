@@ -539,7 +539,7 @@ def _group_molecules_by_energy(
     return equiv_molecule_indices
 
 
-def _extract_all_molecules(
+def _extract_nonunique_molecules(
         crystal: mbe_automation.storage.Structure | mbe_automation.storage.MolecularCrystal,
         bonding_algo: NearNeighbors,
         reference_frame_index: int = 0,
@@ -595,22 +595,13 @@ def _extract_all_molecules(
 
 
 def _extract_unique_molecules(
-        crystal: mbe_automation.storage.Structure | mbe_automation.storage.MolecularCrystal,
-        calculator: ASECalculator,
-        bonding_algo: NearNeighbors,
+        molecules_nonunique: List[mbe_automation.storage.Structure],
         energy_thresh: float = 1.0E-5, # eV/atom
         reference_frame_index: int = 0,
 ) -> list[mbe_automation.storage.Structure]:
     
-    all_molecules = _extract_all_molecules(
-        crystal=crystal,
-        bonding_algo=bonding_algo,
-        reference_frame_index=reference_frame_index,
-        calculator=calculator,
-    )
-
     grouped_molecules = _group_molecules_by_energy(
-        molecules=all_molecules,
+        molecules=molecules_nonunique,
         thresh=energy_thresh,
         reference_frame_index=reference_frame_index,
     )
@@ -619,7 +610,7 @@ def _extract_unique_molecules(
     
     unique_molecules = []
     for equivalent_molecules in grouped_molecules:
-        molecule = all_molecules[equivalent_molecules[0]]
+        molecule = molecules_nonunique[equivalent_molecules[0]]
         unique_molecules.append(molecule)
 
     return unique_molecules
@@ -658,7 +649,7 @@ def identify_molecules(
         bonding_algo=bonding_algo,
     )
 
-    molecules_nonunique = _extract_all_molecules(
+    molecules_nonunique = _extract_nonunique_molecules(
         crystal=molecular_crystal,
         bonding_algo=bonding_algo,
         reference_frame_index=reference_frame_index,
@@ -670,10 +661,8 @@ def identify_molecules(
 
     if calculator is not None:
         molecules_unique = _extract_unique_molecules(
-            crystal=molecular_crystal,
-            calculator=calculator,
+            molecules_nonunique=molecules_nonunique,
             energy_thresh=energy_thresh,
-            bonding_algo=bonding_algo,
             reference_frame_index=reference_frame_index,
         )
         n_molecules_unique = len(molecules_unique)
