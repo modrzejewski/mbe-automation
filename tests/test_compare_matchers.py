@@ -62,7 +62,7 @@ def compute_exact_rmsd(mol_a, mol_b, align_mirror_images=False):
 
     return rmsd
 
-def run_comparison():
+def run_comparison(verbose=True):
     # Define systems using "+" notation
     systems = [
         "H2O", "NH3", "CH4", "C6H6",
@@ -122,15 +122,17 @@ def run_comparison():
         return rmsd_ase, rmsd_pmg
 
     for R in R_values:
-        print(f"\n=======================================================")
-        print(f"================== Radius R = {R} Angs ==================")
-        print(f"=======================================================")
+        if verbose:
+            print(f"\n=======================================================")
+            print(f"================== Radius R = {R} Angs ==================")
+            print(f"=======================================================")
 
         # 1. Tests with different noise levels (no mirror images)
         for noise_level in noise_levels:
-            print(f"\n### Test: Noise level {noise_level} Angs (R={R})")
-            print(f"| {'System':<20} | {'Exact RMSD':<15} | {'RMSD (ASE)':<15} | {'RMSD (Pymatgen)':<15} |")
-            print(f"|{'-'*22}|{'-'*17}|{'-'*17}|{'-'*17}|")
+            if verbose:
+                print(f"\n### Test: Noise level {noise_level} Angs (R={R})")
+                print(f"| {'System':<20} | {'Exact RMSD':<15} | {'RMSD (ASE)':<15} | {'RMSD (Pymatgen)':<15} |")
+                print(f"|{'-'*22}|{'-'*17}|{'-'*17}|{'-'*17}|")
 
             for system_name in systems:
                 mol_a = create_system(system_name, R=R)
@@ -146,12 +148,14 @@ def run_comparison():
                 # evaluate function takes care of permutation and matching
                 rmsd_ase, rmsd_pmg = evaluate(mol_a, mol_b, exact_rmsd, align_mirror_images=False)
 
-                print(f"| {system_name:<20} | {exact_rmsd:<15.6f} | {rmsd_ase:<15.6f} | {rmsd_pmg:<15.6f} |")
+                if verbose:
+                    print(f"| {system_name:<20} | {exact_rmsd:<15.6f} | {rmsd_ase:<15.6f} | {rmsd_pmg:<15.6f} |")
 
         # 2. Tests with mirror images
-        print(f"\n### Test: Mirror Images (align_mirror_images=True, R={R})")
-        print(f"| {'System':<20} | {'Exact RMSD':<15} | {'RMSD (ASE)':<15} | {'RMSD (Pymatgen)':<15} |")
-        print(f"|{'-'*22}|{'-'*17}|{'-'*17}|{'-'*17}|")
+        if verbose:
+            print(f"\n### Test: Mirror Images (align_mirror_images=True, R={R})")
+            print(f"| {'System':<20} | {'Exact RMSD':<15} | {'RMSD (ASE)':<15} | {'RMSD (Pymatgen)':<15} |")
+            print(f"|{'-'*22}|{'-'*17}|{'-'*17}|{'-'*17}|")
 
         for system_name in systems:
             mol_a = create_system(system_name, R=R)
@@ -170,21 +174,37 @@ def run_comparison():
             # evaluate function takes care of permutation and matching
             rmsd_ase, rmsd_pmg = evaluate(mol_a, mol_b, exact_rmsd, align_mirror_images=True)
 
-            print(f"| {system_name:<20} | {exact_rmsd:<15.6f} | {rmsd_ase:<15.6f} | {rmsd_pmg:<15.6f} |")
-
-    # Summary
-    print("\n" + "="*55)
-    print("Summary:")
-    print("="*55)
-    print(f"In {ase_better} tests out of {total_tests} algorithm ase was closer to the exact result than algorithm pymatgen.")
-    print(f"In {pmg_better} tests out of {total_tests} algorithm pymatgen was closer to the exact result than algorithm ase.")
+            if verbose:
+                print(f"| {system_name:<20} | {exact_rmsd:<15.6f} | {rmsd_ase:<15.6f} | {rmsd_pmg:<15.6f} |")
 
     avg_ase_dev = total_ase_deviation / total_tests
     avg_pmg_dev = total_pmg_deviation / total_tests
 
-    print(f"\nAverage deviation against exact RMSD:")
-    print(f"  - ASE:      {avg_ase_dev:.6f}")
-    print(f"  - Pymatgen: {avg_pmg_dev:.6f}")
+    # Summary
+    if verbose:
+        print("\n" + "="*55)
+        print("Summary:")
+        print("="*55)
+        print(f"In {ase_better} tests out of {total_tests} algorithm ase was closer to the exact result than algorithm pymatgen.")
+        print(f"In {pmg_better} tests out of {total_tests} algorithm pymatgen was closer to the exact result than algorithm ase.")
+
+        print(f"\nAverage deviation against exact RMSD:")
+        print(f"  - ASE:      {avg_ase_dev:.6f}")
+        print(f"  - Pymatgen: {avg_pmg_dev:.6f}")
+    
+    return avg_ase_dev, avg_pmg_dev
+
+def test_compare_matchers_accuracy():
+    """
+    Test that the average error of pymatgen and ASE matchers is within limits.
+    Success criteria:
+    - Pymatgen average error < 0.02 Angstrom
+    - ASE average error < 0.2 Angstrom
+    """
+    avg_ase_dev, avg_pmg_dev = run_comparison(verbose=False)
+    
+    assert avg_pmg_dev < 0.02, f"Pymatgen average deviation {avg_pmg_dev:.6f} exceeds 0.02!"
+    assert avg_ase_dev < 0.2, f"ASE average deviation {avg_ase_dev:.6f} exceeds 0.2!"
 
 if __name__ == "__main__":
-    run_comparison()
+    run_comparison(verbose=True)
