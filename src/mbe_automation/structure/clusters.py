@@ -38,6 +38,15 @@ from mbe_automation.configs.clusters import NUMBER_SELECTION, DISTANCE_SELECTION
 from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueClustersFilter
 from mbe_automation.configs.structure import Minimum
 
+@dataclass
+class MolecularComposition:
+    molecular_crystal: mbe_automation.storage.core.MolecularCrystal
+    molecules_nonunique: List[mbe_automation.storage.Structure]
+    n_molecules_nonunique: int
+    molecules_unique: List[mbe_automation.storage.Structure] | None = None
+    n_molecules_unique: int | None = None
+
+
 def Label(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
     prefixes = {1:"monomer", 2:"dimer", 3:"trimer", 4:"tetramer"}
@@ -227,29 +236,19 @@ def _test_identical_composition(
     return True
 
 
-def detect_molecules(
+def _generate_covalent_bond_graph(
         system: mbe_automation.storage.Structure,
+        bonding_algo: NearNeighbors,
         reference_frame_index: int = 0,
-        assert_identical_composition: bool = True,
-        bonding_algo: NearNeighbors | None = None,
+        assert_identical_composition: bool = False,
         validate_pbc_structure: bool = False
 ) -> mbe_automation.storage.MolecularCrystal:
     """
     Identify molecules in a periodic Structure.
     """
 
-    if bonding_algo is None:
-        bonding_algo = CutOffDictNN.from_preset("vesta_2019")
-    
-    mbe_automation.common.display.framed("Molecule detection")
-    print(f"n_frames                {system.n_frames}")
-    print(f"reference_frame_index   {reference_frame_index}")
-
-    assert system.atomic_numbers.ndim == 1
-    assert system.masses.ndim == 1
-    
     if not system.periodic:
-        raise ValueError("detect_molecules is designed for periodic systems.")
+        raise ValueError("_generate_covalent_bond_graph is designed for periodic systems.")
 
     if system.positions.ndim == 3:
         positions_ref = system.positions[reference_frame_index]
@@ -497,7 +496,7 @@ def _extract_finite_subsystem(
     return finite_subsystem
 
 
-def group_molecules_by_energy(
+def _group_molecules_by_energy(
         molecules: List[mbe_automation.storage.Structure],
         thresh: float = 1.0E-5, # eV/atom
         reference_frame_index: int = 0,
@@ -537,9 +536,8 @@ def group_molecules_by_energy(
     return equiv_molecule_indices
 
 
-def extract_all_molecules(
-        crystal: mbe_automation.storage.Structure,
-        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+def _extract_nonunique_molecules(
+        molecular_crystal: mbe_automation.storage.MolecularCrystal,
         reference_frame_index: int = 0,
         calculator: ASECalculator | None = None,
 ) -> List[mbe_automation.storage.Structure]:
@@ -547,16 +545,6 @@ def extract_all_molecules(
     Extract all molecules present in a unit cell as a list of separate
     Structures.
     """
-    assert crystal.atomic_numbers.ndim == 1
-    assert crystal.masses.ndim == 1
-    
-    molecular_crystal = detect_molecules(
-        system=crystal,
-        reference_frame_index=reference_frame_index,
-        assert_identical_composition=False,
-        bonding_algo=bonding_algo,
-    )
-
     molecules = []
     for atom_indices in molecular_crystal.index_map:
 
@@ -590,23 +578,14 @@ def extract_all_molecules(
     return molecules
 
 
-def extract_unique_molecules(
-        crystal: mbe_automation.storage.Structure,
-        calculator: ASECalculator,
+def _extract_unique_molecules(
+        molecules_nonunique: List[mbe_automation.storage.Structure],
         energy_thresh: float = 1.0E-5, # eV/atom
-        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
         reference_frame_index: int = 0,
 ) -> list[mbe_automation.storage.Structure]:
     
-    all_molecules = extract_all_molecules(
-        crystal=crystal,
-        bonding_algo=bonding_algo,
-        reference_frame_index=reference_frame_index,
-        calculator=calculator,
-    )
-
-    grouped_molecules = group_molecules_by_energy(
-        molecules=all_molecules,
+    grouped_molecules = _group_molecules_by_energy(
+        molecules=molecules_nonunique,
         thresh=energy_thresh,
         reference_frame_index=reference_frame_index,
     )
@@ -615,10 +594,76 @@ def extract_unique_molecules(
     
     unique_molecules = []
     for equivalent_molecules in grouped_molecules:
-        molecule = all_molecules[equivalent_molecules[0]]
+        molecule = molecules_nonunique[equivalent_molecules[0]]
         unique_molecules.append(molecule)
 
     return unique_molecules
+
+
+def identify_molecules(
+        crystal: mbe_automation.storage.Structure,
+        calculator: ASECalculator | None = None,
+        energy_thresh: float = 1.0E-5, # eV/atom
+        assert_identical_composition: bool = False,
+        bonding_algo: NearNeighbors | None = None,
+        reference_frame_index: int = 0,
+) -> MolecularComposition:
+    """
+    Central driver for molecular identification and reporting.
+    Orchestrates molecule detection, extracts all individual molecules,
+    and identifies symmetry-unique ones based on single-point energy criteria.
+    """
+
+    if bonding_algo is None:
+        bonding_algo = CutOffDictNN.from_preset("vesta_2019")
+
+    mbe_automation.common.display.framed("Molecule detection")
+    print(f"bonding_algo                {type(bonding_algo).__name__}")
+    if calculator is not None:
+        print(f"energy_thresh               {energy_thresh} eV/atom")
+    print(f"assert_identical_comp       {assert_identical_composition}")
+    if crystal.n_frames > 1:
+        print(f"reference_frame_index       {reference_frame_index}")
+    print()
+
+    assert crystal.atomic_numbers.ndim == 1
+    assert crystal.masses.ndim == 1
+
+    molecular_crystal = _generate_covalent_bond_graph(
+        system=crystal,
+        reference_frame_index=reference_frame_index,
+        assert_identical_composition=assert_identical_composition,
+        bonding_algo=bonding_algo,
+    )
+
+    molecules_nonunique = _extract_nonunique_molecules(
+        molecular_crystal=molecular_crystal,
+        reference_frame_index=reference_frame_index,
+        calculator=calculator,
+    )
+
+    molecules_unique = None
+    n_molecules_unique = None
+
+    if calculator is not None:
+        molecules_unique = _extract_unique_molecules(
+            molecules_nonunique=molecules_nonunique,
+            energy_thresh=energy_thresh,
+            reference_frame_index=reference_frame_index,
+        )
+        n_molecules_unique = len(molecules_unique)
+
+    print(f"Nonunique molecules:  {len(molecules_nonunique)}/unit cell")
+    if molecules_unique is not None:
+        print(f"Unique molecules (energy criterion): {n_molecules_unique}/unit cell")
+
+    return MolecularComposition(
+        molecular_crystal=molecular_crystal,
+        molecules_nonunique=molecules_nonunique,
+        n_molecules_nonunique=len(molecules_nonunique),
+        molecules_unique=molecules_unique,
+        n_molecules_unique=n_molecules_unique,
+    )
 
 
 def extract_relaxed_unique_molecules(
@@ -628,7 +673,7 @@ def extract_relaxed_unique_molecules(
         calculator: ASECalculator,
         config: Minimum,
         energy_thresh: float = 1.0E-5, # eV/atom
-        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+        bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
         work_dir: Path | str = Path("./")
 ) -> None:
@@ -637,14 +682,16 @@ def extract_relaxed_unique_molecules(
     structures to a dataset file.
     """
     
-    unique_molecules = extract_unique_molecules(
+    composition = identify_molecules(
         crystal=crystal,
         calculator=calculator,
         energy_thresh=energy_thresh,
         bonding_algo=bonding_algo,
         reference_frame_index=reference_frame_index,
     )
-    n_unique_molecules = len(unique_molecules)
+
+    unique_molecules = composition.molecules_unique
+    n_unique_molecules = composition.n_molecules_unique
     
     relaxed_molecules = []
     relaxed_labels = []
