@@ -6,7 +6,7 @@ from pymatgen.analysis.local_env import CutOffDictNN
 
 def test_identify_molecules():
     # Build a simple molecular crystal model
-    h2_mol1 = ase.build.molecule('H2')
+    h2_mol1 = ase.build.molecule("H2")
     h2_mol1.positions += [1, 1, 1]
 
     supercell = h2_mol1
