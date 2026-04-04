@@ -667,9 +667,9 @@ def identify_molecules(
         )
         n_molecules_unique = len(molecules_unique)
 
-    print(f"Total molecules detected:  {len(molecules_nonunique)}")
+    print(f"Nonunique molecules:  {len(molecules_nonunique)}/unit cell")
     if molecules_unique is not None:
-        print(f"Symmetry-unique molecules: {n_molecules_unique}")
+        print(f"Unique molecules (energy criterion): {n_molecules_unique}/unit cell")
 
     return MolecularComposition(
         molecular_crystal=molecular_crystal,
