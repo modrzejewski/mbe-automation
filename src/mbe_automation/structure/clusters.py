@@ -36,15 +36,22 @@ import mbe_automation.calculators.core
 from mbe_automation.storage.core import MolecularCrystal, UniqueClusters
 from mbe_automation.configs.clusters import NUMBER_SELECTION, DISTANCE_SELECTION
 from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueClustersFilter
-from mbe_automation.configs.structure import Minimum
+from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
 
-@dataclass
+@dataclass(kw_only=True)
 class MolecularComposition:
+    """
+    Molecular composition of a periodic structure.
+    """
     molecular_crystal: mbe_automation.storage.core.MolecularCrystal
     molecules_nonunique: List[mbe_automation.storage.Structure]
     n_molecules_nonunique: int
-    molecules_unique: List[mbe_automation.storage.Structure] | None = None
-    n_molecules_unique: int | None = None
+    molecules_unique: List[mbe_automation.storage.Structure]
+    n_molecules_unique: int
+    n_molecules_unique_rmsd: int
+    n_molecules_unique_energy: int | None = None
+    rmsd_thresh: float
+    energy_thresh: float | None = None
 
 
 def Label(Constituents, NMonomers):
@@ -578,22 +585,53 @@ def _extract_nonunique_molecules(
     return molecules
 
 
-def _extract_unique_molecules(
+def _group_molecules_by_rmsd(
+        molecules: List[mbe_automation.storage.Structure],
+        thresh: float = SYMMETRY_TOLERANCE_LOOSE,
+) -> list[npt.NDArray[np.int64]]:
+    n_mols = len(molecules)
+    if n_mols == 0:
+        return []
+
+    adjacency_matrix = np.zeros((n_mols, n_mols), dtype=bool)
+    for i in range(n_mols):
+        adjacency_matrix[i, i] = True
+        for j in range(i + 1, n_mols):
+            rmsd = mbe_automation.structure.molecule.match(
+                positions_a=molecules[i].positions,
+                atomic_numbers_a=molecules[i].atomic_numbers,
+                positions_b=molecules[j].positions,
+                atomic_numbers_b=molecules[j].atomic_numbers,
+            )
+            if not np.isnan(rmsd) and rmsd < thresh:
+                adjacency_matrix[i, j] = True
+                adjacency_matrix[j, i] = True
+
+    n_components, labels = sparse.csgraph.connected_components(
+        adjacency_matrix, directed=False, return_labels=True
+    )
+
+    grouped_indices = []
+    for comp_idx in range(n_components):
+        grouped_indices.append(np.where(labels == comp_idx)[0])
+
+    return grouped_indices
+
+def _unique_molecules_combined_criteria(
         molecules_nonunique: List[mbe_automation.storage.Structure],
-        energy_thresh: float = 1.0E-5, # eV/atom
+        energy_groups: list[npt.NDArray[np.int64]],
+        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE,
 ) -> list[mbe_automation.storage.Structure]:
     
-    grouped_molecules = _group_molecules_by_energy(
-        molecules=molecules_nonunique,
-        thresh=energy_thresh,
-    )
-    n_unique_molecules = len(grouped_molecules)
-    assert n_unique_molecules > 0
-    
     unique_molecules = []
-    for equivalent_molecules in grouped_molecules:
-        molecule = molecules_nonunique[equivalent_molecules[0]]
-        unique_molecules.append(molecule)
+    for group_indices in energy_groups:
+        group_molecules = [molecules_nonunique[i] for i in group_indices]
+        rmsd_groups = _group_molecules_by_rmsd(
+            molecules=group_molecules,
+            thresh=rmsd_thresh,
+        )
+        for rmsd_group_indices in rmsd_groups:
+            unique_molecules.append(group_molecules[rmsd_group_indices[0]])
 
     return unique_molecules
 
@@ -602,15 +640,15 @@ def identify_molecules(
         crystal: mbe_automation.storage.Structure,
         calculator: ASECalculator | None = None,
         energy_thresh: float = 1.0E-5, # eV/atom
+        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
         assert_identical_composition: bool = False,
         bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
 ) -> MolecularComposition:
     """
-    Central driver for molecular identification and reporting.
-    Orchestrates molecule detection, extracts all individual molecules,
-    and identifies symmetry-unique ones based on single-point energy criteria.
+    Identify and extract molecules from a periodic structure. Group nonunique molecules into symmetry-unique subsets based on structure and potential energy.
     """
+    assert crystal.periodic
 
     if bonding_algo is None:
         bonding_algo = CutOffDictNN.from_preset("vesta_2019")
@@ -619,6 +657,7 @@ def identify_molecules(
     print(f"bonding_algo                {type(bonding_algo).__name__}")
     if calculator is not None:
         print(f"energy_thresh               {energy_thresh} eV/atom")
+        print(f"rmsd_thresh                 {rmsd_thresh} Å")
     print(f"assert_identical_comp       {assert_identical_composition}")
     if crystal.n_frames > 1:
         print(f"reference_frame_index       {reference_frame_index}")
@@ -640,19 +679,36 @@ def identify_molecules(
         calculator=calculator,
     )
 
-    molecules_unique = None
-    n_molecules_unique = None
+    rmsd_groups = _group_molecules_by_rmsd(
+        molecules=molecules_nonunique,
+        thresh=rmsd_thresh,
+    )
+    n_molecules_unique_rmsd = len(rmsd_groups)
+
+    n_molecules_unique_energy = None
 
     if calculator is not None:
-        molecules_unique = _extract_unique_molecules(
+        energy_groups = _group_molecules_by_energy(
+            molecules=molecules_nonunique,
+            thresh=energy_thresh,
+        )
+        n_molecules_unique_energy = len(energy_groups)
+
+        molecules_unique = _unique_molecules_combined_criteria(
             molecules_nonunique=molecules_nonunique,
-            energy_thresh=energy_thresh,
+            energy_groups=energy_groups,
+            rmsd_thresh=rmsd_thresh,
         )
         n_molecules_unique = len(molecules_unique)
+    else:
+        molecules_unique = [molecules_nonunique[group[0]] for group in rmsd_groups]
+        n_molecules_unique = n_molecules_unique_rmsd
 
     print(f"Nonunique molecules:  {len(molecules_nonunique)}/unit cell")
-    if molecules_unique is not None:
-        print(f"Unique molecules (energy criterion): {n_molecules_unique}/unit cell")
+    if calculator is not None:
+        print(f"Unique molecules (energy criterion): {n_molecules_unique_energy}/unit cell")
+    print(f"Unique molecules (rmsd criterion):   {n_molecules_unique_rmsd}/unit cell")
+    print(f"Unique molecules (combined):         {n_molecules_unique}/unit cell")
 
     return MolecularComposition(
         molecular_crystal=molecular_crystal,
@@ -660,6 +716,10 @@ def identify_molecules(
         n_molecules_nonunique=len(molecules_nonunique),
         molecules_unique=molecules_unique,
         n_molecules_unique=n_molecules_unique,
+        n_molecules_unique_energy=n_molecules_unique_energy,
+        n_molecules_unique_rmsd=n_molecules_unique_rmsd,
+        energy_thresh=energy_thresh if calculator is not None else None,
+        rmsd_thresh=rmsd_thresh,
     )
 
 
@@ -670,6 +730,7 @@ def extract_relaxed_unique_molecules(
         calculator: ASECalculator,
         config: Minimum,
         energy_thresh: float = 1.0E-5, # eV/atom
+        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
         bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
         work_dir: Path | str = Path("./")
@@ -683,6 +744,7 @@ def extract_relaxed_unique_molecules(
         crystal=crystal,
         calculator=calculator,
         energy_thresh=energy_thresh,
+        rmsd_thresh=rmsd_thresh,
         bonding_algo=bonding_algo,
         reference_frame_index=reference_frame_index,
     )
