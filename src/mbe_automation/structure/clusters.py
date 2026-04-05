@@ -617,18 +617,11 @@ def _group_molecules_by_rmsd(
 
     return grouped_indices
 
-def _extract_unique_molecules(
+def _unique_molecules_combined_criteria(
         molecules_nonunique: List[mbe_automation.storage.Structure],
-        energy_thresh: float = 1.0E-5, # eV/atom
-        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
-) -> tuple[list[mbe_automation.storage.Structure], int]:
-    
-    energy_groups = _group_molecules_by_energy(
-        molecules=molecules_nonunique,
-        thresh=energy_thresh,
-    )
-    n_unique_molecules_energy = len(energy_groups)
-    assert n_unique_molecules_energy > 0
+        energy_groups: list[npt.NDArray[np.int64]],
+        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE,
+) -> list[mbe_automation.storage.Structure]:
     
     unique_molecules = []
     for group_indices in energy_groups:
@@ -640,7 +633,7 @@ def _extract_unique_molecules(
         for rmsd_group_indices in rmsd_groups:
             unique_molecules.append(group_molecules[rmsd_group_indices[0]])
 
-    return unique_molecules, n_unique_molecules_energy
+    return unique_molecules
 
 
 def identify_molecules(
@@ -694,9 +687,15 @@ def identify_molecules(
     n_molecules_unique_energy = None
 
     if calculator is not None:
-        molecules_unique, n_molecules_unique_energy = _extract_unique_molecules(
+        energy_groups = _group_molecules_by_energy(
+            molecules=molecules_nonunique,
+            thresh=energy_thresh,
+        )
+        n_molecules_unique_energy = len(energy_groups)
+
+        molecules_unique = _unique_molecules_combined_criteria(
             molecules_nonunique=molecules_nonunique,
-            energy_thresh=energy_thresh,
+            energy_groups=energy_groups,
             rmsd_thresh=rmsd_thresh,
         )
         n_molecules_unique = len(molecules_unique)
