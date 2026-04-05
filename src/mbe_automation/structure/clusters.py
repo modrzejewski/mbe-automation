@@ -5,6 +5,7 @@ from typing import List, Literal, Dict
 import math
 import itertools
 from collections import deque
+import time
 import numpy as np
 import numpy.typing as npt
 import ase.geometry
@@ -278,7 +279,6 @@ def _generate_covalent_bond_graph(
     ).make_supercell([3, 3, 3])
     supercell_to_unit_cell = np.array(supercell.site_properties["original_index"])
 
-    import time
     print("Computing covalent bonds graph...", end="", flush=True)
     start_time = time.time()
     structure_graph = pymatgen.analysis.graphs.StructureGraph.from_local_env_strategy(
