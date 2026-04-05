@@ -36,10 +36,13 @@ import mbe_automation.calculators.core
 from mbe_automation.storage.core import MolecularCrystal, UniqueClusters
 from mbe_automation.configs.clusters import NUMBER_SELECTION, DISTANCE_SELECTION
 from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueClustersFilter
-from mbe_automation.configs.structure import Minimum
+from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
 
 @dataclass
 class MolecularComposition:
+    """
+    Store molecular composition of a periodic crystal structure.
+    """
     molecular_crystal: mbe_automation.storage.core.MolecularCrystal
     molecules_nonunique: List[mbe_automation.storage.Structure]
     n_molecules_nonunique: int
@@ -47,6 +50,8 @@ class MolecularComposition:
     n_molecules_unique_energy: int | None = None
     n_molecules_unique_rmsd: int | None = None
     n_molecules_unique: int | None = None
+    energy_thresh: float | None = None
+    rmsd_thresh: float | None = None
 
 
 def Label(Constituents, NMonomers):
@@ -582,7 +587,7 @@ def _extract_nonunique_molecules(
 
 def _group_molecules_by_rmsd(
         molecules: List[mbe_automation.storage.Structure],
-        thresh: float = 0.01,
+        thresh: float = SYMMETRY_TOLERANCE_LOOSE,
 ) -> list[npt.NDArray[np.int64]]:
     n_mols = len(molecules)
     if n_mols == 0:
@@ -615,7 +620,7 @@ def _group_molecules_by_rmsd(
 def _extract_unique_molecules(
         molecules_nonunique: List[mbe_automation.storage.Structure],
         energy_thresh: float = 1.0E-5, # eV/atom
-        rmsd_thresh: float = 0.01, # Angs
+        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
 ) -> tuple[list[mbe_automation.storage.Structure], int]:
     
     energy_groups = _group_molecules_by_energy(
@@ -642,15 +647,13 @@ def identify_molecules(
         crystal: mbe_automation.storage.Structure,
         calculator: ASECalculator | None = None,
         energy_thresh: float = 1.0E-5, # eV/atom
-        rmsd_thresh: float = 0.01, # Angs
+        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
         assert_identical_composition: bool = False,
         bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
 ) -> MolecularComposition:
     """
-    Central driver for molecular identification and reporting.
-    Orchestrates molecule detection, extracts all individual molecules,
-    and identifies symmetry-unique ones based on single-point energy criteria.
+    Identify and extract molecules from a periodic crystal. Group nonunique molecules into symmetry-unique subsets based on structure and potential energy.
     """
 
     if bonding_algo is None:
@@ -717,6 +720,8 @@ def identify_molecules(
         n_molecules_unique=n_molecules_unique,
         n_molecules_unique_energy=n_molecules_unique_energy,
         n_molecules_unique_rmsd=n_molecules_unique_rmsd,
+        energy_thresh=energy_thresh if calculator is not None else None,
+        rmsd_thresh=rmsd_thresh,
     )
 
 
@@ -727,7 +732,7 @@ def extract_relaxed_unique_molecules(
         calculator: ASECalculator,
         config: Minimum,
         energy_thresh: float = 1.0E-5, # eV/atom
-        rmsd_thresh: float = 0.01, # Angs
+        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
         bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
         work_dir: Path | str = Path("./")
