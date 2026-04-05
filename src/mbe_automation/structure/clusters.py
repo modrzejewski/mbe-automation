@@ -680,7 +680,7 @@ def _display_unique_molecules(molecules_unique: List[mbe_automation.storage.Stru
 
         if calculator_provided:
             energy_val = mol.E_pot[0]
-            energy = f"{energy_val / n_atoms:.6f}"
+            energy = f"{energy_val / n_atoms:.5f}"
             print(f"{i:>7} | {n_atoms:>7} | {comp:<15} | {energy:<16}")
         else:
             print(f"{i:>7} | {n_atoms:>7} | {comp:<15}")
