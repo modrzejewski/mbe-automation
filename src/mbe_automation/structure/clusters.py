@@ -50,9 +50,9 @@ class MolecularComposition:
     molecules_unique: List[mbe_automation.storage.Structure]
     n_molecules_unique: int
     n_equivalent: npt.NDArray[np.int64]
-    n_molecules_unique_rmsd: int
+    n_molecules_unique_rmsd: int | None = None
     n_molecules_unique_energy: int | None = None
-    rmsd_thresh: float
+    rmsd_thresh: float | None = None
     energy_thresh: float | None = None
 
     def extract_relaxed_unique_molecules(
@@ -767,11 +767,14 @@ def identify_molecules(
         )
         n_molecules_unique_energy = len(energy_groups)
 
-    rmsd_groups = _group_molecules_by_rmsd(
-        molecules=molecules_nonunique,
-        thresh=rmsd_thresh,
-    )
-    n_molecules_unique_rmsd = len(rmsd_groups)
+    n_molecules_unique_rmsd = None
+    rmsd_groups = None
+    if match_mode in ("rmsd_only", "combined"):
+        rmsd_groups = _group_molecules_by_rmsd(
+            molecules=molecules_nonunique,
+            thresh=rmsd_thresh,
+        )
+        n_molecules_unique_rmsd = len(rmsd_groups)
 
     n_equivalent_list = []
 
@@ -798,11 +801,12 @@ def identify_molecules(
     print(f"Nonunique molecules:  {len(molecules_nonunique)}/unit cell")
     if calculator is not None:
         print(f"Unique molecules (energy criterion): {n_molecules_unique_energy}/unit cell")
-    print(f"Unique molecules (rmsd criterion):   {n_molecules_unique_rmsd}/unit cell")
-    if calculator is not None:
-        print(f"Unique molecules (combined):         {len(_unique_molecules_combined_criteria(molecules_nonunique, energy_groups, rmsd_thresh)[0])}/unit cell")
+    if n_molecules_unique_rmsd is not None:
+        print(f"Unique molecules (rmsd criterion):   {n_molecules_unique_rmsd}/unit cell")
+    if calculator is not None and match_mode == "combined":
+        print(f"Unique molecules (combined):         {n_molecules_unique}/unit cell")
 
-        if n_molecules_unique_energy != n_molecules_unique_rmsd:
+        if n_molecules_unique_energy is not None and n_molecules_unique_rmsd is not None and n_molecules_unique_energy != n_molecules_unique_rmsd:
             print("\nNote: The number of unique molecules in the unit cell differs depending on the RMSD and energy criteria. Assuming the structure is not distorted, this can occur if the unit cell contains a mixture of isomers.")
 
     if match_mode == "energy_only":
@@ -820,7 +824,7 @@ def identify_molecules(
         n_molecules_unique_energy=n_molecules_unique_energy,
         n_molecules_unique_rmsd=n_molecules_unique_rmsd,
         energy_thresh=energy_thresh if calculator is not None else None,
-        rmsd_thresh=rmsd_thresh,
+        rmsd_thresh=rmsd_thresh if match_mode in ("rmsd_only", "combined") else None,
     )
 
 

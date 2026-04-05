@@ -70,6 +70,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         calculator=config.calculator,
         energy_thresh=config.unique_molecules_energy_thresh,
         rmsd_thresh=config.unique_molecules_rmsd_thresh,
+        match_mode=config.unique_molecules_match_mode,
     )
     composition.extract_relaxed_unique_molecules(
         dataset=config.dataset,
