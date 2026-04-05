@@ -58,8 +58,29 @@ if TYPE_CHECKING:
 @dataclass(kw_only=True)
 class MolecularComposition(_MolecularComposition):
 
+    def __init__(
+            self,
+            crystal: Structure,
+            calculator: ASECalculator | None = None,
+            energy_thresh: float = 1.0E-5, # eV/atom
+            rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
+            assert_identical_composition: bool = False,
+            bonding_algo: NearNeighbors | None = None,
+            reference_frame_index: int = 0,
+    ):
+        result = mbe_automation.structure.clusters.identify_molecules(
+            crystal=crystal,
+            calculator=calculator,
+            energy_thresh=energy_thresh,
+            rmsd_thresh=rmsd_thresh,
+            assert_identical_composition=assert_identical_composition,
+            bonding_algo=bonding_algo,
+            reference_frame_index=reference_frame_index,
+        )
+        super().__init__(**vars(result))
+
     @classmethod
-    def from_cif_file(
+    def from_xyz_file(
             cls,
             file_path: str | Path,
             calculator: ASECalculator | None = None,
@@ -68,8 +89,8 @@ class MolecularComposition(_MolecularComposition):
             assert_identical_composition: bool = False,
             bonding_algo: NearNeighbors | None = None,
     ) -> MolecularComposition:
-        crystal = Structure.from_cif_file(
-            file_path=file_path,
+        crystal = Structure.from_xyz_file(
+            read_path=file_path,
         )
         return cls(
             crystal=crystal,
