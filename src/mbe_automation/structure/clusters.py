@@ -46,9 +46,9 @@ class MolecularComposition:
     molecular_crystal: mbe_automation.storage.core.MolecularCrystal
     molecules_nonunique: List[mbe_automation.storage.Structure]
     n_molecules_nonunique: int
+    n_molecules_unique_rmsd: int
     molecules_unique: List[mbe_automation.storage.Structure] | None = None
     n_molecules_unique_energy: int | None = None
-    n_molecules_unique_rmsd: int | None = None
     n_molecules_unique: int | None = None
     energy_thresh: float | None = None
     rmsd_thresh: float | None = None
