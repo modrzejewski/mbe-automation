@@ -38,7 +38,7 @@ from mbe_automation.configs.clusters import NUMBER_SELECTION, DISTANCE_SELECTION
 from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueClustersFilter
 from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
 
-@dataclass
+@dataclass(kw_only=True)
 class MolecularComposition:
     """
     Molecular composition of a periodic structure.
@@ -46,12 +46,12 @@ class MolecularComposition:
     molecular_crystal: mbe_automation.storage.core.MolecularCrystal
     molecules_nonunique: List[mbe_automation.storage.Structure]
     n_molecules_nonunique: int
+    molecules_unique: List[mbe_automation.storage.Structure]
+    n_molecules_unique: int
     n_molecules_unique_rmsd: int
-    molecules_unique: List[mbe_automation.storage.Structure] | None = None
     n_molecules_unique_energy: int | None = None
-    n_molecules_unique: int | None = None
+    rmsd_thresh: float
     energy_thresh: float | None = None
-    rmsd_thresh: float | None = None
 
 
 def Label(Constituents, NMonomers):
@@ -691,8 +691,6 @@ def identify_molecules(
     )
     n_molecules_unique_rmsd = len(rmsd_groups)
 
-    molecules_unique = None
-    n_molecules_unique = None
     n_molecules_unique_energy = None
 
     if calculator is not None:
