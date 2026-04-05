@@ -131,14 +131,53 @@ def _match_pymatgen(
     rmsd = np.sqrt(3.0) * rmsd 
 
     return rmsd
+
+def _match_pymatgen_genetic(
+        positions_a: npt.NDArray[np.floating],
+        atomic_numbers_a: npt.NDArray[np.integer],
+        positions_b: npt.NDArray[np.floating],
+        atomic_numbers_b: npt.NDArray[np.integer],
+        align_mirror_images: bool,
+):
+    molecule_a = pymatgen.core.Molecule(
+        species=atomic_numbers_a,
+        coords=positions_a
+    )
+    molecule_b = pymatgen.core.Molecule(
+        species=atomic_numbers_b,
+        coords=positions_b,
+    )
+    algo = pymatgen.analysis.molecule_matcher.GeneticOrderMatcher(
+        molecule_a, threshold=0.3
+    )
+
+    match_result = algo.match(molecule_b)
+    if match_result and len(match_result) > 0:
+        rmsd = match_result[0][-1]
+    else:
+        return np.nan
+
+    if align_mirror_images:
+        molecule_b_mirror = pymatgen.core.Molecule(
+            species=atomic_numbers_b,
+            coords=positions_b * [1, -1, 1]
+        )
+        match_result_mirror = algo.match(molecule_b_mirror)
+        if match_result_mirror and len(match_result_mirror) > 0:
+            rmsd_mirror = match_result_mirror[0][-1]
+            rmsd = min(rmsd, rmsd_mirror)
     
+    rmsd = np.sqrt(3.0) * rmsd
+
+    return rmsd
+
 def match(
         positions_a: npt.NDArray[np.floating],
         atomic_numbers_a: npt.NDArray[np.integer],
         positions_b: npt.NDArray[np.floating],
         atomic_numbers_b: npt.NDArray[np.integer],
         align_mirror_images: bool = False,
-        algorithm: Literal["ase", "pymatgen"] | None = None,
+        algorithm: Literal["ase", "pymatgen", "pymatgen_genetic"] | None = None,
 ):
     """
     Compute root-mean square difference between atomic positions
@@ -167,6 +206,7 @@ def match(
     _match_algorithms = {
         "ase": _match_ase,
         "pymatgen": _match_pymatgen,
+        "pymatgen_genetic": _match_pymatgen_genetic,
     }
 
     try:

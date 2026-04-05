@@ -79,12 +79,14 @@ def run_comparison(verbose=True):
     total_tests = 0
     ase_better = 0
     pmg_better = 0
+    pmg_gen_better = 0
 
     total_ase_deviation = 0.0
     total_pmg_deviation = 0.0
+    total_pmg_gen_deviation = 0.0
 
     def evaluate(mol_a, mol_b, exact_rmsd, align_mirror_images=False):
-        nonlocal total_tests, ase_better, pmg_better, total_ase_deviation, total_pmg_deviation
+        nonlocal total_tests, ase_better, pmg_better, pmg_gen_better, total_ase_deviation, total_pmg_deviation, total_pmg_gen_deviation
         
         # ALWAYS permute atoms of mol_b before calling match
         indices = np.random.permutation(len(mol_b))
@@ -103,23 +105,47 @@ def run_comparison(verbose=True):
             align_mirror_images=align_mirror_images,
             algorithm="pymatgen"
         )
+
+        rmsd_pmg_gen = match(
+            mol_a.positions, mol_a.numbers,
+            mol_b.positions, mol_b.numbers,
+            align_mirror_images=align_mirror_images,
+            algorithm="pymatgen_genetic"
+        )
         
         # Calculate deviations
         ase_dev = abs(rmsd_ase - exact_rmsd)
         pmg_dev = abs(rmsd_pmg - exact_rmsd)
 
+        if np.isnan(rmsd_pmg_gen):
+            pmg_gen_dev = np.nan
+        else:
+            pmg_gen_dev = abs(rmsd_pmg_gen - exact_rmsd)
+
         total_ase_deviation += ase_dev
         total_pmg_deviation += pmg_dev
+
+        if not np.isnan(pmg_gen_dev):
+            total_pmg_gen_deviation += pmg_gen_dev
 
         total_tests += 1
 
         # Comparison logic based on deviation from exact result
-        if ase_dev < pmg_dev - 1e-6:
-            ase_better += 1
-        elif pmg_dev < ase_dev - 1e-6:
-            pmg_better += 1
+        # Only compare genetic if it's not nan
+        if not np.isnan(pmg_gen_dev):
+            if ase_dev < pmg_dev - 1e-6 and ase_dev < pmg_gen_dev - 1e-6:
+                ase_better += 1
+            elif pmg_dev < ase_dev - 1e-6 and pmg_dev < pmg_gen_dev - 1e-6:
+                pmg_better += 1
+            elif pmg_gen_dev < ase_dev - 1e-6 and pmg_gen_dev < pmg_dev - 1e-6:
+                pmg_gen_better += 1
+        else:
+            if ase_dev < pmg_dev - 1e-6:
+                ase_better += 1
+            elif pmg_dev < ase_dev - 1e-6:
+                pmg_better += 1
 
-        return rmsd_ase, rmsd_pmg
+        return rmsd_ase, rmsd_pmg, rmsd_pmg_gen
 
     for R in R_values:
         if verbose:
@@ -131,8 +157,8 @@ def run_comparison(verbose=True):
         for noise_level in noise_levels:
             if verbose:
                 print(f"\n### Test: Noise level {noise_level} Angs (R={R})")
-                print(f"| {'System':<20} | {'Exact RMSD':<15} | {'RMSD (ASE)':<15} | {'RMSD (Pymatgen)':<15} |")
-                print(f"|{'-'*22}|{'-'*17}|{'-'*17}|{'-'*17}|")
+                print(f"| {'System':<20} | {'Exact RMSD':<15} | {'RMSD (ASE)':<15} | {'RMSD (Pymatgen)':<15} | {'RMSD (Pymatgen Gen)':<19} |")
+                print(f"|{'-'*22}|{'-'*17}|{'-'*17}|{'-'*17}|{'-'*21}|")
 
             for system_name in systems:
                 mol_a = create_system(system_name, R=R)
@@ -146,16 +172,16 @@ def run_comparison(verbose=True):
                 exact_rmsd = compute_exact_rmsd(mol_a, mol_b, align_mirror_images=False)
 
                 # evaluate function takes care of permutation and matching
-                rmsd_ase, rmsd_pmg = evaluate(mol_a, mol_b, exact_rmsd, align_mirror_images=False)
+                rmsd_ase, rmsd_pmg, rmsd_pmg_gen = evaluate(mol_a, mol_b, exact_rmsd, align_mirror_images=False)
 
                 if verbose:
-                    print(f"| {system_name:<20} | {exact_rmsd:<15.6f} | {rmsd_ase:<15.6f} | {rmsd_pmg:<15.6f} |")
+                    print(f"| {system_name:<20} | {exact_rmsd:<15.6f} | {rmsd_ase:<15.6f} | {rmsd_pmg:<15.6f} | {rmsd_pmg_gen:<19.6f} |")
 
         # 2. Tests with mirror images
         if verbose:
             print(f"\n### Test: Mirror Images (align_mirror_images=True, R={R})")
-            print(f"| {'System':<20} | {'Exact RMSD':<15} | {'RMSD (ASE)':<15} | {'RMSD (Pymatgen)':<15} |")
-            print(f"|{'-'*22}|{'-'*17}|{'-'*17}|{'-'*17}|")
+            print(f"| {'System':<20} | {'Exact RMSD':<15} | {'RMSD (ASE)':<15} | {'RMSD (Pymatgen)':<15} | {'RMSD (Pymatgen Gen)':<19} |")
+            print(f"|{'-'*22}|{'-'*17}|{'-'*17}|{'-'*17}|{'-'*21}|")
 
         for system_name in systems:
             mol_a = create_system(system_name, R=R)
@@ -172,13 +198,15 @@ def run_comparison(verbose=True):
             exact_rmsd = compute_exact_rmsd(mol_a, mol_b, align_mirror_images=True)
 
             # evaluate function takes care of permutation and matching
-            rmsd_ase, rmsd_pmg = evaluate(mol_a, mol_b, exact_rmsd, align_mirror_images=True)
+            rmsd_ase, rmsd_pmg, rmsd_pmg_gen = evaluate(mol_a, mol_b, exact_rmsd, align_mirror_images=True)
 
             if verbose:
-                print(f"| {system_name:<20} | {exact_rmsd:<15.6f} | {rmsd_ase:<15.6f} | {rmsd_pmg:<15.6f} |")
+                print(f"| {system_name:<20} | {exact_rmsd:<15.6f} | {rmsd_ase:<15.6f} | {rmsd_pmg:<15.6f} | {rmsd_pmg_gen:<19.6f} |")
 
     avg_ase_dev = total_ase_deviation / total_tests
     avg_pmg_dev = total_pmg_deviation / total_tests
+    # To compute average for pmg_gen safely, assuming not all are nans. If there are NaNs, we could normalize by valid tests.
+    avg_pmg_gen_dev = total_pmg_gen_deviation / total_tests
 
     # Summary
     if verbose:
@@ -187,12 +215,14 @@ def run_comparison(verbose=True):
         print("="*55)
         print(f"In {ase_better} tests out of {total_tests} algorithm ase was closer to the exact result than algorithm pymatgen.")
         print(f"In {pmg_better} tests out of {total_tests} algorithm pymatgen was closer to the exact result than algorithm ase.")
+        print(f"In {pmg_gen_better} tests out of {total_tests} algorithm pymatgen_genetic was closest to the exact result.")
 
         print(f"\nAverage deviation against exact RMSD:")
-        print(f"  - ASE:      {avg_ase_dev:.6f}")
-        print(f"  - Pymatgen: {avg_pmg_dev:.6f}")
+        print(f"  - ASE:              {avg_ase_dev:.6f}")
+        print(f"  - Pymatgen:         {avg_pmg_dev:.6f}")
+        print(f"  - Pymatgen Genetic: {avg_pmg_gen_dev:.6f}")
     
-    return avg_ase_dev, avg_pmg_dev
+    return avg_ase_dev, avg_pmg_dev, avg_pmg_gen_dev
 
 def test_compare_matchers_accuracy():
     """
@@ -201,7 +231,7 @@ def test_compare_matchers_accuracy():
     - Pymatgen average error < 0.02 Angstrom
     - ASE average error < 0.2 Angstrom
     """
-    avg_ase_dev, avg_pmg_dev = run_comparison(verbose=False)
+    avg_ase_dev, avg_pmg_dev, avg_pmg_gen_dev = run_comparison(verbose=False)
     
     assert avg_pmg_dev < 0.02, f"Pymatgen average deviation {avg_pmg_dev:.6f} exceeds 0.02!"
     assert avg_ase_dev < 0.2, f"ASE average deviation {avg_ase_dev:.6f} exceeds 0.2!"
