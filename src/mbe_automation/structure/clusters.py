@@ -648,6 +648,7 @@ def identify_molecules(
     """
     Identify and extract molecules from a periodic structure. Group nonunique molecules into symmetry-unique subsets based on structure and potential energy.
     """
+    assert crystal.periodic
 
     if bonding_algo is None:
         bonding_algo = CutOffDictNN.from_preset("vesta_2019")
