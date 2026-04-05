@@ -647,6 +647,18 @@ def identify_molecules(
 ) -> MolecularComposition:
     """
     Identify and extract molecules from a periodic structure. Group nonunique molecules into symmetry-unique subsets based on structure and potential energy.
+
+    Args:
+        crystal: The periodic structure to process.
+        calculator: An optional ASE calculator to compute the potential energy of individual molecules.
+        energy_thresh: Threshold in eV/atom for considering two molecules to have the same potential energy.
+        rmsd_thresh: Threshold in Å for considering two molecules structurally identical based on RMSD.
+        assert_identical_composition: If True, raises an error if the identified molecules do not share identical atomic compositions.
+        bonding_algo: Optional pymatgen bonding algorithm to determine connectivity; defaults to CutOffDictNN with "vesta_2019" preset.
+        reference_frame_index: The index of the frame to use as reference, defaults to 0.
+
+    Returns:
+        MolecularComposition dataclass containing the grouped molecular representations.
     """
     assert crystal.periodic
 

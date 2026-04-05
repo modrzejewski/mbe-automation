@@ -28,6 +28,7 @@ from .api import (
     Trajectory,
     MolecularCrystal,
     FiniteSubsystem,
+    MolecularComposition,
     Dataset,
     AtomicReference,
     AnySystem,
