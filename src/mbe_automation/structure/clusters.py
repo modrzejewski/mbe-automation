@@ -45,6 +45,7 @@ class MolecularComposition:
     n_molecules_nonunique: int
     molecules_unique: List[mbe_automation.storage.Structure] | None = None
     n_molecules_unique_energy: int | None = None
+    n_molecules_unique_rmsd: int | None = None
     n_molecules_unique: int | None = None
 
 
@@ -681,6 +682,12 @@ def identify_molecules(
         calculator=calculator,
     )
 
+    rmsd_groups = _group_molecules_by_rmsd(
+        molecules=molecules_nonunique,
+        thresh=rmsd_thresh,
+    )
+    n_molecules_unique_rmsd = len(rmsd_groups)
+
     molecules_unique = None
     n_molecules_unique = None
     n_molecules_unique_energy = None
@@ -692,11 +699,15 @@ def identify_molecules(
             rmsd_thresh=rmsd_thresh,
         )
         n_molecules_unique = len(molecules_unique)
+    else:
+        molecules_unique = [molecules_nonunique[group[0]] for group in rmsd_groups]
+        n_molecules_unique = n_molecules_unique_rmsd
 
     print(f"Nonunique molecules:  {len(molecules_nonunique)}/unit cell")
-    if molecules_unique is not None:
+    if calculator is not None:
         print(f"Unique molecules (energy criterion): {n_molecules_unique_energy}/unit cell")
-        print(f"Unique molecules (rmsd criterion):   {n_molecules_unique}/unit cell")
+    print(f"Unique molecules (rmsd criterion):   {n_molecules_unique_rmsd}/unit cell")
+    print(f"Unique molecules (combined):         {n_molecules_unique}/unit cell")
 
     return MolecularComposition(
         molecular_crystal=molecular_crystal,
@@ -705,6 +716,7 @@ def identify_molecules(
         molecules_unique=molecules_unique,
         n_molecules_unique=n_molecules_unique,
         n_molecules_unique_energy=n_molecules_unique_energy,
+        n_molecules_unique_rmsd=n_molecules_unique_rmsd,
     )
 
 
