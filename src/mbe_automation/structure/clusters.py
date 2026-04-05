@@ -664,7 +664,11 @@ def _unique_molecules_combined_criteria(
     return unique_molecules, n_equivalent_list
 
 
-def _display_unique_molecules(molecules_unique: List[mbe_automation.storage.Structure], n_equivalent: npt.NDArray[np.int64], calculator_provided: bool):
+def _display_unique_molecules(
+        molecules_unique: List[mbe_automation.storage.Structure],
+        n_equivalent: npt.NDArray[np.int64],
+        calculator_provided: bool,
+):
     print("\nUnique Molecules:")
 
     if calculator_provided:
