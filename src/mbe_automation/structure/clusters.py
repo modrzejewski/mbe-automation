@@ -41,7 +41,7 @@ from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
 @dataclass
 class MolecularComposition:
     """
-    Store molecular composition of a periodic crystal structure.
+    Molecular composition of a periodic crystal structure.
     """
     molecular_crystal: mbe_automation.storage.core.MolecularCrystal
     molecules_nonunique: List[mbe_automation.storage.Structure]
