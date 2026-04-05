@@ -581,25 +581,6 @@ def _extract_nonunique_molecules(
 
 from typing import Tuple
 
-def _are_geometries_identical(
-        molecule_a: mbe_automation.storage.Structure,
-        molecule_b: mbe_automation.storage.Structure,
-        rmsd_thresh: float
-) -> bool:
-    if len(molecule_a.atomic_numbers) != len(molecule_b.atomic_numbers):
-        return False
-
-    if not np.array_equal(np.sort(molecule_a.atomic_numbers), np.sort(molecule_b.atomic_numbers)):
-        return False
-
-    rmsd = mbe_automation.structure.molecule.match(
-        positions_a=molecule_a.positions,
-        atomic_numbers_a=molecule_a.atomic_numbers,
-        positions_b=molecule_b.positions,
-        atomic_numbers_b=molecule_b.atomic_numbers,
-    )
-    return rmsd < rmsd_thresh
-
 def _extract_unique_molecules(
         molecules_nonunique: List[mbe_automation.storage.Structure],
         energy_thresh: float = 1.0E-5, # eV/atom
@@ -615,18 +596,34 @@ def _extract_unique_molecules(
     
     unique_molecules = []
     for equivalent_molecules in grouped_molecules:
-        unique_in_group = []
-        for mol_idx in equivalent_molecules:
-            molecule = molecules_nonunique[mol_idx]
-            is_unique = not any(
-                _are_geometries_identical(molecule, ref_molecule, rmsd_thresh)
-                for ref_molecule in unique_in_group
-            )
+        n_mols = len(equivalent_molecules)
+        adjacency_matrix = np.zeros((n_mols, n_mols), dtype=bool)
 
-            if is_unique:
-                unique_in_group.append(molecule)
+        # Build adjacency matrix based on RMSD matches
+        for i in range(n_mols):
+            adjacency_matrix[i, i] = True
+            mol_i = molecules_nonunique[equivalent_molecules[i]]
+            for j in range(i + 1, n_mols):
+                mol_j = molecules_nonunique[equivalent_molecules[j]]
+                rmsd = mbe_automation.structure.molecule.match(
+                    positions_a=mol_i.positions,
+                    atomic_numbers_a=mol_i.atomic_numbers,
+                    positions_b=mol_j.positions,
+                    atomic_numbers_b=mol_j.atomic_numbers,
+                )
+                if not np.isnan(rmsd) and rmsd < rmsd_thresh:
+                    adjacency_matrix[i, j] = True
+                    adjacency_matrix[j, i] = True
 
-        unique_molecules.extend(unique_in_group)
+        # Find connected components (each component is a unique molecule)
+        n_components, labels = sparse.csgraph.connected_components(
+            adjacency_matrix, directed=False, return_labels=True
+        )
+
+        # Pick one representative from each component
+        for comp_idx in range(n_components):
+            rep_idx = np.where(labels == comp_idx)[0][0]
+            unique_molecules.append(molecules_nonunique[equivalent_molecules[rep_idx]])
 
     return unique_molecules, n_unique_molecules_energy
 

@@ -149,8 +149,17 @@ def match(
     lower RMSDs in the tesing script. Thus, we select it
     as the default algorithm.
 
-    Assertions: equal numbers of atoms, equal elemental compositions.
+    Returns np.nan if the atomic compositions (number and types of atoms) differ.
     """
+
+    if len(atomic_numbers_a) != len(atomic_numbers_b):
+        return np.nan
+
+    max_z = max(np.max(atomic_numbers_a), np.max(atomic_numbers_b))
+    comp_a = np.bincount(atomic_numbers_a, minlength=max_z + 1)
+    comp_b = np.bincount(atomic_numbers_b, minlength=max_z + 1)
+    if not np.array_equal(comp_a, comp_b):
+        return np.nan
 
     if algorithm is None:
         algorithm = "pymatgen"
