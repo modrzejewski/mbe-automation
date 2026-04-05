@@ -53,6 +53,33 @@ class MolecularComposition:
     rmsd_thresh: float
     energy_thresh: float | None = None
 
+    def __init__(
+            self,
+            crystal: mbe_automation.storage.Structure | None = None,
+            calculator: ASECalculator | None = None,
+            energy_thresh: float = 1.0E-5, # eV/atom
+            rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
+            assert_identical_composition: bool = False,
+            bonding_algo: NearNeighbors | None = None,
+            reference_frame_index: int = 0,
+            **kwargs
+    ):
+        if crystal is not None:
+            res = identify_molecules(
+                crystal=crystal,
+                calculator=calculator,
+                energy_thresh=energy_thresh,
+                rmsd_thresh=rmsd_thresh,
+                assert_identical_composition=assert_identical_composition,
+                bonding_algo=bonding_algo,
+                reference_frame_index=reference_frame_index,
+            )
+            for k, v in vars(res).items():
+                setattr(self, k, v)
+        else:
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
 
 def Label(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
@@ -654,8 +681,8 @@ def identify_molecules(
         energy_thresh: Threshold in eV/atom for considering two molecules to have the same potential energy.
         rmsd_thresh: Threshold in Å for considering two molecules structurally identical based on RMSD.
         assert_identical_composition: If True, raises an error if the identified molecules do not share identical atomic compositions.
-        bonding_algo: Optional pymatgen bonding algorithm to determine connectivity; defaults to CutOffDictNN with "vesta_2019" preset.
-        reference_frame_index: The index of the frame to use as reference, defaults to 0.
+        bonding_algo: Optional pymatgen bonding algorithm to determine connectivity.
+        reference_frame_index: The index of the frame to use as reference.
 
     Returns:
         MolecularComposition dataclass containing the grouped molecular representations.
@@ -722,17 +749,17 @@ def identify_molecules(
     print(f"Unique molecules (rmsd criterion):   {n_molecules_unique_rmsd}/unit cell")
     print(f"Unique molecules (combined):         {n_molecules_unique}/unit cell")
 
-    return MolecularComposition(
-        molecular_crystal=molecular_crystal,
-        molecules_nonunique=molecules_nonunique,
-        n_molecules_nonunique=len(molecules_nonunique),
-        molecules_unique=molecules_unique,
-        n_molecules_unique=n_molecules_unique,
-        n_molecules_unique_energy=n_molecules_unique_energy,
-        n_molecules_unique_rmsd=n_molecules_unique_rmsd,
-        energy_thresh=energy_thresh if calculator is not None else None,
-        rmsd_thresh=rmsd_thresh,
-    )
+    res = MolecularComposition.__new__(MolecularComposition)
+    res.molecular_crystal=molecular_crystal
+    res.molecules_nonunique=molecules_nonunique
+    res.n_molecules_nonunique=len(molecules_nonunique)
+    res.molecules_unique=molecules_unique
+    res.n_molecules_unique=n_molecules_unique
+    res.n_molecules_unique_energy=n_molecules_unique_energy
+    res.n_molecules_unique_rmsd=n_molecules_unique_rmsd
+    res.energy_thresh=energy_thresh if calculator is not None else None
+    res.rmsd_thresh=rmsd_thresh
+    return res
 
 
 def extract_relaxed_unique_molecules(
