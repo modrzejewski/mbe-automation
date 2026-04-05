@@ -812,13 +812,15 @@ def identify_molecules(
 
         if n_molecules_unique_energy != n_molecules_unique_rmsd:
             print(
-                "\nNote: The number of unique molecules in the unit "
-                "cell differs depending on the RMSD and energy criteria. Assuming the structure "
-                "is not distorted, this can occur if the unit cell contains a mixture of isomers."
+                "\n Note: The number of unique molecules in the unit cell differs \n"
+                "depending on the RMSD and energy criteria. Assuming the structure \n"
+                "is not distorted, this can occur if the unit cell contains a mixture \n"
+                "of isomers."
             )
 
     if match_mode == "energy_only":
-        print("\nNote: Energy-only matching will not recognize different isomers if the energy model yields close energies.")
+        print("\nNote: Energy-only matching will not recognize different isomers \n"
+              "if the energy model yields close energies.")
 
     _display_unique_molecules(
         molecules_unique,
