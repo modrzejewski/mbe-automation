@@ -735,6 +735,7 @@ def identify_molecules(
 
     mbe_automation.common.display.framed("Molecule detection")
     print(f"bonding_algo                {type(bonding_algo).__name__}")
+    print(f"match_mode                  {match_mode}")
     if calculator is not None:
         print(f"energy_thresh               {energy_thresh} eV/atom")
     print(f"rmsd_thresh                 {rmsd_thresh} Å")
