@@ -40,9 +40,8 @@ The following table summarizes the key methods available across these classes.
 | :--- | :--- | :--- |
 | **`read`** | Method to load the object from an HDF5 dataset. | `AtomicReference`, `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem`, `AnySystem` |
 | **`save`** | Saves the object to an HDF5 dataset. Supports `update_properties` mode to update energies, forces, and feature vectors (if missing), without overwriting geometry. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
-| **`from_xyz_file`** | Creates a structure object from an XYZ file. | `Structure` |
+| **`from_xyz_file`** | Creates a structure object from an XYZ file (for `Structure`), or loads a composition and performs molecular identification (for `MolecularComposition`). | `Structure`, `MolecularComposition` |
 | **`from_atomic_numbers`** | Creates an `AtomicReference` from a list of atomic numbers and a calculator. | `AtomicReference` |
-| **`from_xyz_file`** | Loads a composition from an XYZ file and performs molecular identification. | `MolecularComposition` |
 | **`subsample`** | Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`select`** | Returns a new object containing only the specified frames (by index). | `Structure`, `Trajectory`, `FiniteSubsystem` |
 | **`run`** | Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. | `Structure`, `Trajectory`, `FiniteSubsystem` |
