@@ -54,6 +54,27 @@ class MolecularComposition:
     rmsd_thresh: float
     energy_thresh: float | None = None
 
+    def extract_relaxed_unique_molecules(
+            self,
+            dataset: str,
+            key: str,
+            calculator: ASECalculator,
+            config: Minimum,
+            work_dir: Path | str = Path("./")
+    ) -> None:
+        """
+        Extract nonequivalent molecules from a periodic cell and save the corresponding
+        structures to a dataset file.
+        """
+        _extract_relaxed_unique_molecules(
+            composition=self,
+            dataset=dataset,
+            key=key,
+            calculator=calculator,
+            config=config,
+            work_dir=work_dir,
+        )
+
 
 def Label(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
@@ -667,7 +688,7 @@ def identify_molecules(
     assert crystal.periodic
 
     if energy_thresh is None:
-        energy_thresh = 1.0E-4
+        energy_thresh = 1.0E-3
     if rmsd_thresh is None:
         rmsd_thresh = 0.1
 
@@ -745,32 +766,18 @@ def identify_molecules(
     )
 
 
-def extract_relaxed_unique_molecules(
+def _extract_relaxed_unique_molecules(
+        composition: MolecularComposition,
         dataset: str,
         key: str,
-        crystal: mbe_automation.storage.Structure,
         calculator: ASECalculator,
         config: Minimum,
-        energy_thresh: float | None = None, # eV/atom
-        rmsd_thresh: float | None = None, # Angs
-        bonding_algo: NearNeighbors | None = None,
-        reference_frame_index: int = 0,
         work_dir: Path | str = Path("./")
 ) -> None:
     """
     Extract nonequivalent molecules from a periodic cell and save the corresponding
     structures to a dataset file.
     """
-    
-    composition = identify_molecules(
-        crystal=crystal,
-        calculator=calculator,
-        energy_thresh=energy_thresh,
-        rmsd_thresh=rmsd_thresh,
-        bonding_algo=bonding_algo,
-        reference_frame_index=reference_frame_index,
-    )
-
     unique_molecules = composition.molecules_unique
     n_unique_molecules = composition.n_molecules_unique
     

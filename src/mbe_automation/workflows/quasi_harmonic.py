@@ -65,13 +65,17 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         dataset=config.dataset,
         key=f"{config.root_key}/structures/crystal[input]",
     )
-    mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
-        dataset=config.dataset,
-        key=f"{config.root_key}/structures",
+    composition = mbe_automation.structure.clusters.identify_molecules(
         crystal=mbe_automation.storage.from_ase_atoms(unit_cell),
         calculator=config.calculator,
-        config=config.relaxation,
         energy_thresh=config.unique_molecules_energy_thresh,
+        rmsd_thresh=config.unique_molecules_rmsd_thresh,
+    )
+    composition.extract_relaxed_unique_molecules(
+        dataset=config.dataset,
+        key=f"{config.root_key}/structures",
+        calculator=config.calculator,
+        config=config.relaxation,
         work_dir=geom_opt_dir,
     )
 
