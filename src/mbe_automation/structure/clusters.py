@@ -278,12 +278,16 @@ def _generate_covalent_bond_graph(
     ).make_supercell([3, 3, 3])
     supercell_to_unit_cell = np.array(supercell.site_properties["original_index"])
 
-    print("Computing graph of covalent bonds...", flush=True)
+    import time
+    print("Computing covalent bonds graph...", end="", flush=True)
+    start_time = time.time()
     structure_graph = pymatgen.analysis.graphs.StructureGraph.from_local_env_strategy(
         structure=supercell,
         strategy=bonding_algo
     )
-    print("Graph completed", flush=True)
+    end_time = time.time()
+    delta_tau = end_time - start_time
+    print(f" (Δτ={delta_tau:.2f} s)", flush=True)
     
     components = list(networkx.weakly_connected_components(structure_graph.graph))
     masses = np.array([site.specie.atomic_mass for site in supercell.sites])
@@ -639,8 +643,8 @@ def _unique_molecules_combined_criteria(
 def identify_molecules(
         crystal: mbe_automation.storage.Structure,
         calculator: ASECalculator | None = None,
-        energy_thresh: float = 1.0E-5, # eV/atom
-        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
+        energy_thresh: float | None = None, # eV/atom
+        rmsd_thresh: float | None = None, # Angs
         assert_identical_composition: bool = False,
         bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
@@ -662,6 +666,11 @@ def identify_molecules(
     """
     assert crystal.periodic
 
+    if energy_thresh is None:
+        energy_thresh = 1.0E-4
+    if rmsd_thresh is None:
+        rmsd_thresh = 0.1
+
     if bonding_algo is None:
         bonding_algo = CutOffDictNN.from_preset("vesta_2019")
 
@@ -669,7 +678,7 @@ def identify_molecules(
     print(f"bonding_algo                {type(bonding_algo).__name__}")
     if calculator is not None:
         print(f"energy_thresh               {energy_thresh} eV/atom")
-        print(f"rmsd_thresh                 {rmsd_thresh} Å")
+    print(f"rmsd_thresh                 {rmsd_thresh} Å")
     print(f"assert_identical_comp       {assert_identical_composition}")
     if crystal.n_frames > 1:
         print(f"reference_frame_index       {reference_frame_index}")
@@ -720,7 +729,8 @@ def identify_molecules(
     if calculator is not None:
         print(f"Unique molecules (energy criterion): {n_molecules_unique_energy}/unit cell")
     print(f"Unique molecules (rmsd criterion):   {n_molecules_unique_rmsd}/unit cell")
-    print(f"Unique molecules (combined):         {n_molecules_unique}/unit cell")
+    if calculator is not None:
+        print(f"Unique molecules (combined):         {n_molecules_unique}/unit cell")
 
     return MolecularComposition(
         molecular_crystal=molecular_crystal,
@@ -741,8 +751,8 @@ def extract_relaxed_unique_molecules(
         crystal: mbe_automation.storage.Structure,
         calculator: ASECalculator,
         config: Minimum,
-        energy_thresh: float = 1.0E-5, # eV/atom
-        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
+        energy_thresh: float | None = None, # eV/atom
+        rmsd_thresh: float | None = None, # Angs
         bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
         work_dir: Path | str = Path("./")

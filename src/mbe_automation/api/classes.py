@@ -62,8 +62,8 @@ class MolecularComposition(_MolecularComposition):
             self,
             crystal: Structure,
             calculator: ASECalculator | None = None,
-            energy_thresh: float = 1.0E-5, # eV/atom
-            rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
+            energy_thresh: float | None = None, # eV/atom
+            rmsd_thresh: float | None = None, # Angs
             assert_identical_composition: bool = False,
             bonding_algo: NearNeighbors | None = None,
             reference_frame_index: int = 0,
@@ -84,8 +84,8 @@ class MolecularComposition(_MolecularComposition):
             cls,
             file_path: str | Path,
             calculator: ASECalculator | None = None,
-            energy_thresh: float = 1.0E-5, # eV/atom
-            rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
+            energy_thresh: float | None = None, # eV/atom
+            rmsd_thresh: float | None = None, # Angs
             assert_identical_composition: bool = False,
             bonding_algo: NearNeighbors | None = None,
     ) -> MolecularComposition:
@@ -779,7 +779,8 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
     def identify_molecules(
             self,
             calculator: ASECalculator | None = None,
-            energy_thresh: float = 1.0E-5, # eV/atom
+            energy_thresh: float | None = None, # eV/atom
+            rmsd_thresh: float | None = None, # Angs
             assert_identical_composition: bool = False,
             bonding_algo: NearNeighbors | None = None,
             reference_frame_index: int = 0,
@@ -806,6 +807,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             crystal=self,
             calculator=calculator,
             energy_thresh=energy_thresh,
+            rmsd_thresh=rmsd_thresh,
             assert_identical_composition=assert_identical_composition,
             bonding_algo=bonding_algo,
             reference_frame_index=reference_frame_index,
