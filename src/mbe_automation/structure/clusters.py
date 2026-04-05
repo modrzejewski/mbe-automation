@@ -579,51 +579,60 @@ def _extract_nonunique_molecules(
     return molecules
 
 
-from typing import Tuple
+def _group_molecules_by_rmsd(
+        molecules: List[mbe_automation.storage.Structure],
+        thresh: float = 0.01,
+) -> list[npt.NDArray[np.int64]]:
+    n_mols = len(molecules)
+    if n_mols == 0:
+        return []
+
+    adjacency_matrix = np.zeros((n_mols, n_mols), dtype=bool)
+    for i in range(n_mols):
+        adjacency_matrix[i, i] = True
+        for j in range(i + 1, n_mols):
+            rmsd = mbe_automation.structure.molecule.match(
+                positions_a=molecules[i].positions,
+                atomic_numbers_a=molecules[i].atomic_numbers,
+                positions_b=molecules[j].positions,
+                atomic_numbers_b=molecules[j].atomic_numbers,
+            )
+            if not np.isnan(rmsd) and rmsd < thresh:
+                adjacency_matrix[i, j] = True
+                adjacency_matrix[j, i] = True
+
+    n_components, labels = sparse.csgraph.connected_components(
+        adjacency_matrix, directed=False, return_labels=True
+    )
+
+    grouped_indices = []
+    for comp_idx in range(n_components):
+        grouped_indices.append(np.where(labels == comp_idx)[0])
+
+    return grouped_indices
 
 def _extract_unique_molecules(
         molecules_nonunique: List[mbe_automation.storage.Structure],
         energy_thresh: float = 1.0E-5, # eV/atom
         rmsd_thresh: float = 0.01, # Angs
-) -> Tuple[list[mbe_automation.storage.Structure], int]:
+) -> tuple[list[mbe_automation.storage.Structure], int]:
     
-    grouped_molecules = _group_molecules_by_energy(
+    energy_groups = _group_molecules_by_energy(
         molecules=molecules_nonunique,
         thresh=energy_thresh,
     )
-    n_unique_molecules_energy = len(grouped_molecules)
+    n_unique_molecules_energy = len(energy_groups)
     assert n_unique_molecules_energy > 0
     
     unique_molecules = []
-    for equivalent_molecules in grouped_molecules:
-        n_mols = len(equivalent_molecules)
-        adjacency_matrix = np.zeros((n_mols, n_mols), dtype=bool)
-
-        # Build adjacency matrix based on RMSD matches
-        for i in range(n_mols):
-            adjacency_matrix[i, i] = True
-            mol_i = molecules_nonunique[equivalent_molecules[i]]
-            for j in range(i + 1, n_mols):
-                mol_j = molecules_nonunique[equivalent_molecules[j]]
-                rmsd = mbe_automation.structure.molecule.match(
-                    positions_a=mol_i.positions,
-                    atomic_numbers_a=mol_i.atomic_numbers,
-                    positions_b=mol_j.positions,
-                    atomic_numbers_b=mol_j.atomic_numbers,
-                )
-                if not np.isnan(rmsd) and rmsd < rmsd_thresh:
-                    adjacency_matrix[i, j] = True
-                    adjacency_matrix[j, i] = True
-
-        # Find connected components (each component is a unique molecule)
-        n_components, labels = sparse.csgraph.connected_components(
-            adjacency_matrix, directed=False, return_labels=True
+    for group_indices in energy_groups:
+        group_molecules = [molecules_nonunique[i] for i in group_indices]
+        rmsd_groups = _group_molecules_by_rmsd(
+            molecules=group_molecules,
+            thresh=rmsd_thresh,
         )
-
-        # Pick one representative from each component
-        for comp_idx in range(n_components):
-            rep_idx = np.where(labels == comp_idx)[0][0]
-            unique_molecules.append(molecules_nonunique[equivalent_molecules[rep_idx]])
+        for rmsd_group_indices in rmsd_groups:
+            unique_molecules.append(group_molecules[rmsd_group_indices[0]])
 
     return unique_molecules, n_unique_molecules_energy
 
