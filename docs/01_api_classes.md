@@ -9,6 +9,7 @@ from mbe_automation import (
     Structure,
     Trajectory,
     MolecularCrystal,
+    MolecularComposition,
     FiniteSubsystem,
     Dataset,
     AnySystem
@@ -25,6 +26,7 @@ This chapter provides an overview of the physical content each class represents 
 | **`Structure`** | Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single frame or a sequence of frames of equal size (e.g., from a short trajectory or a collection of configurations). |
 | **`Trajectory`** | Time evolution of an atomistic system generated with molecular dynamics. Includes time-dependent properties like positions, velocities, kinetic energies, and thermodynamic variables. |
 | **`MolecularCrystal`** | Periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). Serves as an intermediate necessary for finite cluster extraction. |
+| **`MolecularComposition`** | Decomposition of the periodic unit cell into unique and non-unique molecules. |
 | **`FiniteSubsystem`** | Finite clusters of molecules extracted from a periodic structure or trajectory. Includes all geometric information of `Structure`, supplemented with extra data which enables tracing back the cleaved molecules to their positions in the cell of the original `MolecularCrystal`. Used to generate training data for fragment-based methods. |
 | **`Dataset`** | A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets. |
 | **`AtomicReference`** | Isolated atom energies required to generate reference energy for machine-learning interatomic potentials. Can store data at multiple levels of theory. |
@@ -38,7 +40,7 @@ The following table summarizes the key methods available across these classes.
 | :--- | :--- | :--- |
 | **`read`** | Method to load the object from an HDF5 dataset. | `AtomicReference`, `ForceConstants`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem`, `AnySystem` |
 | **`save`** | Saves the object to an HDF5 dataset. Supports `update_properties` mode to update energies, forces, and feature vectors (if missing), without overwriting geometry. | `AtomicReference`, `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
-| **`from_xyz_file`** | Creates a structure object from an XYZ file. | `Structure` |
+| **`from_xyz_file`** | Creates a structure object from an XYZ file (for `Structure`), or loads a composition and performs molecular identification (for `MolecularComposition`). | `Structure`, `MolecularComposition` |
 | **`from_atomic_numbers`** | Creates an `AtomicReference` from a list of atomic numbers and a calculator. | `AtomicReference` |
 | **`subsample`** | Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). | `Structure`, `Trajectory`, `MolecularCrystal`, `FiniteSubsystem` |
 | **`select`** | Returns a new object containing only the specified frames (by index). | `Structure`, `Trajectory`, `FiniteSubsystem` |

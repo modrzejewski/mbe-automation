@@ -33,6 +33,9 @@ import mbe_automation.calculators
 from mbe_automation.calculators import CALCULATORS
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
+from mbe_automation.structure.clusters import (
+    MolecularComposition as _MolecularComposition,
+)
 from mbe_automation.storage.core import (
     DATA_FOR_TRAINING,
     CALCULATION_STATUS_UNDEFINED,
@@ -53,6 +56,52 @@ if TYPE_CHECKING:
     from mbe_automation.dynamics.harmonic.refinement import NormalModeRefinement
 
 @dataclass(kw_only=True)
+class MolecularComposition(_MolecularComposition):
+
+    def __init__(
+            self,
+            crystal: Structure,
+            calculator: ASECalculator | None = None,
+            energy_thresh: float = 1.0E-5, # eV/atom
+            rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
+            assert_identical_composition: bool = False,
+            bonding_algo: NearNeighbors | None = None,
+            reference_frame_index: int = 0,
+    ):
+        result = mbe_automation.structure.clusters.identify_molecules(
+            crystal=crystal,
+            calculator=calculator,
+            energy_thresh=energy_thresh,
+            rmsd_thresh=rmsd_thresh,
+            assert_identical_composition=assert_identical_composition,
+            bonding_algo=bonding_algo,
+            reference_frame_index=reference_frame_index,
+        )
+        super().__init__(**vars(result))
+
+    @classmethod
+    def from_xyz_file(
+            cls,
+            file_path: str | Path,
+            calculator: ASECalculator | None = None,
+            energy_thresh: float = 1.0E-5, # eV/atom
+            rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE, # Angs
+            assert_identical_composition: bool = False,
+            bonding_algo: NearNeighbors | None = None,
+    ) -> MolecularComposition:
+        crystal = Structure.from_xyz_file(
+            read_path=file_path,
+        )
+        return cls(
+            crystal=crystal,
+            calculator=calculator,
+            energy_thresh=energy_thresh,
+            rmsd_thresh=rmsd_thresh,
+            assert_identical_composition=assert_identical_composition,
+            bonding_algo=bonding_algo,
+        )
+
+
 class EOSMetadata(_EOSMetadata):
     @classmethod
     def read(cls, dataset: str, key: str) -> EOSMetadata:
