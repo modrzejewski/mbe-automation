@@ -753,6 +753,9 @@ def identify_molecules(
     if calculator is not None:
         print(f"Unique molecules (combined):         {n_molecules_unique}/unit cell")
 
+        if n_molecules_unique_energy != n_molecules_unique_rmsd:
+            print("\nNote: The number of unique molecules in the unit cell differs depending on the RMSD and energy criteria. Assuming the structure is not distorted, this can occur if the unit cell contains a mixture of isomers.")
+
     return MolecularComposition(
         molecular_crystal=molecular_crystal,
         molecules_nonunique=molecules_nonunique,
