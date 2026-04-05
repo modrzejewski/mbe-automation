@@ -125,7 +125,7 @@ def _match_pymatgen(
         _, _, _, rmsd_mirror = algo.match(molecule_b_mirror)
         rmsd = min(rmsd, rmsd_mirror)
     #
-    # pymagen computes rmsd of flattened vectors of dimension 3*n_atoms,
+    # pymatgen computes rmsd of flattened vectors of dimension 3*n_atoms,
     # whereas we would like to have Sqrt(1/n_atoms Sum_i(r_i - r'_i)**2)
     #
     rmsd = np.sqrt(3.0) * rmsd 
