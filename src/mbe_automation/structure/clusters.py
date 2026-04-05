@@ -41,7 +41,7 @@ from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
 @dataclass
 class MolecularComposition:
     """
-    Molecular composition of a periodic crystal structure.
+    Molecular composition of a periodic structure.
     """
     molecular_crystal: mbe_automation.storage.core.MolecularCrystal
     molecules_nonunique: List[mbe_automation.storage.Structure]
@@ -653,7 +653,7 @@ def identify_molecules(
         reference_frame_index: int = 0,
 ) -> MolecularComposition:
     """
-    Identify and extract molecules from a periodic crystal. Group nonunique molecules into symmetry-unique subsets based on structure and potential energy.
+    Identify and extract molecules from a periodic structure. Group nonunique molecules into symmetry-unique subsets based on structure and potential energy.
     """
 
     if bonding_algo is None:
