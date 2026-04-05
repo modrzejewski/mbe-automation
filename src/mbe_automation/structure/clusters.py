@@ -661,6 +661,33 @@ def _unique_molecules_combined_criteria(
     return unique_molecules
 
 
+def _display_unique_molecules(molecules_unique: List[mbe_automation.storage.Structure], calculator_provided: bool):
+    print("\nUnique Molecules:")
+
+    if calculator_provided:
+        header = f"{'index':>7} | {'n_atoms':>7} | {'formula':<15} | {'energy (eV/atom)':<16}"
+    else:
+        header = f"{'index':>7} | {'n_atoms':>7} | {'formula':<15}"
+
+    separator = "-" * len(header)
+    print(header)
+    print(separator)
+
+    for i, mol in enumerate(molecules_unique):
+        pmg_mol = mol.to_pymatgen()
+        comp = pmg_mol.composition.alphabetical_formula
+        n_atoms = len(pmg_mol)
+
+        if calculator_provided:
+            energy_val = mol.E_pot[0]
+            energy = f"{energy_val:.5f}"
+            print(f"{i:>7} | {n_atoms:>7} | {comp:<15} | {energy:<16}")
+        else:
+            print(f"{i:>7} | {n_atoms:>7} | {comp:<15}")
+
+    print()
+
+
 def identify_molecules(
         crystal: mbe_automation.storage.Structure,
         calculator: ASECalculator | None = None,
@@ -755,6 +782,8 @@ def identify_molecules(
 
         if n_molecules_unique_energy != n_molecules_unique_rmsd:
             print("\nNote: The number of unique molecules in the unit cell differs depending on the RMSD and energy criteria. Assuming the structure is not distorted, this can occur if the unit cell contains a mixture of isomers.")
+
+    _display_unique_molecules(molecules_unique, calculator_provided=(calculator is not None))
 
     return MolecularComposition(
         molecular_crystal=molecular_crystal,
