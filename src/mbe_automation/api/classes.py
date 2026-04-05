@@ -67,6 +67,7 @@ class MolecularComposition(_MolecularComposition):
             assert_identical_composition: bool = False,
             bonding_algo: NearNeighbors | None = None,
             reference_frame_index: int = 0,
+            match_mode: Literal["energy_only", "rmsd_only", "combined"] = "energy_only",
     ):
         result = mbe_automation.structure.clusters.identify_molecules(
             crystal=crystal,
@@ -76,6 +77,7 @@ class MolecularComposition(_MolecularComposition):
             assert_identical_composition=assert_identical_composition,
             bonding_algo=bonding_algo,
             reference_frame_index=reference_frame_index,
+            match_mode=match_mode,
         )
         super().__init__(**vars(result))
 
@@ -88,6 +90,7 @@ class MolecularComposition(_MolecularComposition):
             rmsd_thresh: float | None = None, # Angs
             assert_identical_composition: bool = False,
             bonding_algo: NearNeighbors | None = None,
+            match_mode: Literal["energy_only", "rmsd_only", "combined"] = "energy_only",
     ) -> MolecularComposition:
         crystal = Structure.from_xyz_file(
             read_path=file_path,
@@ -99,6 +102,7 @@ class MolecularComposition(_MolecularComposition):
             rmsd_thresh=rmsd_thresh,
             assert_identical_composition=assert_identical_composition,
             bonding_algo=bonding_algo,
+            match_mode=match_mode,
         )
 
 
@@ -784,6 +788,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             assert_identical_composition: bool = False,
             bonding_algo: NearNeighbors | None = None,
             reference_frame_index: int = 0,
+            match_mode: Literal["energy_only", "rmsd_only", "combined"] = "energy_only",
     ) -> mbe_automation.structure.clusters.MolecularComposition:
         """
         Identify molecules in the periodic structure, returning a MolecularComposition
@@ -796,6 +801,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             assert_identical_composition: Raise error if molecules with varying composition are found.
             bonding_algo: NearNeighbors strategy for generating covalent bond graph.
             reference_frame_index: Which frame to use as reference geometry for bond detection.
+            match_mode: The matching mode to use: "energy_only", "rmsd_only", or "combined".
 
         Returns:
             MolecularComposition dataclass containing identified components.
@@ -811,6 +817,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             assert_identical_composition=assert_identical_composition,
             bonding_algo=bonding_algo,
             reference_frame_index=reference_frame_index,
+            match_mode=match_mode,
         )
 
         composition.molecular_crystal = MolecularCrystal(**vars(composition.molecular_crystal))
