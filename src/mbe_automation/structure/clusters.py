@@ -49,9 +49,10 @@ class MolecularComposition:
     n_molecules_nonunique: int
     molecules_unique: List[mbe_automation.storage.Structure]
     n_molecules_unique: int
-    n_molecules_unique_rmsd: int
+    n_equivalent: npt.NDArray[np.int64]
+    n_molecules_unique_rmsd: int | None = None
     n_molecules_unique_energy: int | None = None
-    rmsd_thresh: float
+    rmsd_thresh: float | None = None
     energy_thresh: float | None = None
 
     def extract_relaxed_unique_molecules(
@@ -646,9 +647,10 @@ def _unique_molecules_combined_criteria(
         molecules_nonunique: List[mbe_automation.storage.Structure],
         energy_groups: list[npt.NDArray[np.int64]],
         rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE,
-) -> list[mbe_automation.storage.Structure]:
+) -> tuple[list[mbe_automation.storage.Structure], list[int]]:
     
     unique_molecules = []
+    n_equivalent_list = []
     for group_indices in energy_groups:
         group_molecules = [molecules_nonunique[i] for i in group_indices]
         rmsd_groups = _group_molecules_by_rmsd(
@@ -657,17 +659,22 @@ def _unique_molecules_combined_criteria(
         )
         for rmsd_group_indices in rmsd_groups:
             unique_molecules.append(group_molecules[rmsd_group_indices[0]])
+            n_equivalent_list.append(len(rmsd_group_indices))
 
-    return unique_molecules
+    return unique_molecules, n_equivalent_list
 
 
-def _display_unique_molecules(molecules_unique: List[mbe_automation.storage.Structure], calculator_provided: bool):
+def _display_unique_molecules(
+        molecules_unique: List[mbe_automation.storage.Structure],
+        n_equivalent: npt.NDArray[np.int64],
+        calculator_provided: bool,
+):
     print("\nUnique Molecules:")
 
     if calculator_provided:
-        header = f"{'index':>7} | {'n_atoms':>7} | {'formula':<15} | {'energy (eV/atom)':<16}"
+        header = f"{'index':>7} | {'n_atoms':>7} | {'formula':<15} | {'n_equiv':>7} | {'energy (eV/atom)':<16}"
     else:
-        header = f"{'index':>7} | {'n_atoms':>7} | {'formula':<15}"
+        header = f"{'index':>7} | {'n_atoms':>7} | {'formula':<15} | {'n_equiv':>7}"
 
     separator = "-" * len(header)
     print(header)
@@ -677,13 +684,14 @@ def _display_unique_molecules(molecules_unique: List[mbe_automation.storage.Stru
         pmg_mol = mol.to_pymatgen()
         comp = pmg_mol.composition.alphabetical_formula
         n_atoms = len(pmg_mol)
+        n_eq = n_equivalent[i]
 
         if calculator_provided:
             energy_val = mol.E_pot[0]
             energy = f"{energy_val:.5f}"
-            print(f"{i:>7} | {n_atoms:>7} | {comp:<15} | {energy:<16}")
+            print(f"{i:>7} | {n_atoms:>7} | {comp:<15} | {n_eq:>7} | {energy:<16}")
         else:
-            print(f"{i:>7} | {n_atoms:>7} | {comp:<15}")
+            print(f"{i:>7} | {n_atoms:>7} | {comp:<15} | {n_eq:>7}")
 
     print()
 
@@ -696,6 +704,7 @@ def identify_molecules(
         assert_identical_composition: bool = False,
         bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
+        match_mode: Literal["energy_only", "rmsd_only", "combined"] = "energy_only",
 ) -> MolecularComposition:
     """
     Identify and extract molecules from a periodic structure. Group nonunique molecules into symmetry-unique subsets based on structure and potential energy.
@@ -708,11 +717,15 @@ def identify_molecules(
         assert_identical_composition: If True, raises an error if the identified molecules do not share identical atomic compositions.
         bonding_algo: Optional pymatgen bonding algorithm to determine connectivity.
         reference_frame_index: The index of the frame to use as reference.
+        match_mode: The matching mode to use: "energy_only", "rmsd_only", or "combined".
 
     Returns:
         MolecularComposition dataclass containing the grouped molecular representations.
     """
     assert crystal.periodic
+
+    if match_mode in ("energy_only", "combined") and calculator is None:
+        raise ValueError(f"Cannot use {match_mode} match_mode when calculator is None.")
 
     if energy_thresh is None:
         energy_thresh = 1.0E-3
@@ -724,9 +737,11 @@ def identify_molecules(
 
     mbe_automation.common.display.framed("Molecule detection")
     print(f"bonding_algo                {type(bonding_algo).__name__}")
-    if calculator is not None:
+    print(f"match_mode                  {match_mode}")
+    if match_mode in ("energy_only", "combined"):
         print(f"energy_thresh               {energy_thresh} eV/atom")
-    print(f"rmsd_thresh                 {rmsd_thresh} Å")
+    if match_mode in ("rmsd_only", "combined"):
+        print(f"rmsd_thresh                 {rmsd_thresh} Å")
     print(f"assert_identical_comp       {assert_identical_composition}")
     if crystal.n_frames > 1:
         print(f"reference_frame_index       {reference_frame_index}")
@@ -745,45 +760,67 @@ def identify_molecules(
     molecules_nonunique = _extract_nonunique_molecules(
         molecular_crystal=molecular_crystal,
         reference_frame_index=reference_frame_index,
-        calculator=calculator,
+        calculator=calculator if match_mode in ("energy_only", "combined") else None,
     )
-
-    rmsd_groups = _group_molecules_by_rmsd(
-        molecules=molecules_nonunique,
-        thresh=rmsd_thresh,
-    )
-    n_molecules_unique_rmsd = len(rmsd_groups)
 
     n_molecules_unique_energy = None
-
-    if calculator is not None:
+    if match_mode in ("energy_only", "combined"):
         energy_groups = _group_molecules_by_energy(
             molecules=molecules_nonunique,
             thresh=energy_thresh,
         )
         n_molecules_unique_energy = len(energy_groups)
 
-        molecules_unique = _unique_molecules_combined_criteria(
+    n_molecules_unique_rmsd = None
+    rmsd_groups = None
+    if match_mode in ("rmsd_only", "combined"):
+        rmsd_groups = _group_molecules_by_rmsd(
+            molecules=molecules_nonunique,
+            thresh=rmsd_thresh,
+        )
+        n_molecules_unique_rmsd = len(rmsd_groups)
+
+    n_equivalent_list = []
+
+    if match_mode == "energy_only":
+        molecules_unique = [molecules_nonunique[group[0]] for group in energy_groups]
+        n_molecules_unique = n_molecules_unique_energy
+        n_equivalent_list = [len(group) for group in energy_groups]
+    elif match_mode == "rmsd_only":
+        molecules_unique = [molecules_nonunique[group[0]] for group in rmsd_groups]
+        n_molecules_unique = n_molecules_unique_rmsd
+        n_equivalent_list = [len(group) for group in rmsd_groups]
+    elif match_mode == "combined":
+        molecules_unique, n_equivalent_list = _unique_molecules_combined_criteria(
             molecules_nonunique=molecules_nonunique,
             energy_groups=energy_groups,
             rmsd_thresh=rmsd_thresh,
         )
         n_molecules_unique = len(molecules_unique)
     else:
-        molecules_unique = [molecules_nonunique[group[0]] for group in rmsd_groups]
-        n_molecules_unique = n_molecules_unique_rmsd
+        raise ValueError(f"Invalid match_mode: {match_mode}")
+
+    n_equivalent = np.array(n_equivalent_list, dtype=np.int64)
 
     print(f"Nonunique molecules:  {len(molecules_nonunique)}/unit cell")
-    if calculator is not None:
+    if match_mode in ("energy_only", "combined"):
         print(f"Unique molecules (energy criterion): {n_molecules_unique_energy}/unit cell")
-    print(f"Unique molecules (rmsd criterion):   {n_molecules_unique_rmsd}/unit cell")
-    if calculator is not None:
+    if match_mode in ("rmsd_only", "combined"):
+        print(f"Unique molecules (rmsd criterion):   {n_molecules_unique_rmsd}/unit cell")
+    if match_mode == "combined":
         print(f"Unique molecules (combined):         {n_molecules_unique}/unit cell")
 
-        if n_molecules_unique_energy != n_molecules_unique_rmsd:
+        if n_molecules_unique_energy is not None and n_molecules_unique_rmsd is not None and n_molecules_unique_energy != n_molecules_unique_rmsd:
             print("\nNote: The number of unique molecules in the unit cell differs depending on the RMSD and energy criteria. Assuming the structure is not distorted, this can occur if the unit cell contains a mixture of isomers.")
 
-    _display_unique_molecules(molecules_unique, calculator_provided=(calculator is not None))
+    if match_mode == "energy_only":
+        print("\nNote: Energy-only matching will not recognize different isomers if the energy model yields close energies.")
+
+    _display_unique_molecules(
+        molecules_unique,
+        n_equivalent,
+        calculator_provided=(match_mode in ("energy_only", "combined"))
+    )
 
     return MolecularComposition(
         molecular_crystal=molecular_crystal,
@@ -791,10 +828,11 @@ def identify_molecules(
         n_molecules_nonunique=len(molecules_nonunique),
         molecules_unique=molecules_unique,
         n_molecules_unique=n_molecules_unique,
+        n_equivalent=n_equivalent,
         n_molecules_unique_energy=n_molecules_unique_energy,
         n_molecules_unique_rmsd=n_molecules_unique_rmsd,
-        energy_thresh=energy_thresh if calculator is not None else None,
-        rmsd_thresh=rmsd_thresh,
+        energy_thresh=energy_thresh if match_mode in ("energy_only", "combined") else None,
+        rmsd_thresh=rmsd_thresh if match_mode in ("rmsd_only", "combined") else None,
     )
 
 
