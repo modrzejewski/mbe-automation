@@ -65,15 +65,6 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         dataset=config.dataset,
         key=f"{config.root_key}/structures/crystal[input]",
     )
-    mbe_automation.structure.clusters.extract_relaxed_unique_molecules(
-        dataset=config.dataset,
-        key=f"{config.root_key}/structures",
-        crystal=mbe_automation.storage.from_ase_atoms(unit_cell),
-        calculator=config.calculator,
-        config=config.relaxation,
-        energy_thresh=config.unique_molecules_energy_thresh,
-        work_dir=geom_opt_dir,
-    )
 
     if config.molecule is not None:
         molecule = config.molecule.copy()
@@ -132,10 +123,19 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         key=f"{config.root_key}/structures/{relaxed_crystal_label}"
     )
     V0 = unit_cell_V0.get_volume()
-    reference_cell = unit_cell_V0.cell.copy()
-    mbe_automation.structure.crystal.display(
-        unit_cell=unit_cell_V0,
-        key=f"{config.root_key}/structures/{relaxed_crystal_label}"
+    composition = mbe_automation.structure.clusters.identify_molecules(
+        crystal=mbe_automation.storage.from_ase_atoms(unit_cell_V0),
+        calculator=config.calculator,
+        energy_thresh=config.unique_molecules_energy_thresh,
+        rmsd_thresh=config.unique_molecules_rmsd_thresh,
+        match_mode=config.unique_molecules_match_mode,
+    )
+    composition.extract_relaxed_unique_molecules(
+        dataset=config.dataset,
+        key=f"{config.root_key}/structures",
+        calculator=config.calculator,
+        config=config.relaxation,
+        work_dir=geom_opt_dir,
     )
     #
     # The supercell transformation is computed once and kept

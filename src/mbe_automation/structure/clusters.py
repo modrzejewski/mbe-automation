@@ -5,6 +5,7 @@ from typing import List, Literal, Dict
 import math
 import itertools
 from collections import deque
+import time
 import numpy as np
 import numpy.typing as npt
 import ase.geometry
@@ -36,7 +37,54 @@ import mbe_automation.calculators.core
 from mbe_automation.storage.core import MolecularCrystal, UniqueClusters
 from mbe_automation.configs.clusters import NUMBER_SELECTION, DISTANCE_SELECTION
 from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueClustersFilter
-from mbe_automation.configs.structure import Minimum
+from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
+
+@dataclass(kw_only=True)
+class MolecularComposition:
+    """
+    Molecular composition of a periodic structure.
+
+    Attributes:
+        molecular_crystal: Full periodic molecular crystal graph representation.
+        molecules_nonunique: List containing all individual 
+            molecules found within the periodic cell.
+        n_molecules_nonunique: Total count of all molecules in the cell.
+        molecules_unique: List of the representative unique molecules.
+        n_molecules_unique: Count of unique molecules.
+        n_equivalent: n_equivalent[k] specifies how many equivalent molecules
+            correspond to k-th unique molecule.
+        groups: Lists of equivalent molecules. Each item is an array of indices 
+            pointing to the equivalent molecules in `molecules_nonunique`.
+    """
+    molecular_crystal: mbe_automation.storage.core.MolecularCrystal
+    molecules_nonunique: List[mbe_automation.storage.Structure]
+    n_molecules_nonunique: int
+    molecules_unique: List[mbe_automation.storage.Structure]
+    n_molecules_unique: int
+    n_equivalent: npt.NDArray[np.int64]
+    groups: list[npt.NDArray[np.int64]]
+
+    def extract_relaxed_unique_molecules(
+            self,
+            dataset: str,
+            key: str,
+            calculator: ASECalculator,
+            config: Minimum,
+            work_dir: Path | str = Path("./")
+    ) -> None:
+        """
+        Extract nonequivalent molecules from a periodic cell and save the corresponding
+        structures to a dataset file.
+        """
+        _extract_relaxed_unique_molecules(
+            composition=self,
+            dataset=dataset,
+            key=key,
+            calculator=calculator,
+            config=config,
+            work_dir=work_dir,
+        )
+
 
 def Label(Constituents, NMonomers):
     d = math.ceil(math.log(NMonomers, 10))
@@ -227,29 +275,19 @@ def _test_identical_composition(
     return True
 
 
-def detect_molecules(
+def _generate_covalent_bond_graph(
         system: mbe_automation.storage.Structure,
+        bonding_algo: NearNeighbors,
         reference_frame_index: int = 0,
-        assert_identical_composition: bool = True,
-        bonding_algo: NearNeighbors | None = None,
+        assert_identical_composition: bool = False,
         validate_pbc_structure: bool = False
 ) -> mbe_automation.storage.MolecularCrystal:
     """
     Identify molecules in a periodic Structure.
     """
 
-    if bonding_algo is None:
-        bonding_algo = CutOffDictNN.from_preset("vesta_2019")
-    
-    mbe_automation.common.display.framed("Molecule detection")
-    print(f"n_frames                {system.n_frames}")
-    print(f"reference_frame_index   {reference_frame_index}")
-
-    assert system.atomic_numbers.ndim == 1
-    assert system.masses.ndim == 1
-    
     if not system.periodic:
-        raise ValueError("detect_molecules is designed for periodic systems.")
+        raise ValueError("_generate_covalent_bond_graph is designed for periodic systems.")
 
     if system.positions.ndim == 3:
         positions_ref = system.positions[reference_frame_index]
@@ -272,12 +310,15 @@ def detect_molecules(
     ).make_supercell([3, 3, 3])
     supercell_to_unit_cell = np.array(supercell.site_properties["original_index"])
 
-    print("Computing graph of covalent bonds...", flush=True)
+    print("Computing covalent bonds graph...", end="", flush=True)
+    start_time = time.time()
     structure_graph = pymatgen.analysis.graphs.StructureGraph.from_local_env_strategy(
         structure=supercell,
         strategy=bonding_algo
     )
-    print("Graph completed", flush=True)
+    end_time = time.time()
+    delta_tau = end_time - start_time
+    print(f" (Δτ={delta_tau:.2f} s)", flush=True)
     
     components = list(networkx.weakly_connected_components(structure_graph.graph))
     masses = np.array([site.specie.atomic_mass for site in supercell.sites])
@@ -497,10 +538,9 @@ def _extract_finite_subsystem(
     return finite_subsystem
 
 
-def group_molecules_by_energy(
+def _group_molecules_by_energy(
         molecules: List[mbe_automation.storage.Structure],
         thresh: float = 1.0E-5, # eV/atom
-        reference_frame_index: int = 0,
 ) -> list[npt.NDArray[np.int64]]:
     """
     Group molecules based on energy similarity.
@@ -510,11 +550,12 @@ def group_molecules_by_energy(
     assert thresh > 0.0
     for molecule in molecules:
         assert molecule.E_pot is not None
+        assert len(molecule.E_pot) == 1
 
     n_molecules = len(molecules)
-    energies = np.array([molecules[i].E_pot[reference_frame_index] for i in range(n_molecules)])
+    energies = np.array([molecules[i].E_pot[0] for i in range(n_molecules)])
     
-    sort_order = np.argsort(energies)
+    sort_order = np.argsort(energies, kind="stable")
     sorted_energies = energies[sort_order]
     #
     # Compute differences between consecutive sorted energies
@@ -537,9 +578,8 @@ def group_molecules_by_energy(
     return equiv_molecule_indices
 
 
-def extract_all_molecules(
-        crystal: mbe_automation.storage.Structure,
-        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+def _extract_nonunique_molecules(
+        molecular_crystal: mbe_automation.storage.MolecularCrystal,
         reference_frame_index: int = 0,
         calculator: ASECalculator | None = None,
 ) -> List[mbe_automation.storage.Structure]:
@@ -547,16 +587,6 @@ def extract_all_molecules(
     Extract all molecules present in a unit cell as a list of separate
     Structures.
     """
-    assert crystal.atomic_numbers.ndim == 1
-    assert crystal.masses.ndim == 1
-    
-    molecular_crystal = detect_molecules(
-        system=crystal,
-        reference_frame_index=reference_frame_index,
-        assert_identical_composition=False,
-        bonding_algo=bonding_algo,
-    )
-
     molecules = []
     for atom_indices in molecular_crystal.index_map:
 
@@ -590,61 +620,227 @@ def extract_all_molecules(
     return molecules
 
 
-def extract_unique_molecules(
+def _group_molecules_by_rmsd(
+        molecules: List[mbe_automation.storage.Structure],
+        thresh: float = SYMMETRY_TOLERANCE_LOOSE,
+) -> list[npt.NDArray[np.int64]]:
+    n_mols = len(molecules)
+    if n_mols == 0:
+        return []
+
+    adjacency_matrix = np.zeros((n_mols, n_mols), dtype=bool)
+    for i in range(n_mols):
+        adjacency_matrix[i, i] = True
+        for j in range(i + 1, n_mols):
+            rmsd = mbe_automation.structure.molecule.match(
+                positions_a=molecules[i].positions,
+                atomic_numbers_a=molecules[i].atomic_numbers,
+                positions_b=molecules[j].positions,
+                atomic_numbers_b=molecules[j].atomic_numbers,
+            )
+            if not np.isnan(rmsd) and rmsd < thresh:
+                adjacency_matrix[i, j] = True
+                adjacency_matrix[j, i] = True
+
+    n_components, labels = sparse.csgraph.connected_components(
+        adjacency_matrix, directed=False, return_labels=True
+    )
+
+    grouped_indices = []
+    for comp_idx in range(n_components):
+        grouped_indices.append(np.where(labels == comp_idx)[0])
+
+    return grouped_indices
+
+def _split_groups_by_rmsd(
+        molecules_nonunique: List[mbe_automation.storage.Structure],
+        energy_groups: list[npt.NDArray[np.int64]],
+        rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE,
+) -> list[npt.NDArray[np.int64]]:
+    
+    energy_rmsd_groups = []
+    for group_indices in energy_groups:
+        group_molecules = [molecules_nonunique[i] for i in group_indices]
+        rmsd_groups = _group_molecules_by_rmsd(
+            molecules=group_molecules,
+            thresh=rmsd_thresh,
+        )
+        for rmsd_group_indices in rmsd_groups:
+            energy_rmsd_groups.append(group_indices[rmsd_group_indices])
+
+    return energy_rmsd_groups
+
+
+def _display_unique_molecules(
+        molecules_nonunique: List[mbe_automation.storage.Structure],
+        groups: list[npt.NDArray[np.int64]],
+        energies_available: bool,
+):
+
+    if energies_available:
+        header = f"{'molecule':>8}   {'n_atoms':>8}   {'n_equivalent':>12}   {'energy (eV/atom)':<17}   {'formula':<15}"
+    else:
+        header = f"{'molecule':>8}   {'n_atoms':>8}   {'n_equivalent':>12}   {'formula':<15}"
+
+    mbe_automation.common.display.dotted_separator(len(header))
+    print(header)
+    mbe_automation.common.display.dotted_separator(len(header))
+
+    for i, group_indices in enumerate(groups):
+        mol = molecules_nonunique[group_indices[0]]
+        pmg_mol = mol.to_pymatgen()
+        comp = pmg_mol.composition.alphabetical_formula
+        n_atoms = len(pmg_mol)
+        n_eq = len(group_indices)
+
+        if energies_available:
+            for j, idx in enumerate(group_indices):
+                energy_val = molecules_nonunique[idx].E_pot[0]
+                energy = f"{energy_val:.6f}"
+                if j == 0:
+                    print(f"{i:>8}   {n_atoms:>8}   {n_eq:>12}   {energy:>17}   {comp:<15}")
+                else:
+                    print(f"{'':>8}   {'':>8}   {'':>12}   {energy:>17}")
+        else:
+            print(f"{i:>8}   {n_atoms:>8}   {n_eq:>12}   {comp:<15}")
+
+    mbe_automation.common.display.dotted_separator(len(header))
+
+
+def identify_molecules(
         crystal: mbe_automation.storage.Structure,
-        calculator: ASECalculator,
-        energy_thresh: float = 1.0E-5, # eV/atom
-        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
+        calculator: ASECalculator | None = None,
+        energy_thresh: float | None = None, # eV/atom
+        rmsd_thresh: float | None = None, # Angs
+        assert_identical_composition: bool = False,
+        bonding_algo: NearNeighbors | None = None,
         reference_frame_index: int = 0,
-) -> list[mbe_automation.storage.Structure]:
-    
-    all_molecules = extract_all_molecules(
-        crystal=crystal,
+        match_mode: Literal["energy_only", "rmsd_only", "combined"] = "energy_only",
+) -> MolecularComposition:
+    """
+    Identify and extract molecules from a periodic structure. Group nonunique molecules into symmetry-unique subsets based on structure and potential energy.
+
+    Args:
+        crystal: The periodic structure to process.
+        calculator: An optional ASE calculator to compute the potential energy of individual molecules.
+        energy_thresh: Threshold in eV/atom for considering two molecules to have the same potential energy.
+        rmsd_thresh: Threshold in Å for considering two molecules structurally identical based on RMSD.
+        assert_identical_composition: If True, raises an error if the identified molecules do not share identical atomic compositions.
+        bonding_algo: Optional pymatgen bonding algorithm to determine connectivity.
+        reference_frame_index: The index of the frame to use as reference.
+        match_mode: The mechanism for clustering structurally identical molecules in the cell:
+            * "energy_only": Groups molecules based purely on their potential energy (per atom) using 
+              `energy_thresh`. Avoids structural alignment, but fails to differentiate 
+              isomers with identical or nearly identical energies.
+            * "rmsd_only": Groups molecules directly via optimal RMSD alignment using `rmsd_thresh`. 
+            * "combined": A hierarchical algorithm that first bins molecules into energy groups, 
+              then sub-clusters each individual energy grouping using the RMSD 
+              criterion.
+
+    Returns:
+        MolecularComposition dataclass containing the grouped molecular representations.
+    """
+    assert crystal.periodic
+    assert match_mode in ("energy_only", "rmsd_only", "combined")
+
+    if match_mode in ("energy_only", "combined") and calculator is None:
+        raise ValueError(f"Cannot use {match_mode} match_mode when calculator is None.")
+
+    if energy_thresh is None:
+        energy_thresh = 1.0E-3
+    if rmsd_thresh is None:
+        rmsd_thresh = 0.1
+
+    if bonding_algo is None:
+        bonding_algo = CutOffDictNN.from_preset("vesta_2019")
+
+    mbe_automation.common.display.framed("Molecule detection")
+    print(f"bonding_algo                {type(bonding_algo).__name__}")
+    print(f"match_mode                  {match_mode}")
+    if match_mode in ("energy_only", "combined"):
+        print(f"energy_thresh               {energy_thresh} eV/atom")
+    if match_mode in ("rmsd_only", "combined"):
+        print(f"rmsd_thresh                 {rmsd_thresh} Å")
+    print(f"assert_identical_comp       {assert_identical_composition}")
+    if crystal.n_frames > 1:
+        print(f"reference_frame_index       {reference_frame_index}")
+    print()
+
+    assert crystal.atomic_numbers.ndim == 1
+    assert crystal.masses.ndim == 1
+
+    molecular_crystal = _generate_covalent_bond_graph(
+        system=crystal,
+        reference_frame_index=reference_frame_index,
+        assert_identical_composition=assert_identical_composition,
         bonding_algo=bonding_algo,
-        reference_frame_index=reference_frame_index,
-        calculator=calculator,
     )
 
-    grouped_molecules = group_molecules_by_energy(
-        molecules=all_molecules,
-        thresh=energy_thresh,
+    molecules_nonunique = _extract_nonunique_molecules(
+        molecular_crystal=molecular_crystal,
         reference_frame_index=reference_frame_index,
+        calculator=calculator if match_mode in ("energy_only", "combined") else None,
     )
-    n_unique_molecules = len(grouped_molecules)
-    assert n_unique_molecules > 0
-    
-    unique_molecules = []
-    for equivalent_molecules in grouped_molecules:
-        molecule = all_molecules[equivalent_molecules[0]]
-        unique_molecules.append(molecule)
 
-    return unique_molecules
+    if match_mode == "energy_only":
+        groups = _group_molecules_by_energy(
+            molecules=molecules_nonunique,
+            thresh=energy_thresh,
+        )
+    elif match_mode == "rmsd_only":
+        groups = _group_molecules_by_rmsd(
+            molecules=molecules_nonunique,
+            thresh=rmsd_thresh,
+        )
+    elif match_mode == "combined":
+        energy_groups = _group_molecules_by_energy(
+            molecules=molecules_nonunique,
+            thresh=energy_thresh,
+        )
+        groups = _split_groups_by_rmsd(
+            molecules_nonunique=molecules_nonunique,
+            energy_groups=energy_groups,
+            rmsd_thresh=rmsd_thresh,
+        )
+
+    molecules_unique = [molecules_nonunique[group[0]] for group in groups]
+    n_molecules_unique = len(groups)
+    n_equivalent = np.array([len(group) for group in groups], dtype=np.int64)
+
+    print(f"{'Nonunique molecules:':<32}{len(molecules_nonunique)}/unit cell")
+    print(f"{'Unique molecules:':<32}{n_molecules_unique}/unit cell")
+
+    _display_unique_molecules(
+        molecules_nonunique=molecules_nonunique,
+        groups=groups,
+        energies_available=(match_mode in ("energy_only", "combined"))
+    )
+
+    return MolecularComposition(
+        molecular_crystal=molecular_crystal,
+        molecules_nonunique=molecules_nonunique,
+        n_molecules_nonunique=len(molecules_nonunique),
+        molecules_unique=molecules_unique,
+        n_molecules_unique=n_molecules_unique,
+        n_equivalent=n_equivalent,
+        groups=groups,
+    )
 
 
-def extract_relaxed_unique_molecules(
+def _extract_relaxed_unique_molecules(
+        composition: MolecularComposition,
         dataset: str,
         key: str,
-        crystal: mbe_automation.storage.Structure,
         calculator: ASECalculator,
         config: Minimum,
-        energy_thresh: float = 1.0E-5, # eV/atom
-        bonding_algo: NearNeighbors=CutOffDictNN.from_preset("vesta_2019"),
-        reference_frame_index: int = 0,
         work_dir: Path | str = Path("./")
 ) -> None:
     """
     Extract nonequivalent molecules from a periodic cell and save the corresponding
     structures to a dataset file.
     """
-    
-    unique_molecules = extract_unique_molecules(
-        crystal=crystal,
-        calculator=calculator,
-        energy_thresh=energy_thresh,
-        bonding_algo=bonding_algo,
-        reference_frame_index=reference_frame_index,
-    )
-    n_unique_molecules = len(unique_molecules)
+    unique_molecules = composition.molecules_unique
+    n_unique_molecules = composition.n_molecules_unique
     
     relaxed_molecules = []
     relaxed_labels = []
@@ -939,10 +1135,7 @@ def extract_unique_clusters(
                         atomic_numbers_a=atomic_numbers_current,
                         positions_b=positions_ref,
                         atomic_numbers_b=atomic_numbers_ref,
-                        thresh_for_mirror_check=(
-                            unique_cluster_filter.alignment_thresh
-                            if unique_cluster_filter.align_mirror_images else None
-                        ),
+                        align_mirror_images=unique_cluster_filter.align_mirror_images,
                         algorithm=unique_cluster_filter.algorithm,
                     )
                     if rmsd < unique_cluster_filter.alignment_thresh:

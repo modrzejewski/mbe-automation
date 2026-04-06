@@ -95,6 +95,17 @@ class FreeEnergy:
                                    #
     unique_molecules_energy_thresh: float = 1.0E-3
                                    #
+                                   # RMSD threshold (Angstroms) used to detect
+                                   # nonequivalent molecules in the input unit
+                                   # cell based on their structures.
+                                   #
+    unique_molecules_rmsd_thresh: float = 0.1
+                                   #
+                                   # Match mode used to detect nonequivalent
+                                   # molecules ("energy_only", "rmsd_only", or "combined")
+                                   #
+    unique_molecules_match_mode: Literal["energy_only", "rmsd_only", "combined"] = "energy_only"
+                                   #
                                    # Parameters controlling geometry relaxation
                                    #
     relaxation: Minimum = field(default_factory=Minimum)

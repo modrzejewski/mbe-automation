@@ -67,13 +67,12 @@ def n_rotational_degrees_of_freedom(molecule):
 
     return n_rot_dof
 
-
 def _match_ase(
         positions_a: npt.NDArray[np.floating],
         atomic_numbers_a: npt.NDArray[np.integer],
         positions_b: npt.NDArray[np.floating],
         atomic_numbers_b: npt.NDArray[np.integer],
-        thresh_for_mirror_check: float | None = None,
+        align_mirror_images: bool,
 ):
     molecule_a = ase.Atoms(
         numbers=atomic_numbers_a,
@@ -87,15 +86,14 @@ def _match_ase(
     frob_norm = ase.geometry.distance(molecule_a, molecule_b)
     rmsd = np.sqrt(frob_norm**2 / n_atoms)
 
-    if thresh_for_mirror_check is not None:
-        if rmsd >= thresh_for_mirror_check:
-            molecule_b_mirror = ase.Atoms(
-                numbers=atomic_numbers_b,
-                positions=positions_b * [1, -1, 1]
-            )
-            frob_norm_mirror = ase.geometry.distance(molecule_a, molecule_b_mirror)
-            rmsd_mirror = np.sqrt(frob_norm_mirror**2 / n_atoms)
-            rmsd = min(rmsd, rmsd_mirror)
+    if align_mirror_images:
+        molecule_b_mirror = ase.Atoms(
+            numbers=atomic_numbers_b,
+            positions=positions_b * [1, -1, 1]
+        )
+        frob_norm_mirror = ase.geometry.distance(molecule_a, molecule_b_mirror)
+        rmsd_mirror = np.sqrt(frob_norm_mirror**2 / n_atoms)
+        rmsd = min(rmsd, rmsd_mirror)
 
     return rmsd
 
@@ -104,7 +102,7 @@ def _match_pymatgen(
         atomic_numbers_a: npt.NDArray[np.integer],
         positions_b: npt.NDArray[np.floating],
         atomic_numbers_b: npt.NDArray[np.integer],
-        thresh_for_mirror_check: float | None = None,
+        align_mirror_images: bool,
 ):
     molecule_a = pymatgen.core.Molecule(
         species=atomic_numbers_a,
@@ -114,19 +112,23 @@ def _match_pymatgen(
         species=atomic_numbers_b,
         coords=positions_b,
     )
-    algo = pymatgen.analysis.molecule_matcher.BruteForceOrderMatcher(
+    algo = pymatgen.analysis.molecule_matcher.HungarianOrderMatcher(
         molecule_a
     )
     _, _, _, rmsd = algo.match(molecule_b)
     
-    if thresh_for_mirror_check is not None:
-        if rmsd >= thresh_for_mirror_check:
-            molecule_b_mirror = pymatgen.core.Molecule(
-                species=atomic_numbers_b,
-                coords=positions_b * [1, -1, 1]
-            )
-            _, _, _, rmsd_mirror = algo.match(molecule_b_mirror)
-            rmsd = min(rmsd, rmsd_mirror)
+    if align_mirror_images:
+        molecule_b_mirror = pymatgen.core.Molecule(
+            species=atomic_numbers_b,
+            coords=positions_b * [1, -1, 1]
+        )
+        _, _, _, rmsd_mirror = algo.match(molecule_b_mirror)
+        rmsd = min(rmsd, rmsd_mirror)
+    #
+    # pymatgen computes rmsd of flattened vectors of dimension 3*n_atoms,
+    # whereas we would like to have Sqrt(1/n_atoms Sum_i(r_i - r'_i)**2)
+    #
+    rmsd = np.sqrt(3.0) * rmsd 
 
     return rmsd
     
@@ -135,16 +137,32 @@ def match(
         atomic_numbers_a: npt.NDArray[np.integer],
         positions_b: npt.NDArray[np.floating],
         atomic_numbers_b: npt.NDArray[np.integer],
-        thresh_for_mirror_check: float | None = None,
-        algorithm: Literal["ase", "pymatgen"] = "ase"
+        align_mirror_images: bool = False,
+        algorithm: Literal["ase", "pymatgen"] | None = None,
 ):
     """
     Compute root-mean square difference between atomic positions
     of two molecules. The structures can correspond to permuted
     lists of atoms.
 
-    Assertions: equal numbers of atoms, equal elemental compositions.
+    As of April 4th, 2026, the pymatgen algorithm yields
+    lower RMSDs in the tesing script. Thus, we select it
+    as the default algorithm.
+
+    Returns np.nan if the atomic compositions (number and types of atoms) differ.
     """
+
+    if len(atomic_numbers_a) != len(atomic_numbers_b):
+        return np.nan
+
+    max_z = max(np.max(atomic_numbers_a), np.max(atomic_numbers_b))
+    comp_a = np.bincount(atomic_numbers_a, minlength=max_z + 1)
+    comp_b = np.bincount(atomic_numbers_b, minlength=max_z + 1)
+    if not np.array_equal(comp_a, comp_b):
+        return np.nan
+
+    if algorithm is None:
+        algorithm = "pymatgen"
 
     _match_algorithms = {
         "ase": _match_ase,
@@ -164,5 +182,5 @@ def match(
         atomic_numbers_a,
         positions_b,
         atomic_numbers_b,
-        thresh_for_mirror_check,
+        align_mirror_images,
     )
