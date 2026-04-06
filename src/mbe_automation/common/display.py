@@ -249,6 +249,11 @@ def shorten_path(path: str | Path, max_length: int = 60) -> str:
     return ".../" + "/".join(res_parts)
 
 
+def dotted_separator(n: int):
+    separator = (". " * (n // 2 + 1))[:n]
+    print(separator)
+
+
 def mace_summary(calculator: MACECalculator) -> None:
     """
     Print essential MACE model information.

@@ -669,16 +669,15 @@ def _display_unique_molecules(
         n_equivalent: npt.NDArray[np.int64],
         calculator_provided: bool,
 ):
-    print("\nUnique Molecules:")
 
     if calculator_provided:
-        header = f"{'index':>7} | {'n_atoms':>7} | {'formula':<15} | {'n_equiv':>7} | {'energy (eV/atom)':<16}"
+        header = f"{'molecule':>8}   {'n_atoms':>8}   {'n_equivalent':>12}   {'energy (eV/atom)':<16}   {'formula':<15}"
     else:
-        header = f"{'index':>7} | {'n_atoms':>7} | {'formula':<15} | {'n_equiv':>7}"
+        header = f"{'molecule':>8}   {'n_atoms':>8}   {'n_equivalent':>12}   {'formula':<15}"
 
-    separator = "-" * len(header)
+    mbe_automation.common.display.dotted_separator(len(header))
     print(header)
-    print(separator)
+    mbe_automation.common.display.dotted_separator(len(header))
 
     for i, mol in enumerate(molecules_unique):
         pmg_mol = mol.to_pymatgen()
@@ -689,11 +688,11 @@ def _display_unique_molecules(
         if calculator_provided:
             energy_val = mol.E_pot[0]
             energy = f"{energy_val:.5f}"
-            print(f"{i:>7} | {n_atoms:>7} | {comp:<15} | {n_eq:>7} | {energy:<16}")
+            print(f"{i:>8}   {n_atoms:>8}   {n_eq:>12}   {energy:>16}   {comp:<15}")
         else:
-            print(f"{i:>7} | {n_atoms:>7} | {comp:<15} | {n_eq:>7}")
+            print(f"{i:>8}   {n_atoms:>8}   {n_eq:>12}   {comp:<15}")
 
-    print()
+    mbe_automation.common.display.dotted_separator(len(header))
 
 
 def identify_molecules(
@@ -812,14 +811,14 @@ def identify_molecules(
 
         if n_molecules_unique_energy != n_molecules_unique_rmsd:
             print(
-                "\n Note: The number of unique molecules in the unit cell differs \n"
+                "Note: The number of unique molecules in the unit cell differs \n"
                 "depending on the RMSD and energy criteria. Assuming the structure \n"
                 "is not distorted, this can occur if the unit cell contains a mixture \n"
                 "of isomers."
             )
 
     if match_mode == "energy_only":
-        print("\nNote: Energy-only matching will not recognize different isomers \n"
+        print("Note: Energy-only matching will not recognize different isomers \n"
               "if the energy model yields close energies.")
 
     _display_unique_molecules(
