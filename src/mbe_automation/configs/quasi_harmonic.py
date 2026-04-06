@@ -93,7 +93,7 @@ class FreeEnergy:
                                    #
                                    # ||E_pot(A)-E_pot(B)|| > unique_molecules_energy_thresh
                                    #
-    unique_molecules_energy_thresh: float = 1.0E-3
+    unique_molecules_energy_thresh: float = 1.0E-5
                                    #
                                    # RMSD threshold (Angstroms) used to detect
                                    # nonequivalent molecules in the input unit

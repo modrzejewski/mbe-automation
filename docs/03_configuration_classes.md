@@ -30,7 +30,7 @@ This chapter documents the configuration classes used to control the various wor
 | `molecule`                      | Initial, non-relaxed structure of the isolated molecule. If set to `None`, sublimation free energy is not computed.                                                                           | `None`                                          |
 | `relaxation`                    | An instance of `Minimum` that configures the geometry relaxation parameters.                                                                                                                       | `Minimum()`                                     |
 | `temperatures_K`                | Array of temperatures (in Kelvin) for the calculation.                                                                                                                                              | `np.array([298.15])`                            |
-| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell.                                                                         | `1.0E-3`                                        |
+| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell.                                                                         | `1.0E-5`                                        |
 | `supercell_radius`              | Minimum point-periodic image distance in the supercell for phonon calculations (Å).                                                                                                               | `25.0`                                          |
 | `supercell_matrix`              | Supercell transformation matrix. If specified, `supercell_radius` is ignored.                                                                                                                      | `None`                                          |
 | `supercell_diagonal`            | If `True`, create a diagonal supercell. Ignored if `supercell_matrix` is provided.                                                                                                                 | `False`                                         |
@@ -82,7 +82,7 @@ Configuration object for Empirical Electronic Energy Correction (EEC). EEC enfor
 | `md_crystal` | An instance of `ClassicalMD` that configures the MD simulation for the crystal. | - |
 | `temperatures_K` | Target temperatures (in Kelvin) for the MD simulation. Can be a single float or an array of floats. | `298.15` |
 | `pressures_GPa` | Target pressures (in GPa) for the MD simulation. Can be a single float or an array of floats. | `1.0E-4` |
-| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell. | `1.0E-3`    |
+| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell. | `1.0E-5`    |
 | `relaxation`                     | An instance of `Minimum` that configures the geometry relaxation parameters.                | `Minimum()` |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
 | `dataset` | The main HDF5 file with all data computed for the physical system. | `"./properties.hdf5"` |
