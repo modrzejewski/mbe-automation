@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 import numpy.typing as npt
 from ase.calculators.calculator import Calculator as ASECalculator
-from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
+from pymatgen.core.local_env import NearNeighbors, CutOffDictNN
 
 import mbe_automation.storage
 import mbe_automation.common

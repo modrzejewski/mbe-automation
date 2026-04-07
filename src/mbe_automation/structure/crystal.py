@@ -12,7 +12,7 @@ import warnings
 import numpy as np
 import numpy.typing as npt
 from pymatgen.transformations.advanced_transformations import CubicSupercellTransformation
-from pymatgen.analysis.structure_matcher import StructureMatcher
+from pymatgen.core.structure_matcher import StructureMatcher
 import pymatgen
 import pymatgen.core
 import pymatgen.io.ase

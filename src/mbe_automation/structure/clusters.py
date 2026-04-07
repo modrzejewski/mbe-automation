@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Literal, Dict
 import math
+import sys
 import itertools
 from collections import deque
 import time
@@ -22,12 +23,12 @@ import scipy
 import networkx
 import pymatgen
 import pymatgen.analysis
-import pymatgen.analysis.local_env
-from pymatgen.analysis.local_env import NearNeighbors, CutOffDictNN
-import pymatgen.analysis.graphs
+import pymatgen.core.local_env
+from pymatgen.core.local_env import NearNeighbors, CutOffDictNN
+import pymatgen.core.graphs
 import pymatgen.core
 import pymatgen.core.operations
-import pymatgen.analysis.molecule_matcher
+import pymatgen.core.molecule_matcher
 
 import mbe_automation.storage
 import mbe_automation.structure.crystal
@@ -312,7 +313,7 @@ def _generate_covalent_bond_graph(
 
     print("Computing covalent bonds graph...", end="", flush=True)
     start_time = time.time()
-    structure_graph = pymatgen.analysis.graphs.StructureGraph.from_local_env_strategy(
+    structure_graph = pymatgen.core.graphs.StructureGraph.from_local_env_strategy(
         structure=supercell,
         strategy=bonding_algo
     )

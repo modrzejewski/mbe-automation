@@ -6,7 +6,7 @@ import ase
 import pyscf
 import pyscf.hessian.thermo
 import pymatgen.core
-import pymatgen.analysis.molecule_matcher
+import pymatgen.core.molecule_matcher
 
 def to_pyscf(atoms: ase.Atoms, charge: int = 0, spin: int = 0) -> pyscf.gto.Mole:
     """
@@ -112,7 +112,7 @@ def _match_pymatgen(
         species=atomic_numbers_b,
         coords=positions_b,
     )
-    algo = pymatgen.analysis.molecule_matcher.HungarianOrderMatcher(
+    algo = pymatgen.core.molecule_matcher.HungarianOrderMatcher(
         molecule_a
     )
     _, _, _, rmsd = algo.match(molecule_b)
