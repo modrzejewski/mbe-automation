@@ -338,7 +338,7 @@ def relax(
         # the DFTB+ gen format from ".gen" extension
         #
         relaxed_system = mbe_automation.storage.from_xyz_file(
-            str(output_file),
+            output_file,
             transform="no_transformation"
         )
     else:

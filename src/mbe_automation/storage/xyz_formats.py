@@ -11,6 +11,7 @@ import numpy as np
 import numpy.typing as npt
 import warnings
 import gemmi
+from pathlib import Path
 
 if TYPE_CHECKING:
     import mbe_automation.dynamics.harmonic.modes
@@ -22,7 +23,7 @@ import mbe_automation.common.display
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 from mbe_automation.dynamics.harmonic.modes import symmetrize_adps
 
-def _read_cif_pymatgen(filepath: str) -> pymatgen.core.Structure:
+def _read_cif_pymatgen(filepath: str | Path) -> pymatgen.core.Structure:
     """Read a structure from a file."""
     parser = CifParser(
         filepath,
@@ -33,7 +34,7 @@ def _read_cif_pymatgen(filepath: str) -> pymatgen.core.Structure:
     return structures[0]
 
 def _read_cif_gemmi(
-        filepath: str
+        filepath: str | Path
     ) -> pymatgen.core.Structure:
     """
     Read periodic structure and expand asymmetric unit to P1 unit cell.
@@ -79,7 +80,7 @@ def _read_cif_gemmi(
     return structure
 
 def _read_cif(
-    filepath: str,
+    filepath: str | Path,
     backend: Literal["gemmi", "pymatgen"] = "gemmi"
 ):
     if backend == "gemmi":
@@ -283,7 +284,7 @@ def _print_cell_summary(system: ase.Atoms, label: str) -> None:
 
 
 def from_xyz_file(
-        read_path: str,
+        read_path: str | Path,
         transform: Literal[
             "to_symmetrized_conventional_cell",
             "to_symmetrized_primitive_cell",
@@ -293,12 +294,14 @@ def from_xyz_file(
         cif_backend: Literal["gemmi", "pymatgen"] = "gemmi"
 ) -> ase.Atoms:
 
+    read_path = Path(read_path).expanduser().resolve()
+
     mbe_automation.common.display.framed([
         "Reading structure from file",
         mbe_automation.common.display.shorten_path(read_path)
     ])
 
-    if read_path.lower().endswith(".cif"):
+    if read_path.name.lower().endswith(".cif"):
         structure = _read_cif(read_path, backend=cif_backend)
         system = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
     else:

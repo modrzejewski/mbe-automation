@@ -668,7 +668,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
     @classmethod
     def from_xyz_file(
             cls,
-            read_path: str,
+            read_path: str | Path,
             transform: Literal[
                 "to_symmetrized_conventional_cell",
                 "to_symmetrized_primitive_cell",
