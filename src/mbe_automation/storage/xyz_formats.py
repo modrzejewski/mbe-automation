@@ -294,7 +294,7 @@ def from_xyz_file(
         cif_backend: Literal["gemmi", "pymatgen"] = "gemmi"
 ) -> ase.Atoms:
 
-    read_path = Path(read_path).expanduser().resolve()
+    read_path = Path(read_path).expanduser()
 
     mbe_automation.common.display.framed([
         "Reading structure from file",
