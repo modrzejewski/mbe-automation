@@ -301,7 +301,7 @@ def from_xyz_file(
         mbe_automation.common.display.shorten_path(read_path)
     ])
 
-    if read_path.name.lower().endswith(".cif"):
+    if read_path.suffix.lower() == ".cif":
         structure = _read_cif(read_path, backend=cif_backend)
         system = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
     else:
