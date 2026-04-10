@@ -91,7 +91,7 @@ def _read_cif(
         raise ValueError("Invalid backend requested in _read_cif.")        
 
 def _cif_with_adps(
-        save_path: str,
+        save_path: str | Path,
         struct: pymatgen.core.Structure,
         adps_cif: npt.NDArray[np.floating] | None = None,
         symprec: float = SYMMETRY_TOLERANCE_STRICT,
@@ -350,19 +350,21 @@ def from_xyz_file(
     return system
 
 def to_xyz_file(
-        save_path: str,
+        save_path: str | Path,
         system: ase.Atoms | mbe_automation.storage.core.Structure,
         frame_index: int = 0,
         thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None = None,
         temperature_idx: int = 0,
         symprec: float = SYMMETRY_TOLERANCE_STRICT
 ):
+    save_path = Path(save_path).expanduser()
+
     if isinstance(system, mbe_automation.storage.core.Structure):
         system_ase = mbe_automation.storage.views.to_ase(system, frame_index=frame_index)
     else:
         system_ase = system
         
-    if save_path.lower().endswith(".cif"):
+    if save_path.suffix.lower() == ".cif":
         pmg_structure = pymatgen.io.ase.AseAtomsAdaptor.get_structure(system_ase)
         _cif_with_adps(
             save_path=save_path,
@@ -378,7 +380,7 @@ def to_xyz_file(
 
 
 def to_cif_file(
-        save_path: str,
+        save_path: str | Path,
         system: ase.Atoms | mbe_automation.storage.core.Structure,
         frame_index: int = 0,
         thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None = None,
@@ -390,7 +392,8 @@ def to_cif_file(
     
     This is a wrapper around to_xyz_file that enforces the .cif extension.
     """
-    if not save_path.lower().endswith(".cif"):
+    save_path = Path(save_path).expanduser()
+    if save_path.suffix.lower() != ".cif":
         raise ValueError(f"The save_path must end with .cif, got: {save_path}")
 
     to_xyz_file(

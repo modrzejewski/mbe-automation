@@ -17,7 +17,7 @@ import mbe_automation.calculators
 
 @dataclass(kw_only=True)
 class PhononSampling:
-    force_constants_dataset: str = "./properties.hdf5"
+    force_constants_dataset: str | Path = "./properties.hdf5"
     force_constants_key: str = "training/quasi_harmonic/phonons/force_constants/crystal[opt:atoms,shape]"
                                    #
                                    # Calculators used for
@@ -128,13 +128,13 @@ class PhononSampling:
                                    # Directory where files are stored
                                    # at runtime
                                    #
-    work_dir: str = "./"
+    work_dir: str | Path = "./"
                                    #
                                    # The main result of the calculations:
                                    # a single dataset file with all data computed
                                    # for the physical system
                                    #
-    dataset: str = "./properties.hdf5"
+    dataset: str | Path = "./properties.hdf5"
                                    #
                                    # Root of the dataset hierarchical structure
                                    #
@@ -146,6 +146,9 @@ class PhononSampling:
     verbose: int = 0
 
     def __post_init__(self):
+        self.force_constants_dataset = Path(self.force_constants_dataset).expanduser()
+        self.dataset  = Path(self.dataset).expanduser()
+        self.work_dir = Path(self.work_dir).expanduser()
         if self.feature_vectors_type != "none" and self.features_calculator is None:
             raise ValueError(
                 "A features_calculator must be provided when "
@@ -201,13 +204,13 @@ class MDSampling:
                                    # Directory where files are stored
                                    # at runtime
                                    #
-    work_dir: str = "./"
+    work_dir: str | Path = "./"
                                    #
                                    # The main result of the calculations:
                                    # a single dataset file with all data computed
                                    # for the physical system
                                    #
-    dataset: str = "./properties.hdf5"
+    dataset: str | Path = "./properties.hdf5"
                                    #
                                    # Root of the dataset hierarchical structure
                                    #
@@ -223,6 +226,9 @@ class MDSampling:
     def __post_init__(self):
         if isinstance(self.crystal, mbe_automation.storage.Structure):
             self.crystal = mbe_automation.storage.to_ase(self.crystal)
+
+        self.dataset  = Path(self.dataset).expanduser()
+        self.work_dir = Path(self.work_dir).expanduser()
 
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
         self.pressures_GPa = np.atleast_1d(self.pressures_GPa)

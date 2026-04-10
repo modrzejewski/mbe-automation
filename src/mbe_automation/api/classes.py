@@ -164,7 +164,7 @@ class BrillouinZonePath(_BrillouinZonePath):
 
     def plot(
             self,
-            save_path: str | None = None,
+            save_path: str | Path | None = None,
             freq_max_THz: float | None = None,
             color_map: str = "plasma",
             freq_units: Literal["THz", "cm-1"] = "THz"
@@ -178,6 +178,8 @@ class BrillouinZonePath(_BrillouinZonePath):
             color_map: Matplotlib colormap name.
             freq_units: Units for frequency axis, "THz" or "cm-1".
         """
+        if save_path is not None:
+            save_path = Path(save_path).expanduser()
         return mbe_automation.dynamics.harmonic.display.band_structure(
             fbz_path=self,
             save_path=save_path,
@@ -189,10 +191,11 @@ class BrillouinZonePath(_BrillouinZonePath):
 class _TrainingStructure:
     def to_mace_dataset(
             self,
-            save_path: str,
+            save_path: str | Path,
             level_of_theory: str | dict[Literal["target", "baseline"], str],
             atomic_reference: AtomicReference | None = None,
     ) -> None:
+        save_path = Path(save_path).expanduser()
         _to_mace_dataset(
             dataset=[self],
             save_path=save_path,
@@ -415,7 +418,7 @@ class ForceConstants(_ForceConstants):
         
     def to_cif_file(
             self,
-            save_path: str,
+            save_path: str | Path,
             save_adps: bool = False,
             temperature_K: float | None = None,
             phonon_filter: PhononFilter | None = None,
@@ -435,6 +438,7 @@ class ForceConstants(_ForceConstants):
             symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
                 using crystal symmetry operations.
         """
+        save_path = Path(save_path).expanduser()
         _to_cif_file(
             force_constants=self,
             save_path=save_path,
@@ -919,8 +923,10 @@ class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
     def display(
             self,
             quantity: Literal["energy_fluctuations"] = "energy_fluctuations",
-            save_path: str | None = None
+            save_path: str | Path | None = None
     ):
+        if save_path is not None:
+            save_path = Path(save_path).expanduser()
         if quantity == "energy_fluctuations":
             return _energy_fluctuations(self, save_path)
 
@@ -1123,10 +1129,11 @@ class Dataset(_AtomicEnergiesCalc):
 
     def to_mace_dataset(
             self,
-            save_path: str,
+            save_path: str | Path,
             level_of_theory: str | dict[Literal["target", "baseline"], str],
             atomic_reference: AtomicReference | None = None,
     ) -> None:
+        save_path = Path(save_path).expanduser()
         _to_mace_dataset(
             dataset=self.structures,
             save_path=save_path,
