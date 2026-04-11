@@ -313,7 +313,7 @@ class FreeEnergy:
         if isinstance(self.molecule, mbe_automation.storage.Structure):
             self.molecule = mbe_automation.storage.to_ase(self.molecule)
 
-        self.dataset  = Path(self.dataset).expanduser()
+        self.dataset = Path(self.dataset).expanduser()
         self.work_dir = Path(self.work_dir).expanduser()
 
         self.temperatures_K = np.sort(np.atleast_1d(self.temperatures_K))
