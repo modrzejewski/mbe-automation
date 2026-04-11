@@ -45,7 +45,7 @@ def _read_cif_gemmi(
     Returns:
         Periodic structure with expanded atomic positions.
     """
-    document = gemmi.cif.read_file(filepath)
+    document = gemmi.cif.read_file(str(filepath))
     block = document.sole_block()
     asymmetric_unit = gemmi.make_small_structure_from_block(block)
     
