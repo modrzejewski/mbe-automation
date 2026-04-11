@@ -6,6 +6,7 @@ from ase import Atoms
 from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
 import numpy.typing as npt
+from pathlib import Path
 
 from mbe_automation.configs.recommended import KNOWN_MODELS
 from mbe_automation.configs.structure import Minimum
