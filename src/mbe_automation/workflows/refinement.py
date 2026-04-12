@@ -11,12 +11,7 @@ import mbe_automation.dynamics.harmonic.refinement_v3
 import mbe_automation.dynamics.harmonic.thermodynamics
 import mbe_automation.storage
 
-try:
-    from mace.calculators import MACECalculator
-    _MACE_AVAILABLE = True
-except ImportError:
-    MACECalculator = None
-    _MACE_AVAILABLE = False
+from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
 
 
 def run(

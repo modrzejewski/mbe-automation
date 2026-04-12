@@ -287,7 +287,7 @@ class FreeEnergy:
                                    # (3) space group different from the reference
                                    # (4) free energy minium beyond the volume sampling interval
                                    #
-    filter_out_imaginary_acoustic: bool = False
+    filter_out_imaginary_acoustic: bool = True
     filter_out_imaginary_optical: bool = True
     filter_out_broken_symmetry: bool = True
     filter_out_extrapolated_minimum: bool = True

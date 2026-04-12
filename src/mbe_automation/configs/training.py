@@ -6,7 +6,6 @@ import numpy.typing as npt
 from pathlib import Path
 import ase
 from ase.calculators.calculator import Calculator as ASECalculator
-from mace.calculators import MACECalculator
 
 from .md import ClassicalMD
 from .clusters import FiniteSubsystemFilter

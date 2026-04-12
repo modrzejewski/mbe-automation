@@ -13,12 +13,7 @@ import mbe_automation.configs
 import mbe_automation.dynamics
 import mbe_automation.structure
 
-try:
-    from mace.calculators import MACECalculator
-    mace_available = True
-except ImportError:
-    MACECalculator = None
-    mace_available = False
+from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
 
 def _save_md_plots(
         config: mbe_automation.configs.md.Enthalpy,
@@ -119,7 +114,7 @@ def run(config: mbe_automation.configs.md.Enthalpy):
     if isinstance(config, mbe_automation.configs.md.Enthalpy):
         mbe_automation.common.display.framed("Sublimation enthalpy")
         
-    if mace_available:
+    if _MACE_AVAILABLE:
         if isinstance(config.calculator, MACECalculator):
             mbe_automation.common.display.mace_summary(config.calculator)
 

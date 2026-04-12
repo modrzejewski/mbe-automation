@@ -7,15 +7,15 @@ name = "mbe-automation"
 version = "0.4.0"
 requires-python = ">=3.11"
 dependencies = [
-  "torch>=2.9.0",
+  "torch",
   "numpy",
   "networkx",
   "scipy",
   "ase>=3.26.0",
   "dscribe",
-  "mace-torch>=0.3.14",
   "matplotlib",
-  "pymatgen",
+  "pymatgen>=2026.3.23",
+  "pymatgen-core>=2026.4.7",
   "pyscf>=2.12.0",
   "pyscf-dispersion",
   "scikit-learn",
@@ -38,6 +38,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mace = [
+  "torch>=2.9.0",
+  "mace-torch>=0.3.15",
+]
+uma = [
+  "fairchem-core>=2.19.0",
+]
 # For CUDA 11.X environments
 gpu-cuda11 = [
   "cuequivariance",
