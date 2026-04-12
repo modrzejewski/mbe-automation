@@ -7,7 +7,7 @@ name = "mbe-automation"
 version = "0.4.0"
 requires-python = ">=3.11"
 dependencies = [
-  "torch>=2.9.0",
+  "torch",
   "numpy",
   "networkx",
   "scipy",
@@ -39,6 +39,7 @@ dependencies = [
 
 [project.optional-dependencies]
 mace = [
+  "torch>=2.9.0",
   "mace-torch>=0.3.15",
 ]
 uma = [
