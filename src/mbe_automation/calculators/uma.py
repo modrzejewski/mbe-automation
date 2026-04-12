@@ -61,7 +61,7 @@ if _UMA_AVAILABLE:
             return UMA, {
                 "model_name": self.model_name,
                 "device": self.device,
-                "task_name": self.task_name,  # Safely reads the base class property
+                "task_name": self.task_name,
             }
 else:
     UMA = None  # type: ignore[assignment,misc]
