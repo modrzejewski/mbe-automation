@@ -32,6 +32,7 @@ if _UMA_AVAILABLE:
 
             self.model_name = model_name
             self.device = device
+            self.task_name = task_name
 
             self.level_of_theory = f"uma_{model_name}_{task_name}_head"
 
