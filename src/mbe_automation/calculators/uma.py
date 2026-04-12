@@ -14,7 +14,7 @@ if _UMA_AVAILABLE:
         ASE Calculator wrapper for the Universal Machine learning potential for
         Atomistic simulations (UMA).
 
-        Provides a seamless interface within the mbe_automation package, replacing MACE.
+        Provides a seamless interface within the mbe_automation package.
         Handles UMA's multi-head (multi-task) architecture via the 'task_name' argument.
         """
         def __init__(
