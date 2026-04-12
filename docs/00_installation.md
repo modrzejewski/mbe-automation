@@ -81,7 +81,7 @@ To install the base program along with UMA:
 pip install -e ".[uma]"
 ```
 
-If you are using a system with CUDA 12, you should also install the optional `gpu-cuda12` dependencies. This includes packages like `cuequivariance` which provide necessary GPU acceleration and optimizations for this environment. For example, to install with MACE and CUDA 12:
+For CUDA 12 systems, also install gpu-cuda12 for GPU acceleration. For example, with MACE:
 
 ```bash
 pip install -e ".[mace,gpu-cuda12]"
