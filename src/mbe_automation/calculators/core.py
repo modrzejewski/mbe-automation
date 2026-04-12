@@ -16,14 +16,20 @@ from mbe_automation.storage.core import (
     CALCULATION_STATUS_FAILED,
     CALCULATION_STATUS_SCF_NOT_CONVERGED,
 )
-from mbe_automation.calculators.mace import MACE, DeltaMACE
+from mbe_automation.calculators.mace import MACE, DeltaMACE, _MACE_AVAILABLE
 from mbe_automation.calculators.pyscf import PySCFCalculator, SCFNotConverged
 from mbe_automation.calculators.dftb import DFTBCalculator
 import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
-CALCULATORS = PySCFCalculator | DFTBCalculator | MACE | DeltaMACE
+CALCULATORS = PySCFCalculator | DFTBCalculator
+
+
+def _is_mace(calc) -> bool:
+    """Safe isinstance check when MACE may be None (mace package not installed)."""
+    return _MACE_AVAILABLE and isinstance(calc, MACE)
+
 
 def _split_work(structure: Structure, n_workers: int):
     assert structure.atomic_numbers.ndim == structure.masses.ndim
@@ -96,7 +102,7 @@ def _sequential_loop(
         forces = None
 
     if compute_feature_vectors:
-        assert isinstance(calculator, MACE)
+        assert _is_mace(calculator)
         n_features = calculator.n_invariant_features()
         if average_over_atoms:
             feature_vectors = np.zeros((n_frames, n_features))
@@ -344,7 +350,7 @@ def run_model(
     if resources is None:
         resources = Resources.auto_detect()
 
-    compute_feature_vectors = compute_feature_vectors and isinstance(calculator, MACE)
+    compute_feature_vectors = compute_feature_vectors and _is_mace(calculator)
 
     n_workers = min(resources.n_gpus, structure.n_frames)
     n_gpus_per_worker = 1
@@ -352,7 +358,7 @@ def run_model(
     use_ray = (
         RAY_AVAILABLE and
         n_workers > 1 and
-        isinstance(calculator, (MACE, PySCFCalculator))
+        (isinstance(calculator, PySCFCalculator) or _is_mace(calculator))
     )
 
     if use_ray:

@@ -12,10 +12,10 @@ import numpy as np
 
 try:
     from mace.calculators import MACECalculator
-    mace_available = True
+    _MACE_AVAILABLE = True
 except ImportError:
     MACECalculator = None
-    mace_available = False
+    _MACE_AVAILABLE = False
 
 class Progress:
     """Wrap an iterable to print progress updates.

@@ -17,12 +17,7 @@ import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.structure.clusters
 
-try:
-    from mace.calculators import MACECalculator
-    mace_available = True
-except ImportError:
-    MACECalculator = None
-    mace_available = False
+from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
 
 
 def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
@@ -56,7 +51,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     )
     unit_cell = config.crystal.copy()
 
-    if mace_available:
+    if _MACE_AVAILABLE:
         if isinstance(config.calculator, MACECalculator):
             mbe_automation.common.display.mace_summary(config.calculator)
 

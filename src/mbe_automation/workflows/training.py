@@ -12,12 +12,7 @@ import mbe_automation.dynamics
 import mbe_automation.structure
 import mbe_automation.calculators
 
-try:
-    from mace.calculators import MACECalculator
-    mace_available = True
-except ImportError:
-    MACECalculator = None
-    mace_available = False
+from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
 
 
 def phonon_sampling(
@@ -33,7 +28,7 @@ def phonon_sampling(
 
     mbe_automation.common.display.framed(["Training set", "Normal-mode coordinate sampling"])
         
-    if mace_available:
+    if _MACE_AVAILABLE:
         if isinstance(config.calculator, MACECalculator):
             mbe_automation.common.display.mace_summary(config.calculator)
 
@@ -245,7 +240,7 @@ def md_sampling(
 
     mbe_automation.common.display.framed(["Training set", "MD sampling"])
         
-    if mace_available:
+    if _MACE_AVAILABLE:
         if isinstance(config.calculator, MACECalculator):
             mbe_automation.common.display.mace_summary(config.calculator)
     
