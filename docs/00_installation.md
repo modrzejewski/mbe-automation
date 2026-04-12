@@ -68,6 +68,9 @@ With the virtual environment active, install the program and its dependencies in
 
 Machine learning interatomic potentials (MLIPs) such as MACE and UMA are optional dependencies. You should explicitly include them if you plan to use them.
 
+> **Note on Compatibility**
+> As of April 12th, 2026, MACE and UMA cannot be installed in the same environment due to incompatibilities in their dependencies. You must choose one or the other, or create separate virtual environments for each.
+
 To install the base program along with MACE:
 ```bash
 pip install -e ".[mace]"
