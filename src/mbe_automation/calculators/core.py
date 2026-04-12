@@ -32,7 +32,7 @@ if _UMA_AVAILABLE:
 
 
 def _is_mace(calc: object) -> bool:
-    """Safe isinstance check when MACE may be None (mace package not installed)."""
+    """Perform a safe isinstance check when MACE may be None (mace package not installed)."""
     return MACE is not None and isinstance(calc, (MACE, DeltaMACE))
 
 
