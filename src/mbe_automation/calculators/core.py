@@ -338,7 +338,7 @@ else:
 
 def run_model(
     structure: Structure,
-    calculator: MACE | UMA | PySCFCalculator | DFTBCalculator,
+    calculator: CALCULATORS,
     compute_energies: bool = True,
     compute_forces: bool = True,
     compute_feature_vectors: bool = True,
