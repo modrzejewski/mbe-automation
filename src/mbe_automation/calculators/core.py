@@ -28,7 +28,7 @@ CALCULATORS = PySCFCalculator | DFTBCalculator
 
 def _is_mace(calc) -> bool:
     """Safe isinstance check when MACE may be None (mace package not installed)."""
-    return _MACE_AVAILABLE and isinstance(calc, MACE)
+    return MACE is not None and isinstance(calc, (MACE, DeltaMACE))
 
 
 def _split_work(structure: Structure, n_workers: int):
