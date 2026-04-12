@@ -17,21 +17,27 @@ from mbe_automation.storage.core import (
     CALCULATION_STATUS_SCF_NOT_CONVERGED,
 )
 from mbe_automation.calculators.mace import MACE, DeltaMACE, _MACE_AVAILABLE
+from mbe_automation.calculators.uma import UMA, _UMA_AVAILABLE
 from mbe_automation.calculators.pyscf import PySCFCalculator, SCFNotConverged
 from mbe_automation.calculators.dftb import DFTBCalculator
 import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
+CALCULATORS = PySCFCalculator | DFTBCalculator
 if _MACE_AVAILABLE:
-    CALCULATORS = PySCFCalculator | DFTBCalculator | MACE | DeltaMACE
-else:
-    CALCULATORS = PySCFCalculator | DFTBCalculator
+    CALCULATORS = CALCULATORS | MACE | DeltaMACE
+if _UMA_AVAILABLE:
+    CALCULATORS = CALCULATORS | UMA
 
 
 def _is_mace(calc) -> bool:
     """Safe isinstance check when MACE may be None (mace package not installed)."""
     return MACE is not None and isinstance(calc, (MACE, DeltaMACE))
+
+def _is_uma(calc) -> bool:
+    """Safe isinstance check when UMA may be None (fairchem package not installed)."""
+    return UMA is not None and isinstance(calc, UMA)
 
 
 def _split_work(structure: Structure, n_workers: int):
@@ -186,7 +192,7 @@ def _sequential_loop(
 
 
 def _parallel_loop(
-    calculator: MACE | PySCFCalculator,
+    calculator: MACE | UMA | PySCFCalculator,
     structure: Structure,
     compute_energies: bool,
     compute_forces: bool,
@@ -336,7 +342,7 @@ else:
 
 def run_model(
     structure: Structure,
-    calculator: MACE | PySCFCalculator | DFTBCalculator,
+    calculator: MACE | UMA | PySCFCalculator | DFTBCalculator,
     compute_energies: bool = True,
     compute_forces: bool = True,
     compute_feature_vectors: bool = True,
@@ -361,7 +367,7 @@ def run_model(
     use_ray = (
         RAY_AVAILABLE and
         n_workers > 1 and
-        (isinstance(calculator, PySCFCalculator) or _is_mace(calculator))
+        (isinstance(calculator, PySCFCalculator) or _is_mace(calculator) or _is_uma(calculator))
     )
 
     if use_ray:

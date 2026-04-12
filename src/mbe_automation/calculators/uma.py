@@ -2,7 +2,7 @@ import torch
 
 try:
     from fairchem.core import pretrained_mlip, FAIRChemCalculator
-    from fairchem.core.units.mlip_unit.api.inference import InferenceSettings
+    from fairchem.core.units.mlip_unit import InferenceSettings
     _UMA_AVAILABLE = True
 except ImportError:
     FAIRChemCalculator = object  # type: ignore[assignment,misc]
@@ -24,7 +24,6 @@ if _UMA_AVAILABLE:
                 task_name: str = "omc",
                 **kwargs
         ):
-            # Auto-detect GPU if not explicitly provided
             if device is None:
                 if torch.cuda.is_available():
                     device = "cuda"
@@ -34,10 +33,8 @@ if _UMA_AVAILABLE:
             self.model_name = model_name
             self.device = device
 
-            # Track the multi-head character in the level_of_theory string
             self.level_of_theory = f"uma_{model_name}_{task_name}_head"
 
-            # Create InferenceSettings with float64 precision
             inference_settings = InferenceSettings(
                 tf32=False,
                 activation_checkpointing=True,
@@ -48,12 +45,8 @@ if _UMA_AVAILABLE:
                 base_precision_dtype=torch.float64
             )
 
-            # Load the pretrained predictor
             predictor = pretrained_mlip.get_predict_unit(model_name, device=self.device, inference_settings=inference_settings)
 
-            # Initialize the base FAIRChemCalculator.
-            # We pass task_name straight to super() here.
-            # DO NOT use self.task_name = task_name!
             super().__init__(predictor, task_name=task_name, **kwargs)
 
         def serialize(self) -> tuple:
