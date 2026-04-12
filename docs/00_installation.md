@@ -2,7 +2,7 @@
 
 The program integrates several scientific codes into a unified workflow, including:
 
-*   **MACE** and **UMA:** Optional MLIP models for energies and forces.
+*   **MACE** and **UMA:** MLIP models for energies and forces.
 *   **phonopy:** Phonon calculations and vibrational properties.
 *   **pymatgen:** Crystal structure analysis and manipulation.
 *   **ASE:** Geometry relaxation and molecular dynamics simulations.
