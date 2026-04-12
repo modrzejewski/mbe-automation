@@ -35,7 +35,7 @@ if _UMA_AVAILABLE:
 
             self.level_of_theory = f"uma_{model_name}_{task_name}_head"
 
-            inference_settings = InferenceSettings(
+            config = InferenceSettings(
                 tf32=False,
                 activation_checkpointing=True,
                 merge_mole=False,
@@ -45,7 +45,11 @@ if _UMA_AVAILABLE:
                 base_precision_dtype=torch.float64
             )
 
-            predictor = pretrained_mlip.get_predict_unit(model_name, device=self.device, inference_settings=inference_settings)
+            predictor = pretrained_mlip.get_predict_unit(
+                model_name,
+                device=self.device,
+                inference_settings=config
+            )
 
             super().__init__(predictor, task_name=task_name, **kwargs)
 

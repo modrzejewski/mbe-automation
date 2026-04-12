@@ -35,10 +35,6 @@ def _is_mace(calc) -> bool:
     """Safe isinstance check when MACE may be None (mace package not installed)."""
     return MACE is not None and isinstance(calc, (MACE, DeltaMACE))
 
-def _is_uma(calc) -> bool:
-    """Safe isinstance check when UMA may be None (fairchem package not installed)."""
-    return UMA is not None and isinstance(calc, UMA)
-
 
 def _split_work(structure: Structure, n_workers: int):
     assert structure.atomic_numbers.ndim == structure.masses.ndim
@@ -192,7 +188,7 @@ def _sequential_loop(
 
 
 def _parallel_loop(
-    calculator: MACE | UMA | PySCFCalculator,
+    calculator: CALCULATORS,
     structure: Structure,
     compute_energies: bool,
     compute_forces: bool,
@@ -367,7 +363,7 @@ def run_model(
     use_ray = (
         RAY_AVAILABLE and
         n_workers > 1 and
-        (isinstance(calculator, PySCFCalculator) or _is_mace(calculator) or _is_uma(calculator))
+        (isinstance(calculator, PySCFCalculator) or _is_mace(calculator))
     )
 
     if use_ray:
