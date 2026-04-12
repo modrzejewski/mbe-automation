@@ -17,16 +17,18 @@ from mbe_automation.storage.core import (
     CALCULATION_STATUS_SCF_NOT_CONVERGED,
 )
 from mbe_automation.calculators.mace import MACE, DeltaMACE, _MACE_AVAILABLE
+from mbe_automation.calculators.uma import UMA, _UMA_AVAILABLE
 from mbe_automation.calculators.pyscf import PySCFCalculator, SCFNotConverged
 from mbe_automation.calculators.dftb import DFTBCalculator
 import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
+CALCULATORS = PySCFCalculator | DFTBCalculator
 if _MACE_AVAILABLE:
-    CALCULATORS = PySCFCalculator | DFTBCalculator | MACE | DeltaMACE
-else:
-    CALCULATORS = PySCFCalculator | DFTBCalculator
+    CALCULATORS = CALCULATORS | MACE | DeltaMACE
+if _UMA_AVAILABLE:
+    CALCULATORS = CALCULATORS | UMA
 
 
 def _is_mace(calc) -> bool:
@@ -186,7 +188,7 @@ def _sequential_loop(
 
 
 def _parallel_loop(
-    calculator: MACE | PySCFCalculator,
+    calculator: CALCULATORS,
     structure: Structure,
     compute_energies: bool,
     compute_forces: bool,
@@ -336,7 +338,7 @@ else:
 
 def run_model(
     structure: Structure,
-    calculator: MACE | PySCFCalculator | DFTBCalculator,
+    calculator: CALCULATORS,
     compute_energies: bool = True,
     compute_forces: bool = True,
     compute_feature_vectors: bool = True,

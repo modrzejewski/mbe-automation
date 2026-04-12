@@ -12,6 +12,7 @@ from .calculators import (
     DFT,
     MACE,
     DeltaMACE,
+    UMA,
 )
 
 from .storage.core import (
