@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Any, Literal
 from dataclasses import dataclass, field
+from pathlib import Path
 import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
@@ -208,13 +209,13 @@ class Enthalpy:
                                    # Directory where files are stored
                                    # at runtime
                                    #
-    work_dir: str = "./"
+    work_dir: str | Path = "./"
                                    #
                                    # The main result of the calculations:
                                    # a single HDF5 file with all data computed
                                    # for the physical system
                                    #
-    dataset: str = "./properties.hdf5"
+    dataset: str | Path = "./properties.hdf5"
     root_key: str = "md"
                                    #
                                    # Verbosity of the program's output.
@@ -230,6 +231,9 @@ class Enthalpy:
         if isinstance(self.molecule, mbe_automation.storage.Structure):
             self.molecule = mbe_automation.storage.to_ase(self.molecule)
         
+        self.dataset  = Path(self.dataset).expanduser()
+        self.work_dir = Path(self.work_dir).expanduser()
+
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
         self.pressures_GPa = np.atleast_1d(self.pressures_GPa)
         

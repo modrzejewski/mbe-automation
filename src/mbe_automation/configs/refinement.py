@@ -15,7 +15,7 @@ class NormalModeRefinement:
     #
     # Path to the experimental CIF file.
     #
-    cif_path: str
+    cif_path: str | Path
     #
     # ASE-compatible force calculator or MBE calculator configuration.
     #
@@ -49,7 +49,7 @@ class NormalModeRefinement:
     # a single dataset file with all data computed
     # for the physical system.
     #
-    dataset: str = "./properties.hdf5"
+    dataset: str | Path = "./properties.hdf5"
     #
     # Root location in the dataset hierarchical structure.
     #
@@ -73,7 +73,9 @@ class NormalModeRefinement:
     best_strategy_criterion: Literal["mean_s12", "rmsd"] = "mean_s12"
 
     def __post_init__(self):
-        self.work_dir = Path(self.work_dir)
+        self.cif_path = Path(self.cif_path).expanduser()
+        self.dataset  = Path(self.dataset).expanduser()
+        self.work_dir = Path(self.work_dir).expanduser()
         self.temperatures_K = np.sort(np.atleast_1d(self.temperatures_K))
         if len(self.temperatures_K) > 1:
             diffs = np.diff(self.temperatures_K)

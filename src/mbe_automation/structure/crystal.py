@@ -631,22 +631,28 @@ def compare_conventional_cells(
     sg_i = f"{sga_i.get_space_group_symbol()} ({sga_i.get_space_group_number()})"
     sg_f = f"{sga_f.get_space_group_symbol()} ({sga_f.get_space_group_number()})"
 
-    print(f"Comparison of conventional cells")
-    print(f"Space Group: {sg_i} -> {sg_f}")
-    print(f"{'-' * 75}")
-    print(f"{'Parameter':<15} | {label_initial:<15} | {label_final:<15} | {'Change [%]':<10}")
-    print(f"{'-' * 75}")
+    percent_change_ang = (ang_f - ang_i) / ang_i * 100
 
-    params = ["a [Å]", "b [Å]", "c [Å]"]
-    for i, p in enumerate(params):
-        print(f"{p:<15} | {abc_i[i]:<15.3f} | {abc_f[i]:<15.3f} | {percent_change_abc[i]:<+10.2f}")
+    col_w = 20
+    header = f"{'conventional cell':<{col_w}}   {label_initial:<{col_w}}   {label_final:<{col_w}}   {'Δ [%]':<8}"
+    data_rows = [
+        f"{'a [Å]':<{col_w}}   {abc_i[0]:<{col_w}.3f}   {abc_f[0]:<{col_w}.3f}   {percent_change_abc[0]:<+8.2f}",
+        f"{'b [Å]':<{col_w}}   {abc_i[1]:<{col_w}.3f}   {abc_f[1]:<{col_w}.3f}   {percent_change_abc[1]:<+8.2f}",
+        f"{'c [Å]':<{col_w}}   {abc_i[2]:<{col_w}.3f}   {abc_f[2]:<{col_w}.3f}   {percent_change_abc[2]:<+8.2f}",
+        f"{'α [°]':<{col_w}}   {ang_i[0]:<{col_w}.1f}   {ang_f[0]:<{col_w}.1f}   {percent_change_ang[0]:<+8.2f}",
+        f"{'β [°]':<{col_w}}   {ang_i[1]:<{col_w}.1f}   {ang_f[1]:<{col_w}.1f}   {percent_change_ang[1]:<+8.2f}",
+        f"{'γ [°]':<{col_w}}   {ang_i[2]:<{col_w}.1f}   {ang_f[2]:<{col_w}.1f}   {percent_change_ang[2]:<+8.2f}",
+        f"{'volume [Å³]':<{col_w}}   {vol_i:<{col_w}.1f}   {vol_f:<{col_w}.1f}   {percent_change_vol:<+8.2f}",
+        f"{'space group':<{col_w}}   {sg_i:<{col_w}}   {sg_f:<{col_w}}",
+    ]
+    n = max(len(header), max(len(d) for d in data_rows))
+    mbe_automation.common.display.dotted_separator(n)
+    print(header)
+    mbe_automation.common.display.dotted_separator(n)
+    for row in data_rows:
+        print(row)
+    mbe_automation.common.display.dotted_separator(n)
 
-    angles = ["α [°]", "β [°]", "γ [°]"]
-    for i, a in enumerate(angles):
-        print(f"{a:<15} | {ang_i[i]:<15.1f} | {ang_f[i]:<15.1f} | {'-':<10}")
-
-    print(f"{'Volume [Å³]':<15} | {vol_i:<15.1f} | {vol_f:<15.1f} | {percent_change_vol:<+10.2f}")
-    print(f"{'-' * 75}\n")
 
 
 def conventional_cell_params(
@@ -714,20 +720,24 @@ def display_conventional_cell(
     
     sg_string = f"{sga.get_space_group_symbol()} ({sga.get_space_group_number()})"
 
-    print(f"conventional cell parameters: {label}")
-    print(f"space group: {sg_string}")
-    print(f"{'-' * 40}")
-    print(f"{'parameter':<15} | {'value':<15}")
-    print(f"{'-' * 40}")
-    
-    params = ["a [Å]", "b [Å]", "c [Å]"]
-    for i, p in enumerate(params):
-        print(f"{p:<15} | {abc[i]:<15.3f}")
+    col_w = 18
+    header = f"{'conventional cell':<{col_w}}   {'value':<{col_w}}"
+    data_rows = [
+        f"{'a [Å]':<{col_w}}   {abc[0]:<{col_w}.3f}",
+        f"{'b [Å]':<{col_w}}   {abc[1]:<{col_w}.3f}",
+        f"{'c [Å]':<{col_w}}   {abc[2]:<{col_w}.3f}",
+        f"{'α [°]':<{col_w}}   {ang[0]:<{col_w}.1f}",
+        f"{'β [°]':<{col_w}}   {ang[1]:<{col_w}.1f}",
+        f"{'γ [°]':<{col_w}}   {ang[2]:<{col_w}.1f}",
+        f"{'volume [Å³]':<{col_w}}   {lat.volume:<{col_w}.1f}",
+        f"{'atoms':<{col_w}}   {n_atoms:<{col_w}}",
+        f"{'space group':<{col_w}}   {sg_string}",
+    ]
+    n = max(len(header), max(len(d) for d in data_rows))
+    mbe_automation.common.display.dotted_separator(n)
+    print(header)
+    mbe_automation.common.display.dotted_separator(n)
+    for row in data_rows:
+        print(row)
+    mbe_automation.common.display.dotted_separator(n)
 
-    angles = ["α [°]", "β [°]", "γ [°]"]
-    for i, a in enumerate(angles):
-        print(f"{a:<15} | {ang[i]:<15.1f}")
-
-    print(f"{'volume [Å³]':<15} | {lat.volume:<15.1f}")
-    print(f"{'atoms':<15} | {n_atoms:<15}")
-    print(f"{'-' * 40}\n")

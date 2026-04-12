@@ -6,6 +6,7 @@ from ase import Atoms
 from ase.calculators.calculator import Calculator as ASECalculator
 import numpy as np
 import numpy.typing as npt
+from pathlib import Path
 
 from mbe_automation.configs.recommended import KNOWN_MODELS
 from mbe_automation.configs.structure import Minimum
@@ -113,13 +114,13 @@ class FreeEnergy:
                                    # Directory where files are stored
                                    # at runtime
                                    #
-    work_dir: str = "./"
+    work_dir: str | Path = "./"
                                    #
                                    # The main result of the calculations:
                                    # a single dataset file with all data computed
                                    # for the physical system
                                    #
-    dataset: str = "./properties.hdf5"
+    dataset: str | Path = "./properties.hdf5"
                                    #
                                    # Root location in the dataset hierarchical
                                    # structure.
@@ -312,6 +313,9 @@ class FreeEnergy:
             self.crystal = mbe_automation.storage.to_ase(self.crystal)
         if isinstance(self.molecule, mbe_automation.storage.Structure):
             self.molecule = mbe_automation.storage.to_ase(self.molecule)
+
+        self.dataset = Path(self.dataset).expanduser()
+        self.work_dir = Path(self.work_dir).expanduser()
 
         self.temperatures_K = np.sort(np.atleast_1d(self.temperatures_K))
         if len(self.temperatures_K) > 1:
