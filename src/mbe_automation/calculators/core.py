@@ -23,7 +23,10 @@ import mbe_automation.common.display
 import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
-CALCULATORS = PySCFCalculator | DFTBCalculator
+if _MACE_AVAILABLE:
+    CALCULATORS = PySCFCalculator | DFTBCalculator | MACE | DeltaMACE
+else:
+    CALCULATORS = PySCFCalculator | DFTBCalculator
 
 
 def _is_mace(calc) -> bool:
