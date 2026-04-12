@@ -646,8 +646,6 @@ def compare_conventional_cells(
         f"{'space group':<{col_w}}   {sg_i:<{col_w}}   {sg_f:<{col_w}}",
     ]
     n = max(len(header), max(len(d) for d in data_rows))
-    sep = (". " * (n // 2 + 1))[:n]
-
     mbe_automation.common.display.dotted_separator(n)
     print(header)
     mbe_automation.common.display.dotted_separator(n)
@@ -736,8 +734,6 @@ def display_conventional_cell(
         f"{'space group':<{col_w}}   {sg_string}",
     ]
     n = max(len(header), max(len(d) for d in data_rows))
-    sep = (". " * (n // 2 + 1))[:n]
-
     mbe_automation.common.display.dotted_separator(n)
     print(header)
     mbe_automation.common.display.dotted_separator(n)
