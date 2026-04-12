@@ -66,7 +66,7 @@ git submodule update --init --recursive
 
 With the virtual environment active, install the program and its dependencies in editable mode using `pip`. The `-e` flag allows you to make changes to the source code without needing to reinstall the package.
 
-Machine learning interatomic potentials (MLIPs) such as MACE and UMA are optional dependencies. You should explicitly include them if you plan to use them.
+MACE and UMA are optional dependencies. Include them if needed.
 
 > **Note on Compatibility**
 > As of April 12th, 2026, MACE and UMA cannot be installed in the same environment due to incompatibilities in their dependencies. You must choose one or the other, or create separate virtual environments for each.
