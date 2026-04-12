@@ -164,7 +164,7 @@ if _MACE_AVAILABLE:
 
         def serialize(self) -> tuple:
             """
-            Returns the class and arguments required to reconstruct the calculator.
+            Return the class and arguments required to reconstruct the calculator.
             Used for passing the calculator to Ray workers.
             """
             return DeltaMACE, {
