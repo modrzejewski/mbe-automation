@@ -2,7 +2,7 @@
 
 The program integrates several scientific codes into a unified workflow, including:
 
-*   **MACE:** Primary MLIP model for energies and forces.
+*   **MACE** and **UMA:** Optional MLIP models for energies and forces.
 *   **phonopy:** Phonon calculations and vibrational properties.
 *   **pymatgen:** Crystal structure analysis and manipulation.
 *   **ASE:** Geometry relaxation and molecular dynamics simulations.
@@ -66,16 +66,22 @@ git submodule update --init --recursive
 
 With the virtual environment active, install the program and its dependencies in editable mode using `pip`. The `-e` flag allows you to make changes to the source code without needing to reinstall the package.
 
+Machine learning interatomic potentials (MLIPs) such as MACE and UMA are optional dependencies. You should explicitly include them if you plan to use them.
+
+To install the base program along with MACE:
 ```bash
-pip install -e .
+pip install -e ".[mace]"
 ```
 
-This command will read the `pyproject.toml` file and install all the required dependencies.
+To install the base program along with UMA:
+```bash
+pip install -e ".[uma]"
+```
 
-If you are using a system with CUDA 12, you should instead install the optional `gpu-cuda12` dependencies. This includes packages like `cuequivariance` which provide necessary GPU acceleration and optimizations for this environment.
+If you are using a system with CUDA 12, you should also install the optional `gpu-cuda12` dependencies. This includes packages like `cuequivariance` which provide necessary GPU acceleration and optimizations for this environment. For example, to install with MACE and CUDA 12:
 
 ```bash
-pip install -e ".[gpu-cuda12]"
+pip install -e ".[mace,gpu-cuda12]"
 ```
 
 The installation process may take several minutes.
@@ -92,6 +98,7 @@ The `mbe-automation` package supports several calculation methods. While some de
 | Method | Required Software/Library |
 | :--- | :--- |
 | MACE | `mace-torch` (Python package) |
+| UMA | `fairchem-core` (Python package) |
 | DFT† | `gpu4pyscf`, `pyscf` (Python packages) |
 | HF† | `gpu4pyscf`, `pyscf` (Python packages) |
 | DFTB+MBD, DFTB3-D4 | `dftb+` (Executable) |
