@@ -13,6 +13,7 @@ While these calculators inherit from the standard ASE `Calculator` interface, th
 
 *   [MACE](#mace)
 *   [DeltaMACE](#deltamace)
+*   [UMA](#uma)
 *   [PySCF (DFT & HF)](#pyscf-dft--hf)
 *   [DFTB+ (Semi-empirical)](#dftb-semi-empirical)
 
@@ -97,6 +98,40 @@ energy = structure.ground_truth.energies[calc.level_of_theory]
 forces = structure.ground_truth.forces[calc.level_of_theory]
 
 print(f"Delta-learning Energy: {energy} eV/atom")
+print(f"Forces:\n{forces}")
+```
+
+## UMA
+
+The `UMA` class wraps the Universal Machine learning potential for Atomistic simulations (UMA) via the `fairchem` interface. It handles UMA's multi-head (multi-task) architecture and enforces 64-bit precision by default for robust calculations.
+
+### Adjustable parameters
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `model_name` | `str` | `"uma-s-1p2"` | The UMA model version to use. Any model name listed in the [`fairchem` repository](https://github.com/facebookresearch/fairchem) can be used. |
+| `task_name` | `str` | `"omc"` | The specific task/head to use for predictions (e.g., "omc" for organic molecular crystals). |
+
+### Code Example
+
+```python
+from mbe_automation import Structure
+from mbe_automation.calculators import UMA
+
+# Initialize the UMA calculator
+calc = UMA(model_name="uma-s-1p2", task_name="omc")
+
+# Load a structure
+structure = Structure.from_xyz_file("structure.xyz")
+
+# Run calculation
+structure.run(calc)
+
+# Retrieve results using the calculator's level of theory
+energy = structure.ground_truth.energies[calc.level_of_theory]
+forces = structure.ground_truth.forces[calc.level_of_theory]
+
+print(f"UMA Energy: {energy} eV/atom")
 print(f"Forces:\n{forces}")
 ```
 
