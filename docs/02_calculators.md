@@ -118,16 +118,11 @@ The UMA class wraps the Universal Machine learning potential for Atomistic simul
 from mbe_automation import Structure
 from mbe_automation.calculators import UMA
 
-# Initialize the UMA calculator
 calc = UMA(model_name="uma-s-1p2", task_name="omc")
 
-# Load a structure
 structure = Structure.from_xyz_file("structure.xyz")
-
-# Run calculation
 structure.run(calc)
 
-# Retrieve results using the calculator's level of theory
 energy = structure.ground_truth.energies[calc.level_of_theory]
 forces = structure.ground_truth.forces[calc.level_of_theory]
 
