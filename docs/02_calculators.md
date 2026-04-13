@@ -103,7 +103,7 @@ print(f"Forces:\n{forces}")
 
 ## UMA
 
-The `UMA` class wraps the Universal Machine learning potential for Atomistic simulations (UMA) via the `fairchem` interface. It handles UMA's multi-head (multi-task) architecture and enforces 64-bit precision by default for robust calculations.
+The `UMA` class wraps the Universal Machine learning potential for Atomistic simulations (UMA) via the `fairchem` interface. It handles UMA's multi-head (multi-task) architecture and enforces 64-bit precision by default for numerically stable calculations of phonons.
 
 ### Adjustable parameters
 
