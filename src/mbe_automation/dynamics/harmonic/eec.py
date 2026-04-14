@@ -5,6 +5,11 @@ import numpy as np
 import numpy.typing as npt
 import ase.units
 from scipy.interpolate import CubicSpline
+import warnings
+from scipy.integrate import quad
+from scipy.optimize import curve_fit
+from typing import Callable, Tuple
+
 
 ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "none"]
 
@@ -26,6 +31,87 @@ class EECConfig:
     @property
     def is_enabled(self) -> bool:
         return self.type != "none"
+
+def _debay_fit(
+    V: npt.NDArray[np.float64],
+    T: npt.NDArray[np.float64],
+    T_cutoff: float
+) -> Tuple[Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    """
+    Fits the Debye model to Volume-Temperature data up to a specified cutoff temperature.
+    
+    Args:
+        V: Array of volumes.
+        T: Array of temperatures.
+        T_cutoff: Maximum temperature to include in the curve fitting.
+        
+    Returns:
+        fitted_function: A callable function that takes a temperature array and returns the fitted volumes.
+        V_extrapolated: The volumes calculated over the entire original T array using the fit.
+        T: The original temperature array.
+    """
+
+    def debye_integral_func(z):
+        """Integrand for the Debye function."""
+        if z == 0:
+            return 0.0
+        return (z**3) / (np.exp(z) - 1.0)
+
+    def debye_function(x):
+        """Calculates D(x) as defined in the supplemental material."""
+        if x <= 0:
+            return 1.0 
+        
+        integral, _ = quad(debye_integral_func, 0, x)
+        return (3.0 / (x**3)) * integral
+
+    def debye_volume(T_arr, V0, ThetaD, C):
+        """
+        Calculates the volume based on the Debye model:
+        V(T) = V(0) + C * T * D(ThetaD / T)
+        """
+        # Ensure input is an array for enumeration
+        T_arr = np.atleast_1d(T_arr)
+        V_out = np.zeros_like(T_arr, dtype=float)
+        
+        for i, t in enumerate(T_arr):
+            if t <= 0:
+                V_out[i] = V0
+            else:
+                x = ThetaD / t
+                V_out[i] = V0 + C * t * debye_function(x)
+                
+        # Return scalar if input was scalar
+        return V_out[0] if V_out.size == 1 and np.isscalar(T_arr) else V_out
+
+    # --- 1. Apply Cutoff Mask ---
+    fit_mask = T <= T_cutoff
+    T_fit = T[fit_mask]
+    V_fit = V[fit_mask]
+
+    if len(T_fit) < 3:
+        raise ValueError(f"Not enough data points below T_cutoff ({T_cutoff} K) to perform the fit.")
+
+    # --- 2. Perform the Curve Fit ---
+    initial_guess = [V[0], 200.0, 0.001] 
+    fit_bounds = ([0.0, 0.0, 0.0], [np.inf, 1000.0, np.inf])
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        popt, pcov = curve_fit(debye_volume, T_fit, V_fit, p0=initial_guess, bounds=fit_bounds)
+
+    V0_fit, ThetaD_fit, C_fit = popt
+
+    # --- 3. Create a Frozen Fitted Function ---
+    def fitted_function(T_eval: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        """Callable wrapper that uses the optimal parameters found during the fit."""
+        return debye_volume(T_eval, V0_fit, ThetaD_fit, C_fit)
+
+    # --- 4. Evaluate over the full provided temperature range ---
+    V_extrapolated = fitted_function(T)
+
+    return fitted_function, V_extrapolated, T
+
 
 def _eec_value(
     V, 
