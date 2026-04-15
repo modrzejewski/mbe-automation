@@ -8,7 +8,7 @@ from scipy.interpolate import CubicSpline
 import warnings
 import scipy.integrate
 import scipy.optimize
-from typing import Callable, Tuple
+from typing import Callable
 
 ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "none"]
 
