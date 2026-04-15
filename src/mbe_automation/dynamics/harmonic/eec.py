@@ -140,7 +140,8 @@ def _debye_fit_params(
 class DebyeModel:
     """
     Extrapolation and interpolation of the equilibrium cell volume using
-    the Debye model of eq 1 of ref 1.
+    the Debye model of eq 1 of ref 1. The fit of numerical parameters
+    is carried out within the trust region defined by max_fit_temperature_K.
                                                                        
     Literature:
     1. Hsin-Yu Ko, Robert A. DiStasio, Jr., Biswajit Santra, and Roberto Car,
@@ -148,26 +149,22 @@ class DebyeModel:
        Phys. Rev. Materials 2, 055603 (2018); doi: 10.1103/PhysRevMaterials.2.055603
                                    
     """
-    max_fit_temperature_K: float
-    fit_V0: float
-    fit_ThetaD: float
-    fit_C: float
+    max_fit_temperature_K: float = 200.0
+    _V0: float | None = None
+    _ThetaD: float | None = None
+    _C: float | None = None
 
-    @classmethod
     def fit(
+        self,
         T: npt.NDArray[np.float64],
         V: npt.NDArray[np.float64],
-        max_fit_temperature_K: float,
     ):
-        assert len(T) >= 3, "At least 3 data points are required for fitting DebyeModel."
-        V0, ThetaD, C = _debye_fit_params(
-            V=V, T=T, T_cutoff=max_fit_temperature_K,
+        assert len(T[T <= self.max_fit_temperature_K]) >= 3, (
+            "At least 3 data points within the trust region "
+            " are required to fit DebyeModel."
         )
-        return DebyeModel(
-            max_fit_temperature_K=max_fit_temperature_K,
-            fit_V0=V0,
-            fit_ThetaD=ThetaD,
-            fit_C=C,
+        self._V0, self._ThetaD, self._C = _debye_fit_params(
+            V=V, T=T, T_cutoff=self.max_fit_temperature_K,
         )
 
     def predict(
@@ -186,8 +183,14 @@ class DebyeModel:
                 - Array of predicted equilibrium volumes.
                 - Array of predicted volumetric thermal expansion coefficients.
         """
-        V_pred = _debye_volumes(T, self.fit_V0, self.fit_ThetaD, self.fit_C)
-        alpha_V_pred = _debye_alpha_V(T, self.fit_V0, self.fit_ThetaD, self.fit_C)
+        assert (
+            self._V0 is not None 
+            and self._ThetaD is not None 
+            and self._C is not None
+        ), "Cannot run `predict` with an uninitialized DebyeModel."
+
+        V_pred = _debye_volumes(T, self._V0, self._ThetaD, self._C)
+        alpha_V_pred = _debye_alpha_V(T, self._V0, self._ThetaD, self._C)
         return V_pred, alpha_V_pred
 
 @dataclass(kw_only=True)
