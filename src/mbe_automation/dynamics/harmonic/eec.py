@@ -38,7 +38,7 @@ def _debye_function(x: float) -> float:
     
     return D3
 
-def _debye_function_derivative(x):
+def _debye_function_derivative(x: float) -> float:
     """dD_3(x)/dx """
 
     if x < 1.0E-2: # switchover value tested with Mathematica
