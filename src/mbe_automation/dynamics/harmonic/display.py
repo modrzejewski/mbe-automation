@@ -6,13 +6,16 @@ import numpy.typing as npt
 import pandas as pd
 import os
 import os.path
-from typing import Literal
+from typing import Literal, TYPE_CHECKING
 import phonopy.physical_units
 import nglview
 import pymatviz
 
 import mbe_automation.storage
 import mbe_automation.dynamics.harmonic.modes
+
+if TYPE_CHECKING:
+    from mbe_automation.dynamics.harmonic.eec import DebyeModel
 
 def animate_pymatviz(
         mode: mbe_automation.storage.Structure,
@@ -341,6 +344,57 @@ def eos_curves(
         plt.close(fig)
     else:
         return fig
+
+
+def compare_Debye_vs_G_min(
+    debye_model: DebyeModel,
+    T: npt.NDArray[np.float64],
+    V: npt.NDArray[np.float64],
+    save_path: str | None = None,
+):
+    """
+    Plot the comparison between the Debye model predictions and the results
+    from Gibbs free energy minimization.
+
+    The Debye model is plotted as a continuous line (calculated on a dense grid 
+    from 0 K to the maximum temperature in T), while the G minimization results 
+    are shown as discrete circular points.
+
+    Args:
+        debye_model: An instance of DebyeModel.
+        T: Array of temperatures (K).
+        V: Corresponding equilibrium volumes (Å³∕unit cell) from minimization of G.
+        save_path: Optional path to save the plot. If None, the figure object is returned.
+    """
+    T_dense = np.linspace(0, np.max(T), 200)
+    V_pred, _ = debye_model.predict(T_dense)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Plot Debye model as a continuous line
+    ax.plot(T_dense, V_pred, label="Debye Model", color="tab:blue", lw=2, zorder=2)
+
+    # Plot G minimization points as circular separated points
+    ax.scatter(T, V, label="G minimization", color="tab:red", marker="o", facecolors="none", s=50, zorder=3)
+
+    ax.set_xlabel("Temperature (K)", fontsize=14)
+    ax.set_ylabel("Volume (Å³∕unit cell)", fontsize=14)
+    ax.grid(True, linestyle="--", alpha=0.6)
+    ax.legend(fontsize=12)
+    ax.tick_params(labelsize=12)
+
+    plt.tight_layout()
+
+    if save_path:
+        output_dir = os.path.dirname(save_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        plt.savefig(save_path, dpi=300)
+        plt.close(fig)
+    else:
+        return fig
+
+
 
 
 def print_adps_comparison(
