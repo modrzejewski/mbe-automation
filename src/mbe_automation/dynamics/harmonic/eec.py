@@ -101,7 +101,7 @@ def _debye_fit_params(
     V: npt.NDArray[np.float64],
     T: npt.NDArray[np.float64],
     T_cutoff: float
-) -> tuple[np.float64]:
+) -> tuple[float, float, float]:
     """
     Fit the Debye model to Volume-Temperature data up to a specified cutoff temperature.
     
