@@ -12,7 +12,7 @@ from typing import Callable
 
 ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "none"]
 
-def _debye_function(x):
+def _debye_function(x: float) -> float:
     """Calculate D_3(x) = 3/x**3 Integrate(0,x) z**3/(exp(x)-1) dz."""
 
     assert x >= 0, "Argument of the Debye function must be non-negative."
