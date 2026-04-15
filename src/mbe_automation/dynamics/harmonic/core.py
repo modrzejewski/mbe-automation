@@ -61,6 +61,7 @@ class EOSMetadata:
     dataset: str
     force_constants_keys: list[str]
     eec: mbe_automation.dynamics.harmonic.eec.EEC
+    debye_model: mbe_automation.dynamics.harmonic.eec.DebyeModel
 
     def S_vib_at_T(
         self, 
@@ -368,6 +369,7 @@ def equilibrium_curve(
         filter_out_broken_symmetry: bool,
         filter_out_extrapolated_minimum: bool,
         electronic_energy_correction: mbe_automation.dynamics.harmonic.eec.EECConfig,
+        debye_model: mbe_automation.dynamics.harmonic.eec.DebyeModel,
         dataset: str,
         root_key: str,
         save_plots: bool,
@@ -702,6 +704,24 @@ def equilibrium_curve(
         "min_found": min_found,
         "min_extrapolated": min_extrapolated
     })
+    df_fit = df[
+        (df["T (K)"] <= debye_model.max_fit_temperature_K) &
+        (df["min_found"])
+    ]
+    if filter_out_extrapolated_minimum:
+        df_fit = df_fit[~df_fit["min_extrapolated"]]
+
+    if len(df_fit) >= 3:
+        debye_model.fit(
+            T=df_fit["T (K)"].to_numpy(), 
+            V=df_fit["V_eos (Å³∕unit cell)"].to_numpy()
+        )
+
+    if debye_model.initialized:
+        V_debye, alpha_V_debye = debye_model.predict(temperatures)
+        df["V_crystal_debye (Å³∕unit cell)"] = V_debye
+        df["alpha_V_debye (1∕K)"] = alpha_V_debye
+
     mbe_automation.dynamics.harmonic.display.eos_fitting_summary(
         df_crystal_eos=df,
         filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
@@ -719,7 +739,8 @@ def equilibrium_curve(
         sampled_volumes=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
         dataset=dataset,
         force_constants_keys=force_constants_keys,
-        eec=eec
+        eec=eec,
+        debye_model=debye_model
     )
 
     mbe_automation.storage.core.save_eos_metadata(

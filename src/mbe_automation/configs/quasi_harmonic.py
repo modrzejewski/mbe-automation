@@ -16,6 +16,7 @@ import mbe_automation.storage
 
 from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
 from mbe_automation.dynamics.harmonic.eec import ELECTRONIC_ENERGY_CORRECTION, EECConfig as EEC
+from mbe_automation.dynamics.harmonic.eec import DebyeModel
 
 @dataclass(kw_only=True)
 class FreeEnergy:
@@ -56,6 +57,15 @@ class FreeEnergy:
                                    #    J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
                                    #
     electronic_energy_correction: EEC = field(default_factory=lambda: EEC(type="none"))
+                                   #
+                                   # Debye model used to extrapolate/interpolate the equilibrium
+                                   # cell volume. Using this model is highly recommended for 
+                                   # cases where G(V, p) is very flat and finding its minimum 
+                                   # numerically at a given T is difficult, or when the 
+                                   # minimum falls outside the range of volumes sampled 
+                                   # to obtain the EOS curve.
+                                   #
+    debye_model: DebyeModel = field(default_factory=DebyeModel)
                                    #
                                    # Volumetric thermal expansion
                                    #

@@ -150,6 +150,7 @@ class DebyeModel:
                                    
     """
     max_fit_temperature_K: float = 200.0
+    initialized: bool = False
     _V0: float | None = None
     _ThetaD: float | None = None
     _C: float | None = None
@@ -166,6 +167,7 @@ class DebyeModel:
         self._V0, self._ThetaD, self._C = _debye_fit_params(
             V=V, T=T, T_cutoff=self.max_fit_temperature_K,
         )
+        self.initialized = True
 
     def predict(
         self,
@@ -183,11 +185,7 @@ class DebyeModel:
                 - Array of predicted equilibrium volumes.
                 - Array of predicted volumetric thermal expansion coefficients.
         """
-        assert (
-            self._V0 is not None 
-            and self._ThetaD is not None 
-            and self._C is not None
-        ), "Cannot run `predict` with an uninitialized DebyeModel."
+        assert self.initialized, "Cannot run `predict` with an uninitialized DebyeModel."
 
         V_pred = _debye_volumes(T, self._V0, self._ThetaD, self._C)
         alpha_V_pred = _debye_alpha_V(T, self._V0, self._ThetaD, self._C)

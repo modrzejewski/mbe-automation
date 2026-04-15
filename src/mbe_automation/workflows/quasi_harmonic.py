@@ -238,6 +238,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.filter_out_broken_symmetry,
         config.filter_out_extrapolated_minimum,
         config.electronic_energy_correction,
+        config.debye_model,
         config.dataset,
         config.root_key,
         config.save_plots,

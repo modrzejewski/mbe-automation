@@ -784,6 +784,35 @@ def _read_eec(group: h5py.Group):
     return EEC(config=eec_config, param=param)
 
 
+def _save_debye_model(
+        group: h5py.Group, 
+        debye_model: "mbe_automation.dynamics.harmonic.eec.DebyeModel"
+) -> None:
+    """Save a DebyeModel instance into the provided group."""
+    group.attrs["dataclass"] = "DebyeModel"
+    group.attrs["initialized"] = debye_model.initialized
+    group.attrs["max_fit_temperature (K)"] = debye_model.max_fit_temperature_K
+    
+    if debye_model.initialized:
+        group.attrs["V0"] = debye_model._V0
+        group.attrs["ThetaD (K)"] = debye_model._ThetaD
+        group.attrs["C"] = debye_model._C
+
+
+def _read_debye_model(group: h5py.Group):
+    """Read a DebyeModel instance from the provided group."""
+    from mbe_automation.dynamics.harmonic.eec import DebyeModel
+    model = DebyeModel(
+        max_fit_temperature_K=group.attrs["max_fit_temperature (K)"]
+    )
+    if group.attrs["initialized"]:
+        model._V0 = group.attrs["V0"]
+        model._ThetaD = group.attrs["ThetaD (K)"]
+        model._C = group.attrs["C"]
+        model.initialized = True
+    return model
+
+
 def save_eos_metadata(
         eos_metadata,
         dataset: str,
@@ -823,6 +852,10 @@ def save_eos_metadata(
         eec_subgroup = group.create_group("eec")
         _save_eec(eec_subgroup, eos_metadata.eec)
 
+        if eos_metadata.debye_model.initialized:
+            debye_subgroup = group.create_group("debye_model")
+            _save_debye_model(debye_subgroup, eos_metadata.debye_model)
+
     # Save DataFrames outside the main dataset_file block to prevent 
     # deadlocks if save_data_frame also acquires a lock 
     # (though save_data_frame also uses dataset_file internally).
@@ -858,6 +891,12 @@ def read_eos_metadata(
         select_T = [row for row in select_T_stacked]
 
         eec = _read_eec(group["eec"])
+        
+        if "debye_model" in group:
+            debye_model = _read_debye_model(group["debye_model"])
+        else:
+            from mbe_automation.dynamics.harmonic.eec import DebyeModel
+            debye_model = DebyeModel()
 
     interpolated_df = read_data_frame(
         dataset=dataset,
@@ -876,7 +915,8 @@ def read_eos_metadata(
         sampled_volumes=sampled_volumes,
         dataset=dataset,
         force_constants_keys=force_constants_keys,
-        eec=eec
+        eec=eec,
+        debye_model=debye_model
     )
 
 def _save_structure(
