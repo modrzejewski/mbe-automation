@@ -185,7 +185,8 @@ class DebyeModel:
                 - Array of predicted equilibrium volumes.
                 - Array of predicted volumetric thermal expansion coefficients.
         """
-        assert self.initialized, "Cannot run `predict` with an uninitialized DebyeModel."
+        if not self.initialized:
+            raise RuntimeError("Cannot run `predict` with an uninitialized DebyeModel.")
 
         V_pred = _debye_volumes(T, self._V0, self._ThetaD, self._C)
         alpha_V_pred = _debye_alpha_V(T, self._V0, self._ThetaD, self._C)
