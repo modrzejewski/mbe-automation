@@ -45,9 +45,13 @@ def _debye_function_derivative(x: float) -> float:
     if x < 1.0E-2: # switchover value tested with Mathematica
         dD3dx = -3/8 + 1/10 * x - 1/420 * x**3 + 1/15120 * x**5
 
-    else:
+    elif x < 50:
         D3 = _debye_function(x)
         dD3dx = -3 / x * D3 + 3 / np.expm1(x)
+
+    else:
+        D3 = _debye_function(x)
+        dD3dx = -3 / x * D3
 
     return dD3dx
 
