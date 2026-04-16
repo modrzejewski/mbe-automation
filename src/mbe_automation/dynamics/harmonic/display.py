@@ -371,10 +371,7 @@ def compare_Debye_vs_G_min(
 
     fig, ax = plt.subplots(figsize=(8, 6))
 
-    # Plot Debye model as a continuous line
     ax.plot(T_dense, V_pred, label="Debye Model", color="tab:blue", lw=2, zorder=2)
-
-    # Plot G minimization points as circular separated points
     ax.scatter(T, V, label="G minimization", color="tab:red", marker="o", facecolors="none", s=50, zorder=3)
 
     ax.set_xlabel("Temperature (K)", fontsize=14)

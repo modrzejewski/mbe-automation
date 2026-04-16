@@ -348,6 +348,46 @@ def phonons(
     return phonons
 
 
+def _fit_debye_model(
+    df: pd.DataFrame,
+    debye_model: mbe_automation.dynamics.harmonic.eec.DebyeModel,
+    filter_out_extrapolated_minimum: bool,
+):
+    df_fit = df[
+        (df["T (K)"] <= debye_model.max_fit_temperature_K) &
+        (df["min_found"])
+    ]
+    if filter_out_extrapolated_minimum:
+        df_fit = df_fit[~df_fit["min_extrapolated"]]
+
+    if len(df_fit) >= 3:
+        debye_model.fit(
+            T=df_fit["T (K)"].to_numpy(), 
+            V=df_fit["V_eos (Å³∕unit cell)"].to_numpy()
+        )
+
+
+def _plot_debye_volume(
+    debye_model: mbe_automation.dynamics.harmonic.eec.DebyeModel,
+    df: pd.DataFrame,
+    filter_out_extrapolated_minimum: bool,
+    save_path: str | None = None,
+):
+    """
+    Plot comparison of Debye predicted volumes vs G-minimization volumes.
+    """
+    df_plot = df[df["min_found"]]
+    if filter_out_extrapolated_minimum:
+        df_plot = df_plot[~df_plot["min_extrapolated"]]
+
+    mbe_automation.dynamics.harmonic.display.compare_Debye_vs_G_min(
+        debye_model=debye_model,
+        T=df_plot["T (K)"].to_numpy(),
+        V=df_plot["V_eos (Å³∕unit cell)"].to_numpy(),
+        save_path=save_path
+    )
+
+
 def equilibrium_curve(
         unit_cell_V0,
         reference_space_group,
@@ -704,23 +744,25 @@ def equilibrium_curve(
         "min_found": min_found,
         "min_extrapolated": min_extrapolated
     })
-    df_fit = df[
-        (df["T (K)"] <= debye_model.max_fit_temperature_K) &
-        (df["min_found"])
-    ]
-    if filter_out_extrapolated_minimum:
-        df_fit = df_fit[~df_fit["min_extrapolated"]]
-
-    if len(df_fit) >= 3:
-        debye_model.fit(
-            T=df_fit["T (K)"].to_numpy(), 
-            V=df_fit["V_eos (Å³∕unit cell)"].to_numpy()
-        )
+    
+    _fit_debye_model(
+        df=df,
+        debye_model=debye_model,
+        filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
+    )
 
     if debye_model.initialized:
         V_debye, alpha_V_debye = debye_model.predict(temperatures)
         df["V_crystal_debye (Å³∕unit cell)"] = V_debye
         df["alpha_V_debye (1∕K)"] = alpha_V_debye
+
+    if save_plots and debye_model.initialized:
+        _plot_debye_volume(
+            debye_model=debye_model,
+            df=df,
+            filter_out_extrapolated_minimum=filter_out_extrapolated_minimum,
+            save_path=os.path.join(work_dir, "Debye_model_volume.png")
+        )
 
     mbe_automation.dynamics.harmonic.display.eos_fitting_summary(
         df_crystal_eos=df,
