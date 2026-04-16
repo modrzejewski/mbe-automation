@@ -162,7 +162,7 @@ class DebyeModel:
     ):
         assert len(T[T <= self.max_fit_temperature_K]) >= 3, (
             "At least 3 data points within the trust region "
-            " are required to fit DebyeModel."
+            "are required to fit DebyeModel."
         )
         self._V0, self._ThetaD, self._C = _debye_fit_params(
             V=V, T=T, T_cutoff=self.max_fit_temperature_K,
