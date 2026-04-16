@@ -32,9 +32,10 @@ def _debye_function(x: float) -> float:
     else:
         #
         # For x > 50, the first 15 digits no longer change, which
-        # I checked with Mathematica.
+        # I checked with Mathematica. Therefore, we use the analytical limit
+        #  of D_3(x) as x approaches infinity, which is Pi**4/15.
         #
-        D3 = 3 / x**3 * 6.493939402266829  
+        D3 = 3 / x**3 * (np.pi**4 / 15)
     
     return D3
 
