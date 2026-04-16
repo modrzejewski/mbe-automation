@@ -58,12 +58,9 @@ class FreeEnergy:
                                    #
     electronic_energy_correction: EEC = field(default_factory=lambda: EEC(type="none"))
                                    #
-                                   # Debye model used to extrapolate/interpolate the equilibrium
-                                   # cell volume. Using this model is highly recommended for 
-                                   # cases where G(V, p) is very flat and finding its minimum 
-                                   # numerically at a given T is difficult, or when the 
-                                   # minimum falls outside the range of volumes sampled 
-                                   # to obtain the EOS curve.
+                                   # Debye model for equilibrium cell volume extrapolation/interpolation.
+                                   # Use if G(V, p) is flat or the minimum is outside the sampled volume range.
+                                   #
                                    #
     debye_model: DebyeModel = field(default_factory=DebyeModel)
                                    #
