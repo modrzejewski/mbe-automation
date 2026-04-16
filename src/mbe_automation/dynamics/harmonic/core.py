@@ -753,8 +753,8 @@ def equilibrium_curve(
 
     if debye_model.initialized:
         V_debye, alpha_V_debye = debye_model.predict(temperatures)
-        df["V_crystal_debye (Å³∕unit cell)"] = V_debye
-        df["alpha_V_debye (1∕K)"] = alpha_V_debye
+        df["V_debye (Å³∕unit cell)"] = V_debye
+        df["α_V_debye (1∕K)"] = alpha_V_debye
 
     if save_plots and debye_model.initialized:
         _plot_debye_volume(

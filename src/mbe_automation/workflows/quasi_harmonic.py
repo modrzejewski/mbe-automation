@@ -244,6 +244,16 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.save_plots,
     )
     df_crystal_eos = interpolated_harmonic_props.interpolated_at_equilibrium_volume
+
+    effective_volume_curve = config.volume_curve
+    if config.volume_curve == "debye":
+        if not interpolated_harmonic_props.debye_model.initialized:
+            print(
+                "WARNING: volume_curve='debye' was requested but the Debye model "
+                "could not be fitted (insufficient low-T data). "
+                "Falling back to volume_curve='eos_minimum'."
+            )
+            effective_volume_curve = "eos_minimum"
     #
     # Harmonic properties for unit cells with temperature-dependent
     # equilibrium volumes V(T). Data points where eos fit failed
@@ -254,10 +264,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         filtered_df = df_crystal_eos[df_crystal_eos["min_found"] & (df_crystal_eos["min_extrapolated"] == False)]
     else:
         filtered_df = df_crystal_eos[df_crystal_eos["min_found"]]
-        
+
     for i, row in filtered_df.iterrows():
         T = row["T (K)"]
-        V = row["V_eos (Å³∕unit cell)"]
+        if effective_volume_curve == "eos_minimum":
+            V = row["V_eos (Å³∕unit cell)"]
+        else:  # "debye"
+            V = row["V_debye (Å³∕unit cell)"]
         unit_cell_T = unit_cell_V0.copy()
         unit_cell_T.set_cell(
             unit_cell_V0.cell * (V/V0)**(1/3),
@@ -358,6 +371,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # temeprature points
     #
     df_crystal_qha = pd.concat(data_frames_at_T)
+    df_crystal_qha["volume_curve"] = effective_volume_curve
     #
     # Compute heat capacity at constant pressure (C_P_tot) and thermal expansion
     # coefficients (alpha_V, alpha_L_a, alpha_L_b, alpha_L_c) using numerical

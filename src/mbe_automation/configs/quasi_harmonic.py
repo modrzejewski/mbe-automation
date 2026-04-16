@@ -64,6 +64,14 @@ class FreeEnergy:
                                    #
     debye_model: DebyeModel = field(default_factory=DebyeModel)
                                    #
+                                   # Source of equilibrium volumes V(T) used in the QHA temperature loop.
+                                   # "eos_minimum" - volumes from G(V) EOS minimization (default)
+                                   # "debye"       - volumes from the Debye model fit; more robust when the
+                                   #                 G(V) surface is flat at high temperatures. Falls back to
+                                   #                 "eos_minimum" with a warning if the Debye model cannot be fitted.
+                                   #
+    volume_curve: Literal["eos_minimum", "debye"] = "eos_minimum"
+                                   #
                                    # Volumetric thermal expansion
                                    #
                                    # (1) sample volumes/pressures to determine
