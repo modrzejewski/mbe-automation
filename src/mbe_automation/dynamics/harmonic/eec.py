@@ -39,7 +39,7 @@ def _debye_function(x: float) -> float:
     return D3
 
 def _debye_function_derivative(x: float) -> float:
-    """dD_3(x)/dx """
+    """Calculate the derivative dD_3(x)/dx."""
 
     if x < 1.0E-2: # switchover value tested with Mathematica
         dD3dx = -3/8 + 1/10 * x - 1/420 * x**3 + 1/15120 * x**5
