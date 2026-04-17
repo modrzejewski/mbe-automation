@@ -12,8 +12,7 @@ This report details how data points are handled within the quasi-harmonic workfl
    - `filter_out_broken_symmetry`
 
 2. **EOS Fitting per Temperature**
-   For each temperature `T`, the code extracts the data for `good_points` corresponding to that temperature using the mask `good_points & select_T[i]`. It then attempts to fit the equation of state (e.g., polynomial, spline, Birch-Murnaghan, Vinet) to the `G` vs `V` data.
-
+   For each temperature `T`, the code extracts the data for `good_points` corresponding to that temperature. It then attempts to fit the equation of state (e.g., polynomial, spline, Birch-Murnaghan, Vinet) to the `G` vs `V` data.
    If the minimum is found (`fit.min_found`), it calculates the equilibrium volume `V_min` and `G_min`. These are stored in `V_eos[i]`, `G_tot_eos[i]`, and the `min_found` array is updated to `True` for index `i`.
 
 3. **Debye Model Fit (`_fit_debye_model` function)**
@@ -40,84 +39,97 @@ This report details how data points are handled within the quasi-harmonic workfl
 ## Downstream Handling in `mbe_automation/workflows/quasi_harmonic.py`
 
 1. **Fallback Mechanism**
-   If the Debye model could not be fitted (e.g., because too many low-T EOS points lacked a minimum, resulting in `len(df_fit) < 3`), the workflow gracefully falls back to `eos_minimum`:
+   If the Debye model could not be fitted (e.g., because too many low-T EOS points lacked a minimum, resulting in `len(df_fit) < 3`), the workflow gracefully falls back to `eos_minimum`.
+
+2. **Temperature Filtering for Valid Equilibrium Volumes**
+   The code marks a column `valid_equilibrium`. For the Debye curve, a temperature is considered valid when `V_debye` lies strictly inside the sampled volume range `(V_lo, V_hi)`.
    ```python
-   if config.volume_curve == "debye":
-       if not interpolated_harmonic_props.debye_model.initialized:
-           print("WARNING: volume_curve='debye' was requested but the Debye model could not be fitted...")
-           effective_volume_curve = "eos_minimum"
+    if effective_volume_curve == "debye":
+        in_range = (
+            (df_crystal_eos["V_debye (Å³∕unit cell)"] > V_lo) &
+            (df_crystal_eos["V_debye (Å³∕unit cell)"] < V_hi)
+        )
+        df_crystal_eos["valid_equilibrium"] = in_range
+        df_crystal_eos.drop(columns=["p_thermal_crystal (GPa)"], inplace=True)
    ```
+   If `debye` is used, all temperatures are included as long as their predicted Debye volume is within the sampled range. Crucially, this drops the `p_thermal_crystal (GPa)` column completely since it was computed at the EOS minimum volume, which is not the Debye equilibrium volume.
 
-2. **Temperature Filtering for `data_frames_at_T` Construction**
-   This is where a critical difference occurs between `eos_minimum` and `debye`:
-   ```python
-   if effective_volume_curve == "debye":
-       filtered_df = df_crystal_eos # Includes all temperatures
-   else: # "eos_minimum"
-       filtered_df = df_crystal_eos[df_crystal_eos["min_found"]] # Excludes T without minimum
-   ```
-   If `debye` is used, **all temperatures are initially included** in `filtered_df`, regardless of whether `min_found` is True for that temperature.
-
-3. **Trust Region / Range Check Filtering**
-   For `debye`, a subsequent check filters out temperatures where the predicted Debye volume `V_debye` falls outside the interpolation range of the sampled volumes `[V_lo, V_hi]`.
-   ```python
-   if effective_volume_curve == "debye":
-       V_lo = interpolated_harmonic_props.sampled_volumes.min()
-       V_hi = interpolated_harmonic_props.sampled_volumes.max()
-       in_range = (
-           (filtered_df["V_debye (Å³∕unit cell)"] > V_lo) &
-           (filtered_df["V_debye (Å³∕unit cell)"] < V_hi)
-       )
-       # Warning is printed and out-of-range rows are skipped
-       filtered_df = filtered_df[in_range]
-   ```
-
-## Missing Data Issue / Bug in Workflow
-There is a fundamental issue with how the `p_thermal` and thermodynamic properties are handled when `effective_volume_curve == "debye"`.
-
-In the `for i, row in filtered_df.iterrows():` loop, the code uses `row["p_thermal_crystal (GPa)"]`.
-
-However, if an EOS fit failed (or was excluded because of imaginary modes leading to `< 3` good points) for a specific temperature `T`, `min_found` for that `T` is `False`.
-
-When `min_found` is `False`, `p_thermal_eos[i]` is left as `np.nan` (because it is initialized with `np.full(n_temperatures, np.nan)` and only updated `if min_found[i]:`).
-
-Because `filtered_df` for `debye` includes rows where `min_found` might be `False`, the loop will attempt to use `np.nan` for `row["p_thermal_crystal (GPa)"]`:
-```python
-p_effective = (
-    row["p_thermal_crystal (GPa)"] +
-    config.pressure_GPa
-)
+## Missing Data Issue / Bug Evaluation
+The user previously experienced an issue where the following KeyError occurred:
 ```
-This will result in an effective pressure of `NaN`, which is then passed to the optimizer: `optimizer._pressure_GPa = p_effective`. The relaxation will crash or silently propagate `NaN` coordinates.
-
-Additionally, to compute `dSdV_vib_crystal`, the code retrieves `interpolated_harmonic_props.S_vib_at_T(T, derivative=True)`. This function internally fetches `df_T = self.exact_at_sampled_volume[mask]`. If points were filtered out due to imaginary modes, this dataframe might have fewer than 3 valid points. In fact, `S_vib_at_T` explicitly throws an error:
-```python
-if n_volumes < 3:
-    raise ValueError(f"Cannot fit S_vib(V) at T={temperature_K} K. Need at least 3 volumes...")
+KeyError: 'V_debye (Å³∕unit cell)'
 ```
+
+This error occurred at line 285 in `quasi_harmonic.py`:
+```python
+(filtered_df["V_debye (Å³∕unit cell)"] > V_lo) &
+```
+
+**Is this error still possible on the current branch?**
+**No, this specific `KeyError` is no longer possible for `V_debye (Å³∕unit cell)`.**
+
+Why?
+In `mbe_automation/dynamics/harmonic/core.py`, the `V_debye (Å³∕unit cell)` column is *only* added to `df` if the Debye model is successfully initialized:
+```python
+    if debye_model.initialized:
+        V_debye, alpha_V_debye = debye_model.predict(temperatures)
+        df["V_debye (Å³∕unit cell)"] = V_debye
+```
+
+If the Debye model fails to initialize (e.g., `len(df_fit) < 3` because too many points were removed as low quality), `V_debye (Å³∕unit cell)` is never added. Notice the character `Å` (U+212B) vs `Å` (U+00C5) in the column name might have been a previous issue, but the main protection is the fallback.
+
+In `quasi_harmonic.py`, there is a fallback mechanism:
+```python
+    effective_volume_curve = config.volume_curve
+    if config.volume_curve == "debye":
+        if not interpolated_harmonic_props.debye_model.initialized:
+            print(
+                "WARNING: volume_curve='debye' was requested but the Debye model "
+                "could not be fitted (insufficient low-T data). "
+                "Falling back to volume_curve='eos_minimum'."
+            )
+            effective_volume_curve = "eos_minimum"
+```
+Because of this fallback, if the Debye model is not initialized, `effective_volume_curve` changes to `"eos_minimum"`. Consequently, the block `if effective_volume_curve == "debye":` is **skipped**, and the code evaluating `df_crystal_eos["V_debye (Å³∕unit cell)"]` is never reached.
+
+*Wait! Look closely at the characters!*
+In `mbe_automation/dynamics/harmonic/core.py` (line 749):
+```python
+        df["V_debye (Å³∕unit cell)"] = V_debye
+```
+Notice the Angstrom sign is `Å` (U+212B, Angstrom sign).
+
+In `mbe_automation/workflows/quasi_harmonic.py` (line 284):
+```python
+            (df_crystal_eos["V_debye (Å³∕unit cell)"] > V_lo) &
+```
+Notice the Angstrom sign is `Å` (U+00C5, Latin Capital Letter A with ring above).
+
+**THIS IS THE EXACT CAUSE OF THE KEYERROR!** Even if `debye_model` is initialized and `V_debye (Å³∕unit cell)` is added to the dataframe, the workflow script tries to access `V_debye (Å³∕unit cell)` with the wrong unicode character, causing the `KeyError` regardless of initialization status.
+
+**Yes, the error is definitely still possible on this branch!**
 
 ## Findings Summary
 1. **Debye Fitting is Robust:** The actual Debye fit correctly excludes temperatures where EOS fitting failed or had insufficient high-quality data points.
-2. **Debye Evaluation Injects Invalid Data:** The quasi-harmonic workflow attempts to evaluate structural relaxations and thermodynamic properties for *all* temperatures when `volume_curve='debye'`, even those where the original EOS minimum could not be found due to low-quality points.
-3. **Crashing Dependencies:** For temperatures where `min_found` is False, `p_thermal` is `NaN`, causing relaxation with `NaN` pressure. Further, the cubic spline for `S_vib(V)` will crash if fewer than 3 high-quality volume points are available at that temperature.
+2. **Unicode Mismatch Bug:** The `KeyError: 'V_debye (Å³∕unit cell)'` is caused by a subtle unicode character mismatch. `core.py` sets the column using `Å` (U+212B), but `quasi_harmonic.py` attempts to read it using `Å` (U+00C5).
+3. **`p_thermal` safely dropped:** `p_thermal` is safely dropped for the Debye curve.
+4. **Crashing Dependencies:** The cubic spline for `S_vib(V)` will still crash if fewer than 3 high-quality volume points are available at that temperature, because `valid_equilibrium` does not check `min_found` for `debye`.
 
 ## Recommendations
-The `debye` option is designed to provide a smoother volume curve, especially at low temperatures. However, it still requires the underlying thermal pressure (`p_thermal`) and entropy derivatives (`dS/dV`) to be well-defined at the evaluation temperatures to proceed with the constrained relaxations and property evaluations.
+The `debye` option provides a smoother volume curve, especially at low temperatures.
 
-If `p_thermal` is `NaN` because the EOS could not find a minimum (e.g., due to filtering imaginary modes), it is physically impossible to apply the "effective pressure" relaxation technique used in `eos_sampling='pressure'`.
+**Fix Unicode Bug:** Modify `quasi_harmonic.py` to use the correct unicode character (U+212B) when accessing the `V_debye` column.
 
-**Fix:** The code should filter out temperatures where `min_found` is `False` *even* when using the `debye` volume curve, OR the algorithm needs to be modified to interpolate/extrapolate `p_thermal` and `dS/dV` using the valid temperatures. Given the current architecture, simply requiring `min_found` is the safest and most consistent approach.
-
-Modify `src/mbe_automation/workflows/quasi_harmonic.py` around line 274:
-
+Change lines 284-285 in `src/mbe_automation/workflows/quasi_harmonic.py`:
 ```python
-    if effective_volume_curve == "debye":
-        # CHANGE: Even for debye, we can only proceed if we successfully found a minimum
-        # because we rely on p_thermal and S_vib splines which are only valid when min_found=True.
-        filtered_df = df_crystal_eos[df_crystal_eos["min_found"]]
-    elif config.filter_out_extrapolated_minimum:
-        filtered_df = df_crystal_eos[df_crystal_eos["min_found"] & (df_crystal_eos["min_extrapolated"] == False)]
-    else:
-        filtered_df = df_crystal_eos[df_crystal_eos["min_found"]]
+        in_range = (
+            (df_crystal_eos["V_debye (Å³∕unit cell)"] > V_lo) &
+            (df_crystal_eos["V_debye (Å³∕unit cell)"] < V_hi)
+        )
 ```
-This ensures that only valid temperatures are passed to the relaxation and property evaluation loop, preventing `NaN` pressure crashes and `S_vib` spline errors.
+And around line 292:
+```python
+            out_vols  = df_crystal_eos.loc[~in_range, "V_debye (Å³∕unit cell)"].tolist()
+```
+
+**Fix S_vib Spline Issue:** To fully protect the Debye evaluation loop from bad data, ensure that any temperature processed has at least 3 valid points in `exact_at_sampled_volume` for the `S_vib` spline.
