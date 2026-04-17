@@ -371,8 +371,16 @@ def compare_Debye_vs_G_min(
 
     fig, ax = plt.subplots(figsize=(8, 6))
 
-    ax.plot(T_dense, V_pred, label="Debye Model", color="tab:blue", lw=2, zorder=2)
-    ax.scatter(T, V, label="G minimization", color="tab:red", marker="o", facecolors="none", s=50, zorder=3)
+    ax.plot(T_dense, V_pred, label="Debye model", color="tab:blue", lw=2, zorder=2)
+    ax.scatter(T, V, label="Minimization of G(T, V, p)", color="tab:red", marker="o", facecolors="none", s=50, zorder=3)
+    ax.axvline(
+        x=debye_model.max_fit_temperature_K,
+        color="gray",
+        linestyle="--",
+        lw=1.5,
+        label=f"Trust region ({debye_model.max_fit_temperature_K:.0f} K)",
+        zorder=1,
+    )
 
     ax.set_xlabel("Temperature (K)", fontsize=14)
     ax.set_ylabel("Volume (Å³∕unit cell)", fontsize=14)

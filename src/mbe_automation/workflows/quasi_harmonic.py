@@ -254,13 +254,24 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 "Falling back to volume_curve='eos_minimum'."
             )
             effective_volume_curve = "eos_minimum"
+    if effective_volume_curve == "debye" and config.eos_sampling == "pressure":
+        raise ValueError(
+            "eos_sampling='pressure' is incompatible with volume_curve='debye'. "
+            "The thermal pressure computed during EOS sampling is inconsistent "
+            "with the Debye-derived volume, so minimization under external pressure "
+            "will not converge to the requested volume. "
+            "Use a different eos_sampling option."
+        )
     #
     # Harmonic properties for unit cells with temperature-dependent
-    # equilibrium volumes V(T). Data points where eos fit failed
-    # are skipped.
+    # equilibrium volumes V(T). Data points where the EOS fit failed
+    # are skipped. The Debye model is an extrapolation technique
+    # valid at all temperatures, so no filtering is applied in that case.
     #
     data_frames_at_T = []
-    if config.filter_out_extrapolated_minimum:
+    if effective_volume_curve == "debye":
+        filtered_df = df_crystal_eos
+    elif config.filter_out_extrapolated_minimum:
         filtered_df = df_crystal_eos[df_crystal_eos["min_found"] & (df_crystal_eos["min_extrapolated"] == False)]
     else:
         filtered_df = df_crystal_eos[df_crystal_eos["min_found"]]

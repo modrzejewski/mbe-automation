@@ -380,6 +380,15 @@ class FreeEnergy:
             
             raise ValueError("\n".join(msg))
 
+        if self.volume_curve == "debye" and self.eos_sampling == "pressure":
+            raise ValueError(
+                "eos_sampling='pressure' is incompatible with volume_curve='debye'. "
+                "The thermal pressure computed during EOS sampling is inconsistent "
+                "with the Debye-derived volume, so minimization under external pressure "
+                "will not converge to the requested volume. "
+                "Use a different eos_sampling option."
+            )
+
     @classmethod
     def recommended(
             cls,
