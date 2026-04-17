@@ -12,6 +12,8 @@ from typing import Callable
 
 ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "none"]
 
+DEFAULT_DEBYE_FITTING_T = np.array([10.0, 50.0, 100.0, 150.0, 200.0])
+
 def _debye_function(x: float) -> float:
     """Calculate D_3(x) = 3/x**3 Integrate(0,x) z**3/(exp(x)-1) dz."""
 
