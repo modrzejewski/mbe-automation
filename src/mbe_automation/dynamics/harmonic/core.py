@@ -777,7 +777,7 @@ def equilibrium_curve(
     eos_obj = EOSMetadata(
         interpolated_at_equilibrium_volume=df,
         exact_at_sampled_volume=df_eos[good_points],
-        select_T=select_T,
+        select_T=[s[good_points] for s in select_T],
         temperatures_K=np.array(temperatures),
         sampled_volumes=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
         dataset=dataset,
