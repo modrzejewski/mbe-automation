@@ -264,9 +264,11 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         )
     #
     # Harmonic properties for unit cells with temperature-dependent
-    # equilibrium volumes V(T). Data points where the EOS fit failed
-    # are skipped. The Debye model is an extrapolation technique
-    # valid at all temperatures, so no filtering is applied in that case.
+    # equilibrium volumes V(T). For the EOS minimum curve, data points
+    # where the EOS fit failed are skipped. For the Debye curve, all
+    # temperatures are initially included, but those whose Debye volume
+    # falls outside the EOS interpolation range are subsequently filtered
+    # out, because the S_vib(V) spline cannot be reliably evaluated there.
     #
     data_frames_at_T = []
     if effective_volume_curve == "debye":
@@ -275,6 +277,25 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         filtered_df = df_crystal_eos[df_crystal_eos["min_found"] & (df_crystal_eos["min_extrapolated"] == False)]
     else:
         filtered_df = df_crystal_eos[df_crystal_eos["min_found"]]
+
+    if effective_volume_curve == "debye":
+        V_lo = interpolated_harmonic_props.sampled_volumes.min()
+        V_hi = interpolated_harmonic_props.sampled_volumes.max()
+        in_range = (
+            (filtered_df["V_debye (Å³∕unit cell)"] > V_lo) &
+            (filtered_df["V_debye (Å³∕unit cell)"] < V_hi)
+        )
+        n_out = (~in_range).sum()
+        if n_out > 0:
+            out_temps = filtered_df.loc[~in_range, "T (K)"].tolist()
+            out_vols  = filtered_df.loc[~in_range, "V_debye (Å³∕unit cell)"].tolist()
+            print(
+                f"WARNING: {n_out} temperature(s) have Debye volumes outside the "
+                f"EOS interpolation range [{V_lo:.1f}, {V_hi:.1f}] Å³ and will be skipped:\n"
+                + "\n".join(f"  T={T:.1f} K  →  V_debye={V:.1f} Å³" for T, V in zip(out_temps, out_vols))
+                + "\nExtend volume_range to cover these volumes."
+            )
+        filtered_df = filtered_df[in_range]
 
     for i, row in filtered_df.iterrows():
         T = row["T (K)"]
