@@ -263,39 +263,51 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             "Use a different eos_sampling option."
         )
     #
-    # Harmonic properties for unit cells with temperature-dependent
-    # equilibrium volumes V(T). For the EOS minimum curve, data points
-    # where the EOS fit failed are skipped. For the Debye curve, all
-    # temperatures are initially included, but those whose Debye volume
-    # falls outside the EOS interpolation range are subsequently filtered
-    # out, because the S_vib(V) spline cannot be reliably evaluated there.
+    # Harmonic properties for unit cells with temperature-dependent equilibrium
+    # volumes V(T). The `valid_equilibrium` column marks temperatures for which
+    # the equilibrium volume lies strictly within the sampled range, so that all
+    # volume-dependent properties (phonon spectrum, vibrational free energy,
+    # thermal expansion) can be reliably evaluated there.
     #
-    data_frames_at_T = []
-    if effective_volume_curve == "debye":
-        filtered_df = df_crystal_eos
-    elif config.filter_out_extrapolated_minimum:
-        filtered_df = df_crystal_eos[df_crystal_eos["min_found"] & (df_crystal_eos["min_extrapolated"] == False)]
-    else:
-        filtered_df = df_crystal_eos[df_crystal_eos["min_found"]]
+    # For the EOS minimum curve a temperature is valid when the EOS fit succeeded
+    # and (if filter_out_extrapolated_minimum is set) the minimum is not
+    # extrapolated beyond the sampled volumes.
+    #
+    # For the Debye curve a temperature is valid when V_debye lies strictly
+    # inside the sampled volume range (V_lo, V_hi).
+    #
+    V_lo = interpolated_harmonic_props.sampled_volumes.min()
+    V_hi = interpolated_harmonic_props.sampled_volumes.max()
 
     if effective_volume_curve == "debye":
-        V_lo = interpolated_harmonic_props.sampled_volumes.min()
-        V_hi = interpolated_harmonic_props.sampled_volumes.max()
         in_range = (
-            (filtered_df["V_debye (Å³∕unit cell)"] > V_lo) &
-            (filtered_df["V_debye (Å³∕unit cell)"] < V_hi)
+            (df_crystal_eos["V_debye (Å³∕unit cell)"] > V_lo) &
+            (df_crystal_eos["V_debye (Å³∕unit cell)"] < V_hi)
         )
+        df_crystal_eos["valid_equilibrium"] = in_range
+        # Drop p_thermal: it was computed as dF_vib/dV at the EOS minimum volume.
+        # Applying it as an external pressure would recover the equilibrium volume
+        # only if that volume is a minimum of G, which is not the case here.
+        df_crystal_eos.drop(columns=["p_thermal_crystal (GPa)"], inplace=True)
         n_out = (~in_range).sum()
         if n_out > 0:
-            out_temps = filtered_df.loc[~in_range, "T (K)"].tolist()
-            out_vols  = filtered_df.loc[~in_range, "V_debye (Å³∕unit cell)"].tolist()
+            out_temps = df_crystal_eos.loc[~in_range, "T (K)"].tolist()
+            out_vols  = df_crystal_eos.loc[~in_range, "V_debye (Å³∕unit cell)"].tolist()
             print(
                 f"WARNING: {n_out} temperature(s) have Debye volumes outside the "
                 f"EOS interpolation range [{V_lo:.1f}, {V_hi:.1f}] Å³ and will be skipped:\n"
                 + "\n".join(f"  T={T:.1f} K  →  V_debye={V:.1f} Å³" for T, V in zip(out_temps, out_vols))
                 + "\nExtend volume_range to cover these volumes."
             )
-        filtered_df = filtered_df[in_range]
+    elif config.filter_out_extrapolated_minimum:
+        df_crystal_eos["valid_equilibrium"] = (
+            df_crystal_eos["min_found"] & ~df_crystal_eos["min_extrapolated"]
+        )
+    else:
+        df_crystal_eos["valid_equilibrium"] = df_crystal_eos["min_found"]
+
+    data_frames_at_T = []
+    filtered_df = df_crystal_eos[df_crystal_eos["valid_equilibrium"]]
 
     for i, row in filtered_df.iterrows():
         T = row["T (K)"]
