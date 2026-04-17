@@ -249,7 +249,8 @@ def eos_curves(
     key: str,
     save_path: str | None = None,
     n_molecules_per_cell: int | None = None,
-    max_temp_ticks: int = 10
+    max_temp_ticks: int = 10,
+    debye_model: DebyeModel | None = None,
 ):
     
     eos = mbe_automation.storage.read_eos_curves(
@@ -309,9 +310,23 @@ def eos_curves(
         color="black",
         linestyle="--",
         marker="x",
-        label="Equilibrium path"
+        label="EOS equilibrium path",
     )
 
+    if debye_model is not None and debye_model.initialized:
+        V_debye, _ = debye_model.predict(eos.temperatures)
+        G_debye_scaled = np.array([
+            np.interp(V_debye[i], eos.V_interp, G_interp_scaled[i, :], left=np.nan, right=np.nan)
+            for i in range(n_temperatures)
+        ])
+        ax.plot(
+            V_debye,
+            G_debye_scaled - G_min_global,
+            color="tab:blue",
+            linestyle="--",
+            marker="x",
+            label="Debye model path",
+        )
     ax.legend()
     ax.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
     ax.set_ylabel(y_label, fontsize=14)
@@ -398,8 +413,6 @@ def compare_Debye_vs_G_min(
         plt.close(fig)
     else:
         return fig
-
-
 
 
 def print_adps_comparison(

@@ -727,13 +727,6 @@ def equilibrium_curve(
         dataset=dataset,
         key=f"{root_key}/eos_interpolated"
     )
-
-    if save_plots:
-        mbe_automation.dynamics.harmonic.display.eos_curves(
-            dataset=dataset,
-            key=f"{root_key}/eos_interpolated",
-            save_path=os.path.join(work_dir, "eos_curves.png")
-        )
         
     df = pd.DataFrame({
         "T (K)": temperatures,
@@ -762,6 +755,14 @@ def equilibrium_curve(
             df=df,
             filter_out_extrapolated_minimum=filter_out_extrapolated_minimum,
             save_path=os.path.join(work_dir, "Debye_model_volume.png")
+        )
+
+    if save_plots:
+        mbe_automation.dynamics.harmonic.display.eos_curves(
+            dataset=dataset,
+            key=f"{root_key}/eos_interpolated",
+            save_path=os.path.join(work_dir, "eos_curves.png"),
+            debye_model=debye_model,
         )
 
     mbe_automation.dynamics.harmonic.display.eos_fitting_summary(
