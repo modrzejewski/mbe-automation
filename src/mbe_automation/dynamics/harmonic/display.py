@@ -6,13 +6,17 @@ import numpy.typing as npt
 import pandas as pd
 import os
 import os.path
-from typing import Literal
+from typing import Literal, TYPE_CHECKING
 import phonopy.physical_units
 import nglview
 import pymatviz
 
 import mbe_automation.storage
 import mbe_automation.dynamics.harmonic.modes
+import mbe_automation.common.display
+
+if TYPE_CHECKING:
+    from mbe_automation.dynamics.harmonic.eec import DebyeModel
 
 def animate_pymatviz(
         mode: mbe_automation.storage.Structure,
@@ -246,7 +250,8 @@ def eos_curves(
     key: str,
     save_path: str | None = None,
     n_molecules_per_cell: int | None = None,
-    max_temp_ticks: int = 10
+    max_temp_ticks: int = 10,
+    debye_model: DebyeModel | None = None,
 ):
     
     eos = mbe_automation.storage.read_eos_curves(
@@ -306,9 +311,23 @@ def eos_curves(
         color="black",
         linestyle="--",
         marker="x",
-        label="Equilibrium path"
+        label="EOS equilibrium path",
     )
 
+    if debye_model is not None and debye_model.initialized:
+        V_debye, _ = debye_model.predict(eos.temperatures)
+        G_debye_scaled = np.array([
+            np.interp(V_debye[i], eos.V_interp, G_interp_scaled[i, :], left=np.nan, right=np.nan)
+            for i in range(n_temperatures)
+        ])
+        ax.plot(
+            V_debye,
+            G_debye_scaled - G_min_global,
+            color="tab:blue",
+            linestyle="--",
+            marker="x",
+            label="Debye model path",
+        )
     ax.legend()
     ax.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
     ax.set_ylabel(y_label, fontsize=14)
@@ -330,6 +349,60 @@ def eos_curves(
             
         ax2.set_yticks(final_positions)
         ax2.set_yticklabels(final_labels)
+
+    plt.tight_layout()
+
+    if save_path:
+        output_dir = os.path.dirname(save_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        plt.savefig(save_path, dpi=300)
+        plt.close(fig)
+    else:
+        return fig
+
+
+def compare_Debye_vs_G_min(
+    debye_model: DebyeModel,
+    T: npt.NDArray[np.float64],
+    V: npt.NDArray[np.float64],
+    save_path: str | None = None,
+):
+    """
+    Plot the comparison between the Debye model predictions and the results
+    from Gibbs free energy minimization.
+
+    The Debye model is plotted as a continuous line (calculated on a dense grid 
+    from 0 K to the maximum temperature in T), while the G minimization results 
+    are shown as discrete circular points.
+
+    Args:
+        debye_model: An instance of DebyeModel.
+        T: Array of temperatures (K).
+        V: Corresponding equilibrium volumes (Å³∕unit cell) from minimization of G.
+        save_path: Optional path to save the plot. If None, the figure object is returned.
+    """
+    T_dense = np.linspace(0, np.max(T), 200)
+    V_pred, _ = debye_model.predict(T_dense)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    ax.plot(T_dense, V_pred, label="Debye model", color="tab:blue", lw=2, zorder=2)
+    ax.scatter(T, V, label="Minimization of G(T, V, p)", color="tab:red", marker="o", facecolors="none", s=50, zorder=3)
+    ax.axvline(
+        x=debye_model.max_fit_temperature_K,
+        color="gray",
+        linestyle="--",
+        lw=1.5,
+        label=f"Fitting interval T_max ({debye_model.max_fit_temperature_K:.0f} K)",
+        zorder=1,
+    )
+
+    ax.set_xlabel("Temperature (K)", fontsize=14)
+    ax.set_ylabel("Volume (Å³∕unit cell)", fontsize=14)
+    ax.grid(True, linestyle="--", alpha=0.6)
+    ax.legend(fontsize=12)
+    ax.tick_params(labelsize=12)
 
     plt.tight_layout()
 
@@ -402,7 +475,7 @@ def print_adps_comparison(
         return f"{left} {m[row, 0]:8.5f} {m[row, 1]:8.5f} {m[row, 2]:8.5f} {right}"
     
     print("\n" + "=" * 100)
-    print("ADP Comparison (3×3 Cartesian U tensors, Å²)")
+    print("ADP Comparison (3×3 Cartesian U tensors, Å²)")
     print("=" * 100)
     
     for i in range(n_atoms):
@@ -556,5 +629,39 @@ def eos_fitting_summary(
         
     print("=" * 80 + "\n", flush=True)
 
+
+def debye_model_summary(
+    debye_model: DebyeModel,
+):
+    """
+    Print a summary of the fitted Debye model parameters.
+    """
+    mbe_automation.common.display.framed("Debye model fit")
+
+    if not debye_model.initialized:
+        print(
+            "Debye model was not fitted (insufficient data points in trust region).",
+            flush=True,
+        )
+        return
+
+    T_high = 10.0 * debye_model._ThetaD
+    _, alpha_V_high = debye_model.predict(np.array([T_high]))
+
+    col_w = 36
+    header = f"{'parameter':<{col_w}}   {'value':<{col_w}}"
+    data_rows = [
+        f"{'Fitting interval T_max [K]':<{col_w}}   {debye_model.max_fit_temperature_K:<{col_w}.1f}",
+        f"{'Debye temperature [K]':<{col_w}}   {debye_model._ThetaD:<{col_w}.1f}",
+        f"{'Zero-temperature volume [Å³]':<{col_w}}   {debye_model._V0:<{col_w}.1f}",
+        f"{'High-T α_V at 10·Θ_D [1∕K]':<{col_w}}   {alpha_V_high[0]:<{col_w}.1E}",
+    ]
+    n = max(len(header), max(len(d) for d in data_rows))
+    mbe_automation.common.display.dotted_separator(n)
+    print(header)
+    mbe_automation.common.display.dotted_separator(n)
+    for row in data_rows:
+        print(row)
+    mbe_automation.common.display.dotted_separator(n)
 
 

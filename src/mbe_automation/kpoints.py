@@ -127,7 +127,7 @@ def Automatic(UnitCell, EvenNumbers=False):
     print("BZ: full Brillouin zone")
     print("IBZ: symmetry-reduced Brillouin zone")
     print("")
-    print(f"{'Rmin [Å]':>10}{'m₁×m₂×m₃':>20}{'BZ':>20}{'IBZ(Γ-centered)':>25}{'IBZ(Monkhorst-Pack)':>25}")
+    print(f"{'Rmin [Å]':>10}{'m₁×m₂×m₃':>20}{'BZ':>20}{'IBZ(Γ-centered)':>25}{'IBZ(Monkhorst-Pack)':>25}")
     for R in np.arange(10, 31):
         Nk = RminSupercell(UnitCell, R, EvenNumbers)
         if len(Supercells) >= 1:

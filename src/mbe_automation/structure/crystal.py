@@ -587,10 +587,10 @@ def compare_lattice_params(
     aligned_vol = aligned_lattice.volume
 
     print(f"Lattice parameter comparison: {label_initial_structure} -> {label_final_structure}")
-    print(f"  Lattice lengths (a, b, c) [Å]   {initial_lengths[0]:.4f}, {initial_lengths[1]:.4f}, {initial_lengths[2]:.4f} -> {aligned_lengths[0]:.4f}, {aligned_lengths[1]:.4f}, {aligned_lengths[2]:.4f}")
+    print(f"  Lattice lengths (a, b, c) [Å]   {initial_lengths[0]:.4f}, {initial_lengths[1]:.4f}, {initial_lengths[2]:.4f} -> {aligned_lengths[0]:.4f}, {aligned_lengths[1]:.4f}, {aligned_lengths[2]:.4f}")
     print(f"  Lattice angles (α, β, γ) [°]    {initial_angles[0]:.1f}, {initial_angles[1]:.1f}, {initial_angles[2]:.1f} -> {aligned_angles[0]:.1f}, {aligned_angles[1]:.1f}, {aligned_angles[2]:.1f}")
-    print(f"  Cell volume [Å³]                {initial_vol:.2f} -> {aligned_vol:.2f}")
-    print(f"  RMSD [Å]                        {match_result.rmsd:.6f}")
+    print(f"  Cell volume [Å³]                {initial_vol:.2f} -> {aligned_vol:.2f}")
+    print(f"  RMSD [Å]                        {match_result.rmsd:.6f}")
     print("")
 
 
@@ -636,13 +636,13 @@ def compare_conventional_cells(
     col_w = 20
     header = f"{'conventional cell':<{col_w}}   {label_initial:<{col_w}}   {label_final:<{col_w}}   {'Δ [%]':<8}"
     data_rows = [
-        f"{'a [Å]':<{col_w}}   {abc_i[0]:<{col_w}.3f}   {abc_f[0]:<{col_w}.3f}   {percent_change_abc[0]:<+8.2f}",
-        f"{'b [Å]':<{col_w}}   {abc_i[1]:<{col_w}.3f}   {abc_f[1]:<{col_w}.3f}   {percent_change_abc[1]:<+8.2f}",
-        f"{'c [Å]':<{col_w}}   {abc_i[2]:<{col_w}.3f}   {abc_f[2]:<{col_w}.3f}   {percent_change_abc[2]:<+8.2f}",
+        f"{'a [Å]':<{col_w}}   {abc_i[0]:<{col_w}.3f}   {abc_f[0]:<{col_w}.3f}   {percent_change_abc[0]:<+8.2f}",
+        f"{'b [Å]':<{col_w}}   {abc_i[1]:<{col_w}.3f}   {abc_f[1]:<{col_w}.3f}   {percent_change_abc[1]:<+8.2f}",
+        f"{'c [Å]':<{col_w}}   {abc_i[2]:<{col_w}.3f}   {abc_f[2]:<{col_w}.3f}   {percent_change_abc[2]:<+8.2f}",
         f"{'α [°]':<{col_w}}   {ang_i[0]:<{col_w}.1f}   {ang_f[0]:<{col_w}.1f}   {percent_change_ang[0]:<+8.2f}",
         f"{'β [°]':<{col_w}}   {ang_i[1]:<{col_w}.1f}   {ang_f[1]:<{col_w}.1f}   {percent_change_ang[1]:<+8.2f}",
         f"{'γ [°]':<{col_w}}   {ang_i[2]:<{col_w}.1f}   {ang_f[2]:<{col_w}.1f}   {percent_change_ang[2]:<+8.2f}",
-        f"{'volume [Å³]':<{col_w}}   {vol_i:<{col_w}.1f}   {vol_f:<{col_w}.1f}   {percent_change_vol:<+8.2f}",
+        f"{'volume [Å³]':<{col_w}}   {vol_i:<{col_w}.1f}   {vol_f:<{col_w}.1f}   {percent_change_vol:<+8.2f}",
         f"{'space group':<{col_w}}   {sg_i:<{col_w}}   {sg_f:<{col_w}}",
     ]
     n = max(len(header), max(len(d) for d in data_rows))
@@ -723,13 +723,13 @@ def display_conventional_cell(
     col_w = 18
     header = f"{'conventional cell':<{col_w}}   {'value':<{col_w}}"
     data_rows = [
-        f"{'a [Å]':<{col_w}}   {abc[0]:<{col_w}.3f}",
-        f"{'b [Å]':<{col_w}}   {abc[1]:<{col_w}.3f}",
-        f"{'c [Å]':<{col_w}}   {abc[2]:<{col_w}.3f}",
+        f"{'a [Å]':<{col_w}}   {abc[0]:<{col_w}.3f}",
+        f"{'b [Å]':<{col_w}}   {abc[1]:<{col_w}.3f}",
+        f"{'c [Å]':<{col_w}}   {abc[2]:<{col_w}.3f}",
         f"{'α [°]':<{col_w}}   {ang[0]:<{col_w}.1f}",
         f"{'β [°]':<{col_w}}   {ang[1]:<{col_w}.1f}",
         f"{'γ [°]':<{col_w}}   {ang[2]:<{col_w}.1f}",
-        f"{'volume [Å³]':<{col_w}}   {lat.volume:<{col_w}.1f}",
+        f"{'volume [Å³]':<{col_w}}   {lat.volume:<{col_w}.1f}",
         f"{'atoms':<{col_w}}   {n_atoms:<{col_w}}",
         f"{'space group':<{col_w}}   {sg_string}",
     ]

@@ -40,3 +40,12 @@ mbe_automation.dynamics.harmonic.bands.reorder(
     eigenvectors=eigenvectors,
 )
 ```
+
+## Physical Units
+
+*   **Angstrom Symbol:** Use the ANGSTROM SIGN (U+212B, `Å`) when writing the Angstrom unit label in code, keys, column names, and metadata.
+*   **Do Not Use:** The LATIN CAPITAL LETTER A WITH RING ABOVE (U+00C5, `Å`) is visually indistinguishable but is a different Unicode codepoint.
+    *   **Rationale:** Mixing the two characters causes silent `KeyError`s when retrieving entries from dataframes or dictionaries keyed by unit strings.
+*   **Division in Unit Labels:** When a unit label appears in a dataframe column name or dictionary key (e.g. `"V_crystal (Å³∕unit cell)"`, `"S_vib (J∕K∕mol)"`), use the DIVISION SLASH (U+2215, `∕`) instead of the ordinary solidus (U+002F, `/`).
+    *   **Rationale:** Such keys are commonly persisted as HDF5 dataset names, where `/` is a reserved path separator. Using `∕` prevents collisions with the HDF5 hierarchy.
+    *   **Scope:** This rule applies to unit labels inside keys/column names/metadata. In free-form prose, docstrings, or arithmetic expressions, keep the ordinary `/`.

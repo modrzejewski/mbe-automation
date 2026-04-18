@@ -6,12 +6,198 @@ import numpy.typing as npt
 import ase.units
 from scipy.interpolate import CubicSpline
 import warnings
-from scipy.integrate import quad
-from scipy.optimize import curve_fit
-from typing import Callable, Tuple
-
+import scipy.integrate
+import scipy.optimize
+from typing import Callable
 
 ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "none"]
+
+DEFAULT_DEBYE_FITTING_T = np.array([10.0, 50.0, 100.0, 150.0, 200.0])
+
+def _debye_function(x: float) -> float:
+    """Calculate D_3(x) = 3/x**3 Integrate(0,x) z**3/(exp(x)-1) dz."""
+
+    assert x >= 0, "Argument of the Debye function must be non-negative."
+
+    def integrand(z):
+        if z == 0:
+            return 0.0
+        return (z**3) / np.expm1(z)
+    
+    if x < 1.0E-3: # switchover value tested with Mathematica
+        D3 = 1 - 3/8 * x + 1/20 * x**2
+
+    elif x < 50:
+        integral, _ = scipy.integrate.quad(integrand, 0, x, epsabs=1.0E-12, epsrel=1.0E-12)
+        D3 = 3 / x**3 * integral
+
+    else:
+        #
+        # For x > 50, the first 15 digits no longer change, which
+        # I checked with Mathematica. Therefore, we use the analytical limit
+        #  of D_3(x) as x approaches infinity, which is Pi**4/15.
+        #
+        D3 = 3 / x**3 * (np.pi**4 / 15)
+    
+    return D3
+
+def _debye_function_derivative(x: float) -> float:
+    """Calculate the derivative dD_3(x)/dx."""
+
+    if x < 1.0E-2: # switchover value tested with Mathematica
+        dD3dx = -3/8 + 1/10 * x - 1/420 * x**3 + 1/15120 * x**5
+
+    elif x < 50:
+        D3 = _debye_function(x)
+        dD3dx = -3 / x * D3 + 3 / np.expm1(x)
+
+    else: # this eliminates overflow in exp
+        D3 = _debye_function(x)
+        dD3dx = -3 / x * D3
+
+    return dD3dx
+
+def _debye_volumes(
+    T: npt.NDArray[np.float64], 
+    V0: np.float64, 
+    ThetaD: np.float64, 
+    C: np.float64,
+) -> npt.NDArray[np.float64]:
+    """
+    Calculate the volume based on the Debye model:
+    V(T) = V(0) + C * T * D(ThetaD / T)
+    """
+
+    V_predicted = np.full_like(T, np.nan, dtype=np.float64)
+
+    for i, T_i in enumerate(T):
+        if T_i <= 0:
+            V_predicted[i] = V0
+        else:
+            x = ThetaD / T_i
+            V_predicted[i] = V0 + C * T_i * _debye_function(x)
+            
+    return V_predicted
+
+def _debye_alpha_V(
+    T: npt.NDArray[np.float64], 
+    V0: np.float64, 
+    ThetaD: np.float64, 
+    C: np.float64,
+) -> npt.NDArray[np.float64]:
+    """
+    Calculate the volumetric thermal expansion coefficient based on the Debye model:
+    alpha_V(T) = 1/V(T) * d/dT (V(0) + C * T * D(ThetaD / T))
+    """
+    alpha_V_predicted = np.full_like(T, np.nan, dtype=np.float64)
+    V_predicted = _debye_volumes(T, V0, ThetaD, C)
+    
+    for i, T_i in enumerate(T):
+            if T_i <= 0:
+                alpha_V_predicted[i] = 0.0
+            else:
+                x = ThetaD / T_i
+                alpha_V_predicted[i] = 1 / V_predicted[i] * (
+                    C * _debye_function(x) + 
+                    (-ThetaD / T_i )* C * _debye_function_derivative(x)
+                )   
+
+    return alpha_V_predicted
+
+def _debye_fit_params(
+    V: npt.NDArray[np.float64],
+    T: npt.NDArray[np.float64],
+    T_cutoff: float
+) -> tuple[float, float, float]:
+    """
+    Fit the Debye model to Volume-Temperature data up to a specified cutoff temperature.
+    
+    Args:
+        V: Array of volumes.
+        T: Array of temperatures.
+        T_cutoff: Maximum temperature to include in the curve fitting.
+        
+    Returns:
+        Fitted model parameters (a tuple of floats).
+    """
+
+    fit_mask = T <= T_cutoff
+    T_fit = T[fit_mask]
+    V_fit = V[fit_mask]
+
+    if len(T_fit) < 3:
+        raise ValueError(f"Not enough data points below T_cutoff ({T_cutoff} K) to perform the fit.")
+
+    initial_guess = [V[0], 200.0, 0.001] 
+    fit_bounds = ([0.0, 0.0, 0.0], [np.inf, 1000.0, np.inf])
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        popt, pcov = scipy.optimize.curve_fit(
+            _debye_volumes, 
+            T_fit, 
+            V_fit, 
+            p0=initial_guess, bounds=fit_bounds
+        )
+
+    fit_V0, fit_ThetaD, fit_C = popt
+    return fit_V0, fit_ThetaD, fit_C
+
+@dataclass(kw_only=True)
+class DebyeModel:
+    """
+    Extrapolation and interpolation of the equilibrium cell volume using
+    the Debye model of eq 1 of ref 1. The fit of numerical parameters
+    is carried out within the trust region defined by max_fit_temperature_K.
+                                                                       
+    Literature:
+    1. Hsin-Yu Ko, Robert A. DiStasio, Jr., Biswajit Santra, and Roberto Car,
+       Thermal expansion in dispersion-bound molecular crystals,
+       Phys. Rev. Materials 2, 055603 (2018); doi: 10.1103/PhysRevMaterials.2.055603
+                                   
+    """
+    max_fit_temperature_K: float = 200.0
+    initialized: bool = False
+    _V0: float | None = None
+    _ThetaD: float | None = None
+    _C: float | None = None
+
+    def fit(
+        self,
+        T: npt.NDArray[np.float64],
+        V: npt.NDArray[np.float64],
+    ):
+        assert len(T[T <= self.max_fit_temperature_K]) >= 3, (
+            "At least 3 data points within the trust region "
+            "are required to fit DebyeModel."
+        )
+        self._V0, self._ThetaD, self._C = _debye_fit_params(
+            V=V, T=T, T_cutoff=self.max_fit_temperature_K,
+        )
+        self.initialized = True
+
+    def predict(
+        self,
+        T: npt.NDArray[np.float64]
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        """
+        Predict equilibrium volumes and volumetric thermal expansion coefficients
+        at given temperatures using the fitted Debye model.
+
+        Args:
+            T: Array of temperatures.
+
+        Returns:
+            A tuple containing:
+                - Array of predicted equilibrium volumes.
+                - Array of predicted volumetric thermal expansion coefficients.
+        """
+        if not self.initialized:
+            raise RuntimeError("Cannot run `predict` with an uninitialized DebyeModel.")
+
+        V_pred = _debye_volumes(T, self._V0, self._ThetaD, self._C)
+        alpha_V_pred = _debye_alpha_V(T, self._V0, self._ThetaD, self._C)
+        return V_pred, alpha_V_pred
 
 @dataclass(kw_only=True)
 class EECConfig:
@@ -31,81 +217,6 @@ class EECConfig:
     @property
     def is_enabled(self) -> bool:
         return self.type != "none"
-
-def _debey_fit(
-    V: npt.NDArray[np.float64],
-    T: npt.NDArray[np.float64],
-    T_cutoff: float
-) -> Tuple[Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-    """
-    Fit the Debye model to Volume-Temperature data up to a specified cutoff temperature.
-    
-    Args:
-        V: Array of volumes.
-        T: Array of temperatures.
-        T_cutoff: Maximum temperature to include in the curve fitting.
-        
-    Returns:
-        fitted_function: A callable function that takes a temperature array and returns the fitted volumes.
-        V_extrapolated: The volumes calculated over the entire original T array using the fit.
-        T: The original temperature array.
-    """
-
-    def debye_integral_func(z):
-        """Provide the integrand for the Debye function."""
-        if z == 0:
-            return 0.0
-        return (z**3) / np.expm1(z)
-
-    def debye_function(x):
-        """Calculate D(x) as defined in the supplemental material."""
-        if x <= 0:
-            return 1.0 
-        
-        integral, _ = quad(debye_integral_func, 0, x)
-        return (3.0 / (x**3)) * integral
-
-    def debye_volume(T_arr, V0, ThetaD, C):
-        """
-        Calculate the volume based on the Debye model:
-        V(T) = V(0) + C * T * D(ThetaD / T)
-        """
-        T_arr = np.atleast_1d(T_arr)
-        V_out = np.zeros_like(T_arr, dtype=float)
-        
-        for i, t in enumerate(T_arr):
-            if t <= 0:
-                V_out[i] = V0
-            else:
-                x = ThetaD / t
-                V_out[i] = V0 + C * t * debye_function(x)
-            
-        return V_out[0] if V_out.size == 1 and np.isscalar(T_arr) else V_out
-
-    fit_mask = T <= T_cutoff
-    T_fit = T[fit_mask]
-    V_fit = V[fit_mask]
-
-    if len(T_fit) < 3:
-        raise ValueError(f"Not enough data points below T_cutoff ({T_cutoff} K) to perform the fit.")
-
-    initial_guess = [V[0], 200.0, 0.001] 
-    fit_bounds = ([0.0, 0.0, 0.0], [np.inf, 1000.0, np.inf])
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        popt, pcov = curve_fit(debye_volume, T_fit, V_fit, p0=initial_guess, bounds=fit_bounds)
-
-    V0_fit, ThetaD_fit, C_fit = popt
-
-    def fitted_function(T_eval: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        """Wrap debye_volume with optimal parameters."""
-        return debye_volume(T_eval, V0_fit, ThetaD_fit, C_fit)
-
-    V_extrapolated = fitted_function(T)
-
-    return fitted_function, V_extrapolated, T
-
 
 def _eec_value(
     V, 

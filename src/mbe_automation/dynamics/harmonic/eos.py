@@ -104,7 +104,7 @@ def polynomial_fit(V, G, degree=2):
             V_min=V_min,
             B=V_min * d2GdV2(V_min) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa, # GPa
             min_found = True,
-            min_extrapolated=(V_min < np.min(V) or V_min > np.max(V)),
+            min_extrapolated=not (V_min > np.min(V) and V_min < np.max(V)),
             curve_type="polynomial",
             G_interp=G_fit,
             G_sampled=G.copy(),
@@ -174,7 +174,7 @@ def spline_interpolation(V, G):
             V_min=V_min,
             B=V_min * d2GdV2(V_min) * (ase.units.kJ/ase.units.mol/ase.units.Angstrom**3)/ase.units.GPa, # GPa
             min_found=True,
-            min_extrapolated=(V_min < np.min(V) or V_min > np.max(V)),
+            min_extrapolated=not (V_min > np.min(V) and V_min < np.max(V)),
             curve_type="spline",
             G_interp=cs,
             G_sampled=G.copy(),

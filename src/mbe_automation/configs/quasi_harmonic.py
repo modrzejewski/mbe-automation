@@ -16,6 +16,7 @@ import mbe_automation.storage
 
 from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLING_ALGOS
 from mbe_automation.dynamics.harmonic.eec import ELECTRONIC_ENERGY_CORRECTION, EECConfig as EEC
+from mbe_automation.dynamics.harmonic.eec import DebyeModel, DEFAULT_DEBYE_FITTING_T
 
 @dataclass(kw_only=True)
 class FreeEnergy:
@@ -56,6 +57,20 @@ class FreeEnergy:
                                    #    J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
                                    #
     electronic_energy_correction: EEC = field(default_factory=lambda: EEC(type="none"))
+                                   #
+                                   # Debye model for equilibrium cell volume extrapolation/interpolation.
+                                   # Use if G(V, p) is flat or the minimum is outside the sampled volume range.
+                                   #
+                                   #
+    debye_model: DebyeModel = field(default_factory=DebyeModel)
+                                   #
+                                   # Source of equilibrium volumes V(T) used in the QHA temperature loop.
+                                   # "eos_minimum" - volumes from G(V) EOS minimization (default)
+                                   # "debye"       - volumes from the Debye model fit; more robust when the
+                                   #                 G(V) surface is flat at high temperatures. Falls back to
+                                   #                 "eos_minimum" with a warning if the Debye model cannot be fitted.
+                                   #
+    volume_curve: Literal["eos_minimum", "debye"] = "eos_minimum"
                                    #
                                    # Volumetric thermal expansion
                                    #
@@ -325,7 +340,12 @@ class FreeEnergy:
         
         if self.electronic_energy_correction.is_enabled:
             if not np.any(np.isclose(self.temperatures_K, self.electronic_energy_correction.T_ref, atol=1.0E-5)):
-                raise ValueError("EECConfig.T_ref must be exactly present in temperatures_K.")
+                self.temperatures_K = np.sort(np.append(self.temperatures_K, self.electronic_energy_correction.T_ref))
+                print(
+                    f"INFO: Added T={self.electronic_energy_correction.T_ref:.4g} K to temperatures_K. "
+                    f"The electronic energy correction requires its reference temperature "
+                    f"(EECConfig.T_ref) to be present in the temperature grid."
+                )
             if self.equation_of_state != "spline":
                 raise ValueError("Electronic energy correction is only supported with the 'spline' equation of state.")
         
@@ -364,6 +384,38 @@ class FreeEnergy:
                 msg.append(f" - {eos}: {req}")
             
             raise ValueError("\n".join(msg))
+
+        if self.volume_curve == "debye" and self.eos_sampling == "pressure":
+            raise ValueError(
+                "eos_sampling='pressure' is incompatible with volume_curve='debye'. "
+                "The thermal pressure computed during EOS sampling is inconsistent "
+                "with the Debye-derived volume, so minimization under external pressure "
+                "will not converge to the requested volume. "
+                "Use a different eos_sampling option."
+            )
+
+        if self.volume_curve == "debye":
+            T_max = self.debye_model.max_fit_temperature_K
+            if np.sum(self.temperatures_K <= T_max) < 3:
+                candidates = DEFAULT_DEBYE_FITTING_T[DEFAULT_DEBYE_FITTING_T <= T_max]
+                to_add = candidates[~np.any(
+                    np.abs(candidates[:, None] - self.temperatures_K[None, :]) < 1e-5,
+                    axis=1,
+                )]
+                self.temperatures_K = np.sort(np.concatenate([self.temperatures_K, to_add]))
+                print(
+                    f"INFO: Added temperatures {list(to_add)} K to temperatures_K. "
+                    f"The Debye model fit requires at least 3 points within its trust region "
+                    f"(T <= {T_max:.4g} K)."
+                )
+                if np.sum(self.temperatures_K <= T_max) < 3:
+                    raise ValueError(
+                        f"volume_curve='debye' requires at least 3 temperatures within the "
+                        f"Debye model trust region (T <= {T_max:.4g} K). "
+                        f"Even after adding default low-T points {list(candidates)}, "
+                        f"only {int(np.sum(self.temperatures_K <= T_max))} point(s) are available. "
+                        f"Increase debye_model.max_fit_temperature_K."
+                    )
 
     @classmethod
     def recommended(

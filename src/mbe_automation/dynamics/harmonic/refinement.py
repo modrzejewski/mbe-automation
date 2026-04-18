@@ -167,7 +167,7 @@ def to_phonon_data(
         q_weights: Weights of irreducible q-points.
         cif_adapter: Adapter containing the experimental structure (CIF). 
             If None, identity permutation is assumed.
-        q_spacing: Spacing for path interpolation in Å⁻¹. Used for band tracking.
+        q_spacing: Spacing for path interpolation in Å⁻¹. Used for band tracking.
         degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
         symmetry_tolerance: Tolerance used by nomore_ase to determine if two 
             normal modes are degenerate. It defines the minimum required inner product 
@@ -682,7 +682,7 @@ def run(
         mesh_size: k-point mesh size.
         n_refined: Number of lowest-frequency groups to optimize individually.
         weighting_scheme: Weighting scheme for refinement ('sigma' or 'unit').
-        q_spacing: Spacing for path interpolation in Å⁻¹ along q-point paths.
+        q_spacing: Spacing for path interpolation in Å⁻¹ along q-point paths.
         reasonable_range: Allowed range for optimized scaling factors.
         degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
         symmetry_tolerance: Tolerance used by nomore_ase to determine if two 

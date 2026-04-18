@@ -224,9 +224,9 @@ def gruneisen_parameters(
         - gruneisen_parameters: Gruneisen parameters for each q-point and band (N_q, N_bands)
         - qpoints: Array of q-points in fractional coordinates (N_q, 3)
         - frequencies: Frequencies for each q-point and band (N_q, N_bands)
-        - volume: Equilibrium volume (Å³)
-        - volume_plus: Volume at V * (1 + delta_V) (Å³)
-        - volume_minus: Volume at V * (1 - delta_V) (Å³)
+        - volume: Equilibrium volume (Å³)
+        - volume_plus: Volume at V * (1 + delta_V) (Å³)
+        - volume_minus: Volume at V * (1 - delta_V) (Å³)
     """
     # 1. Structure
     structure = force_constants.primitive

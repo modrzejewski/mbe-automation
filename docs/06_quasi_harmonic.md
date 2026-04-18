@@ -3,6 +3,7 @@
 - [Setup](#setup)
 - [Phonon calculation](#phonon-calculation)
 - [Empirical Electronic Energy Correction (EEC)](#empirical-electronic-energy-correction-eec)
+- [Debye Model Volumes](#debye-model-volumes)
 - [Adjustable parameters](#adjustable-parameters)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [How to read the results](#how-to-read-the-results)
@@ -126,6 +127,32 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 
 mbe_automation.run(properties_config)
 ```
+
+## Debye Model Volumes
+
+By default, the equilibrium volume at each temperature is obtained by minimizing the Gibbs free energy G(V) fitted with an equation of state (`volume_curve="eos_minimum"`). At high temperatures the G(V) surface can become very flat, making the fitted minimum noisy or unreliable. In such cases, the Debye model provides a physically motivated, smooth alternative.
+
+The Debye model expresses V(T) analytically as:
+
+$$V(T) = V_0 + C \cdot T \cdot D_3\!\left(\frac{\Theta_D}{T}\right)$$
+
+where $D_3$ is the third-order Debye function and $V_0$, $\Theta_D$, $C$ are three parameters fitted to the reliable low-temperature EOS-minimum volumes. The model is then extrapolated to the full temperature range. See Ko et al., *Phys. Rev. Materials* 2, 055603 (2018) for details.
+
+To use Debye model volumes in the QHA temperature loop, set `volume_curve="debye"`:
+
+```python
+from mbe_automation.configs.quasi_harmonic import DebyeModel
+
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
+    ...
+    volume_curve="debye",
+    debye_model=DebyeModel(max_fit_temperature_K=200.0),
+)
+```
+
+The `max_fit_temperature_K` parameter (default: `200.0 K`) defines the upper boundary of the trust region: only EOS-minimum volumes at temperatures **below** this threshold are used to fit the three Debye parameters. At least 3 such points must exist for the fit to succeed.
+
+If the fit cannot be performed (fewer than 3 points below the threshold), the workflow prints a warning and falls back to `volume_curve="eos_minimum"` automatically — no exception is raised and the calculation continues. The `"volume_curve"` column in the output CSV records which source was actually used, reflecting any such fallback.
 
 ## Adjustable parameters
 
