@@ -13,6 +13,7 @@ import pymatviz
 
 import mbe_automation.storage
 import mbe_automation.dynamics.harmonic.modes
+import mbe_automation.common.display
 
 if TYPE_CHECKING:
     from mbe_automation.dynamics.harmonic.eec import DebyeModel
@@ -393,7 +394,7 @@ def compare_Debye_vs_G_min(
         color="gray",
         linestyle="--",
         lw=1.5,
-        label=f"Trust region ({debye_model.max_fit_temperature_K:.0f} K)",
+        label=f"Fitting interval T_max ({debye_model.max_fit_temperature_K:.0f} K)",
         zorder=1,
     )
 
@@ -628,5 +629,39 @@ def eos_fitting_summary(
         
     print("=" * 80 + "\n", flush=True)
 
+
+def debye_model_summary(
+    debye_model: DebyeModel,
+):
+    """
+    Print a summary of the fitted Debye model parameters.
+    """
+    mbe_automation.common.display.framed("Debye model fit")
+
+    if not debye_model.initialized:
+        print(
+            "Debye model was not fitted (insufficient data points in trust region).",
+            flush=True,
+        )
+        return
+
+    T_high = 10.0 * debye_model._ThetaD
+    _, alpha_V_high = debye_model.predict(np.array([T_high]))
+
+    col_w = 36
+    header = f"{'parameter':<{col_w}}   {'value':<{col_w}}"
+    data_rows = [
+        f"{'Fitting interval T_max [K]':<{col_w}}   {debye_model.max_fit_temperature_K:<{col_w}.1f}",
+        f"{'Debye temperature [K]':<{col_w}}   {debye_model._ThetaD:<{col_w}.1f}",
+        f"{'Zero-temperature volume [Å³]':<{col_w}}   {debye_model._V0:<{col_w}.1f}",
+        f"{'High-T α_V at 10·Θ_D [1∕K]':<{col_w}}   {alpha_V_high[0]:<{col_w}.1E}",
+    ]
+    n = max(len(header), max(len(d) for d in data_rows))
+    mbe_automation.common.display.dotted_separator(n)
+    print(header)
+    mbe_automation.common.display.dotted_separator(n)
+    for row in data_rows:
+        print(row)
+    mbe_automation.common.display.dotted_separator(n)
 
 

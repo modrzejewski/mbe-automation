@@ -362,9 +362,13 @@ def _fit_debye_model(
 
     if len(df_fit) >= 3:
         debye_model.fit(
-            T=df_fit["T (K)"].to_numpy(), 
+            T=df_fit["T (K)"].to_numpy(),
             V=df_fit["V_eos (Å³∕unit cell)"].to_numpy()
         )
+
+    mbe_automation.dynamics.harmonic.display.debye_model_summary(
+        debye_model=debye_model,
+    )
 
 
 def _plot_debye_volume(
