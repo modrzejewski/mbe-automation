@@ -80,7 +80,7 @@ Configuration object for the Debye model fit used to predict equilibrium volumes
 
 | Parameter               | Description                                                                                                                                                                                                                                                                                | Default Value |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
-| `max_fit_temperature_K` | Defines the upper boundary of the trust region (in Kelvin) used for fitting. Only EOS-minimum volumes at temperatures below this threshold are used to fit the three Debye parameters. At least 3 such points must exist for the fit to succeed.                                       | `200.0`       |
+| max_fit_temperature_K | Upper boundary of the trust region (K) for fitting. Only EOS-minimum volumes at temperatures below this threshold are used. Requires at least 3 points. | 200.0       |
 
 ### `Enthalpy` Class
 
