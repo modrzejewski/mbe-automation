@@ -284,7 +284,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             (df_crystal_eos["V_debye (Å³∕unit cell)"] > V_lo) &
             (df_crystal_eos["V_debye (Å³∕unit cell)"] < V_hi)
         )
-        df_crystal_eos["valid_equilibrium"] = in_range
+        df_crystal_eos["valid_equilibrium"] = in_range & df_crystal_eos["min_found"]  # min_found implies enough points for S_vib spline & df_crystal_eos["min_found"]  # min_found implies enough points for S_vib spline
         # Drop p_thermal: it was computed as dF_vib/dV at the EOS minimum volume.
         # Applying it as an external pressure would recover the equilibrium volume
         # only if that volume is a minimum of G, which is not the case here.
@@ -295,8 +295,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             out_vols  = df_crystal_eos.loc[~in_range, "V_debye (Å³∕unit cell)"].tolist()
             print(
                 f"WARNING: {n_out} temperature(s) have Debye volumes outside the "
-                f"EOS interpolation range [{V_lo:.1f}, {V_hi:.1f}] Å³ and will be skipped:\n"
-                + "\n".join(f"  T={T:.1f} K  →  V_debye={V:.1f} Å³" for T, V in zip(out_temps, out_vols))
+                f"EOS interpolation range [{V_lo:.1f}, {V_hi:.1f}] Å³ and will be skipped:\n"
+                + "\n".join(f"  T={T:.1f} K  →  V_debye={V:.1f} Å³" for T, V in zip(out_temps, out_vols))
                 + "\nExtend volume_range to cover these volumes."
             )
     elif config.filter_out_extrapolated_minimum:

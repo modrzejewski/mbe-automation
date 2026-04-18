@@ -290,7 +290,7 @@ class ForceConstants(_ForceConstants):
                 Used only when track_bands=True. This threshold is needed because the
                 band tracking algorithm needs to apply degenerate perturbation theory
                 when some of the frequencies form a degenerate subset.
-            delta_q: Displacement distance for perturbation theory in Å⁻¹
+            delta_q: Displacement distance for perturbation theory in Å⁻¹
                 Used only when track_bands=True.
             symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
                 using crystal symmetry operations.
@@ -510,7 +510,7 @@ class ForceConstants(_ForceConstants):
                 refinement.
             temperature_K: Temperature in Kelvin used to compute ADPs.
                 If provided, overrides CIF metadata. Required if U_cart_ref is provided.
-            q_spacing: The target spacing for path interpolation in Å⁻¹ along 
+            q_spacing: The target spacing for path interpolation in Å⁻¹ along
                 q-point paths. Used for band tracking.
             reasonable_range: Allowed range for optimized scaling factors.
             degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
@@ -686,7 +686,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
         Args:
             read_path: Path to the coordinate file.
             transform: Symmetrization applied to the periodic structure.
-            symprec: Tolerance used for symmetry detection (in Å).
+            symprec: Tolerance used for symmetry detection (in Å).
 
         Returns:
             Structure object.

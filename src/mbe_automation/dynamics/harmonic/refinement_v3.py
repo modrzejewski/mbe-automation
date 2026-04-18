@@ -130,7 +130,7 @@ def _phonons(
     elements = [sc.element_symbol() for sc in p1.scatterers()]
     non_h_mask = np.array([el.upper() not in ("H", "D", "T") for el in elements])
 
-    u_exp = extract_adps_from_structure(p1)[non_h_mask]  # (N_non_H, 3, 3) Å²
+    u_exp = extract_adps_from_structure(p1)[non_h_mask]  # (N_non_H, 3, 3) Å²
     atoms = _p1_to_ase_atoms(p1=p1)
 
     sym_phonons = get_symmetric_phonons(
@@ -359,7 +359,7 @@ def _report_on_grid_search(
     the normalised residual norm and the per-atom heat capacity C_V.
     """
     col_r = 20   # restraint label
-    col_u = 10   # RMSD (Å²)
+    col_u = 10   # RMSD (Å²)
     col_c = 20   # C_V (J∕K∕mol∕atom)
     col_f = 20   # F (kJ∕mol∕atom)
     col_s = 12   # ⟨s₁₂⟩ (%)
@@ -368,7 +368,7 @@ def _report_on_grid_search(
         n_p = grid[(s_lbl, restraint_labels[0])]["n_params"]
 
         header = (
-            f"{'':<{col_r}}  {'RMSD (Å²)':>{col_u}}"
+            f"{'':<{col_r}}  {'RMSD (Å²)':>{col_u}}"
             f"  {'⟨s₁₂⟩ (%)':>{col_s}}"
             f"  {'C_V (J∕K∕mol∕atom)':>{col_c}}"
             f"  {'F (kJ∕mol∕atom)':>{col_f}}"
@@ -511,12 +511,12 @@ def run(
 
     ``u_calc``
         Calculated ADP tensors for **non-H atoms** from the winning refinement,
-        shape ``(N_non_H, 3, 3)`` in Å².  These are the model ADPs predicted by
+        shape ``(N_non_H, 3, 3)`` in Å².  These are the model ADPs predicted by
         the adjusted phonon frequencies.
 
     ``u_exp``
         Experimental ADP tensors for **non-H atoms** extracted from the CIF
-        structure, shape ``(N_non_H, 3, 3)`` in Å².  The atom ordering matches
+        structure, shape ``(N_non_H, 3, 3)`` in Å².  The atom ordering matches
         ``u_calc`` exactly (both are masked with the same ``non_h_mask``).
 
     ``result``
@@ -642,7 +642,7 @@ def run(
     return {
         "frequencies": winner["frequencies"],
         "initial_frequencies": raw_freqs,
-        "u_calc": winner["u_calc"],  # (N_non_H, 3, 3) Å² – calculated ADPs for non-H atoms
-        "u_exp": u_exp,              # (N_non_H, 3, 3) Å² – experimental ADPs for non-H atoms
+        "u_calc": winner["u_calc"],  # (N_non_H, 3, 3) Å² – calculated ADPs for non-H atoms
+        "u_exp": u_exp,              # (N_non_H, 3, 3) Å² – experimental ADPs for non-H atoms
         "result": winner,
     }

@@ -128,7 +128,7 @@ def WriteClusterXYZ(FilePath, Constituents, Monomers):
 
 def GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs):
     if Cutoffs["ghosts"] >= Cutoffs["dimers"]:
-        print(f"Cutoff for ghosts ({Cutoffs['ghosts']} Å) must be smaller than cutoff for dimers ({Cutoffs['dimers']} Å)")
+        print(f"Cutoff for ghosts ({Cutoffs['ghosts']} Å) must be smaller than cutoff for dimers ({Cutoffs['dimers']} Å)")
         sys.exit(1)
 
     Ghosts = Atoms()
@@ -724,7 +724,7 @@ def identify_molecules(
         crystal: The periodic structure to process.
         calculator: An optional ASE calculator to compute the potential energy of individual molecules.
         energy_thresh: Threshold in eV/atom for considering two molecules to have the same potential energy.
-        rmsd_thresh: Threshold in Å for considering two molecules structurally identical based on RMSD.
+        rmsd_thresh: Threshold in Å for considering two molecules structurally identical based on RMSD.
         assert_identical_composition: If True, raises an error if the identified molecules do not share identical atomic compositions.
         bonding_algo: Optional pymatgen bonding algorithm to determine connectivity.
         reference_frame_index: The index of the frame to use as reference.
