@@ -553,7 +553,12 @@ def equilibrium_curve(
         good_points = np.ones(len(df_eos), dtype=bool)
 
     select_T = [df_eos.index % n_temperatures == i for i in range(n_temperatures)]
-
+    #
+    # `good_points` is T-invariant: its filter columns are V-only properties
+    # broadcast across T rows, so `(good_points & select_T[i]).sum()` equals
+    # `n_good_points` for every i. The routines which employ interpolation over
+    # volume rely on this fact.
+    #
     print("Summary of data points used in the EOS fit \n")
     print(df_eos[select_T[0]][[
         "system_label_crystal",
