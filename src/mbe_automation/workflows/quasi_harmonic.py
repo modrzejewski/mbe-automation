@@ -281,8 +281,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
     if effective_volume_curve == "debye":
         in_range = (
-            (df_crystal_eos["V_debye (Å³∕unit cell)"] > V_lo) &
-            (df_crystal_eos["V_debye (Å³∕unit cell)"] < V_hi)
+            (df_crystal_eos["V_debye (Å³∕unit cell)"] > V_lo) &
+            (df_crystal_eos["V_debye (Å³∕unit cell)"] < V_hi)
         )
         df_crystal_eos["valid_equilibrium"] = in_range
         # Drop p_thermal: it was computed as dF_vib/dV at the EOS minimum volume.
@@ -292,7 +292,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         n_out = (~in_range).sum()
         if n_out > 0:
             out_temps = df_crystal_eos.loc[~in_range, "T (K)"].tolist()
-            out_vols  = df_crystal_eos.loc[~in_range, "V_debye (Å³∕unit cell)"].tolist()
+            out_vols  = df_crystal_eos.loc[~in_range, "V_debye (Å³∕unit cell)"].tolist()
             print(
                 f"WARNING: {n_out} temperature(s) have Debye volumes outside the "
                 f"EOS interpolation range [{V_lo:.1f}, {V_hi:.1f}] Å³ and will be skipped:\n"
