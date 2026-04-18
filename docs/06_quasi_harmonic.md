@@ -150,7 +150,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 )
 ```
 
-The `max_fit_temperature_K` parameter (default: `200.0 K`) defines the upper boundary of the trust region: only EOS-minimum volumes at temperatures below this threshold are used to fit the three Debye parameters. At least 3 such points must exist for the fit to succeed.
+The max_fit_temperature_K parameter (default: 200.0 K) defines the trust region: only EOS-minimum volumes at temperatures below this threshold are used. Requires at least 3 points.
 
 For more details on its configuration, see the [`DebyeModel` class documentation](03_configuration_classes.md#debyemodel-class).
 
