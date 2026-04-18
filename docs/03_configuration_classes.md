@@ -74,7 +74,7 @@ Configuration object for Empirical Electronic Energy Correction (EEC). EEC enfor
 
 ### `DebyeModel` Class
 
-**Location:** `mbe_automation.configs.quasi_harmonic.DebyeModel` (alias for `mbe_automation.dynamics.harmonic.eec.DebyeModel`)
+Location: mbe_automation.configs.quasi_harmonic.DebyeModel
 
 Configuration object for the Debye model fit used to predict equilibrium volumes $V(T)$.
 
