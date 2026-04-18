@@ -5,6 +5,7 @@ This chapter documents the configuration classes used to control the various wor
 - [Thermodynamics](#thermodynamics)
     - [`FreeEnergy`](#freeenergy-class)
     - [`EEC`](#eec-class)
+    - [`DebyeModel`](#debyemodel-class)
     - [`Enthalpy`](#enthalpy-class)
 - [Molecular Dynamics Propagation](#molecular-dynamics-propagation)
     - [`ClassicalMD`](#classicalmd-class)
@@ -42,7 +43,7 @@ This chapter documents the configuration classes used to control the various wor
 | `pressure_GPa`                  | External pressure (GPa). Applied as the isotropic pressure during input cell relaxation if `relaxation.cell_relaxation="full"` If `thermal_expansion=True`, affects the equilibrium volume determined by minimizing Gibbs Free Energy: G(V) = F(V) + pV. | `1.0E-4`                                           |
 | `thermal_pressures_GPa`         | Range of thermal, effective isotropic pressures (in GPa) applied during cell relaxation to sample cell volumes. Added as an extra term in addition to `pressure_GPa`. Referenced only if `thermal_expansion=True`.                                      | `np.array([0.2, ..., -0.6])`                    |
 | `equation_of_state`             | Equation of state used to fit the energy/free energy vs. volume curve: "birch_murnaghan", "vinet", "polynomial", or "spline".                                                                                   | `"spline"`                                  |
-| `debye_model`                   | Configuration for the Debye model fit used to predict equilibrium volumes V(T). An instance of `DebyeModel` with a single parameter `max_fit_temperature_K` (default: `200.0 K`) that sets the upper boundary of the trust region used for fitting: only EOS-minimum volumes at temperatures below this threshold are used. At least 3 such points are required for the fit to succeed. | `DebyeModel()` |
+| debye_model                   | Configuration for the Debye model fit used to predict equilibrium volumes $V(T)$. Uses an instance of [DebyeModel](#debyemodel-class). | DebyeModel() |
 | `volume_curve`                  | Source of equilibrium volumes V(T) used in the QHA temperature loop: `"eos_minimum"` uses volumes from G(V) EOS minimization (default); `"debye"` uses volumes predicted by the Debye model fit, which is more robust when the G(V) surface is flat at high temperatures and EOS minima become noisy. Falls back to `"eos_minimum"` with a warning if the Debye model cannot be fitted. | `"eos_minimum"` |
 | `imaginary_mode_threshold`      | Threshold (in THz) for detecting imaginary phonon frequencies.                                                                                                                                     | `-0.1`                                          |
 | `filter_out_imaginary_acoustic` | If `True`, filters out data points with imaginary acoustic modes before the EOS fit.                                                                                                               | `True`                                          |
@@ -70,6 +71,16 @@ Configuration object for Empirical Electronic Energy Correction (EEC). EEC enfor
 | `cell`             | Specifies the unit cell type (either `"primitive"` or `"conventional"`) that `V_ref` corresponds to. Computations rescale the reference volume automatically to match the internal conventions of the unit cell.         | `"conventional"`   |
 | `pressure_min_GPa` | Lower bound for the evaluated EEC equivalent pressure (in GPa). If the necessary correction is smaller than this lower bound, an error will be raised. This acts as a safeguard against extrapolating corrections outside physically sound regions.                                                                               | `-5.0`             |
 | `pressure_max_GPa` | Upper bound for the evaluated EEC equivalent pressure (in GPa). If the necessary correction exceeds this bound, an error will be raised.                                                                                                                                                                                          | `5.0`              |
+
+### `DebyeModel` Class
+
+Location: mbe_automation.configs.quasi_harmonic.DebyeModel
+
+Configuration object for the Debye model fit used to predict equilibrium volumes $V(T)$.
+
+| Parameter               | Description                                                                                                                                                                                                                                                                                | Default Value |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| max_fit_temperature_K | Upper boundary of the trust region (K) for fitting. Only EOS-minimum volumes at temperatures below this threshold are used. Requires at least 3 points. | 200.0       |
 
 ### `Enthalpy` Class
 
