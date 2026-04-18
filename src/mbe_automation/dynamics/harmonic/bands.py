@@ -15,7 +15,7 @@ from mbe_automation.storage import views
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT
 from mbe_automation.dynamics.harmonic.modes import at_k_points
 
-DEFAULT_Q_SPACING = 0.05  # Å⁻¹
+DEFAULT_Q_SPACING = 0.05  # Å⁻¹
 DEFAULT_DEGENERATE_FREQS_TOL = 0.5  # cm⁻¹
 
 try:
@@ -36,8 +36,8 @@ class PhonopyASEAdapter:
     3. atoms -> object with .cell.reciprocal() and length (n_atoms)
     
     Compatible with units:
-    - Force constants: eV/Å²
-    - Eigenvalues: eV/(Å²·AMU) -> assign_bands interprets this correctly as energy in eV.
+    - Force constants: eV/Å²
+    - Eigenvalues: eV/(Å²·AMU) -> assign_bands interprets this correctly as energy in eV.
     """
     
     def __init__(self, ph: phonopy.Phonopy, symmetrize_Dq: bool = False, symprec: float = 1e-5):
@@ -83,9 +83,9 @@ def track_from_gamma(
     Args:
         phonopy_object: Initialized Phonopy object
         q_points: (N_q, 3) list of q-points to assign
-        q_spacing: Spacing for path interpolation in Å⁻¹
+        q_spacing: Spacing for path interpolation in Å⁻¹
         degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
-        delta_q: Displacement distance for perturbation theory in Å⁻¹
+        delta_q: Displacement distance for perturbation theory in Å⁻¹
         
     Returns:
         band_indices: (N_q, N_modes) integer array of band IDs.

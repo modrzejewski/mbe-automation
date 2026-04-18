@@ -474,7 +474,7 @@ def print_adps_comparison(
         return f"{left} {m[row, 0]:8.5f} {m[row, 1]:8.5f} {m[row, 2]:8.5f} {right}"
     
     print("\n" + "=" * 100)
-    print("ADP Comparison (3×3 Cartesian U tensors, Å²)")
+    print("ADP Comparison (3×3 Cartesian U tensors, Å²)")
     print("=" * 100)
     
     for i in range(n_atoms):

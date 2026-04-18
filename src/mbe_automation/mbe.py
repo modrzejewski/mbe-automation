@@ -184,7 +184,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
     #
     if PBCEmbedding:
         if Cutoffs["ghosts"] < Cutoffs["dimers"]:
-            print(f"Searching for ghost atoms within {Cutoffs['ghosts']} Å from the reference molecule")
+            print(f"Searching for ghost atoms within {Cutoffs['ghosts']} Å from the reference molecule")
             Ghosts = clusters.GhostAtoms(Monomers, MinRij, Reference, MonomersWithinCutoff, Cutoffs)
             print(f"Found {len(Ghosts)} ghost atoms")
             Label = clusters.Label([Reference], NMonomers)
@@ -193,7 +193,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
             Reference_Plus_Ghosts.write(FilePath)
             print(f"Reference monomer+ghosts: {FilePath}")
         else:
-            print(f"Cutoff for ghosts ({Cutoffs['ghosts']} Å) must be smaller than cutoff for dimers ({Cutoffs['dimers']} Å)")
+            print(f"Cutoff for ghosts ({Cutoffs['ghosts']} Å) must be smaller than cutoff for dimers ({Cutoffs['dimers']} Å)")
             sys.exit(1)
     
     ClusterType = None
@@ -231,8 +231,8 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
         ProcessedClusters = 0
         JobsDone = 0
         print("")
-        print(f"Computing unique {ClusterType} with MaxMinRij < {Cutoffs[ClusterType]} Å")
-        print(f"Threshold for symmetry equivalent clusters: {AlignmentThresh:.4f} Å")
+        print(f"Computing unique {ClusterType} with MaxMinRij < {Cutoffs[ClusterType]} Å")
+        print(f"Threshold for symmetry equivalent clusters: {AlignmentThresh:.4f} Å")
         print(f"Algorithm for molecule alignment: {ClusterComparisonAlgorithm}")
         BlockStartTime = time.time()
         for x in itertools.combinations(MonomersWithinCutoff[ClusterType], n-1):
@@ -338,7 +338,7 @@ def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmb
         NClusters[ClusterType] = len(Clusters[ClusterType])
         BlockEndTime = time.time()
         print(f"100% {ClusterType} completed ({BlockEndTime-BlockStartTime:.1E} seconds)")
-        print(f"{NClusters[ClusterType]} unique {ClusterType} satisfy Max(MinRij) < {Cutoff:.2f} Å")
+        print(f"{NClusters[ClusterType]} unique {ClusterType} satisfy Max(MinRij) < {Cutoff:.2f} Å")
 
     for ClusterType in RequestedClusterTypes:
         SortingKey = np.zeros(NClusters[ClusterType])

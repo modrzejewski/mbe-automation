@@ -99,14 +99,14 @@ def _crystal_optimizer_ase(
             
             if max_force < max_force_on_atom:
                 
-                print(f"Converged with max residual force = {max_force:.1e} eV/Å", flush=True)
+                print(f"Converged with max residual force = {max_force:.1e} eV/Å", flush=True)
                 break
             
             else:
 
                 msg = (
                     f"{algo} did not converge "
-                    f"(max force = {max_force:.1e} eV/Å > {max_force_on_atom:.1e} eV/Å)"
+                    f"(max force = {max_force:.1e} eV/Å > {max_force_on_atom:.1e} eV/Å)"
                 )
                 print(msg, flush=True)
                 
@@ -142,7 +142,7 @@ def crystal(
 
     print(f"backend                       {config.backend}")
     print(f"cell_relaxation               {config.cell_relaxation}")
-    print(f"max_force_on_atom             {config.max_force_on_atom_eV_A:.1e} eV/Å")
+    print(f"max_force_on_atom             {config.max_force_on_atom_eV_A:.1e} eV/Å")
     if config.cell_relaxation == "full":
         print(f"pressure                      {config.pressure_GPa} GPa")
     print(f"transform                     {config.transform}")
@@ -296,7 +296,7 @@ def crystal(
 
     relaxed_system.calc = calculator
     max_force = np.abs(relaxed_system.get_forces()).max()
-    print(f"Final max residual force = {max_force:.1e} eV/Å", flush=True)
+    print(f"Final max residual force = {max_force:.1e} eV/Å", flush=True)
 
     if config.save_structure_files:
         cif_path = str(work_dir / "relaxed_structure.cif")
@@ -351,14 +351,14 @@ def _isolated_molecule_optimizer_ase(
             max_force = np.abs(system_to_optimize.get_forces()).max()
             if max_force < max_force_on_atom:
                 
-                print(f"Converged with max residual force = {max_force:.1e} eV/Å", flush=True)
+                print(f"Converged with max residual force = {max_force:.1e} eV/Å", flush=True)
                 break
             
             else:
 
                 msg = (
                     f"{algo} finished but did not converge "
-                    f"(max force = {max_force:.1e} eV/Å > {max_force_on_atom:.1e} eV/Å)"
+                    f"(max force = {max_force:.1e} eV/Å > {max_force_on_atom:.1e} eV/Å)"
                 )
                 print(msg, flush=True)
                 
@@ -389,7 +389,7 @@ def _isolated_molecule(
             key])
     else:
         mbe_automation.common.display.framed("Relaxation")
-    print(f"Max force threshold           {config.max_force_on_atom_eV_A:.1e} eV/Å")
+    print(f"Max force threshold           {config.max_force_on_atom_eV_A:.1e} eV/Å")
 
     if config.backend == "ase":
         relaxed_molecule = _isolated_molecule_optimizer_ase(

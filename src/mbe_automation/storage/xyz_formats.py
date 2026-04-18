@@ -277,9 +277,9 @@ def _print_cell_summary(system: ase.Atoms, label: str) -> None:
     angles = system.cell.angles()
     print(label)
     print(f"  Symmetry          [{hmsymbol}][{space_group}]")
-    print(f"  Lattice lengths   a={lengths[0]:.4f}, b={lengths[1]:.4f}, c={lengths[2]:.4f} Å")
+    print(f"  Lattice lengths   a={lengths[0]:.4f}, b={lengths[1]:.4f}, c={lengths[2]:.4f} Å")
     print(f"  Lattice angles    alpha={angles[0]:.4f}, beta={angles[1]:.4f}, gamma={angles[2]:.4f} °")
-    print(f"  Cell volume       {system.get_volume():.4f} Å³")
+    print(f"  Cell volume       {system.get_volume():.4f} Å³")
     print(f"  Number of atoms   {len(system)}")
 
 
