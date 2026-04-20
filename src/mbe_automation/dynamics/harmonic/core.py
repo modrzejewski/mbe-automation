@@ -60,6 +60,7 @@ class EOSMetadata:
     sampled_volumes: npt.NDArray[np.float64]
     dataset: str
     force_constants_keys: list[str]
+    equation_of_state: Literal[*EQUATIONS_OF_STATE]
     eec: mbe_automation.dynamics.harmonic.eec.EEC
     debye_model: mbe_automation.dynamics.harmonic.eec.DebyeModel
 
@@ -112,6 +113,71 @@ class EOSMetadata:
         else:
             interpolator = CubicSpline(V_sorted, S_sorted, bc_type="not-a-knot")
             return interpolator.derivative(1) if derivative else interpolator
+
+    def cold_curve(
+        self,
+    ) -> dict:
+        """
+        Fit the static electronic energy E^el(V) to a third-order polynomial 
+        using proximity weights, and extract V0, B0, and dB0dP.
+        
+        Returns:
+            dict: A dictionary containing:
+                - 'E_el_crystal_interp (kJ∕mol∕unit cell)': A callable Polynomial representing E^el(V).
+                - 'V0 (Å³∕unit cell)': Equilibrium volume where E^el is minimized.
+                - 'B0 (GPa)': Bulk modulus at V0.
+                - 'dB0dP': Pressure derivative of the bulk modulus at V0.
+        """
+        # 1. Extract V and E_el
+        # Since E_el is temperature-independent, we can use the data from the first temperature point.
+        df = self.exact_at_sampled_volume[self.select_T[0]]
+        
+        V = df["V_crystal (Å³∕unit cell)"].to_numpy()
+        E_el = df["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy()
+        
+        # 2. Fit 3rd-order polynomial
+        V_min_guess = V[np.argmin(E_el)]
+        weights = mbe_automation.dynamics.harmonic.eos.proximity_weights(
+            V=V,
+            V_min=V_min_guess,
+        )
+        poly = Polynomial.fit(
+            x=V,
+            y=E_el,
+            deg=3,
+            w=weights,
+        )
+        
+        # 3. Find V0 from the roots of the first derivative
+        dE = poly.deriv(1)
+        d2E = poly.deriv(2)
+        d3E = poly.deriv(3)
+        
+        roots = dE.roots()
+        real_roots = roots[np.isreal(roots)].real
+        min_roots = real_roots[d2E(real_roots) > 0]
+        
+        if len(min_roots) == 0:
+            raise ValueError("Could not find a minimum for the third-order E_el(V) polynomial.")
+            
+        V0 = min_roots[np.argmin(poly(min_roots))]
+        
+        # 4. Extract B0 and dB0dP
+        E2 = d2E(V0)
+        E3 = d3E(V0)
+        
+        B0_kJ_mol_A3 = V0 * E2
+        conversion_factor = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
+        B0_GPa = B0_kJ_mol_A3 * conversion_factor
+        
+        dB0dP = -1.0 - V0 * E3 / E2
+        
+        return {
+            "E_el_crystal_interp (kJ∕mol∕unit cell)": poly,
+            "V0 (Å³∕unit cell)": V0,
+            "B0 (GPa)": B0_GPa,
+            "dB0dP": dB0dP,
+        }
 
 def _assert_equivalent_cells(
         phonopy_cell: PhonopyAtoms,
@@ -791,6 +857,7 @@ def equilibrium_curve(
         sampled_volumes=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
         dataset=dataset,
         force_constants_keys=force_constants_keys,
+        equation_of_state=equation_of_state,
         eec=eec,
         debye_model=debye_model
     )

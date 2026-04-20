@@ -245,19 +245,14 @@ def band_structure(
     )
 
 
-def eos_curves(
-    dataset: str,
-    key: str,
+def _eos_curves(
+    eos: mbe_automation.storage.core.EOSCurves,
     save_path: str | None = None,
     n_molecules_per_cell: int | None = None,
     max_temp_ticks: int = 10,
     debye_model: DebyeModel | None = None,
 ):
-    
-    eos = mbe_automation.storage.read_eos_curves(
-        dataset,
-        key
-    )
+
     n_temperatures = len(eos.temperatures)
 
     if n_molecules_per_cell:
@@ -360,6 +355,29 @@ def eos_curves(
         plt.close(fig)
     else:
         return fig
+
+
+def eos_curves(
+    eos: mbe_automation.storage.core.EOSCurves | None = None,
+    dataset: str | None = None,
+    key: str | None = None,
+    save_path: str | None = None,
+    n_molecules_per_cell: int | None = None,
+    max_temp_ticks: int = 10,
+    debye_model: DebyeModel | None = None,
+):
+    if eos is None:
+        if dataset is None or key is None:
+            raise ValueError("Either 'eos' or both 'dataset' and 'key' must be provided.")
+        eos = mbe_automation.storage.read_eos_curves(dataset, key)
+
+    return _eos_curves(
+        eos=eos,
+        save_path=save_path,
+        n_molecules_per_cell=n_molecules_per_cell,
+        max_temp_ticks=max_temp_ticks,
+        debye_model=debye_model,
+    )
 
 
 def compare_Debye_vs_G_min(
