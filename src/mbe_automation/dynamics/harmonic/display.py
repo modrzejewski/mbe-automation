@@ -251,6 +251,7 @@ def _eos_curves(
     n_molecules_per_cell: int | None = None,
     max_temp_ticks: int = 10,
     debye_model: DebyeModel | None = None,
+    cold_curve: dict | None = None,
 ):
 
     n_temperatures = len(eos.temperatures)
@@ -269,6 +270,17 @@ def _eos_curves(
     G_min_global = np.nanmin(G_sampled_scaled)
     if np.any(~np.isnan(G_min_scaled)):
         G_min_global = min(G_min_global, np.nanmin(G_min_scaled))
+
+    if cold_curve is not None:
+        poly_E_el = cold_curve["E_el_crystal_interp (kJ∕mol∕unit cell)"]
+        V0_cold = cold_curve["V0 (Å³∕unit cell)"]
+        B0_cold = cold_curve["B0 (GPa)"]
+        dB0dP_cold = cold_curve["dB0dP"]
+        
+        E_el_interp_scaled = poly_E_el(eos.V_interp) * scaling_factor
+        E_el_min_scaled = poly_E_el(V0_cold) * scaling_factor
+        
+        G_min_global = min(G_min_global, E_el_min_scaled)
 
     fig, ax = plt.subplots(figsize=(8, 6))
     cmap = plt.get_cmap("plasma")
@@ -308,6 +320,23 @@ def _eos_curves(
         marker="x",
         label="EOS equilibrium path",
     )
+
+    if cold_curve is not None:
+        label = f"Electronic curve ($B_0$={B0_cold:.1f} GPa, $B'_0$={dB0dP_cold:.1f})"
+        ax.plot(
+            eos.V_interp,
+            E_el_interp_scaled - G_min_global,
+            color="dimgray",
+            linestyle=":",
+            label=label,
+        )
+        ax.plot(
+            V0_cold,
+            E_el_min_scaled - G_min_global,
+            color="dimgray",
+            marker="x",
+            linestyle="None",
+        )
 
     if debye_model is not None and debye_model.initialized:
         V_debye, _ = debye_model.predict(eos.temperatures)
@@ -365,6 +394,7 @@ def eos_curves(
     n_molecules_per_cell: int | None = None,
     max_temp_ticks: int = 10,
     debye_model: DebyeModel | None = None,
+    cold_curve: dict | None = None,
 ):
     if eos is None:
         if dataset is None or key is None:
@@ -377,6 +407,7 @@ def eos_curves(
         n_molecules_per_cell=n_molecules_per_cell,
         max_temp_ticks=max_temp_ticks,
         debye_model=debye_model,
+        cold_curve=cold_curve,
     )
 
 

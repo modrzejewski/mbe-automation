@@ -60,6 +60,7 @@ class EOSMetadata:
     sampled_volumes: npt.NDArray[np.float64]
     dataset: str
     force_constants_keys: list[str]
+    eos_curves_key: str
     equation_of_state: Literal[*EQUATIONS_OF_STATE]
     eec: mbe_automation.dynamics.harmonic.eec.EEC
     debye_model: mbe_automation.dynamics.harmonic.eec.DebyeModel
@@ -178,6 +179,31 @@ class EOSMetadata:
             "B0 (GPa)": B0_GPa,
             "dB0dP": dB0dP,
         }
+
+    def plot_eos_curves(
+        self,
+        save_path: str | None = None,
+        n_molecules_per_cell: int | None = None,
+        max_temp_ticks: int = 10,
+    ):
+        """
+        Read the corresponding EOSCurves data and plot the Gibbs free energy curves
+        along with the cold curve.
+        """
+        eos = mbe_automation.storage.read_eos_curves(
+            self.dataset, 
+            self.eos_curves_key
+        )
+        cold_curve = self.cold_curve()
+
+        return mbe_automation.dynamics.harmonic.display.eos_curves(
+            eos=eos,
+            save_path=save_path,
+            n_molecules_per_cell=n_molecules_per_cell,
+            max_temp_ticks=max_temp_ticks,
+            debye_model=self.debye_model,
+            cold_curve=cold_curve,
+        )
 
 def _assert_equivalent_cells(
         phonopy_cell: PhonopyAtoms,
@@ -832,14 +858,6 @@ def equilibrium_curve(
             save_path=os.path.join(work_dir, "Debye_model_volume.png")
         )
 
-    if save_plots:
-        mbe_automation.dynamics.harmonic.display.eos_curves(
-            dataset=dataset,
-            key=f"{root_key}/eos_interpolated",
-            save_path=os.path.join(work_dir, "eos_curves.png"),
-            debye_model=debye_model,
-        )
-
     mbe_automation.dynamics.harmonic.display.eos_fitting_summary(
         df_crystal_eos=df,
         filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
@@ -857,6 +875,7 @@ def equilibrium_curve(
         sampled_volumes=df_eos[good_points & select_T[0]]["V_crystal (Å³∕unit cell)"].to_numpy(),
         dataset=dataset,
         force_constants_keys=force_constants_keys,
+        eos_curves_key=f"{root_key}/eos_interpolated",
         equation_of_state=equation_of_state,
         eec=eec,
         debye_model=debye_model
@@ -867,6 +886,11 @@ def equilibrium_curve(
         dataset=dataset,
         key=f"{root_key}/eos_metadata"
     )
+
+    if save_plots:
+        eos_obj.plot_eos_curves(
+            save_path=os.path.join(work_dir, "eos_curves.png")
+        )
 
     return eos_obj
 

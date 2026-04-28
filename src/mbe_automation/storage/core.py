@@ -831,6 +831,11 @@ def save_eos_metadata(
         group.attrs["equation_of_state"] = eos_metadata.equation_of_state
 
         group.create_dataset(
+            name="eos_curves_key",
+            data=eos_metadata.eos_curves_key.encode("utf-8")
+        )
+
+        group.create_dataset(
             name="T (K)",
             data=eos_metadata.temperatures_K
         )
@@ -889,6 +894,8 @@ def read_eos_metadata(
         force_constants_keys = group["force_constants_keys"][...].astype(str).tolist()
         equation_of_state = group.attrs["equation_of_state"]
         
+        eos_curves_key = group["eos_curves_key"][()].decode("utf-8")
+        
         select_T_stacked = group["select_T"][...]
         select_T = [row for row in select_T_stacked]
 
@@ -917,6 +924,7 @@ def read_eos_metadata(
         sampled_volumes=sampled_volumes,
         dataset=dataset,
         force_constants_keys=force_constants_keys,
+        eos_curves_key=eos_curves_key,
         equation_of_state=equation_of_state,
         eec=eec,
         debye_model=debye_model
