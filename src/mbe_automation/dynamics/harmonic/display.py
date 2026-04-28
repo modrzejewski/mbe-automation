@@ -284,7 +284,7 @@ def _eos_curves(
         E_el_min_scaled = interp_E_el(V0_cold) * scaling_factor
         E_el_approx_scaled = poly_approx(eos.V_interp) * scaling_factor
         
-        fig, (ax, ax_cold) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+        fig, (ax, ax_cold) = plt.subplots(2, 1, figsize=(8, 10), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         fig.subplots_adjust(hspace=0.05)
     else:
         fig, ax = plt.subplots(figsize=(8, 6))
@@ -337,11 +337,18 @@ def _eos_curves(
             linestyle="-",
             label=label_interp,
         )
+        ax_cold.scatter(
+            eos.V_sampled[0, :],
+            (interp_E_el(eos.V_sampled[0, :]) * scaling_factor) - E_el_min_scaled,
+            color="black",
+            marker="o",
+            facecolors="none"
+        )
         label_approx = f"3rd-order polynomial ($B_0$={B0_cold:.1f} GPa, $B'_0$={dB0dP_cold:.1f})"
         ax_cold.plot(
             eos.V_interp,
             E_el_approx_scaled - E_el_min_scaled,
-            color="dimgray",
+            color="tab:red",
             linestyle=":",
             linewidth=2,
             label=label_approx,
