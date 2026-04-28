@@ -1,0 +1,7 @@
+Structurures optimized using VASP, PBE-D3BJ, hard PAWs, 1600 eV cut-off, KSPACING=0.3 
+
+BPHENO11 Space Group: C 2/c (15)
+BPHENO12 Space Group: P 21 21 21 (19)
+
+
+
