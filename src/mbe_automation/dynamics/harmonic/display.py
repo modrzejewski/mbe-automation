@@ -329,7 +329,7 @@ def _eos_curves(
     )
 
     if cold_curve is not None and ax_cold is not None:
-        label_interp = "Electronic curve (cubic spline)"
+        label_interp = "Cubic spline"
         ax_cold.plot(
             eos.V_interp,
             E_el_interp_scaled - E_el_min_scaled,
