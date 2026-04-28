@@ -173,8 +173,14 @@ class EOSMetadata:
         
         dB0dP = -1.0 - V0 * E3 / E2
         
+        E0 = poly(V0)
+        def poly_approx(V):
+            dV = V - V0
+            return E0 + 0.5 * E2 * dV**2 + (1.0 / 6.0) * E3 * dV**3
+
         return {
             "E_el_crystal_interp (kJ∕mol∕unit cell)": poly,
+            "E_el_crystal_poly_3 (kJ∕mol∕unit cell)": poly_approx,
             "V0 (Å³∕unit cell)": V0,
             "B0 (GPa)": B0_GPa,
             "dB0dP": dB0dP,

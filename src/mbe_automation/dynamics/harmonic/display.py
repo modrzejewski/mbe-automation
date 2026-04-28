@@ -259,9 +259,11 @@ def _eos_curves(
     if n_molecules_per_cell:
         scaling_factor = 1.0 / n_molecules_per_cell
         y_label = "Gibbs free energy (kJ∕mol∕molecule)"
+        y_label_cold = "Electronic energy (kJ∕mol∕molecule)"
     else:
         scaling_factor = 1.0
         y_label = "Gibbs free energy (kJ∕mol∕unit cell)"
+        y_label_cold = "Electronic energy (kJ∕mol∕unit cell)"
 
     G_sampled_scaled = eos.G_sampled * scaling_factor
     G_interp_scaled = eos.G_interp * scaling_factor
@@ -272,17 +274,22 @@ def _eos_curves(
         G_min_global = min(G_min_global, np.nanmin(G_min_scaled))
 
     if cold_curve is not None:
-        poly_E_el = cold_curve["E_el_crystal_interp (kJ∕mol∕unit cell)"]
+        interp_E_el = cold_curve["E_el_crystal_interp (kJ∕mol∕unit cell)"]
+        poly_approx = cold_curve["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"]
         V0_cold = cold_curve["V0 (Å³∕unit cell)"]
         B0_cold = cold_curve["B0 (GPa)"]
         dB0dP_cold = cold_curve["dB0dP"]
         
-        E_el_interp_scaled = poly_E_el(eos.V_interp) * scaling_factor
-        E_el_min_scaled = poly_E_el(V0_cold) * scaling_factor
+        E_el_interp_scaled = interp_E_el(eos.V_interp) * scaling_factor
+        E_el_min_scaled = interp_E_el(V0_cold) * scaling_factor
+        E_el_approx_scaled = poly_approx(eos.V_interp) * scaling_factor
         
-        G_min_global = min(G_min_global, E_el_min_scaled)
+        fig, (ax, ax_cold) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+        fig.subplots_adjust(hspace=0.05)
+    else:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax_cold = None
 
-    fig, ax = plt.subplots(figsize=(8, 6))
     cmap = plt.get_cmap("plasma")
     norm = mcolors.Normalize(vmin=np.min(eos.temperatures), vmax=np.max(eos.temperatures))
 
@@ -321,18 +328,28 @@ def _eos_curves(
         label="EOS equilibrium path",
     )
 
-    if cold_curve is not None:
-        label = f"Electronic curve ($B_0$={B0_cold:.1f} GPa, $B'_0$={dB0dP_cold:.1f})"
-        ax.plot(
+    if cold_curve is not None and ax_cold is not None:
+        label_interp = "Electronic curve (cubic spline)"
+        ax_cold.plot(
             eos.V_interp,
-            E_el_interp_scaled - G_min_global,
+            E_el_interp_scaled - E_el_min_scaled,
+            color="black",
+            linestyle="-",
+            label=label_interp,
+        )
+        label_approx = f"3rd-order polynomial ($B_0$={B0_cold:.1f} GPa, $B'_0$={dB0dP_cold:.1f})"
+        ax_cold.plot(
+            eos.V_interp,
+            E_el_approx_scaled - E_el_min_scaled,
             color="dimgray",
             linestyle=":",
-            label=label,
+            linewidth=2,
+            label=label_approx,
         )
-        ax.plot(
+        
+        ax_cold.plot(
             V0_cold,
-            E_el_min_scaled - G_min_global,
+            0.0,
             color="dimgray",
             marker="x",
             linestyle="None",
@@ -352,12 +369,22 @@ def _eos_curves(
             marker="x",
             label="Debye model path",
         )
+
     ax.legend()
-    ax.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
     ax.set_ylabel(y_label, fontsize=14)
     ax.grid(True, linestyle="--", alpha=0.6)
     ax.tick_params(labelsize=12)
     ax.set_ylim(bottom=0)
+
+    if ax_cold is not None:
+        ax_cold.legend(fontsize=12)
+        ax_cold.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
+        ax_cold.set_ylabel(y_label_cold, fontsize=14)
+        ax_cold.grid(True, linestyle="--", alpha=0.6)
+        ax_cold.tick_params(labelsize=12)
+        ax_cold.set_ylim(bottom=0)
+    else:
+        ax.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
 
     if n_temperatures > 1:
         ax2 = ax.twinx()
