@@ -359,18 +359,18 @@ def _eos_curves(
         ax_cold.axvline(
             x=V0_cold,
             ymin=0.0,
-            ymax=0.15,
+            ymax=0.5,
             color="dimgray",
-            linestyle="-",
-            linewidth=1.5,
+            linestyle="--",
+            linewidth=1.0,
         )
         ax_cold.text(
             x=V0_cold + (np.nanmax(eos.V_interp) - np.nanmin(eos.V_interp)) * 0.015,
-            y=0.075,
+            y=0.5,
             s=f"$V_0$ = {V0_cold:.1f} $\\mathrm{{\\AA}}^3$",
             color="dimgray",
             fontsize=12,
-            verticalalignment="center",
+            verticalalignment="top",
             horizontalalignment="left",
             transform=ax_cold.get_xaxis_transform()
         )
