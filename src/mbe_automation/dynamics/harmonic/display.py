@@ -402,14 +402,20 @@ def _eos_curves(
             label="Debye model path",
         )
 
-    ax.legend()
+    ax.legend(frameon=False)
     ax.set_ylabel(y_label, fontsize=14)
     ax.grid(True, linestyle="--", alpha=0.6)
     ax.tick_params(labelsize=12)
     ax.set_ylim(bottom=0)
 
     if ax_cold is not None:
-        ax_cold.legend(fontsize=12)
+        ax_cold.legend(
+            fontsize=12,
+            loc="upper center",
+            bbox_to_anchor=(V0_cold, 0.98),
+            bbox_transform=ax_cold.get_xaxis_transform(),
+            frameon=False,
+        )
         ax_cold.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
         ax_cold.set_ylabel(y_label_cold, fontsize=14)
         ax_cold.grid(True, linestyle="--", alpha=0.6)
