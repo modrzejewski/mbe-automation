@@ -356,12 +356,23 @@ def _eos_curves(
             label=label_approx,
         )
         
-        ax_cold.plot(
-            V0_cold,
-            0.0,
+        ax_cold.axvline(
+            x=V0_cold,
+            ymin=0.0,
+            ymax=0.15,
             color="dimgray",
-            marker="x",
-            linestyle="None",
+            linestyle="-",
+            linewidth=1.5,
+        )
+        ax_cold.text(
+            x=V0_cold + (np.nanmax(eos.V_interp) - np.nanmin(eos.V_interp)) * 0.015,
+            y=0.075,
+            s=f"$V_0$ = {V0_cold:.1f} $\\mathrm{{\\AA}}^3$",
+            color="dimgray",
+            fontsize=12,
+            verticalalignment="center",
+            horizontalalignment="left",
+            transform=ax_cold.get_xaxis_transform()
         )
 
     if debye_model is not None and debye_model.initialized:
