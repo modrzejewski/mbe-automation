@@ -348,7 +348,7 @@ def _eos_curves(
             marker="o",
             facecolors="none"
         )
-        label_approx = f"3rd-order polynomial ($B_0$={B0_cold:.1f} GPa, $B'_0$={dB0dP_cold:.1f})"
+        label_approx = "3rd-order polynomial"
         ax_cold.plot(
             eos.V_interp,
             E_el_approx_scaled - E_el_min_scaled,
@@ -379,7 +379,7 @@ def _eos_curves(
         ax_cold.text(
             x=V0_cold + (np.nanmax(eos.V_interp) - np.nanmin(eos.V_interp)) * 0.015,
             y=0.5,
-            s=f"$V_0$ = {V0_cold:.1f} $\\mathrm{{\\AA}}^3$",
+            s=f"$V_0$ = {V0_cold:.1f} $\\mathrm{{\\AA}}^3$\n$B_0$ = {B0_cold:.1f} GPa\n$B_0^\\prime$ = {dB0dP_cold:.1f}",
             color="dimgray",
             fontsize=12,
             verticalalignment="top",
