@@ -276,6 +276,7 @@ def _eos_curves(
     if cold_curve is not None:
         interp_E_el = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"]
         poly_approx = cold_curve["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"]
+        bm_approx = cold_curve["E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)"]
         V_accurate = cold_curve["V_sampled (Å³∕unit cell)"]
         E_el_accurate = cold_curve["E_el_crystal_sampled (kJ∕mol∕unit cell)"]
         V0_cold = cold_curve["V0 (Å³∕unit cell)"]
@@ -285,6 +286,7 @@ def _eos_curves(
         E_el_interp_scaled = interp_E_el(eos.V_interp) * scaling_factor
         E_el_min_scaled = interp_E_el(V0_cold) * scaling_factor
         E_el_approx_scaled = poly_approx(eos.V_interp) * scaling_factor
+        E_el_bm_scaled = bm_approx(eos.V_interp) * scaling_factor
         
         fig, (ax, ax_cold) = plt.subplots(2, 1, figsize=(8, 10), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         fig.subplots_adjust(hspace=0.05)
@@ -356,6 +358,16 @@ def _eos_curves(
             label=label_approx,
         )
         
+        label_bm = "Birch-Murnaghan"
+        ax_cold.plot(
+            eos.V_interp,
+            E_el_bm_scaled - E_el_min_scaled,
+            color="tab:blue",
+            linestyle="-.",
+            linewidth=2,
+            label=label_bm,
+        )
+            
         ax_cold.axvline(
             x=V0_cold,
             ymin=0.0,

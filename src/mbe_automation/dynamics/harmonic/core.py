@@ -115,6 +115,23 @@ class EOSMetadata:
             interpolator = CubicSpline(V_sorted, S_sorted, bc_type="not-a-knot")
             return interpolator.derivative(1) if derivative else interpolator
 
+    @staticmethod
+    def _birch_murnaghan(V: npt.NDArray, V0: float, E0: float, B0: float, B0_prime: float) -> npt.NDArray:
+        """
+        Birch-Murnaghan equation of state.
+        
+        Args:
+            V: Volumes to evaluate the energy at.
+            V0: Equilibrium volume.
+            E0: Energy at equilibrium volume.
+            B0: Bulk modulus at equilibrium (in energy/volume units).
+            B0_prime: Pressure derivative of the bulk modulus.
+        """
+        eta = (V0 / V) ** (2.0 / 3.0)
+        term1 = ((eta - 1.0) ** 3) * B0_prime
+        term2 = ((eta - 1.0) ** 2) * (6.0 - 4.0 * eta)
+        return E0 + (9.0 * V0 * B0 / 16.0) * (term1 + term2)
+
     def cold_curve(
         self,
     ) -> dict:
@@ -126,6 +143,7 @@ class EOSMetadata:
             dict: Dictionary containing:
                 - 'E_el_crystal_poly_3 (kJ∕mol∕unit cell)': Least-squares 3rd-order Polynomial fit of E^el(V).
                 - 'E_el_crystal_spline (kJ∕mol∕unit cell)': CubicSpline interpolation of E^el(V).
+                - 'E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)': Birch-Murnaghan equation of state function.
                 - 'V_sampled (Å³∕unit cell)': Array of sampled volumes.
                 - 'E_el_crystal_sampled (kJ∕mol∕unit cell)': Accurate static electronic energies corresponding to the sampled volumes.
                 - 'V0 (Å³∕unit cell)': Equilibrium volume where E^el is minimized.
@@ -178,10 +196,21 @@ class EOSMetadata:
         
         sort_idx = np.argsort(V)
         spline = CubicSpline(V[sort_idx], E_el[sort_idx])
+        
+        E0 = poly_3_lsq(V0)
+        def bm_interp(V_eval):
+            return EOSMetadata._birch_murnaghan(
+                V=V_eval,
+                V0=V0,
+                E0=E0,
+                B0=B0_kJ_mol_A3,
+                B0_prime=dB0dP,
+            )
 
         return {
             "E_el_crystal_poly_3 (kJ∕mol∕unit cell)": poly_3_lsq,
             "E_el_crystal_spline (kJ∕mol∕unit cell)": spline,
+            "E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)": bm_interp,
             "V_sampled (Å³∕unit cell)": V,
             "E_el_crystal_sampled (kJ∕mol∕unit cell)": E_el,
             "V0 (Å³∕unit cell)": V0,
