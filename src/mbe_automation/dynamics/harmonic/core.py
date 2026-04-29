@@ -115,23 +115,6 @@ class EOSMetadata:
             interpolator = CubicSpline(V_sorted, S_sorted, bc_type="not-a-knot")
             return interpolator.derivative(1) if derivative else interpolator
 
-    @staticmethod
-    def _birch_murnaghan(V: npt.NDArray, V0: float, E0: float, B0: float, B0_prime: float) -> npt.NDArray:
-        """
-        Birch-Murnaghan equation of state.
-        
-        Args:
-            V: Volumes to evaluate the energy at.
-            V0: Equilibrium volume.
-            E0: Energy at equilibrium volume.
-            B0: Bulk modulus at equilibrium (in energy/volume units).
-            B0_prime: Pressure derivative of the bulk modulus.
-        """
-        eta = (V0 / V) ** (2.0 / 3.0)
-        term1 = ((eta - 1.0) ** 3) * B0_prime
-        term2 = ((eta - 1.0) ** 2) * (6.0 - 4.0 * eta)
-        return E0 + (9.0 * V0 * B0 / 16.0) * (term1 + term2)
-
     def cold_curve(
         self,
     ) -> dict:
@@ -199,12 +182,12 @@ class EOSMetadata:
         
         E0 = poly_3_lsq(V0)
         def bm_interp(V_eval):
-            return EOSMetadata._birch_murnaghan(
-                V=V_eval,
-                V0=V0,
-                E0=E0,
-                B0=B0_kJ_mol_A3,
-                B0_prime=dB0dP,
+            return mbe_automation.dynamics.harmonic.eos.birch_murnaghan(
+                volume=V_eval,
+                e0=E0,
+                v0=V0,
+                b0=B0_kJ_mol_A3,
+                b1=dB0dP,
             )
 
         return {
