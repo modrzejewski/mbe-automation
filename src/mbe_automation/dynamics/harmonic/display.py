@@ -329,7 +329,7 @@ def _eos_curves(
         color="black",
         linestyle="--",
         marker="x",
-        label="EOS equilibrium path",
+        label="EOS equilibrium",
     )
 
     if cold_curve is not None and ax_cold is not None:
@@ -399,10 +399,14 @@ def _eos_curves(
             color="tab:blue",
             linestyle="--",
             marker="x",
-            label="Debye model path",
+            label="Debye model",
         )
 
-    ax.legend(frameon=False)
+    ax.legend(
+        frameon=True,
+        edgecolor="black",
+        fancybox=False,
+    )
     ax.set_ylabel(y_label, fontsize=14)
     ax.grid(True, linestyle="--", alpha=0.6)
     ax.tick_params(labelsize=12)
@@ -414,7 +418,9 @@ def _eos_curves(
             loc="upper center",
             bbox_to_anchor=(V0_cold, 0.98),
             bbox_transform=ax_cold.get_xaxis_transform(),
-            frameon=False,
+            frameon=True,
+            edgecolor="black",
+            fancybox=False,
         )
         ax_cold.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
         ax_cold.set_ylabel(y_label_cold, fontsize=14)
