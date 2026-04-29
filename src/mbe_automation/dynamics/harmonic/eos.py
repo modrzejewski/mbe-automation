@@ -285,3 +285,86 @@ def get_minimum_points_for_eos(equation_of_state: str) -> int:
     else:
         raise ValueError(f"Unknown EOS: {equation_of_state}")
 
+def cold_curve(
+    V: npt.NDArray[np.float64],
+    E_el: npt.NDArray[np.float64],
+) -> dict:
+    """
+    Fit the static electronic energy E^el(V) to a third-order polynomial 
+    using proximity weights, and extract V0, B0, and dB0dP.
+    
+    Args:
+        V: Array of sampled volumes (Å³∕unit cell).
+        E_el: Array of electronic energies (kJ∕mol∕unit cell).
+        
+    Returns:
+        dict: Dictionary containing:
+            - 'E_el_crystal_poly_3 (kJ∕mol∕unit cell)': Least-squares 3rd-order Polynomial fit of E^el(V).
+            - 'E_el_crystal_spline (kJ∕mol∕unit cell)': CubicSpline interpolation of E^el(V).
+            - 'E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)': Birch-Murnaghan equation of state function.
+            - 'V_sampled (Å³∕unit cell)': Array of sampled volumes.
+            - 'E_el_crystal_sampled (kJ∕mol∕unit cell)': Accurate static electronic energies corresponding to the sampled volumes.
+            - 'V0 (Å³∕unit cell)': Equilibrium volume where E^el is minimized.
+            - 'B0 (GPa)': Bulk modulus at V0.
+            - 'dB0dP': Pressure derivative of the bulk modulus at V0.
+    """
+    # Fit 3rd-order polynomial
+    V_min_guess = V[np.argmin(E_el)]
+    weights = proximity_weights(
+        V=V,
+        V_min=V_min_guess,
+    )
+    poly_3_lsq = Polynomial.fit(
+        x=V,
+        y=E_el,
+        deg=3,
+        w=weights,
+    )
+    
+    # Find V0 from the roots of the first derivative
+    dE = poly_3_lsq.deriv(1)
+    d2E = poly_3_lsq.deriv(2)
+    d3E = poly_3_lsq.deriv(3)
+    
+    roots = dE.roots()
+    real_roots = roots[np.isreal(roots)].real
+    min_roots = real_roots[d2E(real_roots) > 0]
+    
+    if len(min_roots) == 0:
+        raise ValueError("Could not find a minimum for the third-order E_el(V) polynomial.")
+        
+    V0 = min_roots[np.argmin(poly_3_lsq(min_roots))]
+    
+    # Extract B0 and dB0dP
+    E2 = d2E(V0)
+    E3 = d3E(V0)
+    
+    B0_kJ_mol_A3 = V0 * E2
+    conversion_factor = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
+    B0_GPa = B0_kJ_mol_A3 * conversion_factor
+    
+    dB0dP = -1.0 - V0 * E3 / E2
+    
+    sort_idx = np.argsort(V)
+    spline = CubicSpline(V[sort_idx], E_el[sort_idx])
+    
+    E0 = poly_3_lsq(V0)
+    def bm_interp(V_eval):
+        return birch_murnaghan(
+            volume=V_eval,
+            e0=E0,
+            v0=V0,
+            b0=B0_kJ_mol_A3,
+            b1=dB0dP,
+        )
+
+    return {
+        "E_el_crystal_poly_3 (kJ∕mol∕unit cell)": poly_3_lsq,
+        "E_el_crystal_spline (kJ∕mol∕unit cell)": spline,
+        "E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)": bm_interp,
+        "V_sampled (Å³∕unit cell)": V,
+        "E_el_crystal_sampled (kJ∕mol∕unit cell)": E_el,
+        "V0 (Å³∕unit cell)": V0,
+        "B0 (GPa)": B0_GPa,
+        "dB0dP": dB0dP,
+    }

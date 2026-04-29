@@ -137,69 +137,10 @@ class EOSMetadata:
         # Since E_el is temperature-independent, we can use the data from the first temperature point.
         df = self.exact_at_sampled_volume[self.select_T[0]]
         
-        V = df["V_crystal (Å³∕unit cell)"].to_numpy()
-        E_el = df["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy()
-        
-        # 2. Fit 3rd-order polynomial
-        V_min_guess = V[np.argmin(E_el)]
-        weights = mbe_automation.dynamics.harmonic.eos.proximity_weights(
-            V=V,
-            V_min=V_min_guess,
+        return mbe_automation.dynamics.harmonic.eos.cold_curve(
+            V=df["V_crystal (Å³∕unit cell)"].to_numpy(),
+            E_el=df["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
         )
-        poly_3_lsq = Polynomial.fit(
-            x=V,
-            y=E_el,
-            deg=3,
-            w=weights,
-        )
-        
-        # 3. Find V0 from the roots of the first derivative
-        dE = poly_3_lsq.deriv(1)
-        d2E = poly_3_lsq.deriv(2)
-        d3E = poly_3_lsq.deriv(3)
-        
-        roots = dE.roots()
-        real_roots = roots[np.isreal(roots)].real
-        min_roots = real_roots[d2E(real_roots) > 0]
-        
-        if len(min_roots) == 0:
-            raise ValueError("Could not find a minimum for the third-order E_el(V) polynomial.")
-            
-        V0 = min_roots[np.argmin(poly_3_lsq(min_roots))]
-        
-        # 4. Extract B0 and dB0dP
-        E2 = d2E(V0)
-        E3 = d3E(V0)
-        
-        B0_kJ_mol_A3 = V0 * E2
-        conversion_factor = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
-        B0_GPa = B0_kJ_mol_A3 * conversion_factor
-        
-        dB0dP = -1.0 - V0 * E3 / E2
-        
-        sort_idx = np.argsort(V)
-        spline = CubicSpline(V[sort_idx], E_el[sort_idx])
-        
-        E0 = poly_3_lsq(V0)
-        def bm_interp(V_eval):
-            return mbe_automation.dynamics.harmonic.eos.birch_murnaghan(
-                volume=V_eval,
-                e0=E0,
-                v0=V0,
-                b0=B0_kJ_mol_A3,
-                b1=dB0dP,
-            )
-
-        return {
-            "E_el_crystal_poly_3 (kJ∕mol∕unit cell)": poly_3_lsq,
-            "E_el_crystal_spline (kJ∕mol∕unit cell)": spline,
-            "E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)": bm_interp,
-            "V_sampled (Å³∕unit cell)": V,
-            "E_el_crystal_sampled (kJ∕mol∕unit cell)": E_el,
-            "V0 (Å³∕unit cell)": V0,
-            "B0 (GPa)": B0_GPa,
-            "dB0dP": dB0dP,
-        }
 
     def plot_eos_curves(
         self,
