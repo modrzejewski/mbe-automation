@@ -123,8 +123,11 @@ class EOSMetadata:
         using proximity weights, and extract V0, B0, and dB0dP.
         
         Returns:
-            dict: A dictionary containing:
-                - 'E_el_crystal_interp (kJ∕mol∕unit cell)': A callable Polynomial representing E^el(V).
+            dict: Dictionary containing:
+                - 'E_el_crystal_poly_3 (kJ∕mol∕unit cell)': Least-squares 3rd-order Polynomial fit of E^el(V).
+                - 'E_el_crystal_spline (kJ∕mol∕unit cell)': CubicSpline interpolation of E^el(V).
+                - 'V_sampled (Å³∕unit cell)': Array of sampled volumes.
+                - 'E_el_crystal_sampled (kJ∕mol∕unit cell)': Accurate static electronic energies corresponding to the sampled volumes.
                 - 'V0 (Å³∕unit cell)': Equilibrium volume where E^el is minimized.
                 - 'B0 (GPa)': Bulk modulus at V0.
                 - 'dB0dP': Pressure derivative of the bulk modulus at V0.
@@ -142,7 +145,7 @@ class EOSMetadata:
             V=V,
             V_min=V_min_guess,
         )
-        poly = Polynomial.fit(
+        poly_3_lsq = Polynomial.fit(
             x=V,
             y=E_el,
             deg=3,
@@ -150,9 +153,9 @@ class EOSMetadata:
         )
         
         # 3. Find V0 from the roots of the first derivative
-        dE = poly.deriv(1)
-        d2E = poly.deriv(2)
-        d3E = poly.deriv(3)
+        dE = poly_3_lsq.deriv(1)
+        d2E = poly_3_lsq.deriv(2)
+        d3E = poly_3_lsq.deriv(3)
         
         roots = dE.roots()
         real_roots = roots[np.isreal(roots)].real
@@ -161,7 +164,7 @@ class EOSMetadata:
         if len(min_roots) == 0:
             raise ValueError("Could not find a minimum for the third-order E_el(V) polynomial.")
             
-        V0 = min_roots[np.argmin(poly(min_roots))]
+        V0 = min_roots[np.argmin(poly_3_lsq(min_roots))]
         
         # 4. Extract B0 and dB0dP
         E2 = d2E(V0)
@@ -173,14 +176,14 @@ class EOSMetadata:
         
         dB0dP = -1.0 - V0 * E3 / E2
         
-        E0 = poly(V0)
-        def poly_approx(V):
-            dV = V - V0
-            return E0 + 0.5 * E2 * dV**2 + (1.0 / 6.0) * E3 * dV**3
+        sort_idx = np.argsort(V)
+        spline = CubicSpline(V[sort_idx], E_el[sort_idx])
 
         return {
-            "E_el_crystal_interp (kJ∕mol∕unit cell)": poly,
-            "E_el_crystal_poly_3 (kJ∕mol∕unit cell)": poly_approx,
+            "E_el_crystal_poly_3 (kJ∕mol∕unit cell)": poly_3_lsq,
+            "E_el_crystal_spline (kJ∕mol∕unit cell)": spline,
+            "V_sampled (Å³∕unit cell)": V,
+            "E_el_crystal_sampled (kJ∕mol∕unit cell)": E_el,
             "V0 (Å³∕unit cell)": V0,
             "B0 (GPa)": B0_GPa,
             "dB0dP": dB0dP,

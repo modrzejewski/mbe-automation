@@ -274,8 +274,10 @@ def _eos_curves(
         G_min_global = min(G_min_global, np.nanmin(G_min_scaled))
 
     if cold_curve is not None:
-        interp_E_el = cold_curve["E_el_crystal_interp (kJ∕mol∕unit cell)"]
+        interp_E_el = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"]
         poly_approx = cold_curve["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"]
+        V_accurate = cold_curve["V_sampled (Å³∕unit cell)"]
+        E_el_accurate = cold_curve["E_el_crystal_sampled (kJ∕mol∕unit cell)"]
         V0_cold = cold_curve["V0 (Å³∕unit cell)"]
         B0_cold = cold_curve["B0 (GPa)"]
         dB0dP_cold = cold_curve["dB0dP"]
@@ -338,8 +340,8 @@ def _eos_curves(
             label=label_interp,
         )
         ax_cold.scatter(
-            eos.V_sampled[0, :],
-            (interp_E_el(eos.V_sampled[0, :]) * scaling_factor) - E_el_min_scaled,
+            V_accurate,
+            (E_el_accurate * scaling_factor) - E_el_min_scaled,
             color="black",
             marker="o",
             facecolors="none"
