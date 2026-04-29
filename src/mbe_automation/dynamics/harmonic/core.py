@@ -692,7 +692,8 @@ def equilibrium_curve(
         assert df_target["n_atoms_conventional_cell"].nunique() == 1
         eec = mbe_automation.dynamics.harmonic.eec.EEC.from_sampled_eos_curve(
             V_sampled=df_target["V_crystal (Å³∕unit cell)"].to_numpy(),
-            G_sampled=df_target["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(), 
+            G_raw_sampled=df_target["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(), 
+            E_el_raw_sampled=df_target["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
             config=electronic_energy_correction,
             unit_cell_type=df_target["unit_cell_type"].iloc[0],
             n_atoms_primitive_cell=df_target["n_atoms_primitive_cell"].iloc[0],

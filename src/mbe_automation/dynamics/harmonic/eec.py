@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, TYPE_CHECKING
 from copy import deepcopy
 import numpy as np
@@ -10,7 +10,9 @@ import scipy.integrate
 import scipy.optimize
 from typing import Callable
 
-ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "none"]
+import mbe_automation.dynamics.harmonic.eos
+
+ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "rigid_shift", "none"]
 
 DEFAULT_DEBYE_FITTING_T = np.array([10.0, 50.0, 100.0, 150.0, 200.0])
 
@@ -222,7 +224,9 @@ def _eec_value(
     V, 
     V_ref, 
     e_el_correction_param, 
-    correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION]
+    correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION],
+    V_sampled: npt.NDArray[np.float64],
+    E_el_raw_sampled: npt.NDArray[np.float64],
 ):
     """
     Evaluate the empirical electronic energy correction.
@@ -241,6 +245,21 @@ def _eec_value(
         return e_el_correction_param * (V - V_ref)
     elif correction_type == "inverse_volume":
         return e_el_correction_param / V
+    elif correction_type == "rigid_shift":
+        spline = mbe_automation.dynamics.harmonic.eos.cold_curve(
+            V=V_sampled,
+            E_el=E_el_raw_sampled,
+        )["E_el_crystal_spline (kJ∕mol∕unit cell)"]
+        V_shifted = V - e_el_correction_param
+        V_min, V_max = V_sampled.min(), V_sampled.max()
+        V_all = np.atleast_1d(V_shifted)
+        if np.any(V_all < V_min) or np.any(V_all > V_max):
+            raise ValueError(
+                f"rigid_shift: shifted volume V - ΔV falls outside "
+                f"the sampled range [{V_min:.3f}, {V_max:.3f}] Å³. "
+                f"The cold curve spline cannot be safely extrapolated."
+            )
+        return spline(V_shifted) - spline(V)
     elif correction_type == "none":
         return np.zeros_like(V) if isinstance(V, (np.ndarray, list)) else 0.0
     else:
@@ -249,7 +268,9 @@ def _eec_value(
 def _eec_pressure(
     V, 
     e_el_correction_param, 
-    correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION]
+    correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION],
+    V_sampled: npt.NDArray[np.float64],
+    E_el_raw_sampled: npt.NDArray[np.float64],
 ):
     """
     Evaluate the volume derivative of the electronic energy correction.
@@ -269,6 +290,22 @@ def _eec_pressure(
         return float(e_el_correction_param)
     elif correction_type == "inverse_volume":
         return -e_el_correction_param / (V ** 2)
+    elif correction_type == "rigid_shift":
+        spline = mbe_automation.dynamics.harmonic.eos.cold_curve(
+            V=V_sampled,
+            E_el=E_el_raw_sampled,
+        )["E_el_crystal_spline (kJ∕mol∕unit cell)"]
+        V_shifted = V - e_el_correction_param
+        V_min, V_max = V_sampled.min(), V_sampled.max()
+        V_all = np.atleast_1d(V_shifted)
+        if np.any(V_all < V_min) or np.any(V_all > V_max):
+            raise ValueError(
+                f"rigid_shift: shifted volume V - ΔV falls outside "
+                f"the sampled range [{V_min:.3f}, {V_max:.3f}] Å³. "
+                f"The cold curve spline cannot be safely extrapolated."
+            )
+        dE_el = spline.derivative(1)
+        return dE_el(V_shifted) - dE_el(V)
     elif correction_type == "none":
         if isinstance(V, (np.ndarray, list)):
             return np.zeros_like(V, dtype=np.float64)
@@ -278,8 +315,9 @@ def _eec_pressure(
 
 def _eec_param(
     V_sampled: npt.NDArray[np.float64],
-    G_sampled: npt.NDArray[np.float64],
-    config: EECConfig
+    G_raw_sampled: npt.NDArray[np.float64],
+    E_el_raw_sampled: npt.NDArray[np.float64],
+    config: EECConfig,
 ) -> float:
     """
     Perform a cubic spline fit of G(V) and find e_el_correction_param analytically.
@@ -302,7 +340,7 @@ def _eec_param(
 
     sort_idx = np.argsort(V_sampled)
     V_sorted = V_sampled[sort_idx]
-    G_sorted = G_sampled[sort_idx]
+    G_sorted = G_raw_sampled[sort_idx]
 
     if not (V_sorted[0] <= config.V_ref <= V_sorted[-1]):
          raise ValueError(
@@ -319,13 +357,35 @@ def _eec_param(
         e_el_correction_param_opt = -dGdV_tot_Vref
     elif config.type == "inverse_volume":
         e_el_correction_param_opt = (config.V_ref ** 2) * dGdV_tot_Vref
+    elif config.type == "rigid_shift":
+        E_el_spline = mbe_automation.dynamics.harmonic.eos.cold_curve(
+            V=V_sampled, 
+            E_el=E_el_raw_sampled,
+        )["E_el_crystal_spline (kJ∕mol∕unit cell)"]
+        dE_el = E_el_spline.derivative(1)
+        
+        # We want dE_el(V_ref - DeltaV) - dE_el(V_ref) + dGdV_tot_Vref = 0
+        def objective(DeltaV):
+            return dE_el(config.V_ref - DeltaV) - dE_el(config.V_ref) + dGdV_tot_Vref
+
+        sol = scipy.optimize.root_scalar(objective, x0=0.0, x1=1.0)
+        if not sol.converged:
+            raise RuntimeError(
+                f"rigid_shift: root_scalar did not converge when solving "
+                f"for ΔV. V_ref={config.V_ref:.3f} Å³, "
+                f"dG/dV(V_ref)={dGdV_tot_Vref:.6e} kJ/mol/Å³. "
+                f"Iterations: {sol.iterations}, flag: '{sol.flag}'."
+            )
+        e_el_correction_param_opt = sol.root
     else:
         raise ValueError(f"Unknown correction type: {config.type}")
         
     p_eec_GPa = _eec_pressure(
         V=config.V_ref,
         e_el_correction_param=e_el_correction_param_opt,
-        correction_type=config.type
+        correction_type=config.type,
+        V_sampled=V_sampled,
+        E_el_raw_sampled=E_el_raw_sampled
     ) * (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
 
     if p_eec_GPa < config.pressure_min_GPa or p_eec_GPa > config.pressure_max_GPa:
@@ -340,17 +400,21 @@ def _eec_param(
 class EEC:
     """
     Empirical Electronic Energy Correction (EEC) data and evaluation.
-                                    
+
     Empirical electronic energy correction applied
     to enforce known reference volume (V_ref)
     at reference temperature (T_ref). The EEC contribution
     is added to the crystal electronic energy (E_el_crystal)
     and accounted for in all thermodynamic functions derived
-    from E_el_crystal. Two types of ECC are implemented:
-                                   
-    (1) linear: E_el_crystal(corrected) = E_el_crystal + param * V
-    (2) inverse_volume: E_el_crystal(corrected) = E_el_crystal + param / V
-                                   
+    from E_el_crystal. Three types of EEC are implemented:
+
+    (1) linear: E_corr(V) = param * (V - V_ref)
+    (2) inverse_volume: E_corr(V) = param / V
+    (3) rigid_shift: E_corr(V) = E_el(V - DeltaV) - E_el(V)
+        where DeltaV is determined such that dG/dV = 0 at V_ref.
+        This corresponds to a rigid translation of the cold curve
+        by DeltaV along the volume axis. The param field stores DeltaV.
+
     Literature with definitions:
     1. A. Otero-de-la-Roza and V. Lunana, Treatment of first-principles data
        for predictive quasiharmonic thermodynamics of solids: The case of MgO
@@ -361,10 +425,11 @@ class EEC:
     3. X. Bidault and S. Chaudhuri, Improved predictions of thermomechanical properties of
        molecular crystals from energy and dispersion corrected DFT,
        J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
-                                   
     """
     config: EECConfig
     param: float
+    V_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
+    E_el_raw_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
 
     @property
     def is_enabled(self) -> bool:
@@ -386,7 +451,9 @@ class EEC:
             V=V,
             V_ref=self.config.V_ref,
             e_el_correction_param=self.param,
-            correction_type=self.config.type
+            correction_type=self.config.type,
+            V_sampled=self.V_sampled,
+            E_el_raw_sampled=self.E_el_raw_sampled,
         )
 
     def evaluate_pressure(self, V: float | npt.NDArray[np.float64]) -> float | npt.NDArray[np.float64]:
@@ -410,7 +477,9 @@ class EEC:
         dEdV = _eec_pressure(
             V=V,
             e_el_correction_param=self.param,
-            correction_type=self.config.type
+            correction_type=self.config.type,
+            V_sampled=self.V_sampled,
+            E_el_raw_sampled=self.E_el_raw_sampled,
         )
         kJ_mol_Angs3_to_GPa = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
         return dEdV * kJ_mol_Angs3_to_GPa
@@ -419,7 +488,8 @@ class EEC:
     def from_sampled_eos_curve(
         cls,
         V_sampled: npt.NDArray[np.float64],
-        G_sampled: npt.NDArray[np.float64],
+        G_raw_sampled: npt.NDArray[np.float64],
+        E_el_raw_sampled: npt.NDArray[np.float64],
         config: EECConfig,
         unit_cell_type: Literal["primitive", "conventional"],
         n_atoms_primitive_cell: int,
@@ -442,7 +512,13 @@ class EEC:
 
         param = _eec_param(
             V_sampled=V_sampled,
-            G_sampled=G_sampled,
-            config=scaled_config
+            G_raw_sampled=G_raw_sampled,
+            E_el_raw_sampled=E_el_raw_sampled,
+            config=scaled_config,
         )
-        return cls(config=scaled_config, param=param)
+        return cls(
+            config=scaled_config, 
+            param=param,
+            V_sampled=V_sampled,
+            E_el_raw_sampled=E_el_raw_sampled,
+        )

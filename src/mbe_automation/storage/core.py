@@ -755,6 +755,11 @@ def _save_eec(group: h5py.Group, eec) -> None:
             group.attrs["param (kJ∕mol∕Å³)"] = eec.param
         elif eec.config.type == "inverse_volume":
             group.attrs["param (kJ∕mol*Å³)"] = eec.param
+        elif eec.config.type == "rigid_shift":
+            group.attrs["param (Å³∕unit cell)"] = eec.param
+            
+        group.create_dataset("V_sampled (Å³∕unit cell)", data=eec.V_sampled)
+        group.create_dataset("E_el_raw_sampled (kJ∕mol∕unit cell)", data=eec.E_el_raw_sampled)
     else:
         group.attrs["param"] = eec.param
 
@@ -775,13 +780,25 @@ def _read_eec(group: h5py.Group):
         )
         if eec_type == "linear":
             param = group.attrs.get("param (kJ∕mol∕Å³)", group.attrs.get("param"))
-        else:
+        elif eec_type == "inverse_volume":
             param = group.attrs.get("param (kJ∕mol*Å³)", group.attrs.get("param"))
+        elif eec_type == "rigid_shift":
+            param = group.attrs.get("param (Å³∕unit cell)", group.attrs.get("param"))
+            
+        V_sampled = group["V_sampled (Å³∕unit cell)"][:]
+        E_el_raw_sampled = group["E_el_raw_sampled (kJ∕mol∕unit cell)"][:]
     else:
         eec_config = EECConfig(type="none")
         param = group.attrs["param"]
+        V_sampled = np.array([], dtype=np.float64)
+        E_el_raw_sampled = np.array([], dtype=np.float64)
         
-    return EEC(config=eec_config, param=param)
+    return EEC(
+        config=eec_config, 
+        param=param, 
+        V_sampled=V_sampled, 
+        E_el_raw_sampled=E_el_raw_sampled
+    )
 
 
 def _save_debye_model(
