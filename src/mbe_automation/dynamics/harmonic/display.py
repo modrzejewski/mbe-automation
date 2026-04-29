@@ -380,8 +380,8 @@ def _eos_curves(
             x=V0_cold + (np.nanmax(eos.V_interp) - np.nanmin(eos.V_interp)) * 0.015,
             y=0.5,
             s=f"$V_0$ = {V0_cold:.1f} $\\mathrm{{\\AA}}^3$\n$B_0$ = {B0_cold:.1f} GPa\n$B_0^\\prime$ = {dB0dP_cold:.1f}",
-            color="dimgray",
-            fontsize=12,
+            color="black",
+            fontsize=10,
             verticalalignment="top",
             horizontalalignment="left",
             transform=ax_cold.get_xaxis_transform()
@@ -406,6 +406,7 @@ def _eos_curves(
         frameon=True,
         edgecolor="black",
         fancybox=False,
+        fontsize=10,
     )
     ax.set_ylabel(y_label, fontsize=14)
     ax.grid(True, linestyle="--", alpha=0.6)
@@ -414,7 +415,7 @@ def _eos_curves(
 
     if ax_cold is not None:
         ax_cold.legend(
-            fontsize=12,
+            fontsize=10,
             loc="upper center",
             bbox_to_anchor=(V0_cold, 0.98),
             bbox_transform=ax_cold.get_xaxis_transform(),
