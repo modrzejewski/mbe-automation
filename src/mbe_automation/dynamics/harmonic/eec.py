@@ -220,13 +220,90 @@ class EECConfig:
     def is_enabled(self) -> bool:
         return self.type != "none"
 
+def _ΔE_el_poly_3_rigid_ΔV(
+    V_sampled,
+    F_vib_sampled,
+    p_external_GPa,
+    V_ref,
+    cold_curve: dict,
+):
+    """
+    Find the shift ΔV in the electronic energy curve that enforces the
+    reference volume V_ref at the reference temperature T_ref and pressure p_ref.
+
+    The shift is found analytically based on a third-order Taylor expansion 
+    of the cold curve around V0:
+        E(V) = E0 + 1/2*E2*(V-V0)**2 + 1/6*E3*(V-V0)**3
+        ΔE(V) = E(V-ΔV) - E(V)
+    """
+    V0 = cold_curve["V0 (Å³∕unit cell)"]
+    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
+    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
+    conversion_factor = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
+    p_external_kJ_mol_A3 = p_external_GPa / conversion_factor
+    sort_idx = np.argsort(V_sampled)
+    F_vib_spline = CubicSpline(V_sampled[sort_idx], F_vib_sampled[sort_idx])
+    dFdV = F_vib_spline.derivative(1)
+
+    R = -(dFdV(V_ref) + p_external_kJ_mol_A3)
+    discriminant = E2**2 + 2 * E3 * R
+    if discriminant <= 0:
+         raise ValueError(
+             f"Analytical rigid shift optimization failed: discriminant is non-positive ({discriminant:.3e})."
+         )
+    #
+    # We are taking the plus root because this is the solution
+    # which reduces to the DeltaV from the quadratic
+    # approximation of E(V) when we put E3 -> 0.
+    #
+    u = (-E2 + np.sqrt(discriminant)) / E3
+    DeltaV = V_ref - V0 - u
+    return DeltaV 
+
+def _ΔE_el_poly_3_rigid_pressure(
+    V, 
+    DeltaV,
+    cold_curve
+):
+    """
+    Calculate the volume derivative of the rigid shift energy correction:
+        dE_corr/dV = E'(V - DeltaV) - E'(V)
+    based on a third-order expansion of the cold curve around V0:
+        E(V) = E0 + 1/2*E2*(V-V0)**2 + 1/6*E3*(V-V0)**3
+        ΔE(V) = E(V-ΔV) - E(V)
+    """
+    V0 = cold_curve["V0 (Å³∕unit cell)"]
+    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
+    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
+    return 0.5 * DeltaV * (-2 * E2 + E3 * (DeltaV - 2 * V + 2 * V0))
+
+def _ΔE_el_poly_3_rigid_value(
+    V,
+    DeltaV,
+    cold_curve,
+):
+    """
+    Calculate the rigid shift energy correction analytically:
+        ΔE(V) = E(V - ΔV) - E(V)
+    based on a third-order expansion of the cold curve around V0:
+        E(V) = E0 + 1/2*E2*(V-V0)**2 + 1/6*E3*(V-V0)**3
+        ΔE(V) = E(V-ΔV) - E(V)
+    """
+    V0 = cold_curve["V0 (Å³∕unit cell)"]
+    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
+    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
+    dV = V - V0
+    return -(1/6) * DeltaV * (
+        DeltaV**2 * E3 - 3 * DeltaV * (E2 + E3 * dV) + 
+        3 * (2 * E2 + E3 * dV) * dV
+    )
+
 def _eec_value(
     V, 
     V_ref, 
     e_el_correction_param, 
     correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION],
-    V_sampled: npt.NDArray[np.float64],
-    E_el_raw_sampled: npt.NDArray[np.float64],
+    cold_curve: dict,
 ):
     """
     Evaluate the empirical electronic energy correction.
@@ -237,6 +314,7 @@ def _eec_value(
         - e_el_correction_param: 
             * linear: (kJ∕mol) / Å³
             * inverse_volume: (kJ∕mol) * Å³
+            * rigid_shift: DeltaV in Å³
             
     Returns:
         Energy correction in kJ∕mol (per unit cell of type specified by EECConfig.cell).
@@ -246,20 +324,11 @@ def _eec_value(
     elif correction_type == "inverse_volume":
         return e_el_correction_param / V
     elif correction_type == "rigid_shift":
-        spline = mbe_automation.dynamics.harmonic.eos.cold_curve(
-            V=V_sampled,
-            E_el=E_el_raw_sampled,
-        )["E_el_crystal_spline (kJ∕mol∕unit cell)"]
-        V_shifted = V - e_el_correction_param
-        V_min, V_max = V_sampled.min(), V_sampled.max()
-        V_all = np.atleast_1d(V_shifted)
-        if np.any(V_all < V_min) or np.any(V_all > V_max):
-            raise ValueError(
-                f"rigid_shift: shifted volume V - ΔV falls outside "
-                f"the sampled range [{V_min:.3f}, {V_max:.3f}] Å³. "
-                f"The cold curve spline cannot be safely extrapolated."
-            )
-        return spline(V_shifted) - spline(V)
+        return _ΔE_el_poly_3_rigid_value(
+            V=V,
+            DeltaV=e_el_correction_param,
+            cold_curve=cold_curve,
+        )
     elif correction_type == "none":
         return np.zeros_like(V) if isinstance(V, (np.ndarray, list)) else 0.0
     else:
@@ -269,8 +338,7 @@ def _eec_pressure(
     V, 
     e_el_correction_param, 
     correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION],
-    V_sampled: npt.NDArray[np.float64],
-    E_el_raw_sampled: npt.NDArray[np.float64],
+    cold_curve: dict,
 ):
     """
     Evaluate the volume derivative of the electronic energy correction.
@@ -280,6 +348,7 @@ def _eec_pressure(
         - e_el_correction_param: 
             * linear: (kJ∕mol) / Å³
             * inverse_volume: (kJ∕mol) * Å³
+            * rigid_shift: DeltaV in Å³
             
     Returns:
         Derivative of the correction w.r.t volume in (kJ∕mol) / Å³ (per unit cell of type specified by EECConfig.cell).
@@ -291,21 +360,11 @@ def _eec_pressure(
     elif correction_type == "inverse_volume":
         return -e_el_correction_param / (V ** 2)
     elif correction_type == "rigid_shift":
-        spline = mbe_automation.dynamics.harmonic.eos.cold_curve(
-            V=V_sampled,
-            E_el=E_el_raw_sampled,
-        )["E_el_crystal_spline (kJ∕mol∕unit cell)"]
-        V_shifted = V - e_el_correction_param
-        V_min, V_max = V_sampled.min(), V_sampled.max()
-        V_all = np.atleast_1d(V_shifted)
-        if np.any(V_all < V_min) or np.any(V_all > V_max):
-            raise ValueError(
-                f"rigid_shift: shifted volume V - ΔV falls outside "
-                f"the sampled range [{V_min:.3f}, {V_max:.3f}] Å³. "
-                f"The cold curve spline cannot be safely extrapolated."
-            )
-        dE_el = spline.derivative(1)
-        return dE_el(V_shifted) - dE_el(V)
+        return _ΔE_el_poly_3_rigid_pressure(
+            V=V,
+            DeltaV=e_el_correction_param,
+            cold_curve=cold_curve,
+        )
     elif correction_type == "none":
         if isinstance(V, (np.ndarray, list)):
             return np.zeros_like(V, dtype=np.float64)
@@ -317,7 +376,10 @@ def _eec_param(
     V_sampled: npt.NDArray[np.float64],
     G_raw_sampled: npt.NDArray[np.float64],
     E_el_raw_sampled: npt.NDArray[np.float64],
+    F_vib_sampled: npt.NDArray[np.float64],
+    p_external_GPa: float,
     config: EECConfig,
+    cold_curve: dict,
 ) -> float:
     """
     Perform a cubic spline fit of G(V) and find e_el_correction_param analytically.
@@ -358,25 +420,13 @@ def _eec_param(
     elif config.type == "inverse_volume":
         e_el_correction_param_opt = (config.V_ref ** 2) * dGdV_tot_Vref
     elif config.type == "rigid_shift":
-        E_el_spline = mbe_automation.dynamics.harmonic.eos.cold_curve(
-            V=V_sampled, 
-            E_el=E_el_raw_sampled,
-        )["E_el_crystal_spline (kJ∕mol∕unit cell)"]
-        dE_el = E_el_spline.derivative(1)
-        
-        # We want dE_el(V_ref - DeltaV) - dE_el(V_ref) + dGdV_tot_Vref = 0
-        def objective(DeltaV):
-            return dE_el(config.V_ref - DeltaV) - dE_el(config.V_ref) + dGdV_tot_Vref
-
-        sol = scipy.optimize.root_scalar(objective, x0=0.0, x1=1.0)
-        if not sol.converged:
-            raise RuntimeError(
-                f"rigid_shift: root_scalar did not converge when solving "
-                f"for ΔV. V_ref={config.V_ref:.3f} Å³, "
-                f"dG/dV(V_ref)={dGdV_tot_Vref:.6e} kJ/mol/Å³. "
-                f"Iterations: {sol.iterations}, flag: '{sol.flag}'."
-            )
-        e_el_correction_param_opt = sol.root
+        e_el_correction_param_opt = _ΔE_el_poly_3_rigid_ΔV(
+            V_sampled=V_sampled,
+            F_vib_sampled=F_vib_sampled,
+            p_external_GPa=p_external_GPa,
+            V_ref=config.V_ref,
+            cold_curve=cold_curve,
+        )
     else:
         raise ValueError(f"Unknown correction type: {config.type}")
         
@@ -384,8 +434,7 @@ def _eec_param(
         V=config.V_ref,
         e_el_correction_param=e_el_correction_param_opt,
         correction_type=config.type,
-        V_sampled=V_sampled,
-        E_el_raw_sampled=E_el_raw_sampled
+        cold_curve=cold_curve,
     ) * (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
 
     if p_eec_GPa < config.pressure_min_GPa or p_eec_GPa > config.pressure_max_GPa:
@@ -411,7 +460,7 @@ class EEC:
     (1) linear: E_corr(V) = param * (V - V_ref)
     (2) inverse_volume: E_corr(V) = param / V
     (3) rigid_shift: E_corr(V) = E_el(V - DeltaV) - E_el(V)
-        where DeltaV is determined such that dG/dV = 0 at V_ref.
+        where DeltaV is determined such that dG/dV = 0 at (V_ref, T_ref, p_ref).
         This corresponds to a rigid translation of the cold curve
         by DeltaV along the volume axis. The param field stores DeltaV.
 
@@ -430,6 +479,20 @@ class EEC:
     param: float
     V_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
     E_el_raw_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
+    F_vib_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
+    external_pressure_GPa: float = 0.0
+    cold_curve: dict | None = None
+
+    def __post_init__(self):
+        #
+        # Reconstruct cold_curve if missing (e.g. after loading from HDF5)
+        #
+        if self.is_enabled and self.cold_curve is None:
+             if len(self.V_sampled) > 0 and len(self.E_el_raw_sampled) > 0:
+                 self.cold_curve = mbe_automation.dynamics.harmonic.eos.cold_curve(
+                     V=self.V_sampled,
+                     E_el=self.E_el_raw_sampled,
+                 )
 
     @property
     def is_enabled(self) -> bool:
@@ -452,8 +515,7 @@ class EEC:
             V_ref=self.config.V_ref,
             e_el_correction_param=self.param,
             correction_type=self.config.type,
-            V_sampled=self.V_sampled,
-            E_el_raw_sampled=self.E_el_raw_sampled,
+            cold_curve=self.cold_curve,
         )
 
     def evaluate_pressure(self, V: float | npt.NDArray[np.float64]) -> float | npt.NDArray[np.float64]:
@@ -478,8 +540,7 @@ class EEC:
             V=V,
             e_el_correction_param=self.param,
             correction_type=self.config.type,
-            V_sampled=self.V_sampled,
-            E_el_raw_sampled=self.E_el_raw_sampled,
+            cold_curve=self.cold_curve,
         )
         kJ_mol_Angs3_to_GPa = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
         return dEdV * kJ_mol_Angs3_to_GPa
@@ -494,10 +555,12 @@ class EEC:
         unit_cell_type: Literal["primitive", "conventional"],
         n_atoms_primitive_cell: int,
         n_atoms_conventional_cell: int,
+        F_vib_sampled: npt.NDArray[np.float64],
+        external_pressure_GPa: float,
     ) -> "EEC":
         if unit_cell_type not in ["primitive", "conventional"]:
             raise ValueError(f"unit_cell_type must be either 'primitive' or 'conventional', got '{unit_cell_type}'")
-        
+
         if not config.is_enabled:
             return cls(config=config, param=0.0)
             
@@ -510,15 +573,27 @@ class EEC:
              scaled_config.V_ref = config.V_ref * (n_atoms_conventional_cell / n_atoms_primitive_cell)
              scaled_config.cell = "conventional"
 
+        cc = mbe_automation.dynamics.harmonic.eos.cold_curve(
+            V=V_sampled,
+            E_el=E_el_raw_sampled,
+        )
+
         param = _eec_param(
             V_sampled=V_sampled,
             G_raw_sampled=G_raw_sampled,
             E_el_raw_sampled=E_el_raw_sampled,
+            F_vib_sampled=F_vib_sampled,
+            p_external_GPa=external_pressure_GPa,
             config=scaled_config,
+            cold_curve=cc,
         )
+
         return cls(
             config=scaled_config, 
             param=param,
             V_sampled=V_sampled,
             E_el_raw_sampled=E_el_raw_sampled,
+            F_vib_sampled=F_vib_sampled,
+            external_pressure_GPa=external_pressure_GPa,
+            cold_curve=cc,
         )
