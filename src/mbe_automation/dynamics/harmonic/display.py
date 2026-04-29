@@ -258,12 +258,12 @@ def _eos_curves(
 
     if n_molecules_per_cell:
         scaling_factor = 1.0 / n_molecules_per_cell
-        y_label = "Gibbs free energy (kJ∕mol∕molecule)"
-        y_label_cold = "Electronic energy (kJ∕mol∕molecule)"
+        y_label = "G (kJ∕mol∕molecule)"
+        y_label_cold = "$E^{\\mathrm{el}}$ (kJ∕mol∕molecule)"
     else:
         scaling_factor = 1.0
-        y_label = "Gibbs free energy (kJ∕mol∕unit cell)"
-        y_label_cold = "Electronic energy (kJ∕mol∕unit cell)"
+        y_label = "G (kJ∕mol∕unit cell)"
+        y_label_cold = "$E^{\\mathrm{el}}$ (kJ∕mol∕unit cell)"
 
     G_sampled_scaled = eos.G_sampled * scaling_factor
     G_interp_scaled = eos.G_interp * scaling_factor
@@ -329,7 +329,7 @@ def _eos_curves(
         color="black",
         linestyle="--",
         marker="x",
-        label="EOS equilibrium",
+        label="G minimum",
     )
 
     if cold_curve is not None and ax_cold is not None:
