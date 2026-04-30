@@ -346,6 +346,13 @@ class FreeEnergy:
                     f"The electronic energy correction requires its reference temperature "
                     f"(EECConfig.T_ref) to be present in the temperature grid."
                 )
+            if not np.isclose(self.electronic_energy_correction.p_ref_GPa, self.pressure_GPa, atol=1.0E-5):
+                raise ValueError(
+                    f"EECConfig.p_ref_GPa ({self.electronic_energy_correction.p_ref_GPa:.6g} GPa) "
+                    f"does not match FreeEnergy.pressure_GPa ({self.pressure_GPa:.6g} GPa). "
+                    f"The reference pressure used for the EEC must equal the external pressure "
+                    f"of the workflow."
+                )
             if self.equation_of_state != "spline":
                 raise ValueError("Electronic energy correction is only supported with the 'spline' equation of state.")
         

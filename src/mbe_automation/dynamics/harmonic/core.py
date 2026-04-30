@@ -695,7 +695,6 @@ def equilibrium_curve(
             G_raw_sampled=df_target["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(), 
             E_el_raw_sampled=df_target["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
             F_vib_sampled=df_target["F_vib_crystal (kJ∕mol∕unit cell)"].to_numpy(),
-            external_pressure_GPa=external_pressure_GPa,
             config=electronic_energy_correction,
             unit_cell_type=df_target["unit_cell_type"].iloc[0],
             n_atoms_primitive_cell=df_target["n_atoms_primitive_cell"].iloc[0],
