@@ -743,7 +743,7 @@ def _save_eec(group: h5py.Group, eec) -> None:
     """Save an EEC instance into the provided group."""
     group.attrs["dataclass"] = "EEC"
     group.attrs["type"] = eec.config.type
-    group.attrs["external_pressure (GPa)"] = eec.external_pressure_GPa
+    group.attrs["p_ref (GPa)"] = eec.config.p_ref_GPa
     
     if eec.config.is_enabled:
         group.attrs["T_ref (K)"] = eec.config.T_ref
@@ -770,13 +770,12 @@ def _read_eec(group: h5py.Group):
     """Read an EEC instance from the provided group."""
     from mbe_automation.dynamics.harmonic.eec import EECConfig, EEC
     eec_type = group.attrs["type"]
-    external_pressure_GPa = float(group.attrs.get("external_pressure (GPa)", 0.0))
-    
     if eec_type != "none":
         eec_config = EECConfig(
             type=eec_type,
             T_ref=group.attrs["T_ref (K)"],
             V_ref=group.attrs["V_ref (Å³∕unit cell)"],
+            p_ref_GPa=float(group.attrs["p_ref (GPa)"]),
             cell=group.attrs["cell"],
             pressure_min_GPa=group.attrs["pressure_min (GPa)"],
             pressure_max_GPa=group.attrs["pressure_max (GPa)"],
@@ -804,7 +803,6 @@ def _read_eec(group: h5py.Group):
         V_sampled=V_sampled, 
         E_el_raw_sampled=E_el_raw_sampled,
         F_vib_sampled=F_vib_sampled,
-        external_pressure_GPa=external_pressure_GPa,
     )
 
 

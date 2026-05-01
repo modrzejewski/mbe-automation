@@ -1,6 +1,6 @@
 # Analysis of `rigid_shift` implementation for Empirical Electronic Energy Correction (EEC)
 
-The `rigid_shift` option of the Empirical Electronic Energy Correction (EEC) is designed to enforce a known reference volume ($V_{ref}$) at a reference temperature ($T_{ref}$) and external pressure ($p_{ext}$) by introducing an energy correction $\Delta E(V)$ to the static electronic energy $E_{el}(V)$.
+The `rigid_shift` option of the Empirical Electronic Energy Correction (EEC) is designed to enforce a known reference volume ($V_{ref}$) at a reference temperature ($T_{ref}$) and reference pressure ($p_{ref}$) by introducing an energy correction $\Delta E(V)$ to the static electronic energy $E_{el}(V)$.
 
 Specifically, `rigid_shift` applies a rigid translation of the cold curve by a volume $\Delta V$:
 $$ E_{corr}(V) = E_{el}(V - \Delta V) - E_{el}(V) $$
@@ -8,15 +8,15 @@ $$ E_{corr}(V) = E_{el}(V - \Delta V) - E_{el}(V) $$
 ## 1. Physics Analysis
 
 The objective is to find $\Delta V$ such that the total Gibbs free energy is minimized at the reference conditions:
-$$ \left. \frac{dG}{dV} \right|_{V_{ref}, T_{ref}, p_{ext}} = 0 $$
+$$ \left. \frac{dG}{dV} \right|_{V_{ref}, T_{ref}, p_{ref}} = 0 $$
 
 The Gibbs free energy is given by:
-$$ G(V) = E_{el}(V) + E_{corr}(V) + F_{vib}(V) + p_{ext} V $$
-$$ G(V) = E_{el}(V - \Delta V) + F_{vib}(V) + p_{ext} V $$
+$$ G(V) = E_{el}(V) + E_{corr}(V) + F_{vib}(V) + p_{ref} V $$
+$$ G(V) = E_{el}(V - \Delta V) + F_{vib}(V) + p_{ref} V $$
 
 Setting the derivative to zero at $V_{ref}$:
-$$ E_{el}'(V_{ref} - \Delta V) + F_{vib}'(V_{ref}) + p_{ext} = 0 $$
-$$ E_{el}'(V_{ref} - \Delta V) = - (F_{vib}'(V_{ref}) + p_{ext}) \equiv R $$
+$$ E_{el}'(V_{ref} - \Delta V) + F_{vib}'(V_{ref}) + p_{ref} = 0 $$
+$$ E_{el}'(V_{ref} - \Delta V) = - (F_{vib}'(V_{ref}) + p_{ref}) \equiv R $$
 
 The cold curve $E_{el}(V)$ is approximated by a third-order Taylor expansion around its equilibrium volume $V_0$:
 $$ E_{el}(V) \approx E_0 + \frac{1}{2} E_2 (V - V_0)^2 + \frac{1}{6} E_3 (V - V_0)^3 $$
@@ -78,7 +78,7 @@ No physical or mathematical errors were found in the `rigid_shift` implementatio
 
 **Edge cases appropriately handled:**
 - When $E_3 \to 0$ (the cold curve approaches a pure parabola), `u` mathematically limits to $R/E_2$, which is physically correct.
-- If $E_2^2 + 2 E_3 R \le 0$, a `ValueError` is raised, correctly identifying that the analytical rigid shift optimization fails (i.e. the shifted curve cannot provide enough gradient to counteract $F_{vib}' + p_{ext}$).
+- If $E_2^2 + 2 E_3 R \le 0$, a `ValueError` is raised, correctly identifying that the analytical rigid shift optimization fails (i.e. the shifted curve cannot provide enough gradient to counteract $F_{vib}' + p_{ref}$).
 - The code calculates pressure derivatives, multiplies by appropriate conversion factors (e.g. `(ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa`), and seamlessly integrates with the rest of the dataframe processing.
 
 ## Conclusion

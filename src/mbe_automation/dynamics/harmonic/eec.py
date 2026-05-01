@@ -206,6 +206,7 @@ class EECConfig:
     type: Literal[*ELECTRONIC_ENERGY_CORRECTION] = "inverse_volume"
     T_ref: float | None = None
     V_ref: float | None = None
+    p_ref_GPa: float = 1.0E-4
     cell: Literal["primitive", "conventional"] = "conventional"
     pressure_min_GPa: float = -5.0
     pressure_max_GPa: float = 5.0
@@ -223,7 +224,7 @@ class EECConfig:
 def _ΔE_el_poly_3_rigid_ΔV(
     V_sampled,
     F_vib_sampled,
-    p_external_GPa,
+    p_ref_GPa,
     V_ref,
     cold_curve: dict,
 ):
@@ -240,12 +241,12 @@ def _ΔE_el_poly_3_rigid_ΔV(
     E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
     E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
     conversion_factor = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
-    p_external_kJ_mol_A3 = p_external_GPa / conversion_factor
+    p_ref_kJ_mol_A3 = p_ref_GPa / conversion_factor
     sort_idx = np.argsort(V_sampled)
     F_vib_spline = CubicSpline(V_sampled[sort_idx], F_vib_sampled[sort_idx])
     dFdV = F_vib_spline.derivative(1)
 
-    R = -(dFdV(V_ref) + p_external_kJ_mol_A3)
+    R = -(dFdV(V_ref) + p_ref_kJ_mol_A3)
     discriminant = E2**2 + 2 * E3 * R
     if discriminant <= 0:
          raise ValueError(
@@ -377,7 +378,6 @@ def _eec_param(
     G_raw_sampled: npt.NDArray[np.float64],
     E_el_raw_sampled: npt.NDArray[np.float64],
     F_vib_sampled: npt.NDArray[np.float64],
-    p_external_GPa: float,
     config: EECConfig,
     cold_curve: dict,
 ) -> float:
@@ -423,7 +423,7 @@ def _eec_param(
         e_el_correction_param_opt = _ΔE_el_poly_3_rigid_ΔV(
             V_sampled=V_sampled,
             F_vib_sampled=F_vib_sampled,
-            p_external_GPa=p_external_GPa,
+            p_ref_GPa=config.p_ref_GPa,
             V_ref=config.V_ref,
             cold_curve=cold_curve,
         )
@@ -480,7 +480,6 @@ class EEC:
     V_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
     E_el_raw_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
     F_vib_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
-    external_pressure_GPa: float = 0.0
     cold_curve: dict | None = None
 
     def __post_init__(self):
@@ -556,7 +555,6 @@ class EEC:
         n_atoms_primitive_cell: int,
         n_atoms_conventional_cell: int,
         F_vib_sampled: npt.NDArray[np.float64],
-        external_pressure_GPa: float,
     ) -> "EEC":
         if unit_cell_type not in ["primitive", "conventional"]:
             raise ValueError(f"unit_cell_type must be either 'primitive' or 'conventional', got '{unit_cell_type}'")
@@ -583,17 +581,15 @@ class EEC:
             G_raw_sampled=G_raw_sampled,
             E_el_raw_sampled=E_el_raw_sampled,
             F_vib_sampled=F_vib_sampled,
-            p_external_GPa=external_pressure_GPa,
             config=scaled_config,
             cold_curve=cc,
         )
 
         return cls(
-            config=scaled_config, 
+            config=scaled_config,
             param=param,
             V_sampled=V_sampled,
             E_el_raw_sampled=E_el_raw_sampled,
             F_vib_sampled=F_vib_sampled,
-            external_pressure_GPa=external_pressure_GPa,
             cold_curve=cc,
         )
