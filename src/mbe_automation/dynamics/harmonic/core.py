@@ -680,18 +680,24 @@ def equilibrium_curve(
     # requested target reference volume V_ref.
     #
     if electronic_energy_correction.is_enabled:
-        print(
-            f"Computing electronic energy correction "
-            f"for T_ref={electronic_energy_correction.T_ref} K, "
-            f"target V_ref={electronic_energy_correction.V_ref} Å³"
-        )
-        i_T_ref = np.where(np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5))[0][0]
+        if electronic_energy_correction.enforce_reference_state:
+            print(
+                f"Computing electronic energy correction "
+                f"for T_ref={electronic_energy_correction.T_ref} K, "
+                f"target V_ref={electronic_energy_correction.V_ref} Å³"
+            )
+            i_T_ref = np.where(np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5))[0][0]
+        else:
+            print("Applying baseline cold curve correction (no reference state forcing)")
+            i_T_ref = 0
         df_target = df_eos[good_points & select_T[i_T_ref]]
         assert df_target["unit_cell_type"].nunique() == 1
         assert df_target["n_atoms_primitive_cell"].nunique() == 1
         assert df_target["n_atoms_conventional_cell"].nunique() == 1
         eec = mbe_automation.dynamics.harmonic.eec.EEC.from_sampled_eos_curve(
             V_sampled=df_target["V_crystal (Å³∕unit cell)"].to_numpy(),
+            # G_raw_sampled and F_vib_sampled are temperature-dependent, but are
+            # not read when enforce_reference_state is False (param is set to 0.0).
             G_raw_sampled=df_target["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(), 
             E_el_raw_sampled=df_target["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
             F_vib_sampled=df_target["F_vib_crystal (kJ∕mol∕unit cell)"].to_numpy(),
@@ -711,14 +717,17 @@ def equilibrium_curve(
             eec=eec,
             good_points=good_points
         )
-        p_eec_GPa = eec.evaluate_pressure(eec.config.V_ref)
-        if eec.config.reference_state_forcing == "linear":
-            print(f"EEC type: linear, param = {eec.param:.1e} kJ∕mol∕Å³")
-        elif eec.config.reference_state_forcing == "inverse_volume":
-            print(f"EEC type: inverse_volume, param = {eec.param:.1e} kJ∕mol·Å³")
-        elif eec.config.reference_state_forcing == "rigid_shift":
-            print(f"EEC type: rigid_shift, ΔV = {eec.param:.1f} Å³∕unit cell")
-        print(f"EEC effective pressure at V_ref: {p_eec_GPa:.4f} GPa")
+        if electronic_energy_correction.enforce_reference_state:
+            p_eec_GPa = eec.evaluate_pressure(eec.config.V_ref)
+            if eec.config.reference_state_forcing == "linear":
+                print(f"EEC type: linear, param = {eec.param:.1e} kJ∕mol∕Å³")
+            elif eec.config.reference_state_forcing == "inverse_volume":
+                print(f"EEC type: inverse_volume, param = {eec.param:.1e} kJ∕mol·Å³")
+            elif eec.config.reference_state_forcing == "rigid_shift":
+                print(f"EEC type: rigid_shift, ΔV = {eec.param:.1f} Å³∕unit cell")
+            print(f"EEC effective pressure at V_ref: {p_eec_GPa:.4f} GPa")
+        else:
+            print("EEC type: baseline cold curve only, param = 0.0")
     else:
         eec = mbe_automation.dynamics.harmonic.eec.EEC(
             config=electronic_energy_correction, 
