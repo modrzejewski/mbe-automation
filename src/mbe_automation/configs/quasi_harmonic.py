@@ -338,7 +338,7 @@ class FreeEnergy:
             if np.any(diffs < 1.0E-5):
                  raise ValueError("Numerically close temperatures detected in temperatures_K.")
         
-        if self.electronic_energy_correction.is_enabled:
+        if self.electronic_energy_correction.enforce_reference_state:
             if not np.any(np.isclose(self.temperatures_K, self.electronic_energy_correction.T_ref, atol=1.0E-5)):
                 self.temperatures_K = np.sort(np.append(self.temperatures_K, self.electronic_energy_correction.T_ref))
                 print(

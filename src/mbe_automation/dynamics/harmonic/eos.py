@@ -374,3 +374,38 @@ def cold_curve(
         "E2 (kJ∕mol∕Å⁶)": E2,
         "E3 (kJ∕mol∕Å⁹)": E3,
     }
+
+
+def baseline_cold_curve(
+    V0: float,
+    B0_GPa: float,
+    B0_prime: float,
+    E0: float,
+) -> dict:
+    """
+    Construct a 3rd-order polynomial baseline curve. The output dictionary
+    matches the format of `cold_cuve`.
+    """
+    conversion_factor = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
+    B0_kJ_mol_A3 = B0_GPa / conversion_factor
+    
+    E2 = B0_kJ_mol_A3 / V0
+    E3 = - E2 / V0 * (B0_prime + 1)
+    
+    # Define the polynomial in terms of dV = V - V0
+    E_unshifted = Polynomial([E0, 0.0, E2 / 2.0, E3 / 6.0])
+    
+    # Shift the polynomial to be a function of V directly: E(V) = E_unshifted(V - V0)
+    V_shift = Polynomial([-V0, 1.0])
+    poly_3_baseline = E_unshifted(V_shift)
+    
+    return {
+        "E_el_crystal_poly_3 (kJ∕mol∕unit cell)": poly_3_baseline,
+        "V0 (Å³∕unit cell)": V0,
+        "E0 (kJ∕mol∕unit cell)": E0,
+        "B0 (GPa)": B0_GPa,
+        "B0 (kJ∕mol∕Å³)": B0_kJ_mol_A3,
+        "dB0dP": B0_prime,
+        "E2 (kJ∕mol∕Å⁶)": E2,
+        "E3 (kJ∕mol∕Å⁹)": E3,
+    }
