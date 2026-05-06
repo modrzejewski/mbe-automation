@@ -318,24 +318,20 @@ def _ΔE_el_poly_3_rigid_ΔV(
     dFdV = F_vib_spline.derivative(1)
 
     R = -(dFdV(V_ref) + p_ref_kJ_mol_A3)
-    if abs(E3) < 1e-9 * abs(E2):
-        #
-        # Harmonic limit (E3 -> 0): the quadratic equation E2*u + 1/2*E3*u^2 = R
-        # reduces to E2*u = R, so u = R/E2.
-        #
-        u = R / E2
-    else:
-        discriminant = E2**2 + 2 * E3 * R
-        if discriminant <= 0:
-            raise ValueError(
-                f"Analytical rigid shift optimization failed: discriminant is non-positive ({discriminant:.3e})."
-            )
-        #
-        # We are taking the plus root because this is the solution
-        # which reduces to the DeltaV from the quadratic
-        # approximation of E(V) when we put E3 -> 0.
-        #
-        u = (-E2 + np.sqrt(discriminant)) / E3
+    discriminant = E2**2 + 2 * E3 * R
+    if discriminant <= 0:
+        raise ValueError(
+            f"Analytical rigid shift optimization failed: discriminant is non-positive ({discriminant:.3e})."
+        )
+    #
+    # Rationalized form: multiply the standard root (-E2 + √Δ)/E3 by the
+    # conjugate (-E2 - √Δ)/(-E2 - √Δ).  The numerator becomes E2² - Δ = -2·E3·R,
+    # the E3 cancels, and we obtain u = 2R / (E2 + √Δ).
+    # The denominator is a sum of two positive numbers (E2 > 0 at a minimum,
+    # √Δ > 0), so no catastrophic cancellation occurs for any value of E3,
+    # including E3 → 0 where the formula correctly reduces to u = R/E2.
+    #
+    u = 2 * R / (E2 + np.sqrt(discriminant))
     DeltaV = V_ref - V0 - u
     return DeltaV
 
