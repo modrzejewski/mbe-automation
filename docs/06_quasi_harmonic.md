@@ -135,19 +135,59 @@ mbe_automation.run(properties_config)
 
 ### External baseline substitution example
 
-When high-level reference EOS parameters are available (e.g. from DFT), the MLIP static cold curve can be replaced without any additional empirical forcing:
+When high-level reference EOS parameters are available (e.g. from DFT or coupled-cluster calculations), the MLIP static cold curve can be replaced with an analytical baseline built from user-supplied $V_0$, $B_0$, and $B_0'$ values. Setting `reference_state_forcing="none"` substitutes the electronic baseline without applying any additional empirical correction — the equilibrium volume is determined entirely by the phonon free energy on top of the external curve.
 
 ```python
-electronic_energy_correction=EEC(
-    reference_state_forcing="none",
-    baseline_V0=143.50,        # Å³, conventional cell
-    baseline_B0_GPa=12.4,
-    baseline_B0_prime=6.2,
-    cell="conventional"
+import numpy as np
+from mbe_automation.calculators import MACE
+
+import mbe_automation.configs
+from mbe_automation.configs.structure import Minimum
+from mbe_automation.configs.quasi_harmonic import EEC
+from mbe_automation import Structure
+
+xyz_solid = "path/to/your/solid.xyz"
+xyz_molecule = "path/to/your/molecule.xyz"
+
+mace_calc = MACE(model_path="path/to/your/mace.model")
+
+relaxation_config = Minimum(
+    cell_relaxation="constant_volume",
+    max_force_on_atom_eV_A=1.0E-4
 )
+
+# EOS parameters from a precomputed high-level reference (e.g. DFT-D4)
+# All values refer to the conventional cell
+DFT_V0_A3       = 143.50   # Å³/unit cell
+DFT_B0_GPa      = 12.4     # GPa
+DFT_B0_prime    = 6.2      # dimensionless
+
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
+    model_name="mace",
+    crystal=Structure.from_xyz_file(xyz_solid),
+    molecule=Structure.from_xyz_file(xyz_molecule),
+    temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
+    calculator=mace_calc,
+    supercell_radius=25.0,
+    dataset="properties.hdf5",
+    relaxation=relaxation_config,
+    volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
+
+    # Replace the MLIP cold curve with the precomputed EOS; no empirical forcing
+    electronic_energy_correction=EEC(
+        reference_state_forcing="none",
+        baseline_V0=DFT_V0_A3,
+        baseline_B0_GPa=DFT_B0_GPa,
+        baseline_B0_prime=DFT_B0_prime,
+        cell="conventional"
+    ),
+    equation_of_state="spline"  # Required for EEC
+)
+
+mbe_automation.run(properties_config)
 ```
 
-To combine external baseline substitution with reference state forcing, simply set `reference_state_forcing` to a non-`"none"` value alongside the baseline parameters:
+To combine external baseline substitution with reference state forcing, simply set `reference_state_forcing` to a value other than `"none"` alongside the baseline parameters:
 
 ```python
 electronic_energy_correction=EEC(
@@ -155,9 +195,9 @@ electronic_energy_correction=EEC(
     T_ref=123.0,
     V_ref=145.80,
     cell="conventional",
-    baseline_V0=143.50,
-    baseline_B0_GPa=12.4,
-    baseline_B0_prime=6.2,
+    baseline_V0=DFT_V0_A3,
+    baseline_B0_GPa=DFT_B0_GPa,
+    baseline_B0_prime=DFT_B0_prime,
 )
 ```
 
