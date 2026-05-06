@@ -712,11 +712,11 @@ def equilibrium_curve(
             good_points=good_points
         )
         p_eec_GPa = eec.evaluate_pressure(eec.config.V_ref)
-        if eec.config.type == "linear":
+        if eec.config.reference_state_forcing == "linear":
             print(f"EEC type: linear, param = {eec.param:.1e} kJ∕mol∕Å³")
-        elif eec.config.type == "inverse_volume":
+        elif eec.config.reference_state_forcing == "inverse_volume":
             print(f"EEC type: inverse_volume, param = {eec.param:.1e} kJ∕mol·Å³")
-        elif eec.config.type == "rigid_shift":
+        elif eec.config.reference_state_forcing == "rigid_shift":
             print(f"EEC type: rigid_shift, ΔV = {eec.param:.1f} Å³∕unit cell")
         print(f"EEC effective pressure at V_ref: {p_eec_GPa:.4f} GPa")
     else:

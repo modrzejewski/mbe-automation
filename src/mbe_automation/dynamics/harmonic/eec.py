@@ -203,6 +203,61 @@ class DebyeModel:
 
 @dataclass(kw_only=True)
 class EECConfig:
+    """
+    Configuration for the Empirical Electronic Energy Correction (EEC).
+
+    EEC provides two independent capabilities that can be used separately or together:
+
+    1. **Reference state forcing**: adds an empirical term to enforce a known
+       reference volume (V_ref) at a reference temperature (T_ref). Activated when
+       reference_state_forcing is not "none".
+
+    2. **External baseline substitution**: replaces the MLIP static cold curve
+       with a 3rd-order polynomial baseline built from user-supplied EOS parameters
+       (baseline_V0, baseline_B0_GPa, baseline_B0_prime). Activated when these three
+       parameters are provided. Useful when the MLIP static cold curve should be
+       replaced by a trusted external reference, e.g. a high-level DFT or
+       coupled-cluster curve.
+
+    The two features can be combined: the empirical correction is then applied on
+    top of the external baseline rather than on top of the MLIP curve.
+
+    Parameters
+    ----------
+    reference_state_forcing : str
+        Type of empirical correction: "linear", "inverse_volume", "rigid_shift", or "none".
+        Required if enforcing a reference state (T_ref and V_ref must also be set).
+    T_ref : float or None
+        Reference temperature (K) at which V_ref is enforced. Must appear in
+        the temperatures_K array of the FreeEnergy configuration.
+    V_ref : float or None
+        Reference volume (Å³ per unit cell of type `cell`) enforced at T_ref.
+        Must lie within the sampled volume range.
+    p_ref_GPa : float
+        Reference pressure (GPa) used when solving for the rigid_shift parameter.
+    cell : str
+        Unit cell type ("primitive" or "conventional") that V_ref corresponds to.
+        Volumes are rescaled internally to match the calculation's unit cell convention.
+    min_forcing_pressure_GPa : float
+        Lower pressure bound (GPa) for the EEC correction. An error is raised if
+        the required correction falls below this value.
+    max_forcing_pressure_GPa : float
+        Upper pressure bound (GPa) for the EEC correction. An error is raised if
+        the required correction exceeds this value.
+    baseline_V0 : float or None
+        Equilibrium volume (Å³ per unit cell of type `cell`) of the external
+        baseline static cold curve. Must be set together with baseline_B0_GPa and
+        baseline_B0_prime to activate the external baseline substitution.
+    baseline_B0_GPa : float or None
+        Bulk modulus (GPa) of the external baseline static cold curve.
+    baseline_B0_prime : float or None
+        Pressure derivative of the bulk modulus (dimensionless) of the external
+        baseline static cold curve.
+    baseline_E0_kJ_mol_unit_cell : float or None
+        Reference energy (kJ/mol per unit cell of type `cell`) of the external
+        baseline static cold curve. If None, the E0 from the MLIP static cold
+        curve is used.
+    """
     reference_state_forcing: Literal[*ELECTRONIC_ENERGY_CORRECTION] = "inverse_volume"
     T_ref: float | None = None
     V_ref: float | None = None

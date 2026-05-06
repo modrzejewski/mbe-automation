@@ -56,7 +56,7 @@ class FreeEnergy:
                                    #    molecular crystals from energy and dispersion corrected DFT,
                                    #    J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
                                    #
-    electronic_energy_correction: EEC = field(default_factory=lambda: EEC(type="none"))
+    electronic_energy_correction: EEC = field(default_factory=lambda: EEC(reference_state_forcing="none"))
                                    #
                                    # Debye model for equilibrium cell volume extrapolation/interpolation.
                                    # Use if G(V, p) is flat or the minimum is outside the sampled volume range.

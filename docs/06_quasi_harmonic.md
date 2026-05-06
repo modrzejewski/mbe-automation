@@ -71,17 +71,22 @@ mbe_automation.run(properties_config)
 
 ## Empirical Electronic Energy Correction (EEC)
 
-The Empirical Electronic Energy Correction (EEC) option can be applied to enforce a known reference volume ($V_{\text{ref}}$) for a specific unit cell geometry (either primitive or conventional) at a specific reference temperature ($T_{\text{ref}}$). The EEC contribution is added to the crystal's electronic energy and accounted for in all derived thermodynamic functions.
+EEC provides two independent capabilities that can be used separately or together:
 
-Two types of EEC are supported:
-1.  **Linear**: $E_{\text{el,corrected}} = E_{\text{el}} + \text{param} \cdot (V - V_{\text{ref}})$
-2.  **Inverse Volume**: $E_{\text{el,corrected}} = E_{\text{el}} + \text{param} / V$
+1. **Reference state forcing** — adds an empirical term to enforce a known reference volume ($V_{\text{ref}}$) at a specific reference temperature ($T_{\text{ref}}$). Three correction types are supported:
+   - **Linear**: $E_{\text{corr}}(V) = \text{param} \cdot (V - V_{\text{ref}})$
+   - **Inverse volume**: $E_{\text{corr}}(V) = \text{param} / V$
+   - **Rigid shift**: $E_{\text{corr}}(V) = E_{\text{el}}(V - \Delta V) - E_{\text{el}}(V)$, where $\Delta V$ is chosen so that $\mathrm{d}G/\mathrm{d}V = 0$ at ($V_\text{ref}$, $T_\text{ref}$, $p_\text{ref}$). This corresponds to a rigid translation of the static cold curve along the volume axis.
 
-The parameter (`param`) is calculated analytically using a cubic spline fit of the raw Gibbs free energy vs. volume curve to ensure the corrected equilibrium volume matches $V_{\text{ref}}$ at $T_{\text{ref}}$.
+   The `param` (or $\Delta V$ for rigid shift) is determined analytically from a cubic spline fit of the raw Gibbs free energy vs. volume curve.
 
-To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the [`EEC`](./03_configuration_classes.md#eec-class) dataclass from `mbe_automation.configs.quasi_harmonic`.
+2. **External baseline substitution** — replaces the MLIP static cold curve with a 3rd-order polynomial baseline built from user-supplied EOS parameters (`baseline_V0`, `baseline_B0_GPa`, `baseline_B0_prime`). This is useful when the MLIP static cold curve should be replaced by a trusted external reference, e.g. a high-level DFT or coupled-cluster curve. Can be used with `reference_state_forcing="none"` to substitute the curve without any additional empirical forcing.
 
-The equation of state must be set to `"spline"` (which is the default) to use the EEC option. Additionally, $T_{\text{ref}}$ must be present in the `temperatures_K` array.
+The EEC contribution is added to the crystal's electronic energy and propagated into all derived thermodynamic functions. To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the [`EEC`](./03_configuration_classes.md#eec-class) dataclass from `mbe_automation.configs.quasi_harmonic`.
+
+The equation of state must be set to `"spline"` (which is the default) to use the EEC option. When using reference state forcing, $T_{\text{ref}}$ must be present in the `temperatures_K` array.
+
+### Reference state forcing example
 
 ```python
 import numpy as np
@@ -115,9 +120,9 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 
-    # Enable EEC targeting a reference conventional cell volume of 145.80 A^3 at 123 K
+    # Enforce the experimental conventional cell volume at 123 K
     electronic_energy_correction=EEC(
-        type="inverse_volume",
+        reference_state_forcing="inverse_volume",
         T_ref=123.0,
         V_ref=145.80,
         cell="conventional"
@@ -126,6 +131,34 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 )
 
 mbe_automation.run(properties_config)
+```
+
+### External baseline substitution example
+
+When high-level reference EOS parameters are available (e.g. from DFT), the MLIP static cold curve can be replaced without any additional empirical forcing:
+
+```python
+electronic_energy_correction=EEC(
+    reference_state_forcing="none",
+    baseline_V0=143.50,        # Å³, conventional cell
+    baseline_B0_GPa=12.4,
+    baseline_B0_prime=6.2,
+    cell="conventional"
+)
+```
+
+To combine external baseline substitution with reference state forcing, simply set `reference_state_forcing` to a non-`"none"` value alongside the baseline parameters:
+
+```python
+electronic_energy_correction=EEC(
+    reference_state_forcing="inverse_volume",
+    T_ref=123.0,
+    V_ref=145.80,
+    cell="conventional",
+    baseline_V0=143.50,
+    baseline_B0_GPa=12.4,
+    baseline_B0_prime=6.2,
+)
 ```
 
 ## Debye Model Volumes
@@ -292,7 +325,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 
     # Enable EEC targeting a reference conventional cell volume of 145.80 A^3 at 123 K
     electronic_energy_correction=EEC(
-        type="inverse_volume",
+        reference_state_forcing="inverse_volume",
         T_ref=123.0,
         V_ref=145.80,
         cell="conventional"
