@@ -384,7 +384,7 @@ def baseline_cold_curve(
 ) -> dict:
     """
     Construct a 3rd-order polynomial baseline curve. The output dictionary
-    matches the format of `cold_cuve`.
+    matches the format of `cold_curve`.
     """
     conversion_factor = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
     B0_kJ_mol_A3 = B0_GPa / conversion_factor
