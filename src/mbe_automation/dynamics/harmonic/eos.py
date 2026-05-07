@@ -31,7 +31,20 @@ def birch_murnaghan(volume, e0, v0, b0, b1):
         eta = (v0 / volume) ** (1 / 3)
         return e0 + 9 * b0 * v0 / 16 * (eta**2 - 1) ** 2 * (6 + b1 * (eta**2 - 1.0) - 4 * eta**2)
 
-    
+
+def birch_murnaghan_volume_derivative(volume, v0, b0, b1):
+    """Analytical dE/dV of the Birch-Murnaghan EOS (from PRB 70, 224107).
+
+    Returns dE/dV in the same units as b0 (energy/volume).  The sign matches
+    the physical pressure P = -dE/dV: dE/dV < 0 at V < V0 (compressed),
+    dE/dV > 0 at V > V0 (expanded), and dE/dV = 0 at V = V0.
+    """
+    eta = (v0 / volume) ** (1 / 3)
+    return -(3 * b0 / 2) * (eta**7 - eta**5) * (
+        1 + (3 / 4) * (b1 - 4) * (eta**2 - 1)
+    )
+
+
 def vinet(volume, e0, v0, b0, b1):
         """Vinet equation from PRB 70, 224107."""
         eta = (volume / v0) ** (1 / 3)
@@ -398,9 +411,17 @@ def baseline_cold_curve(
     # Shift the polynomial to be a function of V directly: E(V) = E_unshifted(V - V0)
     V_shift = Polynomial([-V0, 1.0])
     poly_3_baseline = E_unshifted(V_shift)
-    
+
+    def bm_baseline(V_eval):
+        return birch_murnaghan(V_eval, e0=E0, v0=V0, b0=B0_kJ_mol_A3, b1=B0_prime)
+
+    def bm_baseline_deriv(V_eval):
+        return birch_murnaghan_volume_derivative(V_eval, v0=V0, b0=B0_kJ_mol_A3, b1=B0_prime)
+
     return {
         "E_el_crystal_poly_3 (kJ∕mol∕unit cell)": poly_3_baseline,
+        "E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)": bm_baseline,
+        "E_el_crystal_birch_murnaghan_deriv (kJ∕mol∕Å³∕unit cell)": bm_baseline_deriv,
         "V0 (Å³∕unit cell)": V0,
         "E0 (kJ∕mol∕unit cell)": E0,
         "B0 (GPa)": B0_GPa,
