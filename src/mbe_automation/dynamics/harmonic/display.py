@@ -387,6 +387,31 @@ def _eos_curves(
             transform=ax_cold.get_xaxis_transform()
         )
 
+    raw_spline = cold_curve.get("E_el_crystal_raw_spline (kJ∕mol∕unit cell)")
+    V0_raw = cold_curve.get("E_el_crystal_raw_V0 (Å³∕unit cell)")
+    if raw_spline is not None and ax_cold is not None:
+        E_el_raw_interp = raw_spline(eos.V_interp) * scaling_factor
+        E_el_raw_min = np.min(E_el_raw_interp)
+        ax_cold.plot(
+            eos.V_interp,
+            E_el_raw_interp - E_el_raw_min,
+            color="gray",
+            linestyle=":",
+            linewidth=1.5,
+            label="Unaltered MLIP",
+        )
+        if V0_raw is not None:
+            dV = V0_cold - V0_raw
+            E_el_raw_hshifted = (raw_spline(eos.V_interp - dV) - raw_spline(V0_raw)) * scaling_factor
+            ax_cold.plot(
+                eos.V_interp,
+                E_el_raw_hshifted,
+                color="olive",
+                linestyle=":",
+                linewidth=1.5,
+                label="Unaltered MLIP shifted to $V_0$",
+            )
+
     if debye_model is not None and debye_model.initialized:
         V_debye, _ = debye_model.predict(eos.temperatures)
         G_debye_scaled = np.array([

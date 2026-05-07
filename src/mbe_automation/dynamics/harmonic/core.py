@@ -137,10 +137,18 @@ class EOSMetadata:
         # Since E_el is temperature-independent, we can use the data from the first temperature point.
         df = self.exact_at_sampled_volume[self.select_T[0]]
         
-        return mbe_automation.dynamics.harmonic.eos.cold_curve(
+        result = mbe_automation.dynamics.harmonic.eos.cold_curve(
             V=df["V_crystal (Å³∕unit cell)"].to_numpy(),
             E_el=df["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
         )
+        if self.eec.is_enabled and self.eec.cold_curve is not None:
+            result["E_el_crystal_raw_spline (kJ∕mol∕unit cell)"] = (
+                self.eec.cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"]
+            )
+            result["E_el_crystal_raw_V0 (Å³∕unit cell)"] = (
+                self.eec.cold_curve["V0 (Å³∕unit cell)"]
+            )
+        return result
 
     def plot_eos_curves(
         self,
