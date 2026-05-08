@@ -80,7 +80,7 @@ EEC provides two independent capabilities that can be used separately or togethe
 
    The `param` (or $\Delta V$ for rigid shift) is determined analytically from a cubic spline fit of the raw Gibbs free energy vs. volume curve.
 
-2. **External baseline substitution** — replaces the MLIP static cold curve with a 3rd-order polynomial baseline built from user-supplied EOS parameters (`baseline_V0`, `baseline_B0_GPa`, `baseline_B0_prime`). This is useful when the MLIP static cold curve should be replaced by a trusted external reference, e.g. a high-level DFT or coupled-cluster curve. Can be used with `reference_state_forcing="none"` to substitute the curve without any additional empirical forcing.
+2. **External baseline substitution** — replaces the MLIP static cold curve with an external baseline built from user-supplied EOS parameters (`baseline_V0`, `baseline_B0_GPa`, `baseline_B0_prime`). The functional form is controlled by `baseline_curve_type`: Birch–Murnaghan EOS (default) or a 3rd-order Taylor polynomial around $V_0$. Useful when the MLIP static cold curve should be replaced by an external source, e.g. a high-level DFT or coupled-cluster curve. Can be used with `reference_state_forcing="none"` to substitute the curve without any additional empirical forcing.
 
 The EEC contribution is added to the crystal's electronic energy and propagated into all derived thermodynamic functions. To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the [`EEC`](./03_configuration_classes.md#eec-class) dataclass from `mbe_automation.configs.quasi_harmonic`.
 
@@ -207,7 +207,7 @@ By default, the equilibrium volume at each temperature is obtained by minimizing
 
 The Debye model expresses V(T) analytically as:
 
-$$V(T) = V_0 + C \cdot T \cdot D_3\!\left(\frac{\Theta_D}{T}\right)$$
+$$V(T) = V_0 + C \cdot T \cdot D_3\left(\frac{\Theta_D}{T}\right)$$
 
 where $D_3$ is the third-order Debye function and $V_0$, $\Theta_D$, $C$ are three parameters fitted to the reliable low-temperature EOS-minimum volumes. The model is then extrapolated to the full temperature range. See Ko et al., *Phys. Rev. Materials* 2, 055603 (2018) for details.
 
@@ -223,7 +223,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 )
 ```
 
-The max_fit_temperature_K parameter (default: 200.0 K) defines the trust region: only EOS-minimum volumes at temperatures below this threshold are used. Requires at least 3 points.
+The `max_fit_temperature_K` parameter (default: 200.0 K) defines the trust region: only EOS-minimum volumes at temperatures below this threshold are used. Requires at least 3 points.
 
 For more details on its configuration, see the [`DebyeModel` class documentation](03_configuration_classes.md#debyemodel-class).
 
