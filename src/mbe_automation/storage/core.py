@@ -742,19 +742,37 @@ def read_eos_curves(
 def _save_eec(group: h5py.Group, eec) -> None:
     """Save an EEC instance into the provided group."""
     group.attrs["dataclass"] = "EEC"
-    group.attrs["type"] = eec.config.type
+    group.attrs["reference_state_forcing"] = eec.config.reference_state_forcing
+    group.attrs["p_ref (GPa)"] = eec.config.p_ref_GPa
     
     if eec.config.is_enabled:
-        group.attrs["T_ref (K)"] = eec.config.T_ref
-        group.attrs["V_ref (Å³∕unit cell)"] = eec.config.V_ref
+        if eec.config.T_ref is not None:
+            group.attrs["T_ref (K)"] = eec.config.T_ref
+        if eec.config.V_ref is not None:
+            group.attrs["V_ref (Å³∕unit cell)"] = eec.config.V_ref
         group.attrs["cell"] = eec.config.cell
-        group.attrs["pressure_min (GPa)"] = eec.config.pressure_min_GPa
-        group.attrs["pressure_max (GPa)"] = eec.config.pressure_max_GPa
+        group.attrs["min_forcing_pressure (GPa)"] = eec.config.min_forcing_pressure_GPa
+        group.attrs["max_forcing_pressure (GPa)"] = eec.config.max_forcing_pressure_GPa
         
-        if eec.config.type == "linear":
+        if eec.config.override_baseline_curve:
+            group.attrs["baseline_V0 (Å³∕unit cell)"] = eec.config.baseline_V0
+            group.attrs["baseline_B0 (GPa)"] = eec.config.baseline_B0_GPa
+            group.attrs["baseline_B0_prime"] = eec.config.baseline_B0_prime
+            if eec.config.baseline_E0_kJ_mol_unit_cell is not None:
+                group.attrs["baseline_E0 (kJ∕mol∕unit cell)"] = eec.config.baseline_E0_kJ_mol_unit_cell
+            
+        if eec.config.reference_state_forcing == "linear":
             group.attrs["param (kJ∕mol∕Å³)"] = eec.param
-        elif eec.config.type == "inverse_volume":
-            group.attrs["param (kJ∕mol*Å³)"] = eec.param
+        elif eec.config.reference_state_forcing == "inverse_volume":
+            group.attrs["param (kJ∕mol⋅Å³)"] = eec.param
+        elif eec.config.reference_state_forcing == "rigid_shift":
+            group.attrs["param (Å³∕unit cell)"] = eec.param
+        else:
+            group.attrs["param"] = eec.param
+            
+        group.create_dataset("V_sampled (Å³∕unit cell)", data=eec.V_sampled)
+        group.create_dataset("E_el_raw_sampled (kJ∕mol∕unit cell)", data=eec.E_el_raw_sampled)
+        group.create_dataset("F_vib_sampled (kJ∕mol∕unit cell)", data=eec.F_vib_sampled)
     else:
         group.attrs["param"] = eec.param
 
@@ -762,26 +780,55 @@ def _save_eec(group: h5py.Group, eec) -> None:
 def _read_eec(group: h5py.Group):
     """Read an EEC instance from the provided group."""
     from mbe_automation.dynamics.harmonic.eec import EECConfig, EEC
-    eec_type = group.attrs["type"]
+    reference_state_forcing = group.attrs["reference_state_forcing"]
     
-    if eec_type != "none":
+    baseline_V0 = group.attrs.get("baseline_V0 (Å³∕unit cell)")
+    baseline_B0_GPa = group.attrs.get("baseline_B0 (GPa)")
+    baseline_B0_prime = group.attrs.get("baseline_B0_prime")
+    baseline_E0_kJ_mol_unit_cell = group.attrs.get("baseline_E0 (kJ∕mol∕unit cell)")
+    
+    is_enabled = reference_state_forcing != "none" or baseline_V0 is not None
+    
+    if is_enabled:
         eec_config = EECConfig(
-            type=eec_type,
-            T_ref=group.attrs["T_ref (K)"],
-            V_ref=group.attrs["V_ref (Å³∕unit cell)"],
-            cell=group.attrs["cell"],
-            pressure_min_GPa=group.attrs["pressure_min (GPa)"],
-            pressure_max_GPa=group.attrs["pressure_max (GPa)"],
+            reference_state_forcing=reference_state_forcing,
+            T_ref=group.attrs.get("T_ref (K)"),
+            V_ref=group.attrs.get("V_ref (Å³∕unit cell)"),
+            p_ref_GPa=float(group.attrs["p_ref (GPa)"]),
+            cell=group.attrs.get("cell", "conventional"),
+            min_forcing_pressure_GPa=group.attrs.get("min_forcing_pressure (GPa)", -5.0),
+            max_forcing_pressure_GPa=group.attrs.get("max_forcing_pressure (GPa)", 5.0),
+            baseline_V0=baseline_V0,
+            baseline_B0_GPa=baseline_B0_GPa,
+            baseline_B0_prime=baseline_B0_prime,
+            baseline_E0_kJ_mol_unit_cell=baseline_E0_kJ_mol_unit_cell,
         )
-        if eec_type == "linear":
-            param = group.attrs.get("param (kJ∕mol∕Å³)", group.attrs.get("param"))
+        if reference_state_forcing == "linear":
+            param = group.attrs["param (kJ∕mol∕Å³)"]
+        elif reference_state_forcing == "inverse_volume":
+            param = group.attrs["param (kJ∕mol⋅Å³)"]
+        elif reference_state_forcing == "rigid_shift":
+            param = group.attrs["param (Å³∕unit cell)"]
         else:
-            param = group.attrs.get("param (kJ∕mol*Å³)", group.attrs.get("param"))
+            param = group.attrs["param"]
+            
+        V_sampled = group["V_sampled (Å³∕unit cell)"][:]
+        E_el_raw_sampled = group["E_el_raw_sampled (kJ∕mol∕unit cell)"][:]
+        F_vib_sampled = group["F_vib_sampled (kJ∕mol∕unit cell)"][:]
     else:
-        eec_config = EECConfig(type="none")
+        eec_config = EECConfig(reference_state_forcing="none")
         param = group.attrs["param"]
+        V_sampled = np.array([], dtype=np.float64)
+        E_el_raw_sampled = np.array([], dtype=np.float64)
+        F_vib_sampled = np.array([], dtype=np.float64)
         
-    return EEC(config=eec_config, param=param)
+    return EEC(
+        config=eec_config, 
+        param=param, 
+        V_sampled=V_sampled, 
+        E_el_raw_sampled=E_el_raw_sampled,
+        F_vib_sampled=F_vib_sampled,
+    )
 
 
 def _save_debye_model(
@@ -828,6 +875,9 @@ def save_eos_metadata(
 
         group = f.create_group(key)
         group.attrs["dataclass"] = "EOSMetadata"
+        group.attrs["equation_of_state"] = eos_metadata.equation_of_state
+
+        group.attrs["eos_curves_key"] = eos_metadata.eos_curves_key
 
         group.create_dataset(
             name="T (K)",
@@ -886,6 +936,9 @@ def read_eos_metadata(
         temperatures_K = group["T (K)"][...]
         sampled_volumes = group["V_sampled (Å³∕unit cell)"][...]
         force_constants_keys = group["force_constants_keys"][...].astype(str).tolist()
+        equation_of_state = group.attrs["equation_of_state"]
+        
+        eos_curves_key = group.attrs["eos_curves_key"]
         
         select_T_stacked = group["select_T"][...]
         select_T = [row for row in select_T_stacked]
@@ -915,6 +968,8 @@ def read_eos_metadata(
         sampled_volumes=sampled_volumes,
         dataset=dataset,
         force_constants_keys=force_constants_keys,
+        eos_curves_key=eos_curves_key,
+        equation_of_state=equation_of_state,
         eec=eec,
         debye_model=debye_model
     )

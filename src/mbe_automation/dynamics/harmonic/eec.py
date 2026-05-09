@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, TYPE_CHECKING
 from copy import deepcopy
 import numpy as np
@@ -10,7 +10,9 @@ import scipy.integrate
 import scipy.optimize
 from typing import Callable
 
-ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "none"]
+import mbe_automation.dynamics.harmonic.eos
+
+ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "rigid_shift", "none"]
 
 DEFAULT_DEBYE_FITTING_T = np.array([10.0, 50.0, 100.0, 150.0, 200.0])
 
@@ -201,28 +203,193 @@ class DebyeModel:
 
 @dataclass(kw_only=True)
 class EECConfig:
-    type: Literal[*ELECTRONIC_ENERGY_CORRECTION] = "inverse_volume"
+    """
+    Configuration for the Empirical Electronic Energy Correction (EEC).
+
+    EEC provides two independent capabilities that can be used separately or together:
+
+    1. **Reference state forcing**: adds an empirical term to enforce a known
+       reference volume (V_ref) at a reference temperature (T_ref). Activated when
+       reference_state_forcing is not "none".
+
+    2. **External baseline substitution**: replaces the MLIP static cold curve
+       with a 3rd-order polynomial baseline built from user-supplied EOS parameters
+       (baseline_V0, baseline_B0_GPa, baseline_B0_prime). Activated when these three
+       parameters are provided. Useful when the MLIP static cold curve should be
+       replaced by a trusted external reference, e.g. a high-level DFT or
+       coupled-cluster curve.
+
+    The two features can be combined: the empirical correction is then applied on
+    top of the external baseline rather than on top of the MLIP curve.
+
+    Parameters
+    ----------
+    reference_state_forcing : str
+        Type of empirical correction: "linear", "inverse_volume", "rigid_shift", or "none".
+        Required if enforcing a reference state (T_ref and V_ref must also be set).
+    T_ref : float or None
+        Reference temperature (K) at which V_ref is enforced. Must appear in
+        the temperatures_K array of the FreeEnergy configuration.
+    V_ref : float or None
+        Reference volume (Å³ per unit cell of type `cell`) enforced at T_ref.
+        Must lie within the sampled volume range.
+    p_ref_GPa : float
+        Reference pressure (GPa) used when solving for the rigid_shift parameter.
+    cell : str
+        Unit cell type ("primitive" or "conventional") that V_ref corresponds to.
+        Volumes are rescaled internally to match the calculation's unit cell convention.
+    min_forcing_pressure_GPa : float
+        Lower pressure bound (GPa) for the EEC correction. An error is raised if
+        the required correction falls below this value.
+    max_forcing_pressure_GPa : float
+        Upper pressure bound (GPa) for the EEC correction. An error is raised if
+        the required correction exceeds this value.
+    baseline_V0 : float or None
+        Equilibrium volume (Å³ per unit cell of type `cell`) of the external
+        baseline static cold curve. Must be set together with baseline_B0_GPa and
+        baseline_B0_prime to activate the external baseline substitution.
+    baseline_B0_GPa : float or None
+        Bulk modulus (GPa) of the external baseline static cold curve.
+    baseline_B0_prime : float or None
+        Pressure derivative of the bulk modulus (dimensionless) of the external
+        baseline static cold curve.
+    baseline_E0_kJ_mol_unit_cell : float or None
+        Reference energy (kJ/mol per unit cell of type `cell`) of the external
+        baseline static cold curve. If None, the E0 from the MLIP static cold
+        curve is used.
+    baseline_curve_type : str
+        Functional form used for the external baseline curve: ``"birch_murnaghan"``
+        (default) or ``"polynomial"`` (3rd-order Taylor expansion around V0).
+        Ignored when no external baseline is specified.  For the ``"rigid_shift"``
+        correction type the polynomial is always used regardless of this setting,
+        because the analytical ΔV derivation requires polynomial coefficients E2/E3.
+    """
+    reference_state_forcing: Literal[*ELECTRONIC_ENERGY_CORRECTION] = "inverse_volume"
     T_ref: float | None = None
     V_ref: float | None = None
+    p_ref_GPa: float = 1.0E-4
     cell: Literal["primitive", "conventional"] = "conventional"
-    pressure_min_GPa: float = -5.0
-    pressure_max_GPa: float = 5.0
+    min_forcing_pressure_GPa: float = -5.0
+    max_forcing_pressure_GPa: float = 5.0
+    baseline_V0: float | None = None
+    baseline_B0_GPa: float | None = None
+    baseline_B0_prime: float | None = None
+    baseline_E0_kJ_mol_unit_cell: float | None = None
+    baseline_curve_type: Literal["polynomial", "birch_murnaghan"] = "birch_murnaghan"
 
-    def __post_init__(self):
-        if self.type not in ELECTRONIC_ENERGY_CORRECTION:
-            raise ValueError(f"Unknown EECConfig type: {self.type}")
-        if self.is_enabled and (self.T_ref is None or self.V_ref is None):
-            raise ValueError(f"T_ref and V_ref must be specified for correction type '{self.type}'.")
+    @property
+    def override_baseline_curve(self) -> bool:
+        return self.baseline_V0 is not None
+
+    @property
+    def enforce_reference_state(self) -> bool:
+        return self.reference_state_forcing != "none"
 
     @property
     def is_enabled(self) -> bool:
-        return self.type != "none"
+        return self.enforce_reference_state or self.override_baseline_curve
+
+    def __post_init__(self):
+        if self.reference_state_forcing not in ELECTRONIC_ENERGY_CORRECTION:
+            raise ValueError(f"Unknown EECConfig reference_state_forcing: {self.reference_state_forcing}")
+        if self.reference_state_forcing != "none" and (self.T_ref is None or self.V_ref is None):
+            raise ValueError(f"T_ref and V_ref must be specified for reference_state_forcing '{self.reference_state_forcing}'.")
+        has_baseline = [self.baseline_V0, self.baseline_B0_GPa, self.baseline_B0_prime]
+        if any(v is not None for v in has_baseline) and not all(v is not None for v in has_baseline):
+            raise ValueError("All three baseline curve parameters (baseline_V0, baseline_B0_GPa, baseline_B0_prime) must be specified.")
+        if self.baseline_curve_type not in ("polynomial", "birch_murnaghan"):
+            raise ValueError(f"Unknown baseline_curve_type: '{self.baseline_curve_type}'. Must be 'polynomial' or 'birch_murnaghan'.")
+
+
+def _ΔE_el_poly_3_rigid_ΔV(
+    V_sampled,
+    F_vib_sampled,
+    p_ref_GPa,
+    V_ref,
+    cold_curve: dict,
+):
+    """
+    Find the shift ΔV in the electronic energy curve that enforces the
+    reference volume V_ref at the reference temperature T_ref and pressure p_ref.
+
+    The shift is found analytically based on a third-order Taylor expansion 
+    of the cold curve around V0:
+        E(V) = E0 + 1/2*E2*(V-V0)**2 + 1/6*E3*(V-V0)**3
+        ΔE(V) = E(V-ΔV) - E(V)
+    """
+    V0 = cold_curve["V0 (Å³∕unit cell)"]
+    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
+    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
+    conversion_factor = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
+    p_ref_kJ_mol_A3 = p_ref_GPa / conversion_factor
+    sort_idx = np.argsort(V_sampled)
+    F_vib_spline = CubicSpline(V_sampled[sort_idx], F_vib_sampled[sort_idx])
+    dFdV = F_vib_spline.derivative(1)
+
+    R = -(dFdV(V_ref) + p_ref_kJ_mol_A3)
+    discriminant = E2**2 + 2 * E3 * R
+    if discriminant <= 0:
+        raise ValueError(
+            f"Analytical rigid shift optimization failed: discriminant is non-positive ({discriminant:.3e})."
+        )
+    #
+    # Rationalized form: multiply the standard root (-E2 + √Δ)/E3 by the
+    # conjugate (-E2 - √Δ)/(-E2 - √Δ).  The numerator becomes E2² - Δ = -2·E3·R,
+    # the E3 cancels, and we obtain u = 2R / (E2 + √Δ).
+    # The denominator is a sum of two positive numbers (E2 > 0 at a minimum,
+    # √Δ > 0), so no catastrophic cancellation occurs for any value of E3,
+    # including E3 → 0 where the formula correctly reduces to u = R/E2.
+    #
+    u = 2 * R / (E2 + np.sqrt(discriminant))
+    DeltaV = V_ref - V0 - u
+    return DeltaV
+
+def _ΔE_el_poly_3_rigid_pressure(
+    V, 
+    DeltaV,
+    cold_curve
+):
+    """
+    Calculate the volume derivative of the rigid shift energy correction:
+        dE_corr/dV = E'(V - DeltaV) - E'(V)
+    based on a third-order expansion of the cold curve around V0:
+        E(V) = E0 + 1/2*E2*(V-V0)**2 + 1/6*E3*(V-V0)**3
+        ΔE(V) = E(V-ΔV) - E(V)
+    """
+    V0 = cold_curve["V0 (Å³∕unit cell)"]
+    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
+    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
+    return 0.5 * DeltaV * (-2 * E2 + E3 * (DeltaV - 2 * V + 2 * V0))
+
+def _ΔE_el_poly_3_rigid_value(
+    V,
+    DeltaV,
+    cold_curve,
+):
+    """
+    Calculate the rigid shift energy correction analytically:
+        ΔE(V) = E(V - ΔV) - E(V)
+    based on a third-order expansion of the cold curve around V0:
+        E(V) = E0 + 1/2*E2*(V-V0)**2 + 1/6*E3*(V-V0)**3
+        ΔE(V) = E(V-ΔV) - E(V)
+    """
+    V0 = cold_curve["V0 (Å³∕unit cell)"]
+    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
+    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
+    dV = V - V0
+    return -(1/6) * DeltaV * (
+        DeltaV**2 * E3 - 3 * DeltaV * (E2 + E3 * dV) + 
+        3 * (2 * E2 + E3 * dV) * dV
+    )
 
 def _eec_value(
-    V, 
-    V_ref, 
-    e_el_correction_param, 
-    correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION]
+    V,
+    V_ref,
+    e_el_correction_param,
+    correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION],
+    cold_curve: dict,
+    baseline_cold_curve: dict | None = None,
+    baseline_curve_type: str = "polynomial",
 ):
     """
     Evaluate the empirical electronic energy correction.
@@ -233,23 +400,51 @@ def _eec_value(
         - e_el_correction_param: 
             * linear: (kJ∕mol) / Å³
             * inverse_volume: (kJ∕mol) * Å³
+            * rigid_shift: DeltaV in Å³
             
     Returns:
         Energy correction in kJ∕mol (per unit cell of type specified by EECConfig.cell).
     """
+    base_cold_curve = baseline_cold_curve if baseline_cold_curve is not None else cold_curve
+    use_bm = (
+        baseline_cold_curve is not None
+        and baseline_curve_type == "birch_murnaghan"
+        and correction_type != "rigid_shift"
+    )
+    if baseline_cold_curve is not None:
+        if use_bm:
+            E_base = base_cold_curve["E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)"](V)
+        else:
+            E_base = base_cold_curve["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"](V)
+    else:
+        E_base = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"](V)
+
     if correction_type == "linear":
-        return e_el_correction_param * (V - V_ref)
+        E_corr = e_el_correction_param * (V - V_ref)
     elif correction_type == "inverse_volume":
-        return e_el_correction_param / V
+        E_corr = e_el_correction_param / V
+    elif correction_type == "rigid_shift":
+        E_corr = _ΔE_el_poly_3_rigid_value(
+            V=V,
+            DeltaV=e_el_correction_param,
+            cold_curve=base_cold_curve,
+        )
     elif correction_type == "none":
-        return np.zeros_like(V) if isinstance(V, (np.ndarray, list)) else 0.0
+        E_corr = np.zeros_like(V) if isinstance(V, (np.ndarray, list)) else 0.0
     else:
         raise ValueError(f"Unknown correction type: {correction_type}")
 
+    E_final = E_base + E_corr
+    E_spline = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"](V)
+    return E_final - E_spline
+
 def _eec_pressure(
-    V, 
-    e_el_correction_param, 
-    correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION]
+    V,
+    e_el_correction_param,
+    correction_type: Literal[*ELECTRONIC_ENERGY_CORRECTION],
+    cold_curve: dict,
+    baseline_cold_curve: dict | None = None,
+    baseline_curve_type: str = "polynomial",
 ):
     """
     Evaluate the volume derivative of the electronic energy correction.
@@ -259,27 +454,58 @@ def _eec_pressure(
         - e_el_correction_param: 
             * linear: (kJ∕mol) / Å³
             * inverse_volume: (kJ∕mol) * Å³
+            * rigid_shift: DeltaV in Å³
             
     Returns:
         Derivative of the correction w.r.t volume in (kJ∕mol) / Å³ (per unit cell of type specified by EECConfig.cell).
     """
+    base_cold_curve = baseline_cold_curve if baseline_cold_curve is not None else cold_curve
+    use_bm = (
+        baseline_cold_curve is not None
+        and baseline_curve_type == "birch_murnaghan"
+        and correction_type != "rigid_shift"
+    )
+    if baseline_cold_curve is not None:
+        if use_bm:
+            dE_base_dV = base_cold_curve["E_el_crystal_birch_murnaghan_deriv (kJ∕mol∕Å³∕unit cell)"](V)
+        else:
+            dE_base_dV = base_cold_curve["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"].deriv(1)(V)
+    else:
+        dE_base_dV = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"].derivative(1)(V)
+
     if correction_type == "linear":
         if isinstance(V, (np.ndarray, list)):
-            return np.full_like(V, e_el_correction_param, dtype=np.float64)
-        return float(e_el_correction_param)
+            dE_corr_dV = np.full_like(V, e_el_correction_param, dtype=np.float64)
+        else:
+            dE_corr_dV = float(e_el_correction_param)
     elif correction_type == "inverse_volume":
-        return -e_el_correction_param / (V ** 2)
+        dE_corr_dV = -e_el_correction_param / (V ** 2)
+    elif correction_type == "rigid_shift":
+        dE_corr_dV = _ΔE_el_poly_3_rigid_pressure(
+            V=V,
+            DeltaV=e_el_correction_param,
+            cold_curve=base_cold_curve,
+        )
     elif correction_type == "none":
         if isinstance(V, (np.ndarray, list)):
-            return np.zeros_like(V, dtype=np.float64)
-        return 0.0
+            dE_corr_dV = np.zeros_like(V, dtype=np.float64)
+        else:
+            dE_corr_dV = 0.0
     else:
         raise ValueError(f"Unknown correction type: {correction_type}")
 
+    dE_final_dV = dE_base_dV + dE_corr_dV
+    dE_spline_dV = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"].derivative(1)(V)
+    return dE_final_dV - dE_spline_dV
+
 def _eec_param(
     V_sampled: npt.NDArray[np.float64],
-    G_sampled: npt.NDArray[np.float64],
-    config: EECConfig
+    G_raw_sampled: npt.NDArray[np.float64],
+    E_el_raw_sampled: npt.NDArray[np.float64],
+    F_vib_sampled: npt.NDArray[np.float64],
+    config: EECConfig,
+    cold_curve: dict,
+    baseline_cold_curve: dict | None = None,
 ) -> float:
     """
     Perform a cubic spline fit of G(V) and find e_el_correction_param analytically.
@@ -290,11 +516,11 @@ def _eec_param(
         
     Resulting parameter units based on correction type (G units / V units):
         - linear: (kJ∕mol) / Å³
-        - inverse_volume: (kJ∕mol) * Å³
+        - inverse_volume: (kJ∕mol) ⋅ Å³
         
     Note: Output matches the energy scale of G_sampled (kJ∕mol per unit cell of type specified by config.cell).
     """
-    if not config.is_enabled:
+    if not config.enforce_reference_state:
         return 0.0
 
     if len(V_sampled) < 4:
@@ -302,7 +528,19 @@ def _eec_param(
 
     sort_idx = np.argsort(V_sampled)
     V_sorted = V_sampled[sort_idx]
-    G_sorted = G_sampled[sort_idx]
+    
+    G_adjusted = G_raw_sampled[sort_idx].copy()
+    if baseline_cold_curve is not None:
+        use_bm = (
+            config.baseline_curve_type == "birch_murnaghan"
+            and config.reference_state_forcing != "rigid_shift"
+        )
+        if use_bm:
+            E_base_sampled = baseline_cold_curve["E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)"](V_sorted)
+        else:
+            E_base_sampled = baseline_cold_curve["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"](V_sorted)
+        E_spline_sampled = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"](V_sorted)
+        G_adjusted = G_adjusted - E_spline_sampled + E_base_sampled
 
     if not (V_sorted[0] <= config.V_ref <= V_sorted[-1]):
          raise ValueError(
@@ -310,28 +548,40 @@ def _eec_param(
              f"[{V_sorted[0]:.3f}, {V_sorted[-1]:.3f}]."
          )
 
-    cs = CubicSpline(V_sorted, G_sorted)
+    cs = CubicSpline(V_sorted, G_adjusted)
     dGdV_interp = cs.derivative(1)
     
     dGdV_tot_Vref = dGdV_interp(config.V_ref)
+    base_cold_curve = baseline_cold_curve if baseline_cold_curve is not None else cold_curve
     
-    if config.type == "linear":
+    if config.reference_state_forcing == "linear":
         e_el_correction_param_opt = -dGdV_tot_Vref
-    elif config.type == "inverse_volume":
+    elif config.reference_state_forcing == "inverse_volume":
         e_el_correction_param_opt = (config.V_ref ** 2) * dGdV_tot_Vref
+    elif config.reference_state_forcing == "rigid_shift":
+        e_el_correction_param_opt = _ΔE_el_poly_3_rigid_ΔV(
+            V_sampled=V_sampled,
+            F_vib_sampled=F_vib_sampled,
+            p_ref_GPa=config.p_ref_GPa,
+            V_ref=config.V_ref,
+            cold_curve=base_cold_curve,
+        )
     else:
-        raise ValueError(f"Unknown correction type: {config.type}")
+        raise ValueError(f"Unknown reference_state_forcing: {config.reference_state_forcing}")
         
     p_eec_GPa = _eec_pressure(
         V=config.V_ref,
         e_el_correction_param=e_el_correction_param_opt,
-        correction_type=config.type
+        correction_type=config.reference_state_forcing,
+        cold_curve=cold_curve,
+        baseline_cold_curve=baseline_cold_curve,
+        baseline_curve_type=config.baseline_curve_type,
     ) * (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
 
-    if p_eec_GPa < config.pressure_min_GPa or p_eec_GPa > config.pressure_max_GPa:
+    if p_eec_GPa < config.min_forcing_pressure_GPa or p_eec_GPa > config.max_forcing_pressure_GPa:
         raise ValueError(
             f"Evaluated EEC pressure {p_eec_GPa:.4f} GPa is outside the allowed bounds "
-            f"[{config.pressure_min_GPa}, {config.pressure_max_GPa}] GPa."
+            f"[{config.min_forcing_pressure_GPa}, {config.max_forcing_pressure_GPa}] GPa."
         )
         
     return float(e_el_correction_param_opt)
@@ -340,17 +590,28 @@ def _eec_param(
 class EEC:
     """
     Empirical Electronic Energy Correction (EEC) data and evaluation.
-                                    
+
     Empirical electronic energy correction applied
     to enforce known reference volume (V_ref)
     at reference temperature (T_ref). The EEC contribution
     is added to the crystal electronic energy (E_el_crystal)
     and accounted for in all thermodynamic functions derived
-    from E_el_crystal. Two types of ECC are implemented:
-                                   
-    (1) linear: E_el_crystal(corrected) = E_el_crystal + param * V
-    (2) inverse_volume: E_el_crystal(corrected) = E_el_crystal + param / V
-                                   
+    from E_el_crystal. Three types of EEC are implemented:
+
+    (1) linear: E_corr(V) = param * (V - V_ref)
+    (2) inverse_volume: E_corr(V) = param / V
+    (3) rigid_shift: E_corr(V) = E_el(V - DeltaV) - E_el(V)
+        where DeltaV is determined such that dG/dV = 0 at (V_ref, T_ref, p_ref).
+        This corresponds to a rigid translation of the cold curve
+        by DeltaV along the volume axis. The param field stores DeltaV.
+
+    Fields:
+    - cold_curve: Dictionary containing the equation of state fit and derived 
+      properties (E0, V0, B0) of the uncorrected electronic energy surface.
+    - baseline_cold_curve: Optional dictionary containing a customized 3rd-order 
+      polynomial baseline. If `config.override_baseline_curve` is true, this curve 
+      is considered as the baseline on which empirical corrections are applied.
+
     Literature with definitions:
     1. A. Otero-de-la-Roza and V. Lunana, Treatment of first-principles data
        for predictive quasiharmonic thermodynamics of solids: The case of MgO
@@ -361,10 +622,37 @@ class EEC:
     3. X. Bidault and S. Chaudhuri, Improved predictions of thermomechanical properties of
        molecular crystals from energy and dispersion corrected DFT,
        J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
-                                   
     """
     config: EECConfig
     param: float
+    V_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
+    E_el_raw_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
+    F_vib_sampled: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
+    cold_curve: dict | None = None
+    baseline_cold_curve: dict | None = None
+
+    def __post_init__(self):
+        #
+        # Reconstruct cold_curve if missing (e.g. after loading from HDF5)
+        #
+        if self.is_enabled and self.cold_curve is None:
+             if len(self.V_sampled) > 0 and len(self.E_el_raw_sampled) > 0:
+                 self.cold_curve = mbe_automation.dynamics.harmonic.eos.cold_curve(
+                     V=self.V_sampled,
+                     E_el=self.E_el_raw_sampled,
+                 )
+        if self.is_enabled and self.config.override_baseline_curve and self.baseline_cold_curve is None:
+             E0 = (
+                 self.config.baseline_E0_kJ_mol_unit_cell 
+                 if self.config.baseline_E0_kJ_mol_unit_cell is not None 
+                 else self.cold_curve["E0 (kJ∕mol∕unit cell)"]
+             )
+             self.baseline_cold_curve = mbe_automation.dynamics.harmonic.eos.baseline_cold_curve(
+                 V0=self.config.baseline_V0,
+                 B0_GPa=self.config.baseline_B0_GPa,
+                 B0_prime=self.config.baseline_B0_prime,
+                 E0=E0,
+             )
 
     @property
     def is_enabled(self) -> bool:
@@ -386,7 +674,10 @@ class EEC:
             V=V,
             V_ref=self.config.V_ref,
             e_el_correction_param=self.param,
-            correction_type=self.config.type
+            correction_type=self.config.reference_state_forcing,
+            cold_curve=self.cold_curve,
+            baseline_cold_curve=self.baseline_cold_curve,
+            baseline_curve_type=self.config.baseline_curve_type,
         )
 
     def evaluate_pressure(self, V: float | npt.NDArray[np.float64]) -> float | npt.NDArray[np.float64]:
@@ -410,7 +701,10 @@ class EEC:
         dEdV = _eec_pressure(
             V=V,
             e_el_correction_param=self.param,
-            correction_type=self.config.type
+            correction_type=self.config.reference_state_forcing,
+            cold_curve=self.cold_curve,
+            baseline_cold_curve=self.baseline_cold_curve,
+            baseline_curve_type=self.config.baseline_curve_type,
         )
         kJ_mol_Angs3_to_GPa = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
         return dEdV * kJ_mol_Angs3_to_GPa
@@ -419,30 +713,73 @@ class EEC:
     def from_sampled_eos_curve(
         cls,
         V_sampled: npt.NDArray[np.float64],
-        G_sampled: npt.NDArray[np.float64],
+        G_raw_sampled: npt.NDArray[np.float64],
+        E_el_raw_sampled: npt.NDArray[np.float64],
         config: EECConfig,
         unit_cell_type: Literal["primitive", "conventional"],
         n_atoms_primitive_cell: int,
         n_atoms_conventional_cell: int,
+        F_vib_sampled: npt.NDArray[np.float64],
     ) -> "EEC":
         if unit_cell_type not in ["primitive", "conventional"]:
             raise ValueError(f"unit_cell_type must be either 'primitive' or 'conventional', got '{unit_cell_type}'")
-        
+
         if not config.is_enabled:
             return cls(config=config, param=0.0)
             
         scaled_config = deepcopy(config)
         
         if config.cell == "conventional" and unit_cell_type == "primitive":
-             scaled_config.V_ref = config.V_ref * (n_atoms_primitive_cell / n_atoms_conventional_cell)
+             if config.V_ref is not None:
+                 scaled_config.V_ref = config.V_ref * (n_atoms_primitive_cell / n_atoms_conventional_cell)
+             if config.baseline_V0 is not None:
+                 scaled_config.baseline_V0 = config.baseline_V0 * (n_atoms_primitive_cell / n_atoms_conventional_cell)
+             if config.baseline_E0_kJ_mol_unit_cell is not None:
+                 scaled_config.baseline_E0_kJ_mol_unit_cell = config.baseline_E0_kJ_mol_unit_cell * (n_atoms_primitive_cell / n_atoms_conventional_cell)
              scaled_config.cell = "primitive"
         elif config.cell == "primitive" and unit_cell_type == "conventional":
-             scaled_config.V_ref = config.V_ref * (n_atoms_conventional_cell / n_atoms_primitive_cell)
+             if config.V_ref is not None:
+                 scaled_config.V_ref = config.V_ref * (n_atoms_conventional_cell / n_atoms_primitive_cell)
+             if config.baseline_V0 is not None:
+                 scaled_config.baseline_V0 = config.baseline_V0 * (n_atoms_conventional_cell / n_atoms_primitive_cell)
+             if config.baseline_E0_kJ_mol_unit_cell is not None:
+                 scaled_config.baseline_E0_kJ_mol_unit_cell = config.baseline_E0_kJ_mol_unit_cell * (n_atoms_conventional_cell / n_atoms_primitive_cell)
              scaled_config.cell = "conventional"
+
+        cc = mbe_automation.dynamics.harmonic.eos.cold_curve(
+            V=V_sampled,
+            E_el=E_el_raw_sampled,
+        )
+
+        bcc = None
+        if scaled_config.override_baseline_curve:
+            bcc = mbe_automation.dynamics.harmonic.eos.baseline_cold_curve(
+                V0=scaled_config.baseline_V0,
+                B0_GPa=scaled_config.baseline_B0_GPa,
+                B0_prime=scaled_config.baseline_B0_prime,
+                E0=(
+                    scaled_config.baseline_E0_kJ_mol_unit_cell 
+                    if scaled_config.baseline_E0_kJ_mol_unit_cell is not None 
+                    else cc["E0 (kJ∕mol∕unit cell)"]
+                )
+            )
 
         param = _eec_param(
             V_sampled=V_sampled,
-            G_sampled=G_sampled,
-            config=scaled_config
+            G_raw_sampled=G_raw_sampled,
+            E_el_raw_sampled=E_el_raw_sampled,
+            F_vib_sampled=F_vib_sampled,
+            config=scaled_config,
+            cold_curve=cc,
+            baseline_cold_curve=bcc,
         )
-        return cls(config=scaled_config, param=param)
+
+        return cls(
+            config=scaled_config,
+            param=param,
+            V_sampled=V_sampled,
+            E_el_raw_sampled=E_el_raw_sampled,
+            F_vib_sampled=F_vib_sampled,
+            cold_curve=cc,
+            baseline_cold_curve=bcc,
+        )

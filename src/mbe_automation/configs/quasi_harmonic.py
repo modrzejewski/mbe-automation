@@ -56,7 +56,7 @@ class FreeEnergy:
                                    #    molecular crystals from energy and dispersion corrected DFT,
                                    #    J. Chem. Phys. 154, 164105 (2021); doi: 10.1063/5.0041511
                                    #
-    electronic_energy_correction: EEC = field(default_factory=lambda: EEC(type="none"))
+    electronic_energy_correction: EEC = field(default_factory=lambda: EEC(reference_state_forcing="none"))
                                    #
                                    # Debye model for equilibrium cell volume extrapolation/interpolation.
                                    # Use if G(V, p) is flat or the minimum is outside the sampled volume range.
@@ -338,13 +338,20 @@ class FreeEnergy:
             if np.any(diffs < 1.0E-5):
                  raise ValueError("Numerically close temperatures detected in temperatures_K.")
         
-        if self.electronic_energy_correction.is_enabled:
+        if self.electronic_energy_correction.enforce_reference_state:
             if not np.any(np.isclose(self.temperatures_K, self.electronic_energy_correction.T_ref, atol=1.0E-5)):
                 self.temperatures_K = np.sort(np.append(self.temperatures_K, self.electronic_energy_correction.T_ref))
                 print(
                     f"INFO: Added T={self.electronic_energy_correction.T_ref:.4g} K to temperatures_K. "
                     f"The electronic energy correction requires its reference temperature "
                     f"(EECConfig.T_ref) to be present in the temperature grid."
+                )
+            if not np.isclose(self.electronic_energy_correction.p_ref_GPa, self.pressure_GPa, atol=1.0E-5):
+                raise ValueError(
+                    f"EECConfig.p_ref_GPa ({self.electronic_energy_correction.p_ref_GPa:.6g} GPa) "
+                    f"does not match FreeEnergy.pressure_GPa ({self.pressure_GPa:.6g} GPa). "
+                    f"The reference pressure used for the EEC must equal the external pressure "
+                    f"of the workflow."
                 )
             if self.equation_of_state != "spline":
                 raise ValueError("Electronic energy correction is only supported with the 'spline' equation of state.")

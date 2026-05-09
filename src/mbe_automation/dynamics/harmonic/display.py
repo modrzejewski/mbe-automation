@@ -245,27 +245,25 @@ def band_structure(
     )
 
 
-def eos_curves(
-    dataset: str,
-    key: str,
+def _eos_curves(
+    eos: mbe_automation.storage.core.EOSCurves,
     save_path: str | None = None,
     n_molecules_per_cell: int | None = None,
     max_temp_ticks: int = 10,
     debye_model: DebyeModel | None = None,
+    cold_curve: dict | None = None,
 ):
-    
-    eos = mbe_automation.storage.read_eos_curves(
-        dataset,
-        key
-    )
+
     n_temperatures = len(eos.temperatures)
 
     if n_molecules_per_cell:
         scaling_factor = 1.0 / n_molecules_per_cell
-        y_label = "Gibbs free energy (kJ∕mol∕molecule)"
+        y_label = "G (kJ∕mol∕molecule)"
+        y_label_cold = "$E^{\\mathrm{el}}$ (kJ∕mol∕molecule)"
     else:
         scaling_factor = 1.0
-        y_label = "Gibbs free energy (kJ∕mol∕unit cell)"
+        y_label = "G (kJ∕mol∕unit cell)"
+        y_label_cold = "$E^{\\mathrm{el}}$ (kJ∕mol∕unit cell)"
 
     G_sampled_scaled = eos.G_sampled * scaling_factor
     G_interp_scaled = eos.G_interp * scaling_factor
@@ -275,7 +273,27 @@ def eos_curves(
     if np.any(~np.isnan(G_min_scaled)):
         G_min_global = min(G_min_global, np.nanmin(G_min_scaled))
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    if cold_curve is not None:
+        interp_E_el = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"]
+        poly_approx = cold_curve["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"]
+        bm_approx = cold_curve["E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)"]
+        V_accurate = cold_curve["V_sampled (Å³∕unit cell)"]
+        E_el_accurate = cold_curve["E_el_crystal_sampled (kJ∕mol∕unit cell)"]
+        V0_cold = cold_curve["V0 (Å³∕unit cell)"]
+        B0_cold = cold_curve["B0 (GPa)"]
+        dB0dP_cold = cold_curve["dB0dP"]
+        
+        E_el_interp_scaled = interp_E_el(eos.V_interp) * scaling_factor
+        E_el_min_scaled = interp_E_el(V0_cold) * scaling_factor
+        E_el_approx_scaled = poly_approx(eos.V_interp) * scaling_factor
+        E_el_bm_scaled = bm_approx(eos.V_interp) * scaling_factor
+        
+        fig, (ax, ax_cold) = plt.subplots(2, 1, figsize=(8, 10), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
+        fig.subplots_adjust(hspace=0.05)
+    else:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax_cold = None
+
     cmap = plt.get_cmap("plasma")
     norm = mcolors.Normalize(vmin=np.min(eos.temperatures), vmax=np.max(eos.temperatures))
 
@@ -311,8 +329,88 @@ def eos_curves(
         color="black",
         linestyle="--",
         marker="x",
-        label="EOS equilibrium path",
+        label="G minimum",
     )
+
+    if cold_curve is not None and ax_cold is not None:
+        label_interp = "Cubic spline"
+        ax_cold.plot(
+            eos.V_interp,
+            E_el_interp_scaled - E_el_min_scaled,
+            color="black",
+            linestyle="-",
+            label=label_interp,
+        )
+        ax_cold.scatter(
+            V_accurate,
+            (E_el_accurate * scaling_factor) - E_el_min_scaled,
+            color="black",
+            marker="o",
+            facecolors="none"
+        )
+        label_approx = "3rd-order polynomial"
+        ax_cold.plot(
+            eos.V_interp,
+            E_el_approx_scaled - E_el_min_scaled,
+            color="tab:red",
+            linestyle=":",
+            linewidth=2,
+            label=label_approx,
+        )
+        
+        label_bm = "Birch-Murnaghan"
+        ax_cold.plot(
+            eos.V_interp,
+            E_el_bm_scaled - E_el_min_scaled,
+            color="tab:blue",
+            linestyle="-.",
+            linewidth=2,
+            label=label_bm,
+        )
+            
+        ax_cold.axvline(
+            x=V0_cold,
+            ymin=0.0,
+            ymax=0.5,
+            color="dimgray",
+            linestyle="--",
+            linewidth=1.0,
+        )
+        ax_cold.text(
+            x=V0_cold + (np.nanmax(eos.V_interp) - np.nanmin(eos.V_interp)) * 0.015,
+            y=0.5,
+            s=f"$V_0$ = {V0_cold:.1f} $\\mathrm{{\\AA}}^3$\n$B_0$ = {B0_cold:.1f} GPa\n$B_0^\\prime$ = {dB0dP_cold:.1f}",
+            color="black",
+            fontsize=10,
+            verticalalignment="top",
+            horizontalalignment="left",
+            transform=ax_cold.get_xaxis_transform()
+        )
+
+    raw_spline = cold_curve.get("E_el_crystal_raw_spline (kJ∕mol∕unit cell)")
+    V0_raw = cold_curve.get("E_el_crystal_raw_V0 (Å³∕unit cell)")
+    if raw_spline is not None and ax_cold is not None:
+        E_el_raw_interp = raw_spline(eos.V_interp) * scaling_factor
+        E_el_raw_min = np.min(E_el_raw_interp)
+        ax_cold.plot(
+            eos.V_interp,
+            E_el_raw_interp - E_el_raw_min,
+            color="gray",
+            linestyle=":",
+            linewidth=1.5,
+            label="Unaltered MLIP",
+        )
+        if V0_raw is not None:
+            dV = V0_cold - V0_raw
+            E_el_raw_hshifted = (raw_spline(eos.V_interp - dV) - raw_spline(V0_raw)) * scaling_factor
+            ax_cold.plot(
+                eos.V_interp,
+                E_el_raw_hshifted,
+                color="olive",
+                linestyle=":",
+                linewidth=1.5,
+                label="Unaltered MLIP shifted to $V_0$",
+            )
 
     if debye_model is not None and debye_model.initialized:
         V_debye, _ = debye_model.predict(eos.temperatures)
@@ -326,14 +424,37 @@ def eos_curves(
             color="tab:blue",
             linestyle="--",
             marker="x",
-            label="Debye model path",
+            label="Debye model",
         )
-    ax.legend()
-    ax.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
+
+    ax.legend(
+        frameon=True,
+        edgecolor="black",
+        fancybox=False,
+        fontsize=10,
+    )
     ax.set_ylabel(y_label, fontsize=14)
     ax.grid(True, linestyle="--", alpha=0.6)
     ax.tick_params(labelsize=12)
     ax.set_ylim(bottom=0)
+
+    if ax_cold is not None:
+        ax_cold.legend(
+            fontsize=10,
+            loc="upper center",
+            bbox_to_anchor=(V0_cold, 0.98),
+            bbox_transform=ax_cold.get_xaxis_transform(),
+            frameon=True,
+            edgecolor="black",
+            fancybox=False,
+        )
+        ax_cold.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
+        ax_cold.set_ylabel(y_label_cold, fontsize=14)
+        ax_cold.grid(True, linestyle="--", alpha=0.6)
+        ax_cold.tick_params(labelsize=12)
+        ax_cold.set_ylim(bottom=0)
+    else:
+        ax.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
 
     if n_temperatures > 1:
         ax2 = ax.twinx()
@@ -360,6 +481,31 @@ def eos_curves(
         plt.close(fig)
     else:
         return fig
+
+
+def eos_curves(
+    eos: mbe_automation.storage.core.EOSCurves | None = None,
+    dataset: str | None = None,
+    key: str | None = None,
+    save_path: str | None = None,
+    n_molecules_per_cell: int | None = None,
+    max_temp_ticks: int = 10,
+    debye_model: DebyeModel | None = None,
+    cold_curve: dict | None = None,
+):
+    if eos is None:
+        if dataset is None or key is None:
+            raise ValueError("Either 'eos' or both 'dataset' and 'key' must be provided.")
+        eos = mbe_automation.storage.read_eos_curves(dataset, key)
+
+    return _eos_curves(
+        eos=eos,
+        save_path=save_path,
+        n_molecules_per_cell=n_molecules_per_cell,
+        max_temp_ticks=max_temp_ticks,
+        debye_model=debye_model,
+        cold_curve=cold_curve,
+    )
 
 
 def compare_Debye_vs_G_min(

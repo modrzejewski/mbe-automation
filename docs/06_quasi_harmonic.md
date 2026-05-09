@@ -71,17 +71,22 @@ mbe_automation.run(properties_config)
 
 ## Empirical Electronic Energy Correction (EEC)
 
-The Empirical Electronic Energy Correction (EEC) option can be applied to enforce a known reference volume ($V_{\text{ref}}$) for a specific unit cell geometry (either primitive or conventional) at a specific reference temperature ($T_{\text{ref}}$). The EEC contribution is added to the crystal's electronic energy and accounted for in all derived thermodynamic functions.
+EEC provides two independent capabilities that can be used separately or together:
 
-Two types of EEC are supported:
-1.  **Linear**: $E_{\text{el,corrected}} = E_{\text{el}} + \text{param} \cdot (V - V_{\text{ref}})$
-2.  **Inverse Volume**: $E_{\text{el,corrected}} = E_{\text{el}} + \text{param} / V$
+1. **Reference state forcing** — adds an empirical term to enforce a known reference volume ($V_{\text{ref}}$) at a specific reference temperature ($T_{\text{ref}}$). Three correction types are supported:
+   - **Linear**: $E_{\text{corr}}(V) = \text{param} \cdot (V - V_{\text{ref}})$
+   - **Inverse volume**: $E_{\text{corr}}(V) = \text{param} / V$
+   - **Rigid shift**: $E_{\text{corr}}(V) = E_{\text{el}}(V - \Delta V) - E_{\text{el}}(V)$, where $\Delta V$ is chosen so that $\mathrm{d}G/\mathrm{d}V = 0$ at ($V_\text{ref}$, $T_\text{ref}$, $p_\text{ref}$). This corresponds to a rigid translation of the static cold curve along the volume axis.
 
-The parameter (`param`) is calculated analytically using a cubic spline fit of the raw Gibbs free energy vs. volume curve to ensure the corrected equilibrium volume matches $V_{\text{ref}}$ at $T_{\text{ref}}$.
+   The `param` (or $\Delta V$ for rigid shift) is determined analytically from a cubic spline fit of the raw Gibbs free energy vs. volume curve.
 
-To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the [`EEC`](./03_configuration_classes.md#eec-class) dataclass from `mbe_automation.configs.quasi_harmonic`.
+2. **External baseline substitution** — replaces the MLIP static cold curve with an external baseline built from user-supplied EOS parameters (`baseline_V0`, `baseline_B0_GPa`, `baseline_B0_prime`). The functional form is controlled by `baseline_curve_type`: Birch–Murnaghan EOS (default) or a 3rd-order Taylor polynomial around $V_0$. Useful when the MLIP static cold curve should be replaced by an external source, e.g. a high-level DFT or coupled-cluster curve. Can be used with `reference_state_forcing="none"` to substitute the curve without any additional empirical forcing.
 
-The equation of state must be set to `"spline"` (which is the default) to use the EEC option. Additionally, $T_{\text{ref}}$ must be present in the `temperatures_K` array.
+The EEC contribution is added to the crystal's electronic energy and propagated into all derived thermodynamic functions. To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the [`EEC`](./03_configuration_classes.md#eec-class) dataclass from `mbe_automation.configs.quasi_harmonic`.
+
+The equation of state must be set to `"spline"` (which is the default) to use the EEC option. When using reference state forcing, $T_{\text{ref}}$ must be present in the `temperatures_K` array.
+
+### Reference state forcing example
 
 ```python
 import numpy as np
@@ -115,9 +120,9 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 
-    # Enable EEC targeting a reference conventional cell volume of 145.80 A^3 at 123 K
+    # Enforce the experimental conventional cell volume at 123 K
     electronic_energy_correction=EEC(
-        type="inverse_volume",
+        reference_state_forcing="inverse_volume",
         T_ref=123.0,
         V_ref=145.80,
         cell="conventional"
@@ -128,13 +133,81 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 mbe_automation.run(properties_config)
 ```
 
+### External baseline substitution example
+
+When high-level reference EOS parameters are available (e.g. from DFT or coupled-cluster calculations), the MLIP static cold curve can be replaced with an analytical baseline built from user-supplied $V_0$, $B_0$, and $B_0'$ values. Setting `reference_state_forcing="none"` substitutes the electronic baseline without applying any additional empirical correction — the equilibrium volume is determined entirely by the phonon free energy on top of the external curve.
+
+```python
+import numpy as np
+from mbe_automation.calculators import MACE
+
+import mbe_automation.configs
+from mbe_automation.configs.structure import Minimum
+from mbe_automation.configs.quasi_harmonic import EEC
+from mbe_automation import Structure
+
+xyz_solid = "path/to/your/solid.xyz"
+xyz_molecule = "path/to/your/molecule.xyz"
+
+mace_calc = MACE(model_path="path/to/your/mace.model")
+
+relaxation_config = Minimum(
+    cell_relaxation="constant_volume",
+    max_force_on_atom_eV_A=1.0E-4
+)
+
+# EOS parameters from a precomputed high-level reference (e.g. DFT-D4)
+# All values refer to the conventional cell
+DFT_V0_A3       = 143.50   # Å³/unit cell
+DFT_B0_GPa      = 12.4     # GPa
+DFT_B0_prime    = 6.2      # dimensionless
+
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
+    model_name="mace",
+    crystal=Structure.from_xyz_file(xyz_solid),
+    molecule=Structure.from_xyz_file(xyz_molecule),
+    temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
+    calculator=mace_calc,
+    supercell_radius=25.0,
+    dataset="properties.hdf5",
+    relaxation=relaxation_config,
+    volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
+
+    # Replace the MLIP cold curve with the precomputed EOS; no empirical forcing
+    electronic_energy_correction=EEC(
+        reference_state_forcing="none",
+        baseline_V0=DFT_V0_A3,
+        baseline_B0_GPa=DFT_B0_GPa,
+        baseline_B0_prime=DFT_B0_prime,
+        cell="conventional"
+    ),
+    equation_of_state="spline"  # Required for EEC
+)
+
+mbe_automation.run(properties_config)
+```
+
+To combine external baseline substitution with reference state forcing, simply set `reference_state_forcing` to a value other than `"none"` alongside the baseline parameters:
+
+```python
+electronic_energy_correction=EEC(
+    reference_state_forcing="inverse_volume",
+    T_ref=123.0,
+    V_ref=145.80,
+    cell="conventional",
+    baseline_V0=DFT_V0_A3,
+    baseline_B0_GPa=DFT_B0_GPa,
+    baseline_B0_prime=DFT_B0_prime,
+)
+```
+
 ## Debye Model Volumes
 
 By default, the equilibrium volume at each temperature is obtained by minimizing the Gibbs free energy G(V) fitted with an equation of state (`volume_curve="eos_minimum"`). At high temperatures the G(V) surface can become very flat, making the fitted minimum noisy or unreliable. In such cases, the Debye model provides a physically motivated, smooth alternative.
 
 The Debye model expresses V(T) analytically as:
 
-$$V(T) = V_0 + C \cdot T \cdot D_3\!\left(\frac{\Theta_D}{T}\right)$$
+$$V(T) = V_0 + C \cdot T \cdot D_3\left(\frac{\Theta_D}{T}\right)$$
 
 where $D_3$ is the third-order Debye function and $V_0$, $\Theta_D$, $C$ are three parameters fitted to the reliable low-temperature EOS-minimum volumes. The model is then extrapolated to the full temperature range. See Ko et al., *Phys. Rev. Materials* 2, 055603 (2018) for details.
 
@@ -150,7 +223,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 )
 ```
 
-The max_fit_temperature_K parameter (default: 200.0 K) defines the trust region: only EOS-minimum volumes at temperatures below this threshold are used. Requires at least 3 points.
+The `max_fit_temperature_K` parameter (default: 200.0 K) defines the trust region: only EOS-minimum volumes at temperatures below this threshold are used. Requires at least 3 points.
 
 For more details on its configuration, see the [`DebyeModel` class documentation](03_configuration_classes.md#debyemodel-class).
 
@@ -292,7 +365,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 
     # Enable EEC targeting a reference conventional cell volume of 145.80 A^3 at 123 K
     electronic_energy_correction=EEC(
-        type="inverse_volume",
+        reference_state_forcing="inverse_volume",
         T_ref=123.0,
         V_ref=145.80,
         cell="conventional"
