@@ -744,56 +744,57 @@ def _save_eec(group: h5py.Group, eec) -> None:
     group.attrs["dataclass"] = "EEC"
     group.attrs["reference_state_forcing"] = eec.config.reference_state_forcing
     group.attrs["p_ref (GPa)"] = eec.config.p_ref_GPa
-    
-    if eec.config.is_enabled:
+    group.attrs["electronic_energy_source"] = eec.electronic_energy_source
+    group.attrs["param_mlip"] = eec.param_mlip
+    if eec.param_external is not None:
+        group.attrs["param_external"] = eec.param_external
+
+    if eec.is_enabled:
         if eec.config.T_ref is not None:
             group.attrs["T_ref (K)"] = eec.config.T_ref
         if eec.config.V_ref is not None:
-            group.attrs["V_ref (Å³∕unit cell)"] = eec.config.V_ref
+            group.attrs["V_ref (Å³∕unit cell)"] = eec.config.V_ref
         group.attrs["cell"] = eec.config.cell
         group.attrs["min_forcing_pressure (GPa)"] = eec.config.min_forcing_pressure_GPa
         group.attrs["max_forcing_pressure (GPa)"] = eec.config.max_forcing_pressure_GPa
-        
+
         if eec.config.override_baseline_curve:
-            group.attrs["baseline_V0 (Å³∕unit cell)"] = eec.config.baseline_V0
+            group.attrs["baseline_V0 (Å³∕unit cell)"] = eec.config.baseline_V0
             group.attrs["baseline_B0 (GPa)"] = eec.config.baseline_B0_GPa
             group.attrs["baseline_B0_prime"] = eec.config.baseline_B0_prime
             if eec.config.baseline_E0_kJ_mol_unit_cell is not None:
                 group.attrs["baseline_E0 (kJ∕mol∕unit cell)"] = eec.config.baseline_E0_kJ_mol_unit_cell
-            
-        if eec.config.reference_state_forcing == "linear":
-            group.attrs["param (kJ∕mol∕Å³)"] = eec.param
-        elif eec.config.reference_state_forcing == "inverse_volume":
-            group.attrs["param (kJ∕mol⋅Å³)"] = eec.param
-        elif eec.config.reference_state_forcing == "rigid_shift":
-            group.attrs["param (Å³∕unit cell)"] = eec.param
-        else:
-            group.attrs["param"] = eec.param
-            
-        group.create_dataset("V_sampled (Å³∕unit cell)", data=eec.V_sampled)
-        group.create_dataset("E_el_raw_sampled (kJ∕mol∕unit cell)", data=eec.E_el_raw_sampled)
-        group.create_dataset("F_vib_sampled (kJ∕mol∕unit cell)", data=eec.F_vib_sampled)
-    else:
-        group.attrs["param"] = eec.param
 
+        group.create_dataset("V_sampled (Å³∕unit cell)", data=eec.V_sampled)
+        group.create_dataset("E_el_mlip (kJ∕mol∕unit cell)", data=eec.E_el_mlip)
+        group.create_dataset("F_vib_mlip (kJ∕mol∕unit cell)", data=eec.F_vib_mlip)
+        if eec.E_el_mlip_corrected is not None:
+            group.create_dataset("E_el_mlip_corrected (kJ∕mol∕unit cell)", data=eec.E_el_mlip_corrected)
+        if eec.E_el_external is not None:
+            group.create_dataset("E_el_external (kJ∕mol∕unit cell)", data=eec.E_el_external)
+        if eec.E_el_external_corrected is not None:
+            group.create_dataset("E_el_external_corrected (kJ∕mol∕unit cell)", data=eec.E_el_external_corrected)
 
 def _read_eec(group: h5py.Group):
     """Read an EEC instance from the provided group."""
     from mbe_automation.dynamics.harmonic.eec import EECConfig, EEC
     reference_state_forcing = group.attrs["reference_state_forcing"]
-    
-    baseline_V0 = group.attrs.get("baseline_V0 (Å³∕unit cell)")
+    electronic_energy_source = group.attrs.get("electronic_energy_source", "none")
+    param_mlip = float(group.attrs.get("param_mlip", 0.0))
+    param_external = float(group.attrs["param_external"]) if "param_external" in group.attrs else None
+
+    baseline_V0 = group.attrs.get("baseline_V0 (Å³∕unit cell)")
     baseline_B0_GPa = group.attrs.get("baseline_B0 (GPa)")
     baseline_B0_prime = group.attrs.get("baseline_B0_prime")
     baseline_E0_kJ_mol_unit_cell = group.attrs.get("baseline_E0 (kJ∕mol∕unit cell)")
-    
+
     is_enabled = reference_state_forcing != "none" or baseline_V0 is not None
-    
+
     if is_enabled:
         eec_config = EECConfig(
             reference_state_forcing=reference_state_forcing,
             T_ref=group.attrs.get("T_ref (K)"),
-            V_ref=group.attrs.get("V_ref (Å³∕unit cell)"),
+            V_ref=group.attrs.get("V_ref (Å³∕unit cell)"),
             p_ref_GPa=float(group.attrs["p_ref (GPa)"]),
             cell=group.attrs.get("cell", "conventional"),
             min_forcing_pressure_GPa=group.attrs.get("min_forcing_pressure (GPa)", -5.0),
@@ -803,31 +804,41 @@ def _read_eec(group: h5py.Group):
             baseline_B0_prime=baseline_B0_prime,
             baseline_E0_kJ_mol_unit_cell=baseline_E0_kJ_mol_unit_cell,
         )
-        if reference_state_forcing == "linear":
-            param = group.attrs["param (kJ∕mol∕Å³)"]
-        elif reference_state_forcing == "inverse_volume":
-            param = group.attrs["param (kJ∕mol⋅Å³)"]
-        elif reference_state_forcing == "rigid_shift":
-            param = group.attrs["param (Å³∕unit cell)"]
-        else:
-            param = group.attrs["param"]
-            
-        V_sampled = group["V_sampled (Å³∕unit cell)"][:]
-        E_el_raw_sampled = group["E_el_raw_sampled (kJ∕mol∕unit cell)"][:]
-        F_vib_sampled = group["F_vib_sampled (kJ∕mol∕unit cell)"][:]
+        V_sampled = group["V_sampled (Å³∕unit cell)"][:]
+        E_el_mlip = group["E_el_mlip (kJ∕mol∕unit cell)"][:]
+        F_vib_mlip = group["F_vib_mlip (kJ∕mol∕unit cell)"][:]
+        E_el_mlip_corrected = (
+            group["E_el_mlip_corrected (kJ∕mol∕unit cell)"][:]
+            if "E_el_mlip_corrected (kJ∕mol∕unit cell)" in group else None
+        )
+        E_el_external = (
+            group["E_el_external (kJ∕mol∕unit cell)"][:]
+            if "E_el_external (kJ∕mol∕unit cell)" in group else None
+        )
+        E_el_external_corrected = (
+            group["E_el_external_corrected (kJ∕mol∕unit cell)"][:]
+            if "E_el_external_corrected (kJ∕mol∕unit cell)" in group else None
+        )
     else:
         eec_config = EECConfig(reference_state_forcing="none")
-        param = group.attrs["param"]
         V_sampled = np.array([], dtype=np.float64)
-        E_el_raw_sampled = np.array([], dtype=np.float64)
-        F_vib_sampled = np.array([], dtype=np.float64)
-        
+        E_el_mlip = np.array([], dtype=np.float64)
+        F_vib_mlip = np.array([], dtype=np.float64)
+        E_el_mlip_corrected = None
+        E_el_external = None
+        E_el_external_corrected = None
+
     return EEC(
-        config=eec_config, 
-        param=param, 
-        V_sampled=V_sampled, 
-        E_el_raw_sampled=E_el_raw_sampled,
-        F_vib_sampled=F_vib_sampled,
+        config=eec_config,
+        electronic_energy_source=electronic_energy_source,
+        param_mlip=param_mlip,
+        param_external=param_external,
+        V_sampled=V_sampled,
+        E_el_mlip=E_el_mlip,
+        E_el_mlip_corrected=E_el_mlip_corrected,
+        E_el_external=E_el_external,
+        E_el_external_corrected=E_el_external_corrected,
+        F_vib_mlip=F_vib_mlip,
     )
 
 

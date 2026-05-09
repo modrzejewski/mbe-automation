@@ -83,7 +83,7 @@ def MethodDependentKeywords(Method):
         RegexStrings = keywords.rPT2_REGEX_STRINGS
         ExtrapolatedComponents = keywords.rPT2_EXTRAPOLATED_COMPONENTS
         TotalEnergySum = keywords.rPT2_TOTAL_ENERGY_SUM
-    elif Method == "JCTC2024" or Method == "ph-RPA(3)":
+    elif Method == "JCTC2024" or Method == "ph-RPA(3)" or Method == "RPA+ph":
         EnergyComponents = keywords.PHRPA3_ENERGY_COMPONENTS
         RegexStrings = keywords.PHRPA3_REGEX_STRINGS
         ExtrapolatedComponents = keywords.PHRPA3_EXTRAPOLATED_COMPONENTS

@@ -389,7 +389,7 @@ def cold_curve(
     }
 
 
-def baseline_cold_curve(
+def external_cold_curve(
     V0: float,
     B0_GPa: float,
     B0_prime: float,
