@@ -641,7 +641,7 @@ class EEC:
 
     @property
     def param(self) -> float:
-        """The empirical parameter for the active energy source."""
+        """Return the empirical parameter for the active energy source."""
         if self.electronic_energy_source == "external" and self.param_external is not None:
             return self.param_external
         return self.param_mlip
