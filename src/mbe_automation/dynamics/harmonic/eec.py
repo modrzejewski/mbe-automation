@@ -523,7 +523,7 @@ def _eec_param(
         return 0.0
 
     if len(V_sampled) < 4:
-        raise ValueError("Need at least 4 points for cubic spline fit to evaluate alpha.")
+        raise ValueError("Need at least 4 points for cubic spline fit to evaluate the EEC parameter.")
 
     sort_idx = np.argsort(V_sampled)
     V_sorted = V_sampled[sort_idx]
