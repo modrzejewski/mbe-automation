@@ -119,23 +119,13 @@ class EOSMetadata:
         self,
     ) -> dict:
         """
-        Build a plot-tailored projection of the available cold curves.
+        Return the cold curves E(V) available for plotting.
 
-        Returns a dict-of-dicts. Each present top-level entry holds a single
-        callable E(V) and the associated equilibrium volume V0:
-
-            {
-              "cold_curve_mlip":               {"E (callable)": <spline>,           "V0 (Å³∕unit cell)": <float>},
-              "cold_curve_mlip_corrected":     {"E (callable)": <spline>,           "V0 (Å³∕unit cell)": <float>},
-              "cold_curve_external":           {"E (callable)": <BM or poly_3>,     "V0 (Å³∕unit cell)": <float>},
-              "cold_curve_external_corrected": {"E (callable)": <BM or poly_3>,     "V0 (Å³∕unit cell)": <float>},
-            }
-
-        For MLIP variants the callable is the cubic spline. For external variants
-        the callable is selected by ``self.eec.config.baseline_curve_type``:
-        ``"birch_murnaghan"`` selects the Birch-Murnaghan fit, ``"polynomial"``
-        selects the 3rd-order polynomial fit. Absent variants are omitted.
-        When ``self.eec`` is disabled, only ``cold_curve_mlip`` is returned.
+        Each entry maps a curve name to a callable E(V) and its equilibrium
+        volume V0. The possible names are ``cold_curve_mlip``,
+        ``cold_curve_mlip_corrected``, ``cold_curve_external``, and
+        ``cold_curve_external_corrected``; curves that were not computed are
+        omitted. When EEC is disabled, only ``cold_curve_mlip`` is returned.
         """
         result: dict = {}
 
