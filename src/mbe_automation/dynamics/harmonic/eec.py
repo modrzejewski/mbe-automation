@@ -403,6 +403,30 @@ def _eec_value(
 
     Returns:
         Energy correction in kJ∕mol (per unit cell of type specified by EECConfig.cell).
+
+    Construction:
+        The returned value is a *delta* of the form
+
+            E_external_base(V) + E_corr(V) − E_mlip_spline(V)
+
+        designed to be added to an existing MLIP energy at V so that the MLIP
+        contribution cancels and the absolute corrected energy collapses to
+
+            E_external_base(V) + E_corr(V)
+
+        which is a smooth analytic curve.
+
+        Because cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"] is an
+        *interpolating* CubicSpline built from the sampled (V_sampled, E_el_mlip)
+        pairs (see eos.cold_curve), the cancellation is exact at the sampled
+        knots: E_el_mlip − E_mlip_spline(V_sampled) ≡ 0 to machine precision.
+
+        Off-grid, smoothness of the corrected energy depends on the caller
+        adding this delta to the MLIP spline value at V (or to a pre-existing
+        MLIP energy that itself came from the same spline at V). The spline
+        used here must therefore remain an interpolating spline; replacing it
+        with a smoothing/regularized fit would silently break the smoothness
+        guarantee at the knots.
     """
     base_cold_curve = baseline_cold_curve if baseline_cold_curve is not None else cold_curve
     use_bm = (
@@ -706,6 +730,15 @@ class EEC:
 
         Returns:
             Energy correction in kJ∕mol (per unit cell of type specified by self.config.cell).
+
+        Note:
+            The returned quantity is a *delta* designed to be added to a
+            pre-existing MLIP energy at the same V. Internally it has the form
+            E_external_base(V) + E_corr(V) − E_mlip_spline(V). When the caller
+            adds it to the MLIP spline value at V (or to any quantity that
+            already carries the MLIP spline contribution at V), the
+            E_mlip_spline term cancels and the result is the smooth corrected
+            energy E_external_base(V) + E_corr(V). See _eec_value for details.
         """
         if not self.is_enabled:
             return np.zeros_like(V) if isinstance(V, np.ndarray) else 0.0
@@ -845,6 +878,10 @@ class EEC:
                 else cold_curve_baseline_external["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"](V_sampled)
             )
 
+        # At V=V_sampled the −E_mlip_spline(V) term inside _eec_value cancels
+        # E_el_mlip exactly (interpolating cubic spline), so this collapses
+        # to E_el_mlip + E_corr(V) — the MLIP cold curve plus the empirical
+        # correction, evaluated at the knots.
         E_el_mlip_corrected = E_el_mlip + _eec_value(
             V=V_sampled,
             V_ref=scaled_config.V_ref,
@@ -857,6 +894,12 @@ class EEC:
 
         E_el_external_corrected = None
         if cold_curve_baseline_external is not None and param_external is not None:
+            # At V=V_sampled the −E_mlip_spline(V) term inside _eec_value
+            # cancels E_el_mlip exactly (interpolating cubic spline), leaving
+            # the smooth result E_external_base(V_sampled) + E_corr(V_sampled).
+            # The construction looks like it adds MLIP-fit residuals on top of
+            # the smooth external baseline, but those residuals are identically
+            # zero at the knots by construction of CubicSpline.
             E_el_external_corrected = E_el_mlip + _eec_value(
                 V=V_sampled,
                 V_ref=scaled_config.V_ref,
