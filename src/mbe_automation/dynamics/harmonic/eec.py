@@ -230,7 +230,7 @@ class EECConfig:
         Reference temperature (K) at which V_ref is enforced. Must appear in
         the temperatures_K array of the FreeEnergy configuration.
     V_ref : float or None
-        Reference volume (Å³ per unit cell of type `cell`) enforced at T_ref.
+        Reference volume (Å³ per unit cell of type `cell`) enforced at T_ref.
         Must lie within the sampled volume range.
     p_ref_GPa : float
         Reference pressure (GPa) used when solving for the rigid_shift parameter.
@@ -244,7 +244,7 @@ class EECConfig:
         Upper pressure bound (GPa) for the EEC correction. An error is raised if
         the required correction exceeds this value.
     baseline_V0 : float or None
-        Equilibrium volume (Å³ per unit cell of type `cell`) of the external
+        Equilibrium volume (Å³ per unit cell of type `cell`) of the external
         baseline static cold curve. Must be set together with baseline_B0_GPa and
         baseline_B0_prime to activate the external baseline substitution.
     baseline_B0_GPa : float or None
@@ -316,9 +316,9 @@ def _ΔE_el_poly_3_rigid_ΔV(
         E(V) = E0 + 1/2*E2*(V-V0)**2 + 1/6*E3*(V-V0)**3
         ΔE(V) = E(V-ΔV) - E(V)
     """
-    V0 = cold_curve["V0 (Å³∕unit cell)"]
-    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
-    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
+    V0 = cold_curve["V0 (Å³∕unit cell)"]
+    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
+    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
     conversion_factor = (ase.units.kJ / ase.units.mol / ase.units.Angstrom**3) / ase.units.GPa
     p_ref_kJ_mol_A3 = p_ref_GPa / conversion_factor
     sort_idx = np.argsort(V_sampled)
@@ -355,9 +355,9 @@ def _ΔE_el_poly_3_rigid_pressure(
         E(V) = E0 + 1/2*E2*(V-V0)**2 + 1/6*E3*(V-V0)**3
         ΔE(V) = E(V-ΔV) - E(V)
     """
-    V0 = cold_curve["V0 (Å³∕unit cell)"]
-    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
-    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
+    V0 = cold_curve["V0 (Å³∕unit cell)"]
+    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
+    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
     return 0.5 * DeltaV * (-2 * E2 + E3 * (DeltaV - 2 * V + 2 * V0))
 
 def _ΔE_el_poly_3_rigid_value(
@@ -372,9 +372,9 @@ def _ΔE_el_poly_3_rigid_value(
         E(V) = E0 + 1/2*E2*(V-V0)**2 + 1/6*E3*(V-V0)**3
         ΔE(V) = E(V-ΔV) - E(V)
     """
-    V0 = cold_curve["V0 (Å³∕unit cell)"]
-    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
-    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
+    V0 = cold_curve["V0 (Å³∕unit cell)"]
+    E2 = cold_curve["E2 (kJ∕mol∕Å⁶)"]
+    E3 = cold_curve["E3 (kJ∕mol∕Å⁹)"]
     dV = V - V0
     return -(1/6) * DeltaV * (
         DeltaV**2 * E3 - 3 * DeltaV * (E2 + E3 * dV) +
@@ -394,12 +394,12 @@ def _eec_value(
     Evaluate the empirical electronic energy correction.
 
     Units:
-        - V: Crystal volume in Å³ (per unit cell of type specified by EECConfig.cell)
-        - V_ref: Reference volume in Å³ (per unit cell of type specified by EECConfig.cell)
+        - V: Crystal volume in Å³ (per unit cell of type specified by EECConfig.cell)
+        - V_ref: Reference volume in Å³ (per unit cell of type specified by EECConfig.cell)
         - e_el_correction_param:
-            * linear: (kJ∕mol) / Å³
-            * inverse_volume: (kJ∕mol) * Å³
-            * rigid_shift: DeltaV in Å³
+            * linear: (kJ∕mol) / Å³
+            * inverse_volume: (kJ∕mol) * Å³
+            * rigid_shift: DeltaV in Å³
 
     Returns:
         Energy correction in kJ∕mol (per unit cell of type specified by EECConfig.cell).
@@ -449,14 +449,14 @@ def _eec_pressure(
     Evaluate the volume derivative of the electronic energy correction.
 
     Units:
-        - V: Crystal volume in Å³ (per unit cell of type specified by EECConfig.cell)
+        - V: Crystal volume in Å³ (per unit cell of type specified by EECConfig.cell)
         - e_el_correction_param:
-            * linear: (kJ∕mol) / Å³
-            * inverse_volume: (kJ∕mol) * Å³
-            * rigid_shift: DeltaV in Å³
+            * linear: (kJ∕mol) / Å³
+            * inverse_volume: (kJ∕mol) * Å³
+            * rigid_shift: DeltaV in Å³
 
     Returns:
-        Derivative of the correction w.r.t volume in (kJ∕mol) / Å³ (per unit cell of type specified by EECConfig.cell).
+        Derivative of the correction w.r.t volume in (kJ∕mol) / Å³ (per unit cell of type specified by EECConfig.cell).
     """
     base_cold_curve = baseline_cold_curve if baseline_cold_curve is not None else cold_curve
     use_bm = (
@@ -466,7 +466,7 @@ def _eec_pressure(
     )
     if baseline_cold_curve is not None:
         if use_bm:
-            dE_base_dV = base_cold_curve["E_el_crystal_birch_murnaghan_deriv (kJ∕mol∕Å³∕unit cell)"](V)
+            dE_base_dV = base_cold_curve["E_el_crystal_birch_murnaghan_deriv (kJ∕mol∕Å³∕unit cell)"](V)
         else:
             dE_base_dV = base_cold_curve["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"].deriv(1)(V)
     else:
@@ -510,12 +510,12 @@ def _eec_param(
     Perform a cubic spline fit of G(V) and find e_el_correction_param analytically.
 
     Units:
-        - V_sampled: Crystal volume in Å³ (per unit cell of type specified by config.cell)
+        - V_sampled: Crystal volume in Å³ (per unit cell of type specified by config.cell)
         - G: Total Gibbs free energy in kJ∕mol (per unit cell of type specified by config.cell)
 
     Resulting parameter units based on correction type (G units / V units):
-        - linear: (kJ∕mol) / Å³
-        - inverse_volume: (kJ∕mol) ⋅ Å³
+        - linear: (kJ∕mol) / Å³
+        - inverse_volume: (kJ∕mol) ⋅ Å³
 
     Note: Output matches the energy scale of G (kJ∕mol per unit cell of type specified by config.cell).
     """
@@ -702,7 +702,7 @@ class EEC:
         Evaluate the empirical electronic energy correction at the given volume(s).
 
         Parameters:
-            V: Crystal volume in Å³ (per unit cell of type specified by self.config.cell).
+            V: Crystal volume in Å³ (per unit cell of type specified by self.config.cell).
 
         Returns:
             Energy correction in kJ∕mol (per unit cell of type specified by self.config.cell).
@@ -727,7 +727,7 @@ class EEC:
         it to Gigapascals (GPa), acting as the analogue of the thermal pressure.
 
         Parameters:
-            V: Crystal volume in Å³ (per unit cell of type specified by self.config.cell).
+            V: Crystal volume in Å³ (per unit cell of type specified by self.config.cell).
 
         Returns:
             Correction pressure in GPa.

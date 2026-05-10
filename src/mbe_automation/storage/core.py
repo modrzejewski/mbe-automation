@@ -753,19 +753,19 @@ def _save_eec(group: h5py.Group, eec) -> None:
         if eec.config.T_ref is not None:
             group.attrs["T_ref (K)"] = eec.config.T_ref
         if eec.config.V_ref is not None:
-            group.attrs["V_ref (Å³∕unit cell)"] = eec.config.V_ref
+            group.attrs["V_ref (Å³∕unit cell)"] = eec.config.V_ref
         group.attrs["cell"] = eec.config.cell
         group.attrs["min_forcing_pressure (GPa)"] = eec.config.min_forcing_pressure_GPa
         group.attrs["max_forcing_pressure (GPa)"] = eec.config.max_forcing_pressure_GPa
 
         if eec.config.override_baseline_curve:
-            group.attrs["baseline_V0 (Å³∕unit cell)"] = eec.config.baseline_V0
+            group.attrs["baseline_V0 (Å³∕unit cell)"] = eec.config.baseline_V0
             group.attrs["baseline_B0 (GPa)"] = eec.config.baseline_B0_GPa
             group.attrs["baseline_B0_prime"] = eec.config.baseline_B0_prime
             if eec.config.baseline_E0_kJ_mol_unit_cell is not None:
                 group.attrs["baseline_E0 (kJ∕mol∕unit cell)"] = eec.config.baseline_E0_kJ_mol_unit_cell
 
-        group.create_dataset("V_sampled (Å³∕unit cell)", data=eec.V_sampled)
+        group.create_dataset("V_sampled (Å³∕unit cell)", data=eec.V_sampled)
         group.create_dataset("E_el_mlip (kJ∕mol∕unit cell)", data=eec.E_el_mlip)
         group.create_dataset("F_vib_mlip (kJ∕mol∕unit cell)", data=eec.F_vib_mlip)
         if eec.E_el_mlip_corrected is not None:
@@ -783,7 +783,7 @@ def _read_eec(group: h5py.Group):
     param_mlip = float(group.attrs.get("param_mlip", 0.0))
     param_external = float(group.attrs["param_external"]) if "param_external" in group.attrs else None
 
-    baseline_V0 = group.attrs.get("baseline_V0 (Å³∕unit cell)")
+    baseline_V0 = group.attrs.get("baseline_V0 (Å³∕unit cell)")
     baseline_B0_GPa = group.attrs.get("baseline_B0 (GPa)")
     baseline_B0_prime = group.attrs.get("baseline_B0_prime")
     baseline_E0_kJ_mol_unit_cell = group.attrs.get("baseline_E0 (kJ∕mol∕unit cell)")
@@ -794,7 +794,7 @@ def _read_eec(group: h5py.Group):
         eec_config = EECConfig(
             reference_state_forcing=reference_state_forcing,
             T_ref=group.attrs.get("T_ref (K)"),
-            V_ref=group.attrs.get("V_ref (Å³∕unit cell)"),
+            V_ref=group.attrs.get("V_ref (Å³∕unit cell)"),
             p_ref_GPa=float(group.attrs["p_ref (GPa)"]),
             cell=group.attrs.get("cell", "conventional"),
             min_forcing_pressure_GPa=group.attrs.get("min_forcing_pressure (GPa)", -5.0),
@@ -804,7 +804,7 @@ def _read_eec(group: h5py.Group):
             baseline_B0_prime=baseline_B0_prime,
             baseline_E0_kJ_mol_unit_cell=baseline_E0_kJ_mol_unit_cell,
         )
-        V_sampled = group["V_sampled (Å³∕unit cell)"][:]
+        V_sampled = group["V_sampled (Å³∕unit cell)"][:]
         E_el_mlip = group["E_el_mlip (kJ∕mol∕unit cell)"][:]
         F_vib_mlip = group["F_vib_mlip (kJ∕mol∕unit cell)"][:]
         E_el_mlip_corrected = (

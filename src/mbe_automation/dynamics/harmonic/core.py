@@ -119,35 +119,56 @@ class EOSMetadata:
         self,
     ) -> dict:
         """
-        Fit the static electronic energy E^el(V) to a third-order polynomial 
-        using proximity weights, and extract V0, B0, and dB0dP.
-        
-        Returns:
-            dict: Dictionary containing:
-                - 'E_el_crystal_poly_3 (kJ∕mol∕unit cell)': Least-squares 3rd-order Polynomial fit of E^el(V).
-                - 'E_el_crystal_spline (kJ∕mol∕unit cell)': CubicSpline interpolation of E^el(V).
-                - 'E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)': Birch-Murnaghan equation of state function.
-                - 'V_sampled (Å³∕unit cell)': Array of sampled volumes.
-                - 'E_el_crystal_sampled (kJ∕mol∕unit cell)': Accurate static electronic energies corresponding to the sampled volumes.
-                - 'V0 (Å³∕unit cell)': Equilibrium volume where E^el is minimized.
-                - 'B0 (GPa)': Bulk modulus at V0.
-                - 'dB0dP': Pressure derivative of the bulk modulus at V0.
+        Build a plot-tailored projection of the available cold curves.
+
+        Returns a dict-of-dicts. Each present top-level entry holds a single
+        callable E(V) and the associated equilibrium volume V0:
+
+            {
+              "cold_curve_mlip":               {"E (callable)": <spline>,           "V0 (Å³∕unit cell)": <float>},
+              "cold_curve_mlip_corrected":     {"E (callable)": <spline>,           "V0 (Å³∕unit cell)": <float>},
+              "cold_curve_external":           {"E (callable)": <BM or poly_3>,     "V0 (Å³∕unit cell)": <float>},
+              "cold_curve_external_corrected": {"E (callable)": <BM or poly_3>,     "V0 (Å³∕unit cell)": <float>},
+            }
+
+        For MLIP variants the callable is the cubic spline. For external variants
+        the callable is selected by ``self.eec.config.baseline_curve_type``:
+        ``"birch_murnaghan"`` selects the Birch-Murnaghan fit, ``"polynomial"``
+        selects the 3rd-order polynomial fit. Absent variants are omitted.
+        When ``self.eec`` is disabled, only ``cold_curve_mlip`` is returned.
         """
-        # 1. Extract V and E_el
-        # Since E_el is temperature-independent, we can use the data from the first temperature point.
-        df = self.exact_at_sampled_volume[self.select_T[0]]
-        
-        result = mbe_automation.dynamics.harmonic.eos.cold_curve(
-            V=df["V_crystal (Å³∕unit cell)"].to_numpy(),
-            E_el=df["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
-        )
-        if self.eec.is_enabled and self.eec.cold_curve_baseline_mlip is not None:
-            result["E_el_crystal_raw_spline (kJ∕mol∕unit cell)"] = (
-                self.eec.cold_curve_baseline_mlip["E_el_crystal_spline (kJ∕mol∕unit cell)"]
+        result: dict = {}
+
+        if self.eec.is_enabled:
+            external_fit_key = (
+                "E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)"
+                if self.eec.config.baseline_curve_type == "birch_murnaghan"
+                else "E_el_crystal_poly_3 (kJ∕mol∕unit cell)"
             )
-            result["E_el_crystal_raw_V0 (Å³∕unit cell)"] = (
-                self.eec.cold_curve_baseline_mlip["V0 (Å³∕unit cell)"]
+            sources = [
+                ("cold_curve_mlip",               self.eec.cold_curve_baseline_mlip,    "E_el_crystal_spline (kJ∕mol∕unit cell)"),
+                ("cold_curve_mlip_corrected",     self.eec.cold_curve_corrected_mlip,   "E_el_crystal_spline (kJ∕mol∕unit cell)"),
+                ("cold_curve_external",           self.eec.cold_curve_baseline_external, external_fit_key),
+                ("cold_curve_external_corrected", self.eec.cold_curve_corrected_external, external_fit_key),
+            ]
+            for key, inner, callable_key in sources:
+                if inner is None:
+                    continue
+                result[key] = {
+                    "E (callable)":       inner[callable_key],
+                    "V0 (Å³∕unit cell)": inner["V0 (Å³∕unit cell)"],
+                }
+        else:
+            df = self.exact_at_sampled_volume[self.select_T[0]]
+            inner = mbe_automation.dynamics.harmonic.eos.cold_curve(
+                V=df["V_crystal (Å³∕unit cell)"].to_numpy(),
+                E_el=df["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
             )
+            result["cold_curve_mlip"] = {
+                "E (callable)":       inner["E_el_crystal_spline (kJ∕mol∕unit cell)"],
+                "V0 (Å³∕unit cell)": inner["V0 (Å³∕unit cell)"],
+            }
+
         return result
 
     def plot_eos_curves(
@@ -692,7 +713,7 @@ def equilibrium_curve(
             print(
                 f"Computing electronic energy correction "
                 f"for T_ref={electronic_energy_correction.T_ref} K, "
-                f"target V_ref={electronic_energy_correction.V_ref} Å³"
+                f"target V_ref={electronic_energy_correction.V_ref} Å³"
             )
             i_T_ref = np.where(np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5))[0][0]
         else:
@@ -728,11 +749,11 @@ def equilibrium_curve(
         if electronic_energy_correction.enforce_reference_state:
             p_eec_GPa = eec.evaluate_pressure(eec.config.V_ref)
             if eec.config.reference_state_forcing == "linear":
-                print(f"EEC type: linear, param = {eec.param:.1e} kJ∕mol∕Å³")
+                print(f"EEC type: linear, param = {eec.param:.1e} kJ∕mol∕Å³")
             elif eec.config.reference_state_forcing == "inverse_volume":
-                print(f"EEC type: inverse_volume, param = {eec.param:.1e} kJ∕mol·Å³")
+                print(f"EEC type: inverse_volume, param = {eec.param:.1e} kJ∕mol·Å³")
             elif eec.config.reference_state_forcing == "rigid_shift":
-                print(f"EEC type: rigid_shift, ΔV = {eec.param:.1f} Å³∕unit cell")
+                print(f"EEC type: rigid_shift, ΔV = {eec.param:.1f} Å³∕unit cell")
             print(f"EEC effective pressure at V_ref: {p_eec_GPa:.4f} GPa")
         else:
             print("EEC type: baseline cold curve only, param = 0.0")

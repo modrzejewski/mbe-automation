@@ -273,21 +273,29 @@ def _eos_curves(
     if np.any(~np.isnan(G_min_scaled)):
         G_min_global = min(G_min_global, np.nanmin(G_min_scaled))
 
-    if cold_curve is not None:
-        interp_E_el = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"]
-        poly_approx = cold_curve["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"]
-        bm_approx = cold_curve["E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)"]
-        V_accurate = cold_curve["V_sampled (Å³∕unit cell)"]
-        E_el_accurate = cold_curve["E_el_crystal_sampled (kJ∕mol∕unit cell)"]
-        V0_cold = cold_curve["V0 (Å³∕unit cell)"]
-        B0_cold = cold_curve["B0 (GPa)"]
-        dB0dP_cold = cold_curve["dB0dP"]
-        
-        E_el_interp_scaled = interp_E_el(eos.V_interp) * scaling_factor
-        E_el_min_scaled = interp_E_el(V0_cold) * scaling_factor
-        E_el_approx_scaled = poly_approx(eos.V_interp) * scaling_factor
-        E_el_bm_scaled = bm_approx(eos.V_interp) * scaling_factor
-        
+    _COLD_CURVE_PRESENTATION = {
+        "cold_curve_mlip":               ("MLIP",                 "\\mathrm{MLIP}",            "black",    ":"),
+        "cold_curve_mlip_corrected":     ("MLIP (corrected)",     "\\mathrm{MLIP\\,(corr)}",  "black",    "-"),
+        "cold_curve_external":           ("External",             "\\mathrm{ext}",             "tab:blue", "--"),
+        "cold_curve_external_corrected": ("External (corrected)", "\\mathrm{ext\\,(corr)}",   "tab:blue", "-"),
+    }
+    _COLD_CURVE_REFERENCE_PRIORITY = (
+        "cold_curve_mlip_corrected",
+        "cold_curve_external_corrected",
+        "cold_curve_mlip",
+        "cold_curve_external",
+    )
+
+    ref_key = None
+    ref_V0 = None
+    E_el_min_scaled = 0.0
+    if cold_curve:
+        ref_key = next((k for k in _COLD_CURVE_REFERENCE_PRIORITY if k in cold_curve), None)
+
+    if ref_key is not None:
+        ref_entry = cold_curve[ref_key]
+        ref_V0 = ref_entry["V0 (Å³∕unit cell)"]
+        E_el_min_scaled = float(ref_entry["E (callable)"](ref_V0)) * scaling_factor
         fig, (ax, ax_cold) = plt.subplots(2, 1, figsize=(8, 10), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         fig.subplots_adjust(hspace=0.05)
     else:
@@ -332,84 +340,44 @@ def _eos_curves(
         label="G minimum",
     )
 
-    if cold_curve is not None and ax_cold is not None:
-        label_interp = "Cubic spline"
-        ax_cold.plot(
-            eos.V_interp,
-            E_el_interp_scaled - E_el_min_scaled,
-            color="black",
-            linestyle="-",
-            label=label_interp,
-        )
-        ax_cold.scatter(
-            V_accurate,
-            (E_el_accurate * scaling_factor) - E_el_min_scaled,
-            color="black",
-            marker="o",
-            facecolors="none"
-        )
-        label_approx = "3rd-order polynomial"
-        ax_cold.plot(
-            eos.V_interp,
-            E_el_approx_scaled - E_el_min_scaled,
-            color="tab:red",
-            linestyle=":",
-            linewidth=2,
-            label=label_approx,
-        )
-        
-        label_bm = "Birch-Murnaghan"
-        ax_cold.plot(
-            eos.V_interp,
-            E_el_bm_scaled - E_el_min_scaled,
-            color="tab:blue",
-            linestyle="-.",
-            linewidth=2,
-            label=label_bm,
-        )
-            
-        ax_cold.axvline(
-            x=V0_cold,
-            ymin=0.0,
-            ymax=0.5,
-            color="dimgray",
-            linestyle="--",
-            linewidth=1.0,
-        )
-        ax_cold.text(
-            x=V0_cold + (np.nanmax(eos.V_interp) - np.nanmin(eos.V_interp)) * 0.015,
-            y=0.5,
-            s=f"$V_0$ = {V0_cold:.1f} $\\mathrm{{\\AA}}^3$\n$B_0$ = {B0_cold:.1f} GPa\n$B_0^\\prime$ = {dB0dP_cold:.1f}",
-            color="black",
-            fontsize=10,
-            verticalalignment="top",
-            horizontalalignment="left",
-            transform=ax_cold.get_xaxis_transform()
-        )
-
-    raw_spline = cold_curve.get("E_el_crystal_raw_spline (kJ∕mol∕unit cell)")
-    V0_raw = cold_curve.get("E_el_crystal_raw_V0 (Å³∕unit cell)")
-    if raw_spline is not None and ax_cold is not None:
-        E_el_raw_interp = raw_spline(eos.V_interp) * scaling_factor
-        E_el_raw_min = np.min(E_el_raw_interp)
-        ax_cold.plot(
-            eos.V_interp,
-            E_el_raw_interp - E_el_raw_min,
-            color="gray",
-            linestyle=":",
-            linewidth=1.5,
-            label="Unaltered MLIP",
-        )
-        if V0_raw is not None:
-            dV = V0_cold - V0_raw
-            E_el_raw_hshifted = (raw_spline(eos.V_interp - dV) - raw_spline(V0_raw)) * scaling_factor
+    if cold_curve and ax_cold is not None:
+        V_interp = eos.V_interp
+        V_range = np.nanmax(V_interp) - np.nanmin(V_interp)
+        present_keys = [k for k in _COLD_CURVE_PRESENTATION if k in cold_curve]
+        n_curves = len(present_keys)
+        for i, key in enumerate(present_keys):
+            entry = cold_curve[key]
+            label, v0_sub, color, linestyle = _COLD_CURVE_PRESENTATION[key]
+            E_callable = entry["E (callable)"]
+            V0 = entry["V0 (Å³∕unit cell)"]
+            E_curve_scaled = E_callable(V_interp) * scaling_factor
             ax_cold.plot(
-                eos.V_interp,
-                E_el_raw_hshifted,
-                color="olive",
-                linestyle=":",
-                linewidth=1.5,
-                label="Unaltered MLIP shifted to $V_0$",
+                V_interp,
+                E_curve_scaled - E_el_min_scaled,
+                color=color,
+                linestyle=linestyle,
+                linewidth=1.8,
+                label=label,
+            )
+            ax_cold.axvline(
+                x=V0,
+                ymin=0.0,
+                ymax=0.5,
+                color=color,
+                linestyle="--",
+                linewidth=1.0,
+                alpha=0.6,
+            )
+            y_text = 0.5 - 0.08 * i if n_curves > 1 else 0.5
+            ax_cold.text(
+                x=V0 + V_range * 0.015,
+                y=y_text,
+                s=f"$V_0^{{{v0_sub}}}$ = {V0:.1f} $\\mathrm{{\\AA}}^3$",
+                color=color,
+                fontsize=9,
+                verticalalignment="top",
+                horizontalalignment="left",
+                transform=ax_cold.get_xaxis_transform(),
             )
 
     if debye_model is not None and debye_model.initialized:
@@ -442,7 +410,7 @@ def _eos_curves(
         ax_cold.legend(
             fontsize=10,
             loc="upper center",
-            bbox_to_anchor=(V0_cold, 0.98),
+            bbox_to_anchor=(ref_V0, 0.98),
             bbox_transform=ax_cold.get_xaxis_transform(),
             frameon=True,
             edgecolor="black",
