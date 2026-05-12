@@ -346,7 +346,7 @@ class FreeEnergy:
                     f"The electronic energy correction requires its reference temperature "
                     f"(EECConfig.T_ref) to be present in the temperature grid."
                 )
-            if not self.electronic_energy_correction.is_implicit_volume_correction:
+            if not self.electronic_energy_correction.is_implicit:
                 if not np.isclose(self.electronic_energy_correction.p_ref_GPa, self.pressure_GPa, atol=1.0E-5):
                     raise ValueError(
                         f"EECConfig.p_ref_GPa ({self.electronic_energy_correction.p_ref_GPa:.6g} GPa) "
@@ -402,7 +402,7 @@ class FreeEnergy:
                 "Use a different eos_sampling option."
             )
 
-        if self.electronic_energy_correction.is_implicit_volume_correction:
+        if self.electronic_energy_correction.is_implicit:
             if self.eos_sampling == "pressure":
                 raise ValueError(
                     "eos_sampling='pressure' is incompatible with "

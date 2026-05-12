@@ -135,12 +135,17 @@ class EOSMetadata:
                 if self.eec.config.baseline_curve_type == "birch_murnaghan"
                 else "E_el_crystal_poly_3 (kJ∕mol∕unit cell)"
             )
-            sources = [
-                ("cold_curve_mlip",               self.eec.cold_curve_baseline_mlip,    "E_el_crystal_spline (kJ∕mol∕unit cell)"),
-                ("cold_curve_mlip_corrected",     self.eec.cold_curve_corrected_mlip,   "E_el_crystal_spline (kJ∕mol∕unit cell)"),
-                ("cold_curve_external",           self.eec.cold_curve_baseline_external, external_fit_key),
-                ("cold_curve_external_corrected", self.eec.cold_curve_corrected_external, external_fit_key),
-            ]
+            if self.eec.config.is_implicit:
+                sources = [
+                    ("cold_curve_mlip", self.eec.cold_curve_baseline_mlip, "E_el_crystal_spline (kJ∕mol∕unit cell)"),
+                ]
+            else:
+                sources = [
+                    ("cold_curve_mlip",               self.eec.cold_curve_baseline_mlip,      "E_el_crystal_spline (kJ∕mol∕unit cell)"),
+                    ("cold_curve_mlip_corrected",     self.eec.cold_curve_corrected_mlip,     "E_el_crystal_spline (kJ∕mol∕unit cell)"),
+                    ("cold_curve_external",           self.eec.cold_curve_baseline_external,  external_fit_key),
+                    ("cold_curve_external_corrected", self.eec.cold_curve_corrected_external, external_fit_key),
+                ]
             for key, inner, callable_key in sources:
                 if inner is None:
                     continue
@@ -172,10 +177,18 @@ class EOSMetadata:
         along with the cold curve.
         """
         eos = mbe_automation.storage.read_eos_curves(
-            self.dataset, 
+            self.dataset,
             self.eos_curves_key
         )
         cold_curve = self.cold_curve()
+
+        V_rebased = V_ref = T_ref = None
+        if self.eec.config.is_implicit:
+            V_rebased = self.interpolated_at_equilibrium_volume[
+                "V_rebased (Å³∕unit cell)"
+            ].to_numpy()
+            V_ref = self.eec.config.V_ref
+            T_ref = self.eec.config.T_ref
 
         return mbe_automation.dynamics.harmonic.display.eos_curves(
             eos=eos,
@@ -184,6 +197,9 @@ class EOSMetadata:
             max_temp_ticks=max_temp_ticks,
             debye_model=self.debye_model,
             cold_curve=cold_curve,
+            V_rebased=V_rebased,
+            V_ref=V_ref,
+            T_ref=T_ref,
         )
 
 def _assert_equivalent_cells(
@@ -731,13 +747,14 @@ def equilibrium_curve(
         #
         # E_el, F_tot, H_tot, G_tot, E_tot
         # 
-        df_eos = mbe_automation.dynamics.harmonic.data.update_with_eec(
-            df_crystal=df_eos,
-            eec=eec,
-            good_points=good_points
-        )
+        if not electronic_energy_correction.is_implicit:
+            df_eos = mbe_automation.dynamics.harmonic.data.update_with_eec(
+                df_crystal=df_eos,
+                eec=eec,
+                good_points=good_points
+            )
         if (electronic_energy_correction.enforce_reference_state
-                and not electronic_energy_correction.is_implicit_volume_correction):
+                and not electronic_energy_correction.is_implicit):
             p_eec_GPa = eec.evaluate_pressure(eec.config.V_ref)
             if eec.config.reference_state_forcing == "linear":
                 print(f"EEC type: linear, param = {eec.param:.1e} kJ∕mol∕Å³")
@@ -746,7 +763,7 @@ def equilibrium_curve(
             elif eec.config.reference_state_forcing == "rigid_shift":
                 print(f"EEC type: rigid_shift, ΔV = {eec.param:.1f} Å³∕unit cell")
             print(f"EEC effective pressure at V_ref: {p_eec_GPa:.4f} GPa")
-        elif electronic_energy_correction.is_implicit_volume_correction:
+        elif electronic_energy_correction.is_implicit:
             print(
                 f"EEC type: rebase_to_reference, "
                 f"V_ref={eec.config.V_ref:.2f} Å³ anchored at T_ref={eec.config.T_ref:.2f} K "
@@ -855,7 +872,7 @@ def equilibrium_curve(
         df["V_debye (Å³∕unit cell)"] = V_debye
         df["α_V_debye (1∕K)"] = alpha_V_debye
 
-    if electronic_energy_correction.is_implicit_volume_correction:
+    if electronic_energy_correction.is_implicit:
         i_T_ref = np.where(
             np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5)
         )[0][0]

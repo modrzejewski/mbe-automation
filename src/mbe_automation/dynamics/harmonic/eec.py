@@ -299,7 +299,7 @@ class EECConfig:
         return self.enforce_reference_state or self.override_baseline_curve
 
     @property
-    def is_implicit_volume_correction(self) -> bool:
+    def is_implicit(self) -> bool:
         return self.reference_state_forcing == "rebase_to_reference"
 
     def __post_init__(self):
@@ -312,6 +312,13 @@ class EECConfig:
             raise ValueError("All three baseline curve parameters (baseline_V0, baseline_B0_GPa, baseline_B0_prime) must be specified.")
         if self.baseline_curve_type not in ("polynomial", "birch_murnaghan"):
             raise ValueError(f"Unknown baseline_curve_type: '{self.baseline_curve_type}'. Must be 'polynomial' or 'birch_murnaghan'.")
+        if self.reference_state_forcing == "rebase_to_reference" and self.override_baseline_curve:
+            raise ValueError(
+                "reference_state_forcing='rebase_to_reference' cannot be combined "
+                "with external baseline substitution (baseline_V0/baseline_B0_GPa/"
+                "baseline_B0_prime). The rebase leaves E_el(V) untouched, so a "
+                "baseline substitution would be silently ignored."
+            )
 
 
 def rebase_volume_to_reference(
@@ -634,7 +641,7 @@ def _eec_param(
     if not config.enforce_reference_state:
         return 0.0
 
-    if config.is_implicit_volume_correction:
+    if config.is_implicit:
         return 0.0
 
     if len(V_sampled) < 4:

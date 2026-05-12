@@ -254,7 +254,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 "Falling back to volume_curve='eos_minimum'."
             )
             effective_volume_curve = "eos_minimum"
-    if config.electronic_energy_correction.is_implicit_volume_correction:
+    if config.electronic_energy_correction.is_implicit:
         effective_volume_curve = "rebase_to_reference"
     if effective_volume_curve == "debye" and config.eos_sampling == "pressure":
         raise ValueError(
@@ -349,7 +349,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                     config.pressure_GPa
                 )
             if (config.electronic_energy_correction.is_enabled
-                    and not config.electronic_energy_correction.is_implicit_volume_correction):
+                    and not config.electronic_energy_correction.is_implicit):
                 p_effective += interpolated_harmonic_props.eec.evaluate_pressure(V)
             optimizer._pressure_GPa = p_effective
             optimizer.cell_relaxation = "full"
@@ -408,7 +408,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         )
         
         if (config.electronic_energy_correction.is_enabled
-                and not config.electronic_energy_correction.is_implicit_volume_correction):
+                and not config.electronic_energy_correction.is_implicit):
             df_crystal_T = mbe_automation.dynamics.harmonic.data.update_with_eec(
                 df_crystal=df_crystal_T,
                 eec=interpolated_harmonic_props.eec

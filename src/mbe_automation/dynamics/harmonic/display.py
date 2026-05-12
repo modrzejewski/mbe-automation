@@ -252,6 +252,9 @@ def _eos_curves(
     max_temp_ticks: int = 10,
     debye_model: DebyeModel | None = None,
     cold_curve: dict | None = None,
+    V_rebased: npt.NDArray[np.float64] | None = None,
+    V_ref: float | None = None,
+    T_ref: float | None = None,
 ):
 
     n_temperatures = len(eos.temperatures)
@@ -395,6 +398,20 @@ def _eos_curves(
             label="Debye model",
         )
 
+    if V_rebased is not None:
+        G_rebased_scaled = np.array([
+            np.interp(V_rebased[i], eos.V_interp, G_interp_scaled[i, :], left=np.nan, right=np.nan)
+            for i in range(n_temperatures)
+        ])
+        ax.plot(
+            V_rebased,
+            G_rebased_scaled - G_min_global,
+            color="tab:green",
+            linestyle="--",
+            marker="x",
+            label=f"shifted to $V_{{\\mathrm{{ref}}}}$ = {V_ref:.1f} Å³ at $T_{{\\mathrm{{ref}}}}$ = {T_ref:.0f} K",
+        )
+
     ax.legend(
         frameon=True,
         edgecolor="black",
@@ -460,6 +477,9 @@ def eos_curves(
     max_temp_ticks: int = 10,
     debye_model: DebyeModel | None = None,
     cold_curve: dict | None = None,
+    V_rebased: npt.NDArray[np.float64] | None = None,
+    V_ref: float | None = None,
+    T_ref: float | None = None,
 ):
     if eos is None:
         if dataset is None or key is None:
@@ -473,6 +493,9 @@ def eos_curves(
         max_temp_ticks=max_temp_ticks,
         debye_model=debye_model,
         cold_curve=cold_curve,
+        V_rebased=V_rebased,
+        V_ref=V_ref,
+        T_ref=T_ref,
     )
 
 
