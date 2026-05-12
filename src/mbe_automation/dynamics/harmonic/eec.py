@@ -300,6 +300,73 @@ class EECConfig:
             raise ValueError(f"Unknown baseline_curve_type: '{self.baseline_curve_type}'. Must be 'polynomial' or 'birch_murnaghan'.")
 
 
+def rebase_volume_to_reference(
+    T: npt.NDArray[np.float64],
+    V: npt.NDArray[np.float64],
+    config: EECConfig,
+) -> npt.NDArray[np.float64]:
+    """
+    Rigidly shift a quasi-harmonic volume curve V(T) so that it passes
+    through the reference state (T_ref, V_ref).
+
+    The corrected curve is
+
+        V_corrected(T) = V_ref - V(T_ref) + V(T)
+
+    which anchors V_corrected(T_ref) = V_ref exactly while preserving the
+    thermal-expansion shape (dV_corrected/dT = dV/dT everywhere).
+
+    The function does not modify the underlying electronic-energy surface;
+    it is a post-processing volume shift. As a consequence, V_corrected(T)
+    no longer equals argmin_V G(V, T) for the original energy surface, and
+    other thermodynamic quantities recomputed from G(V, T) (e.g. bulk
+    modulus from the EOS, thermal pressure, Grüneisen parameter) are not
+    guaranteed to remain self-consistent with V_corrected(T).
+
+    Parameters
+    ----------
+    T : np.ndarray of float64
+        Temperatures (K) at which V was evaluated.
+    V : np.ndarray of float64
+        Volumes (Å³ per unit cell of type ``config.cell``) at the
+        temperatures in T, typically obtained from minimizing the Gibbs
+        free energy.
+    config : EECConfig
+        Reads ``config.T_ref`` (K) and ``config.V_ref`` (Å³ per unit cell
+        of type ``config.cell``). The caller is responsible for passing
+        V in the same unit-cell convention as V_ref; no rescaling between
+        primitive and conventional cells is performed.
+
+    Returns
+    -------
+    np.ndarray of float64
+        The rebased volume array, same shape as V. A new array is
+        returned; the input V is not modified.
+
+    Raises
+    ------
+    ValueError
+        If ``config.T_ref`` or ``config.V_ref`` is None, or if
+        ``config.T_ref`` does not appear in T (within ``atol=1e-5``).
+    """
+    if config.T_ref is None or config.V_ref is None:
+        raise ValueError(
+            f"T_ref and V_ref must be specified in EECConfig to rebase the volume curve, "
+            f"got T_ref={config.T_ref}, V_ref={config.V_ref}."
+        )
+
+    matches = np.where(np.isclose(T, config.T_ref, atol=1e-5))[0]
+    if matches.size == 0:
+        raise ValueError(
+            f"T_ref={config.T_ref} K not found in the supplied temperature array "
+            f"(range [{T.min()}, {T.max()}] K, {T.size} points)."
+        )
+    i_T_ref = matches[0]
+    V_approx = V[i_T_ref]
+
+    return config.V_ref - V_approx + V
+
+
 def _ΔE_el_poly_3_rigid_ΔV(
     V_sampled,
     F_vib_sampled,
