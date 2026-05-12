@@ -856,6 +856,20 @@ def equilibrium_curve(
         df["α_V_debye (1∕K)"] = alpha_V_debye
 
     if electronic_energy_correction.is_implicit_volume_correction:
+        i_T_ref = np.where(
+            np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5)
+        )[0][0]
+        anchor_valid = min_found[i_T_ref]
+        if filter_out_extrapolated_minimum:
+            anchor_valid = anchor_valid and not min_extrapolated[i_T_ref]
+        if not anchor_valid:
+            raise ValueError(
+                f"rebase_to_reference: V_eos at T_ref="
+                f"{electronic_energy_correction.T_ref:.2f} K is not a valid minimum "
+                f"(min_found={min_found[i_T_ref]}, "
+                f"min_extrapolated={min_extrapolated[i_T_ref]}). "
+                f"Adjust volume_range to cover the equilibrium volume at T_ref."
+            )
         df["V_rebased (Å³∕unit cell)"] = (
             mbe_automation.dynamics.harmonic.eec.rebase_volume_to_reference(
                 temperatures, V_eos, electronic_energy_correction,
