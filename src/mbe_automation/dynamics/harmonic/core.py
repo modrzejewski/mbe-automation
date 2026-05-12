@@ -185,7 +185,7 @@ class EOSMetadata:
         V_rebased = V_ref = T_ref = None
         if self.eec.config.is_implicit:
             V_rebased = self.interpolated_at_equilibrium_volume[
-                "V_rebased (Å³∕unit cell)"
+                "V_rebased (Å³∕unit cell)"
             ].to_numpy()
             V_ref = self.eec.config.V_ref
             T_ref = self.eec.config.T_ref
