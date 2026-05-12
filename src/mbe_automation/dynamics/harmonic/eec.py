@@ -11,7 +11,7 @@ import scipy.optimize
 
 import mbe_automation.dynamics.harmonic.eos
 
-ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "rigid_shift", "none"]
+ELECTRONIC_ENERGY_CORRECTION = ["linear", "inverse_volume", "rigid_shift", "rebase_to_reference", "none"]
 
 DEFAULT_DEBYE_FITTING_T = np.array([10.0, 50.0, 100.0, 150.0, 200.0])
 
@@ -224,8 +224,18 @@ class EECConfig:
     Parameters
     ----------
     reference_state_forcing : str
-        Type of empirical correction: "linear", "inverse_volume", "rigid_shift", or "none".
-        Required if enforcing a reference state (T_ref and V_ref must also be set).
+        How the reference state (T_ref, V_ref) is realised. Five values:
+
+        Explicit electronic-energy corrections — modify E_el(V) analytically
+        so that argmin_V G(V, T_ref) lands on V_ref:
+        "linear", "inverse_volume", "rigid_shift".
+
+        Implicit volume correction — leaves E_el(V) alone and anchors
+        V(T_ref) = V_ref by post-processing the V_eos(T) curve (the implied
+        ΔE_el is not derived): "rebase_to_reference".
+
+        "none" disables both. T_ref and V_ref must be set for every value
+        except "none".
     T_ref : float or None
         Reference temperature (K) at which V_ref is enforced. Must appear in
         the temperatures_K array of the FreeEnergy configuration.
@@ -287,6 +297,10 @@ class EECConfig:
     @property
     def is_enabled(self) -> bool:
         return self.enforce_reference_state or self.override_baseline_curve
+
+    @property
+    def is_implicit_volume_correction(self) -> bool:
+        return self.reference_state_forcing == "rebase_to_reference"
 
     def __post_init__(self):
         if self.reference_state_forcing not in ELECTRONIC_ENERGY_CORRECTION:
@@ -519,6 +533,8 @@ def _eec_value(
             DeltaV=e_el_correction_param,
             cold_curve=base_cold_curve,
         )
+    elif correction_type == "rebase_to_reference":
+        E_corr = np.zeros_like(V) if isinstance(V, (np.ndarray, list)) else 0.0
     elif correction_type == "none":
         E_corr = np.zeros_like(V) if isinstance(V, (np.ndarray, list)) else 0.0
     else:
@@ -576,6 +592,11 @@ def _eec_pressure(
             DeltaV=e_el_correction_param,
             cold_curve=base_cold_curve,
         )
+    elif correction_type == "rebase_to_reference":
+        if isinstance(V, (np.ndarray, list)):
+            dE_corr_dV = np.zeros_like(V, dtype=np.float64)
+        else:
+            dE_corr_dV = 0.0
     elif correction_type == "none":
         if isinstance(V, (np.ndarray, list)):
             dE_corr_dV = np.zeros_like(V, dtype=np.float64)
@@ -611,6 +632,9 @@ def _eec_param(
     Note: Output matches the energy scale of G (kJ∕mol per unit cell of type specified by config.cell).
     """
     if not config.enforce_reference_state:
+        return 0.0
+
+    if config.is_implicit_volume_correction:
         return 0.0
 
     if len(V_sampled) < 4:

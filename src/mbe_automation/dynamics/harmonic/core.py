@@ -736,7 +736,8 @@ def equilibrium_curve(
             eec=eec,
             good_points=good_points
         )
-        if electronic_energy_correction.enforce_reference_state:
+        if (electronic_energy_correction.enforce_reference_state
+                and not electronic_energy_correction.is_implicit_volume_correction):
             p_eec_GPa = eec.evaluate_pressure(eec.config.V_ref)
             if eec.config.reference_state_forcing == "linear":
                 print(f"EEC type: linear, param = {eec.param:.1e} kJ∕mol∕Å³")
@@ -745,6 +746,12 @@ def equilibrium_curve(
             elif eec.config.reference_state_forcing == "rigid_shift":
                 print(f"EEC type: rigid_shift, ΔV = {eec.param:.1f} Å³∕unit cell")
             print(f"EEC effective pressure at V_ref: {p_eec_GPa:.4f} GPa")
+        elif electronic_energy_correction.is_implicit_volume_correction:
+            print(
+                f"EEC type: rebase_to_reference, "
+                f"V_ref={eec.config.V_ref:.2f} Å³ anchored at T_ref={eec.config.T_ref:.2f} K "
+                f"by post-processing the V_eos(T) curve"
+            )
         else:
             print("EEC type: baseline cold curve only, param = 0.0")
     else:
@@ -847,6 +854,13 @@ def equilibrium_curve(
         V_debye, alpha_V_debye = debye_model.predict(temperatures)
         df["V_debye (Å³∕unit cell)"] = V_debye
         df["α_V_debye (1∕K)"] = alpha_V_debye
+
+    if electronic_energy_correction.is_implicit_volume_correction:
+        df["V_rebased (Å³∕unit cell)"] = (
+            mbe_automation.dynamics.harmonic.eec.rebase_volume_to_reference(
+                temperatures, V_eos, electronic_energy_correction,
+            )
+        )
 
     if save_plots and debye_model.initialized:
         _plot_debye_volume(
