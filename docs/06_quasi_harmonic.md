@@ -151,7 +151,7 @@ electronic_energy_correction=EEC(
 ),
 ```
 
-The output CSV records `V_rebased (Å³∕unit cell)` alongside `V_eos` (and `V_debye` when applicable) for traceability. The QHA temperature loop uses the rebased curve. Because the rebased $V(T)$ is not the minimum of $G(V,T)$, this mode is incompatible with `eos_sampling="pressure"` and with `volume_curve="debye"`; both combinations are rejected at configuration time.
+The output CSV records `V_rebased (Å³∕unit cell)` alongside `V_eos` (and `V_debye` when applicable) for traceability. The QHA temperature loop uses the rebased curve. Because the rebased $V(T)$ is not the minimum of $G(V,T)$, this mode is incompatible with `eos_sampling="pressure"`, with `volume_curve="debye"`, and with external baseline substitution (`baseline_V0` / `baseline_B0_GPa` / `baseline_B0_prime`).
 
 ### External baseline substitution example
 
@@ -207,7 +207,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 mbe_automation.run(properties_config)
 ```
 
-To combine external baseline substitution with reference state forcing, simply set `reference_state_forcing` to a value other than `"none"` alongside the baseline parameters:
+To combine external baseline substitution with reference state forcing, set `reference_state_forcing` to one of the explicit modes (`"linear"`, `"inverse_volume"`, `"rigid_shift"`) alongside the baseline parameters. The implicit `"rebase_to_reference"` mode cannot be combined with a baseline substitution.
 
 ```python
 electronic_energy_correction=EEC(
