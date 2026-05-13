@@ -424,15 +424,16 @@ def _eos_curves(
     ax.set_ylim(bottom=0)
 
     if ax_cold is not None:
-        ax_cold.legend(
-            fontsize=10,
-            loc="upper center",
-            bbox_to_anchor=(ref_V0, 0.98),
-            bbox_transform=ax_cold.get_xaxis_transform(),
-            frameon=True,
-            edgecolor="black",
-            fancybox=False,
-        )
+        if n_curves > 1:
+            ax_cold.legend(
+                fontsize=10,
+                loc="upper center",
+                bbox_to_anchor=(ref_V0, 0.98),
+                bbox_transform=ax_cold.get_xaxis_transform(),
+                frameon=True,
+                edgecolor="black",
+                fancybox=False,
+            )
         ax_cold.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
         ax_cold.set_ylabel(y_label_cold, fontsize=14)
         ax_cold.grid(True, linestyle="--", alpha=0.6)
