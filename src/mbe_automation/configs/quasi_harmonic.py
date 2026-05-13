@@ -332,7 +332,9 @@ class FreeEnergy:
         self.dataset = Path(self.dataset).expanduser()
         self.work_dir = Path(self.work_dir).expanduser()
 
-        self.temperatures_K = np.sort(np.atleast_1d(self.temperatures_K))
+        self.temperatures_K = np.sort(
+            np.atleast_1d(self.temperatures_K).astype(np.float64, copy=False)
+        )
         if len(self.temperatures_K) > 1:
             diffs = np.diff(self.temperatures_K)
             if np.any(diffs < 1.0E-5):
