@@ -707,15 +707,12 @@ def print_frequency_comparison(
 
 def eos_fitting_summary(
     df_crystal_eos: pd.DataFrame,
-    filter_out_extrapolated_minimum: bool
+    filter_out_extrapolated_minimum: bool,
+    is_implicit_eec: bool = False,
 ):
     """
     Print a summary of the EOS fitting results across all temperatures.
     """
-    
-    print("\n" + "=" * 80)
-    print(f"{'Gibbs free energy minimization summary':^80}")
-    print("=" * 80)
     
     #
     # Construct the summary table
@@ -723,49 +720,68 @@ def eos_fitting_summary(
     summary_rows = []
     for _, row in df_crystal_eos.iterrows():
         T = row["T (K)"]
-        V = row["V_eos (Å³∕unit cell)"]
+        V_eos = row["V_eos (Å³∕unit cell)"]
         min_found = row["min_found"]
         min_extrapolated = row["min_extrapolated"]
-        
+
         if not min_found:
             status = "skipped (no minimum found)"
         elif min_extrapolated and filter_out_extrapolated_minimum:
             status = "skipped (minimum beyond scanned range)"
         else:
             status = "proceed"
-            
-        summary_rows.append({
-            "T (K)": f"{T:8.1f}",
-            "V (Å³)": f"{V:8.1f}" if not np.isnan(V) else f"{'N/A':>8}",
-            "min_found": f"{str(min_found):^10}",
-            "min_extrapolated": f"{str(min_extrapolated):^16}",
-            "status": status
-        })
-        
+
+        row_data = {"T (K)": f"{T:8.1f}"}
+        if is_implicit_eec:
+            V_rebased = row["V_rebased (Å³∕unit cell)"]
+            row_data["V_eos (Å³, pre-EEC)"] = (
+                f"{V_eos:8.1f}" if not np.isnan(V_eos) else f"{'N/A':>8}"
+            )
+            row_data["V (Å³, post-EEC)"] = (
+                f"{V_rebased:8.1f}" if not np.isnan(V_rebased) else f"{'N/A':>8}"
+            )
+        else:
+            row_data["V (Å³)"] = (
+                f"{V_eos:8.1f}" if not np.isnan(V_eos) else f"{'N/A':>8}"
+            )
+        row_data["min_found"] = f"{str(min_found):^10}"
+        row_data["min_extrapolated"] = f"{str(min_extrapolated):^16}"
+        row_data["status"] = status
+        summary_rows.append(row_data)
+
     df_summary = pd.DataFrame(summary_rows)
-    print(df_summary.to_string(index=False), flush=True)
-    print("-" * 80)
-    
+    table_lines = df_summary.to_string(index=False).split("\n")
+    n = max(len(line) for line in table_lines)
+
+    print()
+    print(f"{'Gibbs free energy minimization summary':^{n}}")
+    mbe_automation.common.display.dotted_separator(n)
+    print(table_lines[0])
+    mbe_automation.common.display.dotted_separator(n)
+    for body_line in table_lines[1:]:
+        print(body_line)
+    mbe_automation.common.display.dotted_separator(n)
+
     #
     # Diagnostic information
     #
     n_total = len(df_crystal_eos)
     n_proceed = sum(1 for r in summary_rows if r["status"] == "proceed")
-    
+
     if n_proceed == 0:
         print("\n[!] CRITICAL: No valid minima found for any temperature.")
         print("    The workflow cannot proceed with equilibrium-volume calculations.")
     elif n_proceed < n_total:
         print(f"\n[!] WARNING: Valid minima found for only {n_proceed}/{n_total} temperature points.")
-    
+
     if n_proceed < n_total:
         print("\nSuggestions:")
         print("1. Inspect the volume sampling range (volume_range/thermal_pressures_GPa).")
         print("   The current range might not bracket the equilibrium volume at all temperatures.")
         print("2. Check phonon dispersion plots for imaginary frequencies.")
         print("3. Consider if the filtering criteria (filter_out_imaginary_*) are too strict.")
-        
-    print("=" * 80 + "\n", flush=True)
+
+    print(flush=True)
 
 
 def debye_model_summary(

@@ -903,7 +903,8 @@ def equilibrium_curve(
 
     mbe_automation.dynamics.harmonic.display.eos_fitting_summary(
         df_crystal_eos=df,
-        filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
+        filter_out_extrapolated_minimum=filter_out_extrapolated_minimum,
+        is_implicit_eec=electronic_energy_correction.is_implicit,
     )
     force_constants_keys = [
         f"{root_key}/phonons/force_constants/{label}"
