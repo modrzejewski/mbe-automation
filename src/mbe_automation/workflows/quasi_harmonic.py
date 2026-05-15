@@ -117,6 +117,12 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         work_dir=geom_opt_dir/relaxed_crystal_label,
         key=f"{config.root_key}/structures/{relaxed_crystal_label}"
     )
+    #
+    # Note: From this point forward, unit_cell_V0 is guaranteed to be
+    # the symmetrized primitive cell (enforced by the Minimum config).
+    # All downstream thermodynamic analysis, representations, and 
+    # generated supercells will be relative to this primitive cell frame.
+    #
     V0 = unit_cell_V0.get_volume()
     composition = mbe_automation.structure.clusters.identify_molecules(
         crystal=mbe_automation.storage.from_ase_atoms(unit_cell_V0),
@@ -143,8 +149,10 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             config.supercell_diagonal
         )
     else:
-        print("Using supercell matrix provided in config", flush=True)
-        supercell_matrix = config.supercell_matrix        
+        print("Remark: Using supercell matrix provided in config.", flush=True)
+        print("        It is on the user's side to ensure that this matrix is defined", flush=True)
+        print("        relative to the symmetrized primitive cell.", flush=True)
+        supercell_matrix = config.supercell_matrix
     #
     # Phonon properties of the fully relaxed cell
     # (the harmonic approximation)

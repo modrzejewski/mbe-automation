@@ -167,6 +167,7 @@ class FreeEnergy:
                                    #
                                    # Supercell transformation matrix. If specified,
                                    # supercell_radius is ignored.
+                                   # Warning: this matrix acts on the primitive cell.
                                    #
     supercell_matrix: npt.NDArray[np.integer] | None = None
                                    #

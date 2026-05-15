@@ -382,6 +382,9 @@ def phonons(
     n_atoms_primitive_cell = len(phonons.primitive)
     n_atoms_super_cell = len(supercells[0])
     
+    print(f"n_atoms_unit_cell               {n_atoms_unit_cell} (primitive)")
+    print("supercell_matrix                (relative to primitive cell)")
+    mbe_automation.common.display.matrix_3x3(supercell_matrix)
     print(f"n_supercells                    {n_supercells}")
     print(f"n_atoms_super_cell              {n_atoms_super_cell}")
     print(f"supercell_displacement          {supercell_displacement:.3f} Å")
@@ -889,7 +892,7 @@ def equilibrium_curve(
             )
         df["V_rebased (Å³∕unit cell)"] = (
             mbe_automation.dynamics.harmonic.eec.rebase_volume_to_reference(
-                temperatures, V_eos, electronic_energy_correction,
+                temperatures, V_eos, eec.config,
             )
         )
 

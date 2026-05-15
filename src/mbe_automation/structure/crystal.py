@@ -67,7 +67,15 @@ def display(unit_cell: ase.Atoms, key: str | None=None) -> None:
     print(f"β = {beta:.1f}°")
     print(f"γ = {gamma:.1f}°")
     print(f"V = {volume:.1f} Å³")
-    print(f"Number of atoms {len(unit_cell)}")
+    n_conv, _, _ = conventional_cell_params(unit_cell)
+    if len(unit_cell) < n_conv:
+        cell_type = "primitive"
+    elif len(unit_cell) == n_conv:
+        cell_type = "conventional"
+    else:
+        cell_type = "supercell"
+        
+    print(f"Number of atoms {len(unit_cell)} ({cell_type})")
     space_group, hmsymbol = check_symmetry(
         unit_cell,
         symmetry_thresh=SYMMETRY_TOLERANCE_STRICT
