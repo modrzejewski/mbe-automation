@@ -7,15 +7,14 @@ name = "mbe-automation"
 version = "0.4.0"
 requires-python = ">=3.11"
 dependencies = [
-  "torch",
-  "numpy",
+  "torch==2.9.1",
+  "numpy==2.3.3",
+  "scipy==1.16.2",
   "networkx",
-  "scipy",
   "ase>=3.26.0",
   "dscribe",
   "matplotlib",
-  "pymatgen==2026.3.23",
-  "pymatgen-core==2026.4.7",
+  "pymatgen==2025.10.7",
   "pyscf>=2.12.0",
   "pyscf-dispersion",
   "scikit-learn",
@@ -29,7 +28,7 @@ dependencies = [
   "h5py",
   "pandas",
   "ipi",
-  "doped",
+  "doped==3.2.1",
   "dynasor",
   "nglview",
   "pymatviz",
