@@ -382,11 +382,10 @@ def phonons(
     n_atoms_primitive_cell = len(phonons.primitive)
     n_atoms_super_cell = len(supercells[0])
     
-    print(f"n_atoms_unit_cell               {n_atoms_unit_cell} (primitive)")
-    print("supercell_matrix                (relative to primitive cell)")
-    mbe_automation.common.display.matrix_3x3(supercell_matrix)
+    atom_count_width = max(len(str(n_atoms_unit_cell)), len(str(n_atoms_super_cell)))
+    print(f"n_atoms                         {n_atoms_unit_cell:<{atom_count_width}} (unit cell=primitive)")
+    print(f"n_atoms                         {n_atoms_super_cell:<{atom_count_width}} (supercell)")
     print(f"n_supercells                    {n_supercells}")
-    print(f"n_atoms_super_cell              {n_atoms_super_cell}")
     print(f"supercell_displacement          {supercell_displacement:.3f} Å")
     #
     # Compute second-order dynamic matrix (Hessian)
