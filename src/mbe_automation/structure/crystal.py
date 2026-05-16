@@ -430,8 +430,8 @@ def supercell_matrix(
         "primitive → supercell"
     ])
     transformation_type = "diagonal" if diagonal else "non-diagonal"
-    print(f"type                  {transformation_type}")
-    print(f"library               {backend}")
+    print(f"transformation_type   {transformation_type}")
+    print(f"backend               {backend}")
     print(f"requested R           {r_point_image:.1f} Å")
     if backend == "doped":
         r = get_min_image_distance(supercell)
