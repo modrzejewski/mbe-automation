@@ -28,11 +28,11 @@ DEFAULT_SYMMETRIZATION_BACKEND: Literal["spglib", "pymatgen"] = "pymatgen"
 try:
     from doped.generation import get_ideal_supercell_matrix
     from doped.utils.supercells import get_min_image_distance
-    doped_available = True
+    _DOPED_AVAILABLE = True
 except ImportError:
     get_ideal_supercell_matrix = None
     get_min_image_distance = None
-    doped_available = False
+    _DOPED_AVAILABLE = False
 
 @dataclass
 class CrystalMatch:
@@ -387,13 +387,12 @@ def supercell_matrix(
     """
 
     if backend == "auto":
-        if doped_available:
+        if _DOPED_AVAILABLE:
             backend = "doped"
         else:
             warnings.warn("doped package not available, falling back to CubicSupercellTransformation", RuntimeWarning)
             backend = "pymatgen"
     
-    print(f"Supercell transformation with minimum point-image radius R={r_point_image:.1f} Å")
     structure = pymatgen.core.structure.Structure(
                 lattice=pymatgen.core.lattice.Lattice(
                     matrix=unit_cell.get_cell(),
@@ -425,13 +424,24 @@ def supercell_matrix(
     optimal_matrix = np.round(optimal_matrix).astype(np.int64)
         
     supercell = structure.make_supercell(optimal_matrix)
-    mbe_automation.common.display.matrix_3x3(optimal_matrix)
+
+    mbe_automation.common.display.framed([
+        "Cell transformation",
+        "primitive → supercell"
+    ])
+    transformation_type = "diagonal" if diagonal else "non-diagonal"
+    print(f"type                  {transformation_type}")
+    print(f"library               {backend}")
+    print(f"requested R           {r_point_image:.1f} Å")
     if backend == "doped":
         r = get_min_image_distance(supercell)
-        print(f"Actual point-image distance {r:.1f} Å")
         assert r >= r_point_image, "Supercell matrix does not satisfy r >= r_point_image"
-        
-    print(f"Number of atoms {len(supercell)}")
+        print(f"actual R              {r:.1f} Å")
+    else:
+        print("actual R              not available (pymatgen backend)")
+    print("transformation matrix")
+    mbe_automation.common.display.matrix_3x3(optimal_matrix)
+    print(f"number of atoms       {len(supercell)}")
     
     return optimal_matrix
 
