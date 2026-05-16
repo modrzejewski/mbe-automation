@@ -56,7 +56,7 @@ class Minimum:
                                    #
                                    # Maximum number of steps in the geometry relaxation
                                    #
-    max_n_steps: int = 500
+    max_n_steps: int = 1000
                                    #
                                    # Relaxed degrees of freedom. Referenced
                                    # only for periodic systems.
