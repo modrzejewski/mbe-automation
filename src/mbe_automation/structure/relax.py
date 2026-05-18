@@ -146,7 +146,6 @@ def crystal(
     if config.cell_relaxation == "full":
         print(f"pressure                      {config.pressure_GPa} GPa")
     print(f"transform                     {config.transform}")
-    print(f"align_to_input                {config.align_to_input}")
 
     cuda_available = torch.cuda.is_available()
     if cuda_available:
@@ -260,31 +259,9 @@ def crystal(
             symmetry_thresh=config.symmetry_tolerance_strict
         )
 
-    
     if cuda_available:
         peak_gpu = torch.cuda.max_memory_allocated()
         print(f"Peak GPU memory usage: {peak_gpu/1024**3:.1f}GB")
-        
-    match_result = mbe_automation.structure.crystal.match(
-        positions_a=relaxed_system.get_positions(),
-        atomic_numbers_a=relaxed_system.get_atomic_numbers(),
-        cell_vectors_a=relaxed_system.cell.array,
-        positions_b=unit_cell.get_positions(),
-        atomic_numbers_b=unit_cell.get_atomic_numbers(),
-        cell_vectors_b=unit_cell.cell.array,
-        compute_atom_to_atom_mapping=True,
-    )
-    if match_result is None:
-        print("RMSD could not be computed (structures did not match within tolerances)")
-    else:
-        if config.align_to_input:
-            print("Aligning relaxed structure to input structure...")
-            relaxed_system = ase.Atoms(
-                numbers=match_result.aligned_atomic_numbers_a,
-                positions=match_result.aligned_positions_a,
-                cell=match_result.aligned_cell_vectors_a,
-                pbc=True,
-            )
 
     mbe_automation.structure.crystal.compare_conventional_cells(
         structure_initial=unit_cell,

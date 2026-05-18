@@ -119,35 +119,51 @@ class EOSMetadata:
         self,
     ) -> dict:
         """
-        Fit the static electronic energy E^el(V) to a third-order polynomial 
-        using proximity weights, and extract V0, B0, and dB0dP.
-        
-        Returns:
-            dict: Dictionary containing:
-                - 'E_el_crystal_poly_3 (kJ∕mol∕unit cell)': Least-squares 3rd-order Polynomial fit of E^el(V).
-                - 'E_el_crystal_spline (kJ∕mol∕unit cell)': CubicSpline interpolation of E^el(V).
-                - 'E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)': Birch-Murnaghan equation of state function.
-                - 'V_sampled (Å³∕unit cell)': Array of sampled volumes.
-                - 'E_el_crystal_sampled (kJ∕mol∕unit cell)': Accurate static electronic energies corresponding to the sampled volumes.
-                - 'V0 (Å³∕unit cell)': Equilibrium volume where E^el is minimized.
-                - 'B0 (GPa)': Bulk modulus at V0.
-                - 'dB0dP': Pressure derivative of the bulk modulus at V0.
+        Return the cold curves E(V) available for plotting.
+
+        Each entry maps a curve name to a callable E(V) and its equilibrium
+        volume V0. The possible names are ``cold_curve_mlip``,
+        ``cold_curve_mlip_corrected``, ``cold_curve_external``, and
+        ``cold_curve_external_corrected``; curves that were not computed are
+        omitted. When EEC is disabled, only ``cold_curve_mlip`` is returned.
         """
-        # 1. Extract V and E_el
-        # Since E_el is temperature-independent, we can use the data from the first temperature point.
-        df = self.exact_at_sampled_volume[self.select_T[0]]
-        
-        result = mbe_automation.dynamics.harmonic.eos.cold_curve(
-            V=df["V_crystal (Å³∕unit cell)"].to_numpy(),
-            E_el=df["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
-        )
-        if self.eec.is_enabled and self.eec.cold_curve is not None:
-            result["E_el_crystal_raw_spline (kJ∕mol∕unit cell)"] = (
-                self.eec.cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"]
+        result: dict = {}
+
+        if self.eec.is_enabled:
+            external_fit_key = (
+                "E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)"
+                if self.eec.config.baseline_curve_type == "birch_murnaghan"
+                else "E_el_crystal_poly_3 (kJ∕mol∕unit cell)"
             )
-            result["E_el_crystal_raw_V0 (Å³∕unit cell)"] = (
-                self.eec.cold_curve["V0 (Å³∕unit cell)"]
+            if self.eec.config.is_implicit:
+                sources = [
+                    ("cold_curve_mlip", self.eec.cold_curve_baseline_mlip, "E_el_crystal_spline (kJ∕mol∕unit cell)"),
+                ]
+            else:
+                sources = [
+                    ("cold_curve_mlip",               self.eec.cold_curve_baseline_mlip,      "E_el_crystal_spline (kJ∕mol∕unit cell)"),
+                    ("cold_curve_mlip_corrected",     self.eec.cold_curve_corrected_mlip,     "E_el_crystal_spline (kJ∕mol∕unit cell)"),
+                    ("cold_curve_external",           self.eec.cold_curve_baseline_external,  external_fit_key),
+                    ("cold_curve_external_corrected", self.eec.cold_curve_corrected_external, external_fit_key),
+                ]
+            for key, inner, callable_key in sources:
+                if inner is None:
+                    continue
+                result[key] = {
+                    "E (callable)":       inner[callable_key],
+                    "V0 (Å³∕unit cell)": inner["V0 (Å³∕unit cell)"],
+                }
+        else:
+            df = self.exact_at_sampled_volume[self.select_T[0]]
+            inner = mbe_automation.dynamics.harmonic.eos.cold_curve(
+                V=df["V_crystal (Å³∕unit cell)"].to_numpy(),
+                E_el=df["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
             )
+            result["cold_curve_mlip"] = {
+                "E (callable)":       inner["E_el_crystal_spline (kJ∕mol∕unit cell)"],
+                "V0 (Å³∕unit cell)": inner["V0 (Å³∕unit cell)"],
+            }
+
         return result
 
     def plot_eos_curves(
@@ -161,10 +177,18 @@ class EOSMetadata:
         along with the cold curve.
         """
         eos = mbe_automation.storage.read_eos_curves(
-            self.dataset, 
+            self.dataset,
             self.eos_curves_key
         )
         cold_curve = self.cold_curve()
+
+        V_rebased = V_ref = T_ref = None
+        if self.eec.config.is_implicit:
+            V_rebased = self.interpolated_at_equilibrium_volume[
+                "V_rebased (Å³∕unit cell)"
+            ].to_numpy()
+            V_ref = self.eec.config.V_ref
+            T_ref = self.eec.config.T_ref
 
         return mbe_automation.dynamics.harmonic.display.eos_curves(
             eos=eos,
@@ -173,6 +197,9 @@ class EOSMetadata:
             max_temp_ticks=max_temp_ticks,
             debye_model=self.debye_model,
             cold_curve=cold_curve,
+            V_rebased=V_rebased,
+            V_ref=V_ref,
+            T_ref=T_ref,
         )
 
 def _assert_equivalent_cells(
@@ -355,8 +382,10 @@ def phonons(
     n_atoms_primitive_cell = len(phonons.primitive)
     n_atoms_super_cell = len(supercells[0])
     
+    atom_count_width = max(len(str(n_atoms_unit_cell)), len(str(n_atoms_super_cell)))
+    print(f"n_atoms                         {n_atoms_unit_cell:<{atom_count_width}} (unit cell=primitive)")
+    print(f"n_atoms                         {n_atoms_super_cell:<{atom_count_width}} (supercell)")
     print(f"n_supercells                    {n_supercells}")
-    print(f"n_atoms_super_cell              {n_atoms_super_cell}")
     print(f"supercell_displacement          {supercell_displacement:.3f} Å")
     #
     # Compute second-order dynamic matrix (Hessian)
@@ -692,7 +721,7 @@ def equilibrium_curve(
             print(
                 f"Computing electronic energy correction "
                 f"for T_ref={electronic_energy_correction.T_ref} K, "
-                f"target V_ref={electronic_energy_correction.V_ref} Å³"
+                f"target V_ref={electronic_energy_correction.V_ref} Å³"
             )
             i_T_ref = np.where(np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5))[0][0]
         else:
@@ -704,11 +733,11 @@ def equilibrium_curve(
         assert df_target["n_atoms_conventional_cell"].nunique() == 1
         eec = mbe_automation.dynamics.harmonic.eec.EEC.from_sampled_eos_curve(
             V_sampled=df_target["V_crystal (Å³∕unit cell)"].to_numpy(),
-            # G_raw_sampled and F_vib_sampled are temperature-dependent, but are
+            # G_mlip and F_vib_mlip are temperature-dependent, but are
             # not read when enforce_reference_state is False (param is set to 0.0).
-            G_raw_sampled=df_target["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(), 
-            E_el_raw_sampled=df_target["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
-            F_vib_sampled=df_target["F_vib_crystal (kJ∕mol∕unit cell)"].to_numpy(),
+            G_mlip=df_target["G_tot_crystal (kJ∕mol∕unit cell)"].to_numpy(),
+            E_el_mlip=df_target["E_el_crystal (kJ∕mol∕unit cell)"].to_numpy(),
+            F_vib_mlip=df_target["F_vib_crystal (kJ∕mol∕unit cell)"].to_numpy(),
             config=electronic_energy_correction,
             unit_cell_type=df_target["unit_cell_type"].iloc[0],
             n_atoms_primitive_cell=df_target["n_atoms_primitive_cell"].iloc[0],
@@ -720,20 +749,28 @@ def equilibrium_curve(
         #
         # E_el, F_tot, H_tot, G_tot, E_tot
         # 
-        df_eos = mbe_automation.dynamics.harmonic.data.update_with_eec(
-            df_crystal=df_eos,
-            eec=eec,
-            good_points=good_points
-        )
-        if electronic_energy_correction.enforce_reference_state:
+        if not electronic_energy_correction.is_implicit:
+            df_eos = mbe_automation.dynamics.harmonic.data.update_with_eec(
+                df_crystal=df_eos,
+                eec=eec,
+                good_points=good_points
+            )
+        if (electronic_energy_correction.enforce_reference_state
+                and not electronic_energy_correction.is_implicit):
             p_eec_GPa = eec.evaluate_pressure(eec.config.V_ref)
             if eec.config.reference_state_forcing == "linear":
-                print(f"EEC type: linear, param = {eec.param:.1e} kJ∕mol∕Å³")
+                print(f"EEC type: linear, param = {eec.param:.1e} kJ∕mol∕Å³")
             elif eec.config.reference_state_forcing == "inverse_volume":
-                print(f"EEC type: inverse_volume, param = {eec.param:.1e} kJ∕mol·Å³")
+                print(f"EEC type: inverse_volume, param = {eec.param:.1e} kJ∕mol·Å³")
             elif eec.config.reference_state_forcing == "rigid_shift":
-                print(f"EEC type: rigid_shift, ΔV = {eec.param:.1f} Å³∕unit cell")
+                print(f"EEC type: rigid_shift, ΔV = {eec.param:.1f} Å³∕unit cell")
             print(f"EEC effective pressure at V_ref: {p_eec_GPa:.4f} GPa")
+        elif electronic_energy_correction.is_implicit:
+            print(
+                f"EEC type: rebase_to_reference, "
+                f"V_ref={eec.config.V_ref:.2f} Å³ anchored at T_ref={eec.config.T_ref:.2f} K "
+                f"by post-processing the V_eos(T) curve"
+            )
         else:
             print("EEC type: baseline cold curve only, param = 0.0")
     else:
@@ -837,6 +874,27 @@ def equilibrium_curve(
         df["V_debye (Å³∕unit cell)"] = V_debye
         df["α_V_debye (1∕K)"] = alpha_V_debye
 
+    if electronic_energy_correction.is_implicit:
+        i_T_ref = np.where(
+            np.isclose(temperatures, electronic_energy_correction.T_ref, atol=1e-5)
+        )[0][0]
+        anchor_valid = min_found[i_T_ref]
+        if filter_out_extrapolated_minimum:
+            anchor_valid = anchor_valid and not min_extrapolated[i_T_ref]
+        if not anchor_valid:
+            raise ValueError(
+                f"rebase_to_reference: V_eos at T_ref="
+                f"{electronic_energy_correction.T_ref:.2f} K is not a valid minimum "
+                f"(min_found={min_found[i_T_ref]}, "
+                f"min_extrapolated={min_extrapolated[i_T_ref]}). "
+                f"Adjust volume_range to cover the equilibrium volume at T_ref."
+            )
+        df["V_rebased (Å³∕unit cell)"] = (
+            mbe_automation.dynamics.harmonic.eec.rebase_volume_to_reference(
+                temperatures, V_eos, eec.config,
+            )
+        )
+
     if save_plots and debye_model.initialized:
         _plot_debye_volume(
             debye_model=debye_model,
@@ -847,7 +905,8 @@ def equilibrium_curve(
 
     mbe_automation.dynamics.harmonic.display.eos_fitting_summary(
         df_crystal_eos=df,
-        filter_out_extrapolated_minimum=filter_out_extrapolated_minimum
+        filter_out_extrapolated_minimum=filter_out_extrapolated_minimum,
+        is_implicit_eec=electronic_energy_correction.is_implicit,
     )
     force_constants_keys = [
         f"{root_key}/phonons/force_constants/{label}"

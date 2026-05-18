@@ -167,6 +167,7 @@ class FreeEnergy:
                                    #
                                    # Supercell transformation matrix. If specified,
                                    # supercell_radius is ignored.
+                                   # Warning: this matrix acts on the primitive cell.
                                    #
     supercell_matrix: npt.NDArray[np.integer] | None = None
                                    #
@@ -332,7 +333,9 @@ class FreeEnergy:
         self.dataset = Path(self.dataset).expanduser()
         self.work_dir = Path(self.work_dir).expanduser()
 
-        self.temperatures_K = np.sort(np.atleast_1d(self.temperatures_K))
+        self.temperatures_K = np.sort(
+            np.atleast_1d(self.temperatures_K).astype(np.float64, copy=False)
+        )
         if len(self.temperatures_K) > 1:
             diffs = np.diff(self.temperatures_K)
             if np.any(diffs < 1.0E-5):
@@ -346,15 +349,16 @@ class FreeEnergy:
                     f"The electronic energy correction requires its reference temperature "
                     f"(EECConfig.T_ref) to be present in the temperature grid."
                 )
-            if not np.isclose(self.electronic_energy_correction.p_ref_GPa, self.pressure_GPa, atol=1.0E-5):
-                raise ValueError(
-                    f"EECConfig.p_ref_GPa ({self.electronic_energy_correction.p_ref_GPa:.6g} GPa) "
-                    f"does not match FreeEnergy.pressure_GPa ({self.pressure_GPa:.6g} GPa). "
-                    f"The reference pressure used for the EEC must equal the external pressure "
-                    f"of the workflow."
-                )
-            if self.equation_of_state != "spline":
-                raise ValueError("Electronic energy correction is only supported with the 'spline' equation of state.")
+            if not self.electronic_energy_correction.is_implicit:
+                if not np.isclose(self.electronic_energy_correction.p_ref_GPa, self.pressure_GPa, atol=1.0E-5):
+                    raise ValueError(
+                        f"EECConfig.p_ref_GPa ({self.electronic_energy_correction.p_ref_GPa:.6g} GPa) "
+                        f"does not match FreeEnergy.pressure_GPa ({self.pressure_GPa:.6g} GPa). "
+                        f"The reference pressure used for the EEC must equal the external pressure "
+                        f"of the workflow."
+                    )
+                if self.equation_of_state != "spline":
+                    raise ValueError("Electronic energy correction is only supported with the 'spline' equation of state.")
         
         self.volume_range = np.sort(np.atleast_1d(self.volume_range))
         if len(self.volume_range) > 1:
@@ -400,6 +404,23 @@ class FreeEnergy:
                 "will not converge to the requested volume. "
                 "Use a different eos_sampling option."
             )
+
+        if self.electronic_energy_correction.is_implicit:
+            if self.eos_sampling == "pressure":
+                raise ValueError(
+                    "eos_sampling='pressure' is incompatible with "
+                    "reference_state_forcing='rebase_to_reference'. The rebased "
+                    "V(T) is not a minimum of G(V,T), so the thermal pressure "
+                    "computed during EOS sampling is inconsistent. "
+                    "Use a different eos_sampling option."
+                )
+            if self.volume_curve != "eos_minimum":
+                raise ValueError(
+                    "reference_state_forcing='rebase_to_reference' must be used "
+                    f"with volume_curve='eos_minimum', got '{self.volume_curve}'. "
+                    "Combining the rebase with the Debye-volume source is "
+                    "ambiguous (rebase V_eos or rebase V_debye?)."
+                )
 
         if self.volume_curve == "debye":
             T_max = self.debye_model.max_fit_temperature_K

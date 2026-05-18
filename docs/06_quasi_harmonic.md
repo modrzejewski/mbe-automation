@@ -73,18 +73,23 @@ mbe_automation.run(properties_config)
 
 EEC provides two independent capabilities that can be used separately or together:
 
-1. **Reference state forcing** — adds an empirical term to enforce a known reference volume ($V_{\text{ref}}$) at a specific reference temperature ($T_{\text{ref}}$). Three correction types are supported:
+1. **Reference state forcing** — anchors a known reference volume ($V_{\text{ref}}$) at a specific reference temperature ($T_{\text{ref}}$). Four modes are supported:
+
+   *Explicit electronic-energy corrections* — modify $E_{\text{el}}(V)$ analytically so that $\mathrm{argmin}_V\, G(V, T_{\text{ref}}) = V_{\text{ref}}$:
    - **Linear**: $E_{\text{corr}}(V) = \text{param} \cdot (V - V_{\text{ref}})$
    - **Inverse volume**: $E_{\text{corr}}(V) = \text{param} / V$
    - **Rigid shift**: $E_{\text{corr}}(V) = E_{\text{el}}(V - \Delta V) - E_{\text{el}}(V)$, where $\Delta V$ is chosen so that $\mathrm{d}G/\mathrm{d}V = 0$ at ($V_\text{ref}$, $T_\text{ref}$, $p_\text{ref}$). This corresponds to a rigid translation of the static cold curve along the volume axis.
 
    The `param` (or $\Delta V$ for rigid shift) is determined analytically from a cubic spline fit of the raw Gibbs free energy vs. volume curve.
 
+   *Implicit volume correction* — leaves $E_{\text{el}}(V)$ untouched and rigidly shifts the computed volume curve:
+   - **Rebase to reference**: $V_{\text{corrected}}(T) = V_{\text{ref}} - V_{\text{eos}}(T_{\text{ref}}) + V_{\text{eos}}(T)$. The thermal-expansion shape $\mathrm{d}V/\mathrm{d}T$ is preserved. The rebased $V(T)$ is no longer $\mathrm{argmin}_V\, G(V, T)$, so quantities recomputed from $G(V, T)$ are not self-consistent with it.
+
 2. **External baseline substitution** — replaces the MLIP static cold curve with an external baseline built from user-supplied EOS parameters (`baseline_V0`, `baseline_B0_GPa`, `baseline_B0_prime`). The functional form is controlled by `baseline_curve_type`: Birch–Murnaghan EOS (default) or a 3rd-order Taylor polynomial around $V_0$. Useful when the MLIP static cold curve should be replaced by an external source, e.g. a high-level DFT or coupled-cluster curve. Can be used with `reference_state_forcing="none"` to substitute the curve without any additional empirical forcing.
 
 The EEC contribution is added to the crystal's electronic energy and propagated into all derived thermodynamic functions. To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the [`EEC`](./03_configuration_classes.md#eec-class) dataclass from `mbe_automation.configs.quasi_harmonic`.
 
-The equation of state must be set to `"spline"` (which is the default) to use the EEC option. When using reference state forcing, $T_{\text{ref}}$ must be present in the `temperatures_K` array.
+For the explicit forcing modes (`"linear"`, `"inverse_volume"`, `"rigid_shift"`) the equation of state must be set to `"spline"` (which is the default), because the correction parameter is derived from a cubic-spline fit of $G(V)$. The implicit `"rebase_to_reference"` mode performs no such fit and accepts any supported equation of state. When using any reference state forcing, $T_{\text{ref}}$ must be present in the `temperatures_K` array.
 
 ### Reference state forcing example
 
@@ -132,6 +137,21 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 
 mbe_automation.run(properties_config)
 ```
+
+### Rebase to reference example
+
+The implicit `"rebase_to_reference"` mode fits no parameter and applies no $E_{\text{el}}$ correction. Use it when you want to enforce the reference volume without committing to a particular functional form for the cold-curve correction. The configuration is identical to the explicit modes — only the `reference_state_forcing` value changes:
+
+```python
+electronic_energy_correction=EEC(
+    reference_state_forcing="rebase_to_reference",
+    T_ref=123.0,
+    V_ref=145.80,
+    cell="conventional",
+),
+```
+
+The output CSV records `V_rebased (Å³∕unit cell)` alongside `V_eos` (and `V_debye` when applicable) for traceability. The QHA temperature loop uses the rebased curve. Because the rebased $V(T)$ is not the minimum of $G(V,T)$, this mode is incompatible with `eos_sampling="pressure"`, with `volume_curve="debye"`, and with external baseline substitution (`baseline_V0` / `baseline_B0_GPa` / `baseline_B0_prime`).
 
 ### External baseline substitution example
 
@@ -187,7 +207,7 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 mbe_automation.run(properties_config)
 ```
 
-To combine external baseline substitution with reference state forcing, simply set `reference_state_forcing` to a value other than `"none"` alongside the baseline parameters:
+To combine external baseline substitution with reference state forcing, set `reference_state_forcing` to one of the explicit modes (`"linear"`, `"inverse_volume"`, `"rigid_shift"`) alongside the baseline parameters. The implicit `"rebase_to_reference"` mode cannot be combined with a baseline substitution.
 
 ```python
 electronic_energy_correction=EEC(

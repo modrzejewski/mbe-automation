@@ -320,7 +320,7 @@ def cold_curve(
             - 'V0 (Å³∕unit cell)': Equilibrium volume where E^el is minimized.
             - 'E0 (kJ∕mol∕unit cell)': Electronic energy at V0.
             - 'B0 (GPa)': Bulk modulus at V0.
-            - 'B0 (kJ∕mol∕Å³)': Bulk modulus at V0 in kJ/mol/Å³.
+            - 'B0 (kJ∕mol∕Å³)': Bulk modulus at V0 in kJ/mol/Å³.
             - 'dB0dP': Pressure derivative of the bulk modulus at V0.
     """
     # Fit 3rd-order polynomial
@@ -382,14 +382,14 @@ def cold_curve(
         "V0 (Å³∕unit cell)": V0,
         "E0 (kJ∕mol∕unit cell)": E0,
         "B0 (GPa)": B0_GPa,
-        "B0 (kJ∕mol∕Å³)": B0_kJ_mol_A3,
+        "B0 (kJ∕mol∕Å³)": B0_kJ_mol_A3,
         "dB0dP": dB0dP,
-        "E2 (kJ∕mol∕Å⁶)": E2,
-        "E3 (kJ∕mol∕Å⁹)": E3,
+        "E2 (kJ∕mol∕Å⁶)": E2,
+        "E3 (kJ∕mol∕Å⁹)": E3,
     }
 
 
-def baseline_cold_curve(
+def external_cold_curve(
     V0: float,
     B0_GPa: float,
     B0_prime: float,
@@ -421,12 +421,12 @@ def baseline_cold_curve(
     return {
         "E_el_crystal_poly_3 (kJ∕mol∕unit cell)": poly_3_baseline,
         "E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)": bm_baseline,
-        "E_el_crystal_birch_murnaghan_deriv (kJ∕mol∕Å³∕unit cell)": bm_baseline_deriv,
+        "E_el_crystal_birch_murnaghan_deriv (kJ∕mol∕Å³∕unit cell)": bm_baseline_deriv,
         "V0 (Å³∕unit cell)": V0,
         "E0 (kJ∕mol∕unit cell)": E0,
         "B0 (GPa)": B0_GPa,
-        "B0 (kJ∕mol∕Å³)": B0_kJ_mol_A3,
+        "B0 (kJ∕mol∕Å³)": B0_kJ_mol_A3,
         "dB0dP": B0_prime,
-        "E2 (kJ∕mol∕Å⁶)": E2,
-        "E3 (kJ∕mol∕Å⁹)": E3,
+        "E2 (kJ∕mol∕Å⁶)": E2,
+        "E3 (kJ∕mol∕Å⁹)": E3,
     }

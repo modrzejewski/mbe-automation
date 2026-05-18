@@ -17,6 +17,8 @@ from mbe_automation.configs.recommended import SEMIEMPIRICAL_DFTB, KNOWN_MODELS
 SYMMETRY_TOLERANCE_STRICT = 1.0E-5
 SYMMETRY_TOLERANCE_LOOSE = 1.0E-2
 
+CELL_RELAXATION_MODES = ("full", "constant_volume", "only_atoms")
+
 @dataclass(kw_only=True)
 class Minimum:
                                    #
@@ -54,7 +56,7 @@ class Minimum:
                                    #
                                    # Maximum number of steps in the geometry relaxation
                                    #
-    max_n_steps: int = 500
+    max_n_steps: int = 1000
                                    #
                                    # Relaxed degrees of freedom. Referenced
                                    # only for periodic systems.
@@ -67,7 +69,7 @@ class Minimum:
                                    # (2) for harmonic calculations without thermal
                                    #     expansion all three settings are allowed.
                                    #
-    cell_relaxation: Literal["full", "constant_volume", "only_atoms"] = "constant_volume"
+    cell_relaxation: Literal[*CELL_RELAXATION_MODES] = "constant_volume"
                                    #
                                    # Refine the space group symmetry after
                                    # geometry relaxation of the unit cell.
@@ -124,11 +126,6 @@ class Minimum:
                                    # or .cif file in the working directory
                                    #
     save_structure_files: bool = True
-                                   #
-                                   # Construct the relaxed structure aligned to the
-                                   # input structure using StructureMatcher from pymatgen
-                                   #
-    align_to_input: bool = False
 
     @property
     def pressure_GPa(self) -> float:
@@ -136,6 +133,11 @@ class Minimum:
         return self._pressure_GPa
 
     def __post_init__(self):
+        if self.cell_relaxation not in CELL_RELAXATION_MODES:
+            raise ValueError(
+                f"Invalid cell_relaxation: {self.cell_relaxation!r}. "
+                f"Must be one of {CELL_RELAXATION_MODES}."
+            )
         if (
                 self.cell_relaxation == "constant_volume" and
                 self.backend == "dftb"

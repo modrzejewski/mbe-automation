@@ -117,6 +117,12 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         work_dir=geom_opt_dir/relaxed_crystal_label,
         key=f"{config.root_key}/structures/{relaxed_crystal_label}"
     )
+    #
+    # Note: From this point forward, unit_cell_V0 is guaranteed to be
+    # the symmetrized primitive cell (enforced by the Minimum config).
+    # All downstream thermodynamic analysis, representations, and 
+    # generated supercells will be relative to this primitive cell frame.
+    #
     V0 = unit_cell_V0.get_volume()
     composition = mbe_automation.structure.clusters.identify_molecules(
         crystal=mbe_automation.storage.from_ase_atoms(unit_cell_V0),
@@ -143,8 +149,10 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             config.supercell_diagonal
         )
     else:
-        print("Using supercell matrix provided in config", flush=True)
-        supercell_matrix = config.supercell_matrix        
+        print("Remark: Using supercell matrix provided in config.", flush=True)
+        print("        It is on the user's side to ensure that this matrix is defined", flush=True)
+        print("        relative to the symmetrized primitive cell.", flush=True)
+        supercell_matrix = config.supercell_matrix
     #
     # Phonon properties of the fully relaxed cell
     # (the harmonic approximation)
@@ -254,6 +262,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 "Falling back to volume_curve='eos_minimum'."
             )
             effective_volume_curve = "eos_minimum"
+    if config.electronic_energy_correction.is_implicit:
+        effective_volume_curve = "rebase_to_reference"
     if effective_volume_curve == "debye" and config.eos_sampling == "pressure":
         raise ValueError(
             "eos_sampling='pressure' is incompatible with volume_curve='debye'. "
@@ -299,6 +309,19 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 + "\n".join(f"  T={T:.1f} K  →  V_debye={V:.1f} Å³" for T, V in zip(out_temps, out_vols))
                 + "\nExtend volume_range to cover these volumes."
             )
+    elif effective_volume_curve == "rebase_to_reference":
+        # The rebase is a pure algebraic shift, not a model fit — there is
+        # no trust region. Validity falls through to the eos_minimum
+        # criterion. p_thermal_crystal is dropped for the same reason as
+        # in the Debye branch: the rebased V(T) is not a minimum of G(V,T),
+        # so applying p_thermal as an external pressure is inconsistent.
+        if config.filter_out_extrapolated_minimum:
+            df_crystal_eos["valid_equilibrium"] = (
+                df_crystal_eos["min_found"] & ~df_crystal_eos["min_extrapolated"]
+            )
+        else:
+            df_crystal_eos["valid_equilibrium"] = df_crystal_eos["min_found"]
+        df_crystal_eos.drop(columns=["p_thermal_crystal (GPa)"], inplace=True)
     elif config.filter_out_extrapolated_minimum:
         df_crystal_eos["valid_equilibrium"] = (
             df_crystal_eos["min_found"] & ~df_crystal_eos["min_extrapolated"]
@@ -313,8 +336,10 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         T = row["T (K)"]
         if effective_volume_curve == "eos_minimum":
             V = row["V_eos (Å³∕unit cell)"]
-        else:  # "debye"
+        elif effective_volume_curve == "debye":
             V = row["V_debye (Å³∕unit cell)"]
+        else:  # "rebase_to_reference"
+            V = row["V_rebased (Å³∕unit cell)"]
         unit_cell_T = unit_cell_V0.copy()
         unit_cell_T.set_cell(
             unit_cell_V0.cell * (V/V0)**(1/3),
@@ -331,7 +356,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                     row["p_thermal_crystal (GPa)"] + 
                     config.pressure_GPa
                 )
-            if config.electronic_energy_correction.is_enabled:
+            if (config.electronic_energy_correction.is_enabled
+                    and not config.electronic_energy_correction.is_implicit):
                 p_effective += interpolated_harmonic_props.eec.evaluate_pressure(V)
             optimizer._pressure_GPa = p_effective
             optimizer.cell_relaxation = "full"
@@ -389,7 +415,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             unit_cell_type="primitive",
         )
         
-        if config.electronic_energy_correction.is_enabled:
+        if (config.electronic_energy_correction.is_enabled
+                and not config.electronic_energy_correction.is_implicit):
             df_crystal_T = mbe_automation.dynamics.harmonic.data.update_with_eec(
                 df_crystal=df_crystal_T,
                 eec=interpolated_harmonic_props.eec
@@ -416,6 +443,9 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     #
     df_crystal_qha = pd.concat(data_frames_at_T)
     df_crystal_qha["volume_curve"] = effective_volume_curve
+    df_crystal_qha["reference_state_forcing"] = (
+        config.electronic_energy_correction.reference_state_forcing
+    )
     #
     # Compute heat capacity at constant pressure (C_P_tot) and thermal expansion
     # coefficients (alpha_V, alpha_L_a, alpha_L_b, alpha_L_c) using numerical

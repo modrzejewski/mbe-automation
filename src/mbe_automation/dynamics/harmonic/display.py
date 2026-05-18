@@ -252,6 +252,9 @@ def _eos_curves(
     max_temp_ticks: int = 10,
     debye_model: DebyeModel | None = None,
     cold_curve: dict | None = None,
+    V_rebased: npt.NDArray[np.float64] | None = None,
+    V_ref: float | None = None,
+    T_ref: float | None = None,
 ):
 
     n_temperatures = len(eos.temperatures)
@@ -273,21 +276,29 @@ def _eos_curves(
     if np.any(~np.isnan(G_min_scaled)):
         G_min_global = min(G_min_global, np.nanmin(G_min_scaled))
 
-    if cold_curve is not None:
-        interp_E_el = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"]
-        poly_approx = cold_curve["E_el_crystal_poly_3 (kJ∕mol∕unit cell)"]
-        bm_approx = cold_curve["E_el_crystal_birch_murnaghan (kJ∕mol∕unit cell)"]
-        V_accurate = cold_curve["V_sampled (Å³∕unit cell)"]
-        E_el_accurate = cold_curve["E_el_crystal_sampled (kJ∕mol∕unit cell)"]
-        V0_cold = cold_curve["V0 (Å³∕unit cell)"]
-        B0_cold = cold_curve["B0 (GPa)"]
-        dB0dP_cold = cold_curve["dB0dP"]
-        
-        E_el_interp_scaled = interp_E_el(eos.V_interp) * scaling_factor
-        E_el_min_scaled = interp_E_el(V0_cold) * scaling_factor
-        E_el_approx_scaled = poly_approx(eos.V_interp) * scaling_factor
-        E_el_bm_scaled = bm_approx(eos.V_interp) * scaling_factor
-        
+    _COLD_CURVE_PRESENTATION = {
+        "cold_curve_mlip":               ("MLIP",                 "\\mathrm{MLIP}",            "black",    ":"),
+        "cold_curve_mlip_corrected":     ("MLIP (corrected)",     "\\mathrm{MLIP\\,(corr)}",  "black",    "-"),
+        "cold_curve_external":           ("External",             "\\mathrm{ext}",             "tab:blue", "--"),
+        "cold_curve_external_corrected": ("External (corrected)", "\\mathrm{ext\\,(corr)}",   "tab:blue", "-"),
+    }
+    _COLD_CURVE_REFERENCE_PRIORITY = (
+        "cold_curve_mlip_corrected",
+        "cold_curve_external_corrected",
+        "cold_curve_mlip",
+        "cold_curve_external",
+    )
+
+    ref_key = None
+    ref_V0 = None
+    E_el_min_scaled = 0.0
+    if cold_curve:
+        ref_key = next((k for k in _COLD_CURVE_REFERENCE_PRIORITY if k in cold_curve), None)
+
+    if ref_key is not None:
+        ref_entry = cold_curve[ref_key]
+        ref_V0 = ref_entry["V0 (Å³∕unit cell)"]
+        E_el_min_scaled = float(ref_entry["E (callable)"](ref_V0)) * scaling_factor
         fig, (ax, ax_cold) = plt.subplots(2, 1, figsize=(8, 10), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         fig.subplots_adjust(hspace=0.05)
     else:
@@ -332,84 +343,44 @@ def _eos_curves(
         label="G minimum",
     )
 
-    if cold_curve is not None and ax_cold is not None:
-        label_interp = "Cubic spline"
-        ax_cold.plot(
-            eos.V_interp,
-            E_el_interp_scaled - E_el_min_scaled,
-            color="black",
-            linestyle="-",
-            label=label_interp,
-        )
-        ax_cold.scatter(
-            V_accurate,
-            (E_el_accurate * scaling_factor) - E_el_min_scaled,
-            color="black",
-            marker="o",
-            facecolors="none"
-        )
-        label_approx = "3rd-order polynomial"
-        ax_cold.plot(
-            eos.V_interp,
-            E_el_approx_scaled - E_el_min_scaled,
-            color="tab:red",
-            linestyle=":",
-            linewidth=2,
-            label=label_approx,
-        )
-        
-        label_bm = "Birch-Murnaghan"
-        ax_cold.plot(
-            eos.V_interp,
-            E_el_bm_scaled - E_el_min_scaled,
-            color="tab:blue",
-            linestyle="-.",
-            linewidth=2,
-            label=label_bm,
-        )
-            
-        ax_cold.axvline(
-            x=V0_cold,
-            ymin=0.0,
-            ymax=0.5,
-            color="dimgray",
-            linestyle="--",
-            linewidth=1.0,
-        )
-        ax_cold.text(
-            x=V0_cold + (np.nanmax(eos.V_interp) - np.nanmin(eos.V_interp)) * 0.015,
-            y=0.5,
-            s=f"$V_0$ = {V0_cold:.1f} $\\mathrm{{\\AA}}^3$\n$B_0$ = {B0_cold:.1f} GPa\n$B_0^\\prime$ = {dB0dP_cold:.1f}",
-            color="black",
-            fontsize=10,
-            verticalalignment="top",
-            horizontalalignment="left",
-            transform=ax_cold.get_xaxis_transform()
-        )
-
-    raw_spline = cold_curve.get("E_el_crystal_raw_spline (kJ∕mol∕unit cell)")
-    V0_raw = cold_curve.get("E_el_crystal_raw_V0 (Å³∕unit cell)")
-    if raw_spline is not None and ax_cold is not None:
-        E_el_raw_interp = raw_spline(eos.V_interp) * scaling_factor
-        E_el_raw_min = np.min(E_el_raw_interp)
-        ax_cold.plot(
-            eos.V_interp,
-            E_el_raw_interp - E_el_raw_min,
-            color="gray",
-            linestyle=":",
-            linewidth=1.5,
-            label="Unaltered MLIP",
-        )
-        if V0_raw is not None:
-            dV = V0_cold - V0_raw
-            E_el_raw_hshifted = (raw_spline(eos.V_interp - dV) - raw_spline(V0_raw)) * scaling_factor
+    if cold_curve and ax_cold is not None:
+        V_interp = eos.V_interp
+        V_range = np.nanmax(V_interp) - np.nanmin(V_interp)
+        present_keys = [k for k in _COLD_CURVE_PRESENTATION if k in cold_curve]
+        n_curves = len(present_keys)
+        for i, key in enumerate(present_keys):
+            entry = cold_curve[key]
+            label, v0_sub, color, linestyle = _COLD_CURVE_PRESENTATION[key]
+            E_callable = entry["E (callable)"]
+            V0 = entry["V0 (Å³∕unit cell)"]
+            E_curve_scaled = E_callable(V_interp) * scaling_factor
             ax_cold.plot(
-                eos.V_interp,
-                E_el_raw_hshifted,
-                color="olive",
-                linestyle=":",
-                linewidth=1.5,
-                label="Unaltered MLIP shifted to $V_0$",
+                V_interp,
+                E_curve_scaled - E_el_min_scaled,
+                color=color,
+                linestyle=linestyle,
+                linewidth=1.8,
+                label=label,
+            )
+            ax_cold.axvline(
+                x=V0,
+                ymin=0.0,
+                ymax=0.5,
+                color=color,
+                linestyle="--",
+                linewidth=1.0,
+                alpha=0.6,
+            )
+            y_text = 0.5 - 0.08 * i if n_curves > 1 else 0.5
+            ax_cold.text(
+                x=V0 + V_range * 0.015,
+                y=y_text,
+                s=f"$V_0^{{{v0_sub}}}$ = {V0:.1f} $\\mathrm{{\\AA}}^3$",
+                color=color,
+                fontsize=9,
+                verticalalignment="top",
+                horizontalalignment="left",
+                transform=ax_cold.get_xaxis_transform(),
             )
 
     if debye_model is not None and debye_model.initialized:
@@ -427,6 +398,20 @@ def _eos_curves(
             label="Debye model",
         )
 
+    if V_rebased is not None:
+        G_rebased_scaled = np.array([
+            np.interp(V_rebased[i], eos.V_interp, G_interp_scaled[i, :], left=np.nan, right=np.nan)
+            for i in range(n_temperatures)
+        ])
+        ax.plot(
+            V_rebased,
+            G_rebased_scaled - G_min_global,
+            color="tab:green",
+            linestyle="--",
+            marker="x",
+            label=f"shifted to $V_{{\\mathrm{{ref}}}}$ = {V_ref:.1f} Å³ at $T_{{\\mathrm{{ref}}}}$ = {T_ref:.0f} K",
+        )
+
     ax.legend(
         frameon=True,
         edgecolor="black",
@@ -439,15 +424,16 @@ def _eos_curves(
     ax.set_ylim(bottom=0)
 
     if ax_cold is not None:
-        ax_cold.legend(
-            fontsize=10,
-            loc="upper center",
-            bbox_to_anchor=(V0_cold, 0.98),
-            bbox_transform=ax_cold.get_xaxis_transform(),
-            frameon=True,
-            edgecolor="black",
-            fancybox=False,
-        )
+        if n_curves > 1:
+            ax_cold.legend(
+                fontsize=10,
+                loc="upper center",
+                bbox_to_anchor=(ref_V0, 0.98),
+                bbox_transform=ax_cold.get_xaxis_transform(),
+                frameon=True,
+                edgecolor="black",
+                fancybox=False,
+            )
         ax_cold.set_xlabel("Volume (Å³∕unit cell)", fontsize=14)
         ax_cold.set_ylabel(y_label_cold, fontsize=14)
         ax_cold.grid(True, linestyle="--", alpha=0.6)
@@ -492,6 +478,9 @@ def eos_curves(
     max_temp_ticks: int = 10,
     debye_model: DebyeModel | None = None,
     cold_curve: dict | None = None,
+    V_rebased: npt.NDArray[np.float64] | None = None,
+    V_ref: float | None = None,
+    T_ref: float | None = None,
 ):
     if eos is None:
         if dataset is None or key is None:
@@ -505,6 +494,9 @@ def eos_curves(
         max_temp_ticks=max_temp_ticks,
         debye_model=debye_model,
         cold_curve=cold_curve,
+        V_rebased=V_rebased,
+        V_ref=V_ref,
+        T_ref=T_ref,
     )
 
 
@@ -715,15 +707,12 @@ def print_frequency_comparison(
 
 def eos_fitting_summary(
     df_crystal_eos: pd.DataFrame,
-    filter_out_extrapolated_minimum: bool
+    filter_out_extrapolated_minimum: bool,
+    is_implicit_eec: bool = False,
 ):
     """
     Print a summary of the EOS fitting results across all temperatures.
     """
-    
-    print("\n" + "=" * 80)
-    print(f"{'Gibbs free energy minimization summary':^80}")
-    print("=" * 80)
     
     #
     # Construct the summary table
@@ -731,49 +720,68 @@ def eos_fitting_summary(
     summary_rows = []
     for _, row in df_crystal_eos.iterrows():
         T = row["T (K)"]
-        V = row["V_eos (Å³∕unit cell)"]
+        V_eos = row["V_eos (Å³∕unit cell)"]
         min_found = row["min_found"]
         min_extrapolated = row["min_extrapolated"]
-        
+
         if not min_found:
             status = "skipped (no minimum found)"
         elif min_extrapolated and filter_out_extrapolated_minimum:
             status = "skipped (minimum beyond scanned range)"
         else:
             status = "proceed"
-            
-        summary_rows.append({
-            "T (K)": f"{T:8.1f}",
-            "V (Å³)": f"{V:8.1f}" if not np.isnan(V) else f"{'N/A':>8}",
-            "min_found": f"{str(min_found):^10}",
-            "min_extrapolated": f"{str(min_extrapolated):^16}",
-            "status": status
-        })
-        
+
+        row_data = {"T (K)": f"{T:8.1f}"}
+        if is_implicit_eec:
+            V_rebased = row["V_rebased (Å³∕unit cell)"]
+            row_data["V_eos (Å³, pre-EEC)"] = (
+                f"{V_eos:8.1f}" if not np.isnan(V_eos) else f"{'N/A':>8}"
+            )
+            row_data["V (Å³, post-EEC)"] = (
+                f"{V_rebased:8.1f}" if not np.isnan(V_rebased) else f"{'N/A':>8}"
+            )
+        else:
+            row_data["V (Å³)"] = (
+                f"{V_eos:8.1f}" if not np.isnan(V_eos) else f"{'N/A':>8}"
+            )
+        row_data["min_found"] = f"{str(min_found):^10}"
+        row_data["min_extrapolated"] = f"{str(min_extrapolated):^16}"
+        row_data["status"] = status
+        summary_rows.append(row_data)
+
     df_summary = pd.DataFrame(summary_rows)
-    print(df_summary.to_string(index=False), flush=True)
-    print("-" * 80)
-    
+    table_lines = df_summary.to_string(index=False).split("\n")
+    n = max(len(line) for line in table_lines)
+
+    print()
+    print(f"{'Gibbs free energy minimization summary':^{n}}")
+    mbe_automation.common.display.dotted_separator(n)
+    print(table_lines[0])
+    mbe_automation.common.display.dotted_separator(n)
+    for body_line in table_lines[1:]:
+        print(body_line)
+    mbe_automation.common.display.dotted_separator(n)
+
     #
     # Diagnostic information
     #
     n_total = len(df_crystal_eos)
     n_proceed = sum(1 for r in summary_rows if r["status"] == "proceed")
-    
+
     if n_proceed == 0:
         print("\n[!] CRITICAL: No valid minima found for any temperature.")
         print("    The workflow cannot proceed with equilibrium-volume calculations.")
     elif n_proceed < n_total:
         print(f"\n[!] WARNING: Valid minima found for only {n_proceed}/{n_total} temperature points.")
-    
+
     if n_proceed < n_total:
         print("\nSuggestions:")
         print("1. Inspect the volume sampling range (volume_range/thermal_pressures_GPa).")
         print("   The current range might not bracket the equilibrium volume at all temperatures.")
         print("2. Check phonon dispersion plots for imaginary frequencies.")
         print("3. Consider if the filtering criteria (filter_out_imaginary_*) are too strict.")
-        
-    print("=" * 80 + "\n", flush=True)
+
+    print(flush=True)
 
 
 def debye_model_summary(

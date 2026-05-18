@@ -215,10 +215,10 @@ def _hybrid_derivative(x: npt.NDArray[np.float64], y: npt.NDArray[np.float64]) -
         d_dx = d_dx_finite_diff
         
     else:
-        d_dx = np.zeros_like(x)
+        d_dx = np.zeros_like(x, dtype=np.float64)
         d_dx[0] = d_dx_finite_diff[0]
         d_dx[-1] = d_dx_finite_diff[-1]
-        d_dx[1:-1] = d_dx_cspline[1:-1]        
+        d_dx[1:-1] = d_dx_cspline[1:-1]
 
     return d_dx
     
@@ -259,16 +259,22 @@ def fit_thermal_expansion_properties(
     """
     Compute physical quantities by numerical differentiation
 
-    heat capacity at constant pressure C_P
+    heat capacity at constant pressure C_P_tot_crystal
     volumetric thermal expansion cofficient alpha_V
     linear thermal expansion coefficient alpha_L_x, x = a, b, c
 
-    C_P_tot_formula_I(T) = dH_tot(T,P)/dT
-    C_P_tot_formula_II(T) = C_V(T,P) + T * V * alpha_V(T,P) * dS(T,V)/dV|_(V=Veq(T,P))
+    C_P_tot_crystal(T) = C_V(T,V) + T * V * alpha_V(T,V) * dS(T,V)/dV|_(V=V(T,P))
     alpha_V = 1/V(T,P) dV(T,P)/dT
     alpha_L_a = 1/a(T,P) da(T,P)/dT
     alpha_L_b = 1/b(T,P) db(T,P)/dT
     alpha_L_c = 1/c(T,P) dc(T,P)/dT
+
+    Note: the alternative form C_P = dH_tot/dT (formula I) is also
+    computed internally for diagnostics but is not exposed in the
+    returned dataframe. Formula II above is used because it remains
+    valid whenever V at each T is not the minimum of the computed
+    G(V,T), e.g. when an empirical correction shifts V away from the
+    EOS minimum.
 
     The algorithm selected for the numerical differentiation
     depends on the available number of temperature points (n_temperatures).
@@ -356,8 +362,7 @@ def fit_thermal_expansion_properties(
     #
     return pd.DataFrame({
             "T (K)": T,
-            "C_P_tot_formula_I (J∕K∕mol∕unit cell)": properties.C_P_tot_formula_I,
-            "C_P_tot_formula_II (J∕K∕mol∕unit cell)": properties.C_P_tot_formula_II,
+            "C_P_tot_crystal (J∕K∕mol∕unit cell)": properties.C_P_tot_formula_II,
             "α_V (1∕K)": properties.alpha_V,
             "α_L_a_primitive (1∕K)": properties.alpha_L_a_primitive,
             "α_L_b_primitive (1∕K)": properties.alpha_L_b_primitive,

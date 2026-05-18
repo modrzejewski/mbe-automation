@@ -4,32 +4,31 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mbe-automation"
-version = "0.4.0"
+version = "0.4.2"
 requires-python = ">=3.11"
 dependencies = [
-  "torch",
-  "numpy",
+  "torch==2.9.1",
+  "numpy==2.3.3",
+  "scipy==1.16.2",
   "networkx",
-  "scipy",
   "ase>=3.26.0",
   "dscribe",
   "matplotlib",
-  "pymatgen==2026.3.23",
-  "pymatgen-core==2026.4.7",
+  "pymatgen==2025.10.7",
   "pyscf>=2.12.0",
   "pyscf-dispersion",
   "scikit-learn",
-  "spglib",
-  "seekpath",
+  "spglib==2.6.0",
+  "seekpath==2.2.1",
   "euphonic",
-  "phonopy>=2.43.1",
-  "symfc>=1.6.1",
+  "phonopy==2.43.2",
+  "symfc==1.6.1",
   "tqdm",
   "joblib",
   "h5py",
   "pandas",
   "ipi",
-  "doped",
+  "doped==3.2.1",
   "dynasor",
   "nglview",
   "pymatviz",
@@ -39,7 +38,6 @@ dependencies = [
 
 [project.optional-dependencies]
 mace = [
-  "torch>=2.9.0",
   "mace-torch>=0.3.15",
 ]
 uma = [
