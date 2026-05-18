@@ -18,6 +18,18 @@ from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLIN
 from mbe_automation.dynamics.harmonic.eec import ELECTRONIC_ENERGY_CORRECTION, EECConfig as EEC
 from mbe_automation.dynamics.harmonic.eec import DebyeModel, DEFAULT_DEBYE_FITTING_T
 
+
+@dataclass(kw_only=True)
+class MoleculeRef:
+    """
+    Gas-phase reference for one crystallographically distinct molecule
+    in a Z' > 1 crystal.
+    """
+    system: ase.Atoms | mbe_automation.storage.Structure
+    multiplicity: int
+    multiplicity_cell: Literal["primitive", "conventional"] = "conventional"
+
+
 @dataclass(kw_only=True)
 class FreeEnergy:
     """
@@ -33,7 +45,12 @@ class FreeEnergy:
                                    # and isolated molecule
                                    #
     crystal: ase.Atoms | mbe_automation.storage.Structure
-    molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
+    molecule: (
+        ase.Atoms
+        | mbe_automation.storage.Structure
+        | list[MoleculeRef]
+        | None
+    ) = None
                                    #
                                    # Empirical electronic energy correction applied
                                    # to enforce known reference volume (V_ref)

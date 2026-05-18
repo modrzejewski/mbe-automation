@@ -2,6 +2,7 @@ import os
 import os.path
 from copy import deepcopy
 from pathlib import Path
+import ase
 import ase.units
 import numpy as np
 import pandas as pd
@@ -18,6 +19,242 @@ import mbe_automation.structure.relax
 import mbe_automation.structure.clusters
 
 from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
+
+
+def _centering_ratio(unit_cell_primitive):
+    """
+    Return (n_atoms_primitive, n_atoms_conventional) for a relaxed
+    symmetrized primitive cell. The ratio
+    n_atoms_conventional / n_atoms_primitive is the integer centering
+    factor (1 for P lattices, 2 for I/A/B/C/R-on-hex, 3 for some R, 4 for F).
+    """
+    n_atoms_primitive = len(unit_cell_primitive)
+    n_atoms_conventional, _, _ = (
+        mbe_automation.structure.crystal.conventional_cell_params(unit_cell_primitive)
+    )
+    return n_atoms_primitive, n_atoms_conventional
+
+
+def _resolve_multiplicities(refs, n_atoms_primitive, n_atoms_conventional):
+    """
+    Rescale each ref.multiplicity to the primitive-cell frame.
+    Asserts that conventional → primitive rescaling yields an integer.
+    """
+    n_primitive = np.empty(len(refs), dtype=np.int64)
+    for k, ref in enumerate(refs):
+        if ref.multiplicity_cell == "primitive":
+            n_primitive[k] = int(ref.multiplicity)
+        elif ref.multiplicity_cell == "conventional":
+            numerator = int(ref.multiplicity) * n_atoms_primitive
+            if numerator % n_atoms_conventional != 0:
+                raise ValueError(
+                    f"MoleculeRef[{k}] multiplicity {ref.multiplicity} in the "
+                    f"conventional cell does not rescale to an integer in the "
+                    f"primitive cell (centering ratio "
+                    f"n_atoms_primitive/n_atoms_conventional = "
+                    f"{n_atoms_primitive}/{n_atoms_conventional})."
+                )
+            n_primitive[k] = numerator // n_atoms_conventional
+        else:
+            raise ValueError(
+                f"MoleculeRef[{k}].multiplicity_cell must be 'primitive' or "
+                f"'conventional', got {ref.multiplicity_cell!r}."
+            )
+    return n_primitive
+
+
+def _normalize_molecule_input(
+        config_molecule,
+        composition,
+        n_atoms_primitive,
+        n_atoms_conventional,
+):
+    """
+    Convert the polymorphic config.molecule value into the canonical
+    (list[MoleculeRef], n_equivalent_primitive) tuple, or (None, None)
+    when no sublimation is requested.
+
+    A single ase.Atoms / Structure (legacy single-molecule API) is wrapped
+    as a one-element list with multiplicity composition.n_molecules_nonunique
+    in the primitive frame.
+    """
+    MoleculeRef = mbe_automation.configs.quasi_harmonic.MoleculeRef
+
+    if config_molecule is None:
+        return None, None
+
+    if isinstance(config_molecule, list):
+        refs = list(config_molecule)
+        n_primitive = _resolve_multiplicities(
+            refs=refs,
+            n_atoms_primitive=n_atoms_primitive,
+            n_atoms_conventional=n_atoms_conventional,
+        )
+        return refs, n_primitive
+
+    refs = [
+        MoleculeRef(
+            system=config_molecule,
+            multiplicity=int(composition.n_molecules_nonunique),
+            multiplicity_cell="primitive",
+        )
+    ]
+    n_primitive = np.array(
+        [composition.n_molecules_nonunique], dtype=np.int64
+    )
+    return refs, n_primitive
+
+
+def _validate_molecule_refs(
+        refs,
+        n_equivalent_primitive,
+        composition,
+        n_atoms_primitive,
+        n_atoms_conventional,
+):
+    """
+    Three rules:
+    1. count match — len(refs) == composition.n_molecules_unique
+    2. primitive-cell stoichiometry — sum n_i * n_atoms_i == n_atoms_primitive
+    3. multiset of multiplicities matches composition.n_equivalent
+    """
+    n_u = len(refs)
+    if n_u != composition.n_molecules_unique:
+        raise ValueError(
+            f"len(config.molecule) = {n_u} does not match the number of "
+            f"crystallographically distinct molecules detected in the "
+            f"relaxed primitive cell (n_molecules_unique = "
+            f"{composition.n_molecules_unique})."
+        )
+
+    n_atoms_per_ref = np.array(
+        [len(ref.system) for ref in refs], dtype=np.int64
+    )
+    total_atoms = int(np.sum(n_equivalent_primitive * n_atoms_per_ref))
+    if total_atoms != n_atoms_primitive:
+        raise ValueError(
+            f"Primitive-cell stoichiometry check failed: "
+            f"sum(n_i * n_atoms_i) = {total_atoms}, expected "
+            f"n_atoms_primitive_cell = {n_atoms_primitive}. "
+            f"Centering ratio n_atoms_primitive/n_atoms_conventional = "
+            f"{n_atoms_primitive}/{n_atoms_conventional}. If you supplied "
+            f"conventional-cell multiplicities, set "
+            f'multiplicity_cell="conventional" on the corresponding '
+            f"MoleculeRef entries."
+        )
+
+    detected = sorted(composition.n_equivalent.tolist())
+    supplied = sorted(n_equivalent_primitive.tolist())
+    if detected != supplied:
+        raise ValueError(
+            f"Multiplicity multiset mismatch: supplied (primitive) "
+            f"{supplied} != detected n_equivalent {detected}."
+        )
+
+
+def _relax_and_vibrate_one(
+        ref,
+        calculator,
+        relaxation_config,
+        geom_opt_dir,
+        vibrations_dir,
+        dataset,
+        root_key,
+        temperatures_K,
+        input_label,
+        relaxed_label,
+):
+    """
+    Save the user-supplied input reference, relax it in vacuum, run
+    finite-difference vibrations, and build the per-molecule
+    thermodynamic data frame. Returns (relaxed_molecule, vibrations,
+    df_molecule).
+    """
+    mbe_automation.storage.save_structure(
+        structure=mbe_automation.storage.from_ase_atoms(ref.system),
+        dataset=dataset,
+        key=f"{root_key}/structures/{input_label}",
+    )
+    molecule = ref.system.copy()
+    relaxed_molecule = mbe_automation.structure.relax.isolated_molecule(
+        molecule=molecule,
+        calculator=calculator,
+        config=relaxation_config,
+        work_dir=geom_opt_dir / relaxed_label,
+        key=f"{root_key}/structures/{relaxed_label}",
+    )
+    vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
+        molecule=relaxed_molecule,
+        calculator=calculator,
+        work_dir=vibrations_dir / relaxed_label,
+    )
+    df_molecule = mbe_automation.dynamics.harmonic.data.molecule(
+        relaxed_molecule,
+        vibrations,
+        temperatures_K,
+        system_label=relaxed_label,
+    )
+    return relaxed_molecule, vibrations, df_molecule
+
+
+def _process_molecule_refs(
+        refs,
+        legacy_mode,
+        calculator,
+        relaxation_config,
+        geom_opt_dir,
+        vibrations_dir,
+        dataset,
+        root_key,
+        temperatures_K,
+):
+    """
+    Run _relax_and_vibrate_one for each ref. Label scheme:
+    - legacy single-Atoms input: molecule[input] / molecule[opt:atoms]
+    - list[MoleculeRef] input:   molecule[input,k] / molecule[input,k,opt:atoms]
+    Returns (list_of_dfs, list_of_relaxed_labels).
+    """
+    df_molecules = []
+    relaxed_labels = []
+    for k, ref in enumerate(refs):
+        if legacy_mode:
+            input_label = "molecule[input]"
+            relaxed_label = "molecule[opt:atoms]"
+        else:
+            input_label = f"molecule[input,{k}]"
+            relaxed_label = f"molecule[input,{k},opt:atoms]"
+        _, _, df_molecule = _relax_and_vibrate_one(
+            ref=ref,
+            calculator=calculator,
+            relaxation_config=relaxation_config,
+            geom_opt_dir=geom_opt_dir,
+            vibrations_dir=vibrations_dir,
+            dataset=dataset,
+            root_key=root_key,
+            temperatures_K=temperatures_K,
+            input_label=input_label,
+            relaxed_label=relaxed_label,
+        )
+        df_molecules.append(df_molecule)
+        relaxed_labels.append(relaxed_label)
+    return df_molecules, relaxed_labels
+
+
+def _compute_sublimation_df(df_crystal, df_molecules, n_equivalent_primitive):
+    """
+    Dispatch helper: route to the existing single-molecule sublimation()
+    when len(df_molecules) == 1, otherwise to sublimation_multi_molecule().
+    """
+    if len(df_molecules) == 1:
+        return mbe_automation.dynamics.harmonic.data.sublimation(
+            df_crystal,
+            df_molecules[0],
+        )
+    return mbe_automation.dynamics.harmonic.data.sublimation_multi_molecule(
+        df_crystal,
+        df_molecules,
+        n_equivalent_primitive,
+    )
 
 
 def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
@@ -60,27 +297,6 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         dataset=config.dataset,
         key=f"{config.root_key}/structures/crystal[input]",
     )
-
-    if config.molecule is not None:
-        molecule = config.molecule.copy()
-        mbe_automation.storage.save_structure(
-            structure=mbe_automation.storage.from_ase_atoms(config.molecule),
-            dataset=config.dataset,
-            key=f"{config.root_key}/structures/molecule[input]",
-        )
-        relaxed_molecule_label = "molecule[opt:atoms]"
-        molecule = mbe_automation.structure.relax.isolated_molecule(
-            molecule=molecule,
-            calculator=config.calculator,
-            config=config.relaxation,
-            work_dir=geom_opt_dir/relaxed_molecule_label,
-            key=f"{config.root_key}/structures/{relaxed_molecule_label}"
-        )
-        vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
-            molecule=molecule,
-            calculator=config.calculator,
-            work_dir=vibrations_dir/relaxed_molecule_label
-        )
 
     if config.relaxation.cell_relaxation == "full":
         relaxed_crystal_label = "crystal[opt:atoms,shape,V]"
@@ -138,6 +354,46 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config=config.relaxation,
         work_dir=geom_opt_dir,
     )
+    n_atoms_primitive, n_atoms_conventional = _centering_ratio(unit_cell_V0)
+    molecule_refs, n_equivalent_primitive = _normalize_molecule_input(
+        config_molecule=config.molecule,
+        composition=composition,
+        n_atoms_primitive=n_atoms_primitive,
+        n_atoms_conventional=n_atoms_conventional,
+    )
+    legacy_molecule_mode = isinstance(
+        config.molecule,
+        (ase.Atoms, mbe_automation.storage.Structure),
+    )
+    if molecule_refs is not None:
+        _validate_molecule_refs(
+            refs=molecule_refs,
+            n_equivalent_primitive=n_equivalent_primitive,
+            composition=composition,
+            n_atoms_primitive=n_atoms_primitive,
+            n_atoms_conventional=n_atoms_conventional,
+        )
+        df_molecules, relaxed_molecule_labels = _process_molecule_refs(
+            refs=molecule_refs,
+            legacy_mode=legacy_molecule_mode,
+            calculator=config.calculator,
+            relaxation_config=config.relaxation,
+            geom_opt_dir=geom_opt_dir,
+            vibrations_dir=vibrations_dir,
+            dataset=config.dataset,
+            root_key=config.root_key,
+            temperatures_K=config.temperatures_K,
+        )
+        N_FU = int(np.gcd.reduce(n_equivalent_primitive))
+        mbe_automation.storage.save_attribute(
+            dataset=config.dataset,
+            key=f"{config.root_key}/structures",
+            attribute_name="formula_units_per_cell",
+            attribute_value=N_FU,
+        )
+    else:
+        df_molecules = None
+        relaxed_molecule_labels = None
     #
     # The supercell transformation is computed once and kept
     # fixed for the remaining structures
@@ -180,23 +436,22 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         unit_cell_type="primitive",
     )
     
-    if config.molecule is not None:
-        df_molecule = mbe_automation.dynamics.harmonic.data.molecule(
-            molecule,
-            vibrations,
-            config.temperatures_K,
-            system_label=relaxed_molecule_label
+    if df_molecules is not None:
+        df_sublimation = _compute_sublimation_df(
+            df_crystal=df_crystal,
+            df_molecules=df_molecules,
+            n_equivalent_primitive=n_equivalent_primitive,
         )
-        df_sublimation = mbe_automation.dynamics.harmonic.data.sublimation(
-            df_crystal,
-            df_molecule
-        )
+        molecule_dfs_for_concat = [
+            df_molecules[k].drop(columns=["T (K)"])
+            for k in range(len(df_molecules))
+        ]
         df_harmonic = pd.concat([
             df_sublimation,
             df_crystal.drop(columns=["T (K)"]),
-            df_molecule.drop(columns=["T (K)"]),
+            *molecule_dfs_for_concat,
         ], axis=1)
-        
+
     else:
         df_harmonic = df_crystal
         
@@ -457,17 +712,22 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     df_thermal_expansion = mbe_automation.dynamics.harmonic.thermodynamics.fit_thermal_expansion_properties(
         df_crystal_equilibrium=df_crystal_qha
     )
-    if config.molecule is not None:
-        df_sublimation_qha = mbe_automation.dynamics.harmonic.data.sublimation(
-            df_crystal_qha,
-            df_molecule
+    if df_molecules is not None:
+        df_sublimation_qha = _compute_sublimation_df(
+            df_crystal=df_crystal_qha,
+            df_molecules=df_molecules,
+            n_equivalent_primitive=n_equivalent_primitive,
         )
+        molecule_dfs_for_concat = [
+            df_molecules[k].drop(columns=["T (K)"])
+            for k in range(len(df_molecules))
+        ]
         df_quasi_harmonic = pd.concat([
             df_sublimation_qha,
             df_crystal_qha.drop(columns=["T (K)"]),
             df_thermal_expansion.drop(columns=["T (K)"]),
             df_crystal_eos.drop(columns=["T (K)"]),
-            df_molecule.drop(columns=["T (K)"]),
+            *molecule_dfs_for_concat,
         ], axis=1)
 
     else:
