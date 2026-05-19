@@ -4,6 +4,7 @@ This chapter documents the configuration classes used to control the various wor
 
 - [Thermodynamics](#thermodynamics)
     - [`FreeEnergy`](#freeenergy-class)
+    - [`MoleculeRef`](#moleculeref-class)
     - [`EEC`](#eec-class)
     - [`DebyeModel`](#debyemodel-class)
     - [`Enthalpy`](#enthalpy-class)
@@ -28,7 +29,7 @@ This chapter documents the configuration classes used to control the various wor
 | `crystal`                       | Initial, non-relaxed crystal structure. The geometry of the crystal unit cell is relaxed prior to the calculation of the harmonic properties.                                                                                                                                                            | -                                               |
 | `electronic_energy_correction`  | Empirical electronic energy correction (EEC). Can enforce a known reference volume ($V_{\text{ref}}$) at reference temperature ($T_{\text{ref}}$), substitute the MLIP static cold curve with an external reference curve, or both. Uses an instance of `EEC`. Requires `equation_of_state` to be `"spline"`. | `EEC(reference_state_forcing="none")` |
 | `calculator`                    | MLIP calculator for energies and forces.                                                                                                                                                           | -                                               |
-| `molecule`                      | Initial, non-relaxed structure of the isolated molecule. If set to `None`, sublimation free energy is not computed.                                                                           | `None`                                          |
+| `molecule`                      | Initial, non-relaxed structure(s) of the isolated molecule(s). For Z' = 1, pass a single `ase.Atoms`/`Structure`. For Z' > 1, pass a `list[MoleculeRef]`, one entry per crystallographically distinct molecule. If only one gas-phase reference is supplied to a Z' > 1 crystal, the workflow replicates it across all detected crystallographic conformers (common conformational-polymorph case). See the [`MoleculeRef`](#moleculeref-class) class and the [Conformers and Z' > 1 case](./06_quasi_harmonic.md#conformers-and-z--1-case) section. If set to `None`, sublimation free energy is not computed.                                                                           | `None`                                          |
 | `relaxation`                    | An instance of `Minimum` that configures the geometry relaxation parameters.                                                                                                                       | `Minimum()`                                     |
 | `temperatures_K`                | Array of temperatures (in Kelvin) for the calculation.                                                                                                                                              | `np.array([298.15])`                            |
 | `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell.                                                                         | `1.0E-5`                                        |
@@ -56,6 +57,18 @@ This chapter documents the configuration classes used to control the various wor
 | `verbose`                       | Verbosity of the program's output. `0` suppresses warnings.                                                                                                                                      | `0`                                             |
 | `save_plots`                    | If `True`, save plots of the simulation results.                                                                                                                                                 | `True`                                          |
 | `save_csv`                      | If `True`, save CSV files of the simulation results.                                                                                                                                             | `True`                                          |
+
+### `MoleculeRef` Class
+
+**Location:** `mbe_automation.configs.quasi_harmonic.MoleculeRef`
+
+Gas-phase reference for one crystallographically distinct molecule in a Z' > 1 crystal. Pass a `list[MoleculeRef]` as the `molecule` field of [`FreeEnergy`](#freeenergy-class) when the asymmetric unit contains more than one unique molecule. `system` must be the complete gas-phase molecule, not the asymmetric half drawn for a molecule on a special position; the workflow always reassembles whole molecules in the primitive cell, and the validation expects whole-molecule atom counts.
+
+| Parameter | Description | Default Value |
+| --- | --- | --- |
+| `system` | The complete gas-phase molecule as an `ase.Atoms` or `mbe_automation.storage.Structure`. | - |
+| `multiplicity` | Number of copies of this molecule in the reference cell selected by `multiplicity_cell` (typically the Z' contribution of this species times the centering factor). Must be a positive integer. | - |
+| `multiplicity_cell` | Cell convention for `multiplicity`: `"conventional"` (the convention used in CIFs) or `"primitive"`. The workflow rescales conventional → primitive automatically using `n_atoms_primitive / n_atoms_conventional` and errors out if the rescaling does not yield an integer. | `"conventional"` |
 
 ### `EEC` Class
 

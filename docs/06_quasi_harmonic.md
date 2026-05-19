@@ -2,6 +2,7 @@
 
 - [Setup](#setup)
 - [Phonon calculation](#phonon-calculation)
+- [Conformers and Z' > 1 case](#conformers-and-z--1-case)
 - [Empirical Electronic Energy Correction (EEC)](#empirical-electronic-energy-correction-eec)
 - [Debye Model Volumes](#debye-model-volumes)
 - [Adjustable parameters](#adjustable-parameters)
@@ -68,6 +69,87 @@ The workflow is executed by passing the configuration object to the `run` functi
 ```python
 mbe_automation.run(properties_config)
 ```
+
+## Conformers and Z' > 1 case
+
+For crystals with more than one crystallographically distinct molecule in the asymmetric unit (Z' > 1) the workflow needs a gas-phase reference per unique molecule. The `molecule` field of `FreeEnergy` accepts three input forms:
+
+1. **Single `ase.Atoms` / `Structure` (Z' = 1).** The historical API. Used unchanged for crystals with a single unique molecule type.
+
+2. **Single `ase.Atoms` / `Structure` (Z' > 1, conformers of the same species).** When more than one unique molecule is detected in the relaxed primitive cell but the user supplies a single reference, the workflow assumes all detected molecules are conformers of the same species that share a gas-phase minimum, and replicates the reference across them. The workflow prints a one-line notice listing the assumed multiplicities. A validation rule rejects the replication if the detected unique molecules do not share the same chemical composition.
+
+3. **`list[MoleculeRef]` (any Z').** Explicit list, one [`MoleculeRef`](./03_configuration_classes.md#moleculeref-class) per unique molecule. Required for co-crystals or any case where the asymmetric unit contains chemically distinct species.
+
+### Replicated single reference (conformational polymorphs)
+
+```python
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
+    model_name="mace",
+    crystal=Structure.from_xyz_file("polymorph_Zprime2.xyz"),
+    molecule=Structure.from_xyz_file("molecule.xyz"),  # ONE reference
+    temperatures_K=np.array([5.0, 200.0, 300.0]),
+    calculator=mace_calc,
+    dataset="properties.hdf5",
+)
+```
+
+If the relaxed primitive cell contains two unique conformers of the same molecule with multiplicities `[2, 2]`, the workflow prints:
+
+```
+Detected n_molecules_unique = 2 crystallographic conformers but a single
+gas-phase reference was supplied. Replicating the reference across all
+unique molecules with multiplicities = [2, 2].
+```
+
+and proceeds with two independent gas-phase relaxations and vibrational analyses (both starting from the same input and converging to the same geometry).
+
+### Explicit list of references (co-crystals, mixed species)
+
+```python
+from mbe_automation.configs.quasi_harmonic import MoleculeRef
+
+properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
+    model_name="mace",
+    crystal=Structure.from_xyz_file("cocrystal.xyz"),
+    molecule=[
+        MoleculeRef(
+            system=Structure.from_xyz_file("species_A.xyz"),
+            multiplicity=4,           # in the conventional cell
+            multiplicity_cell="conventional",
+        ),
+        MoleculeRef(
+            system=Structure.from_xyz_file("species_B.xyz"),
+            multiplicity=4,
+            multiplicity_cell="conventional",
+        ),
+    ],
+    temperatures_K=np.array([5.0, 200.0, 300.0]),
+    calculator=mace_calc,
+    dataset="properties.hdf5",
+)
+```
+
+`multiplicity_cell="conventional"` lets you transcribe Z values directly from a CIF. The workflow rescales them to the primitive cell internally and errors out if any value does not yield an integer primitive multiplicity (i.e. is inconsistent with the lattice centering).
+
+### What changes in the output
+
+When more than one gas-phase reference is processed (replication or explicit list), the workflow uses single-letter tags `A`, `B`, … in detection / list order. The same letter refers to the same molecule across structures, columns, and the formula-unit string:
+
+- **HDF5 structure keys:**
+  - `quasi_harmonic/structures/molecule[input,A]`
+  - `quasi_harmonic/structures/molecule[input,A,opt:atoms]`
+  - `quasi_harmonic/structures/molecule[input,B]`
+  - `quasi_harmonic/structures/molecule[input,B,opt:atoms]`
+  - (Z' = 1 keeps the legacy `molecule[input]` / `molecule[opt:atoms]` names unchanged.)
+
+- **Data-frame columns** in `quasi_harmonic/thermodynamics_fixed_volume` and `quasi_harmonic/thermodynamics_equilibrium_volume`:
+  - per-molecule columns gain a `[A]`, `[B]`, … tag, e.g. `E_el_molecule[A] (kJ∕mol∕molecule)`, `E_el_molecule[B] (kJ∕mol∕molecule)`;
+  - sublimation columns become per *formula unit*: `ΔH_sub (kJ∕mol∕formula unit)`, `E_latt (kJ∕mol∕formula unit)`, etc.;
+  - bookkeeping columns: `n_molecules_unique`, `n_formula_units (1∕unit cell)`, `formula_unit` (e.g. `A₁B₁`, `A₃B₁`).
+
+- **HDF5 attribute** on the `structures` group: `n_formula_units (1∕unit cell)`.
+
+For Z' = 1 the column names and HDF5 keys are unchanged from earlier versions — no migration is needed.
 
 ## Empirical Electronic Energy Correction (EEC)
 
