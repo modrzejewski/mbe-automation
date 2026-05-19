@@ -487,7 +487,7 @@ def _formula_unit_terms(df_crystal, df_molecules, n_equivalent):
 
     beta = n_atoms_formula_unit / n_atoms_unit_cell
 
-    V_Ang3 = df_crystal["V_crystal (Å³∕unit cell)"]
+    V_Ang3 = df_crystal["V_crystal (Å³∕unit cell)"]
     V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm³/mol/formula unit
 
     def weighted_sum(column):
