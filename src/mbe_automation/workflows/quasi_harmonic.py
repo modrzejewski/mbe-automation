@@ -43,9 +43,9 @@ def _resolve_multiplicities(refs, n_atoms_primitive, n_atoms_conventional):
     n_primitive = np.empty(len(refs), dtype=np.int64)
     for k, ref in enumerate(refs):
         if ref.multiplicity_cell == "primitive":
-            n_primitive[k] = int(ref.multiplicity)
+            n_primitive[k] = ref.multiplicity
         elif ref.multiplicity_cell == "conventional":
-            numerator = int(ref.multiplicity) * n_atoms_primitive
+            numerator = ref.multiplicity * n_atoms_primitive
             if numerator % n_atoms_conventional != 0:
                 raise ValueError(
                     f"MoleculeRef[{k}] multiplicity {ref.multiplicity} in the "
@@ -89,6 +89,9 @@ def _normalize_molecule_input(
     if config_molecule is None:
         return None, None
 
+    # User-supplied list of MoleculeRef entries: covers Z' >= 1 with
+    # chemically distinct species (e.g. cocrystals, salts) where each
+    # unique molecule has its own gas-phase reference.
     if isinstance(config_molecule, list):
         refs = list(config_molecule)
         n_primitive = _resolve_multiplicities(
@@ -98,6 +101,9 @@ def _normalize_molecule_input(
         )
         return refs, n_primitive
 
+    # Z' > 1 conformational polymorph: a single gas-phase reference is
+    # replicated across all crystallographically distinct conformers of
+    # the same species.
     if composition.n_molecules_unique > 1:
         print(
             f"Detected n_molecules_unique = {composition.n_molecules_unique} "
@@ -117,6 +123,8 @@ def _normalize_molecule_input(
         ]
         return refs, composition.n_equivalent
 
+    # Z' = 1: a single gas-phase reference and a single crystallographically
+    # unique molecule replicated n_molecules_nonunique times in the primitive cell.
     refs = [
         MoleculeRef(
             system=config_molecule,
@@ -159,7 +167,7 @@ def _validate_molecule_refs(
     n_atoms_per_ref = np.array(
         [len(ref.system) for ref in refs], dtype=np.int64
     )
-    total_atoms = int(np.sum(n_equivalent_primitive * n_atoms_per_ref))
+    total_atoms = np.sum(n_equivalent_primitive * n_atoms_per_ref)
     if total_atoms != n_atoms_primitive:
         raise ValueError(
             f"Primitive-cell stoichiometry check failed: "
@@ -172,9 +180,9 @@ def _validate_molecule_refs(
             f"MoleculeRef entries."
         )
 
-    detected = sorted(composition.n_equivalent.tolist())
-    supplied = sorted(n_equivalent_primitive.tolist())
-    if detected != supplied:
+    detected = np.sort(composition.n_equivalent)
+    supplied = np.sort(n_equivalent_primitive)
+    if not np.array_equal(detected, supplied):
         raise ValueError(
             f"Multiplicity multiset mismatch: supplied (primitive) "
             f"{supplied} != detected n_equivalent {detected}."
@@ -182,7 +190,7 @@ def _validate_molecule_refs(
 
     if replicated_reference and composition.n_molecules_unique > 1:
         max_Z = max(
-            int(np.max(mol.atomic_numbers)) for mol in composition.molecules_unique
+            np.max(mol.atomic_numbers) for mol in composition.molecules_unique
         )
         ref_bincount = np.bincount(
             composition.molecules_unique[0].atomic_numbers, minlength=max_Z + 1
@@ -203,7 +211,7 @@ def _validate_molecule_refs(
                 )
 
 
-def _relax_and_vibrate_one(
+def _relaxed_single_molecule(
         ref,
         calculator,
         relaxation_config,
@@ -221,14 +229,20 @@ def _relax_and_vibrate_one(
     thermodynamic data frame. Returns (relaxed_molecule, vibrations,
     df_molecule).
     """
+    if isinstance(ref.system, mbe_automation.storage.Structure):
+        input_structure = ref.system
+        ase_system = mbe_automation.storage.to_ase(ref.system)
+    else:
+        input_structure = mbe_automation.storage.from_ase_atoms(ref.system)
+        ase_system = ref.system
+
     mbe_automation.storage.save_structure(
-        structure=mbe_automation.storage.from_ase_atoms(ref.system),
+        structure=input_structure,
         dataset=dataset,
         key=f"{root_key}/structures/{input_label}",
     )
-    molecule = ref.system.copy()
     relaxed_molecule = mbe_automation.structure.relax.isolated_molecule(
-        molecule=molecule,
+        molecule=ase_system.copy(),
         calculator=calculator,
         config=relaxation_config,
         work_dir=geom_opt_dir / relaxed_label,
@@ -260,8 +274,8 @@ def _process_gas_phase_molecules(
         temperatures_K,
 ):
     """
-    Run _relax_and_vibrate_one for each ref. Label scheme:
-    - single-structure input: molecule[input] / molecule[opt:atoms]
+    Run _relaxed_single_molecule for each ref. Label scheme:
+    - single-structure input: molecule[input] / molecule[input,opt:atoms]
     - list[MoleculeRef]:      molecule[input,X] / molecule[input,X,opt:atoms]
       where X = GAS_PHASE_MOLECULE_SYMBOLS[k]
     Returns a list of per-molecule data frames.
@@ -269,7 +283,7 @@ def _process_gas_phase_molecules(
     symbols = mbe_automation.dynamics.harmonic.data.GAS_PHASE_MOLECULE_SYMBOLS
     df_molecules = []
     for k, ref in enumerate(refs):
-        _, _, df_molecule = _relax_and_vibrate_one(
+        _, _, df_molecule = _relaxed_single_molecule(
             ref=ref,
             calculator=calculator,
             relaxation_config=relaxation_config,
@@ -283,7 +297,7 @@ def _process_gas_phase_molecules(
                 else f"molecule[input,{symbols[k]}]"
             ),
             relaxed_label=(
-                "molecule[opt:atoms]" if single_molecule_mode
+                "molecule[input,opt:atoms]" if single_molecule_mode
                 else f"molecule[input,{symbols[k]},opt:atoms]"
             ),
         )
@@ -310,8 +324,9 @@ def _tag_molecule_dfs_for_concat(df_molecules):
 
 def _compute_sublimation_df(df_crystal, df_molecules, n_equivalent_primitive):
     """
-    Dispatch helper: route to the existing single-molecule sublimation()
-    when len(df_molecules) == 1, otherwise to sublimation_multi_molecule().
+    Two code paths: a single unique molecule with quantities expressed
+    per molecule, or multiple unique molecules with quantities expressed
+    per formula unit.
     """
     if len(df_molecules) == 1:
         return mbe_automation.dynamics.harmonic.data.sublimation(
@@ -459,7 +474,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             root_key=config.root_key,
             temperatures_K=config.temperatures_K,
         )
-        n_formula_units = int(np.gcd.reduce(n_equivalent_primitive))
+        n_formula_units = np.gcd.reduce(n_equivalent_primitive)
         mbe_automation.storage.save_attribute(
             dataset=config.dataset,
             key=f"{config.root_key}/structures",

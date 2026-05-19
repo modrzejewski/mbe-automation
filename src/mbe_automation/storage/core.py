@@ -204,7 +204,10 @@ class Structure:
     
     def __post_init__(self):
         self.periodic = (self.cell_vectors is not None)
-        
+
+    def __len__(self) -> int:
+        return self.n_atoms
+
     def copy(self) -> Structure:
         return Structure(
             positions=self.positions.copy(),

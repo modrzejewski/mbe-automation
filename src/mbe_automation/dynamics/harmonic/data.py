@@ -498,7 +498,7 @@ def _formula_unit_terms(df_crystal, df_molecules, n_equivalent):
     E_trans_sum = weighted_sum("E_trans_molecule (kJ∕mol∕molecule)")
     E_rot_sum = weighted_sum("E_rot_molecule (kJ∕mol∕molecule)")
     S_vib_mol_sum = weighted_sum("S_vib_molecule (J∕K∕mol∕molecule)")
-    kT_sum = weighted_sum("kT (kJ∕mol)")
+    kT_sum = weighted_sum("kT (kJ∕mol)") # equals the pV term per molecule in the ideal gas approximation
 
     E_latt = df_crystal["E_el_crystal (kJ∕mol∕unit cell)"] * beta - E_el_mol_sum
     ΔE_vib = E_vib_mol_sum - df_crystal["E_vib_crystal (kJ∕mol∕unit cell)"] * beta

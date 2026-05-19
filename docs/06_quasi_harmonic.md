@@ -140,7 +140,7 @@ When more than one gas-phase reference is processed (replication or explicit lis
   - `quasi_harmonic/structures/molecule[input,A,opt:atoms]`
   - `quasi_harmonic/structures/molecule[input,B]`
   - `quasi_harmonic/structures/molecule[input,B,opt:atoms]`
-  - (Z' = 1 keeps the legacy `molecule[input]` / `molecule[opt:atoms]` names unchanged.)
+  - (Z' = 1 uses `molecule[input]` / `molecule[input,opt:atoms]` — no per-molecule tag.)
 
 - **Data-frame columns** in `quasi_harmonic/thermodynamics_fixed_volume` and `quasi_harmonic/thermodynamics_equilibrium_volume`:
   - per-molecule columns gain a `[A]`, `[B]`, … tag, e.g. `E_el_molecule[A] (kJ∕mol∕molecule)`, `E_el_molecule[B] (kJ∕mol∕molecule)`;
@@ -148,8 +148,6 @@ When more than one gas-phase reference is processed (replication or explicit lis
   - bookkeeping columns: `n_molecules_unique`, `n_formula_units (1∕unit cell)`, `formula_unit` (e.g. `A₁B₁`, `A₃B₁`).
 
 - **HDF5 attribute** on the `structures` group: `n_formula_units (1∕unit cell)`.
-
-For Z' = 1 the column names and HDF5 keys are unchanged from earlier versions — no migration is needed.
 
 ## Empirical Electronic Energy Correction (EEC)
 
