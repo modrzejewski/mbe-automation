@@ -772,11 +772,10 @@ def equilibrium_curve(
                 f"by post-processing the V_eos(T) curve"
             )
         else:
-            print("EEC type: baseline cold curve only, param = 0.0")
+            print("EEC type: baseline cold curve")
     else:
         eec = mbe_automation.dynamics.harmonic.eec.EEC(
-            config=electronic_energy_correction, 
-            param=0.0
+            config=electronic_energy_correction
         )
 
     for i, T in enumerate(temperatures):
