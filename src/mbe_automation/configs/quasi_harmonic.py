@@ -18,6 +18,32 @@ from mbe_automation.dynamics.harmonic.eos import EQUATIONS_OF_STATE, EOS_SAMPLIN
 from mbe_automation.dynamics.harmonic.eec import ELECTRONIC_ENERGY_CORRECTION, EECConfig as EEC
 from mbe_automation.dynamics.harmonic.eec import DebyeModel, DEFAULT_DEBYE_FITTING_T
 
+
+@dataclass(kw_only=True)
+class MoleculeRef:
+    """
+    Gas-phase reference for one crystallographically distinct molecule
+    in a Z' > 1 crystal. `system` must be the complete gas-phase
+    molecule, not the asymmetric half drawn for a molecule on a special
+    position.
+    """
+    system: ase.Atoms | mbe_automation.storage.Structure
+    multiplicity: int
+    multiplicity_cell: Literal["primitive", "conventional"] = "conventional"
+
+    def __post_init__(self):
+        if not isinstance(self.multiplicity, (int, np.integer)):
+            raise TypeError(
+                f"MoleculeRef.multiplicity must be an int, got "
+                f"{type(self.multiplicity).__name__}."
+            )
+        if self.multiplicity <= 0:
+            raise ValueError(
+                f"MoleculeRef.multiplicity must be positive, got "
+                f"{self.multiplicity}."
+            )
+
+
 @dataclass(kw_only=True)
 class FreeEnergy:
     """
@@ -30,10 +56,16 @@ class FreeEnergy:
     calculator: mbe_automation.calculators.CALCULATORS
                                    #
                                    # Initial, nonrelaxed structures of crystal
-                                   # and isolated molecule
+                                   # and isolated molecule. For Z' > 1, pass
+                                   # a list of MoleculeRef objects.
                                    #
     crystal: ase.Atoms | mbe_automation.storage.Structure
-    molecule: ase.Atoms | mbe_automation.storage.Structure | None = None
+    molecule: (
+        ase.Atoms
+        | mbe_automation.storage.Structure
+        | list[MoleculeRef]
+        | None
+    ) = None
                                    #
                                    # Empirical electronic energy correction applied
                                    # to enforce known reference volume (V_ref)

@@ -27,7 +27,6 @@ dependencies = [
   "joblib",
   "h5py",
   "pandas",
-  "ipi",
   "doped==3.2.1",
   "dynasor",
   "nglview",

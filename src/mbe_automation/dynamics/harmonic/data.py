@@ -15,6 +15,26 @@ import mbe_automation.dynamics.harmonic.display
 import mbe_automation.storage
 from mbe_automation.dynamics.harmonic.eec import EEC
 
+
+_SUBSCRIPT_DIGITS = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
+
+GAS_PHASE_MOLECULE_SYMBOLS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+_GAS_PHASE_ENERGY_CONTRIBS = (
+    "E_el_molecule (kJ∕mol∕molecule)",
+    "E_vib_molecule (kJ∕mol∕molecule)",
+    "S_vib_molecule (J∕K∕mol∕molecule)",
+    "F_vib_molecule (kJ∕mol∕molecule)",
+    "ZPE_molecule (kJ∕mol∕molecule)",
+    "E_trans_molecule (kJ∕mol∕molecule)",
+    "E_rot_molecule (kJ∕mol∕molecule)",
+    "kT (kJ∕mol)",
+    "all_freqs_real_molecule",
+    "n_atoms_molecule",
+    "system_label_molecule",
+)
+
+
 @dataclass
 class FBZAnalysis:
     acoustic_freqs_real: bool
@@ -393,22 +413,127 @@ def crystal(
     return df
     
 
+def _format_formula_unit(nu):
+    """
+    Build a formula-unit label A_ν₁B_ν₂C_ν₃ ... using UTF-8 subscript
+    digits, with one uppercase letter per unique molecule type.
+    """
+    if len(nu) > len(GAS_PHASE_MOLECULE_SYMBOLS):
+        raise ValueError(
+            f"Cannot label {len(nu)} unique molecules with single-letter tags."
+        )
+    return "".join(
+        GAS_PHASE_MOLECULE_SYMBOLS[i] + str(int(n)).translate(_SUBSCRIPT_DIGITS)
+        for i, n in enumerate(nu)
+    )
+
+
+def tag_molecule_columns(df_molecule, letter):
+    """
+    Append [<letter>] to every per-molecule column in df_molecule so
+    that horizontally concatenated frames for multiple molecules in a
+    Z' > 1 sublimation calculation have unique column names.
+
+    The columns to tag are taken from _GAS_PHASE_ENERGY_CONTRIBS; any
+    other column (notably "T (K)") is left untouched.
+    """
+    renames = {}
+    for col in _GAS_PHASE_ENERGY_CONTRIBS:
+        if col not in df_molecule.columns:
+            continue
+        if " (" in col:
+            base, _, units = col.partition(" (")
+            renames[col] = f"{base}[{letter}] ({units}"
+        else:
+            renames[col] = f"{col}[{letter}]"
+    return df_molecule.rename(columns=renames)
+
+
+def _formula_unit_terms(df_crystal, df_molecules, n_equivalent):
+    """
+    Per-formula-unit thermodynamic combinations shared by sublimation()
+    and sublimation_multi_molecule().
+
+    A formula unit contains ν_i molecules of unique type i with
+    ν_i = n_equivalent[i] / gcd(n_equivalent). The unit cell contains
+    n_formula_units = gcd(n_equivalent) formula units, and β = n_atoms_formula_unit /
+    n_atoms_unit_cell = 1 / n_formula_units. Crystal terms are scaled by β;
+    molecule terms are summed over types weighted by ν_i.
+    """
+    n_equivalent = np.asarray(n_equivalent, dtype=np.int64)
+    n_u = len(df_molecules)
+    if n_u != len(n_equivalent):
+        raise ValueError(
+            f"len(df_molecules) = {n_u} does not match "
+            f"len(n_equivalent) = {len(n_equivalent)}"
+        )
+
+    g = int(np.gcd.reduce(n_equivalent))
+    nu = n_equivalent // g
+    n_formula_units = g
+
+    n_atoms_per_type = np.array(
+        [int(df["n_atoms_molecule"].iloc[0]) for df in df_molecules],
+        dtype=np.int64,
+    )
+    n_atoms_formula_unit = int(np.sum(nu * n_atoms_per_type))
+
+    assert df_crystal["unit_cell_type"].nunique() == 1
+    unit_cell_type = df_crystal["unit_cell_type"].iloc[0]
+    if unit_cell_type == "conventional":
+        n_atoms_unit_cell = df_crystal["n_atoms_conventional_cell"]
+    else:
+        n_atoms_unit_cell = df_crystal["n_atoms_primitive_cell"]
+
+    beta = n_atoms_formula_unit / n_atoms_unit_cell
+
+    V_Ang3 = df_crystal["V_crystal (Å³∕unit cell)"]
+    V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm³/mol/formula unit
+
+    def weighted_sum(column):
+        return sum(n * df[column] for n, df in zip(nu, df_molecules))
+
+    E_el_mol_sum = weighted_sum("E_el_molecule (kJ∕mol∕molecule)")
+    E_vib_mol_sum = weighted_sum("E_vib_molecule (kJ∕mol∕molecule)")
+    E_trans_sum = weighted_sum("E_trans_molecule (kJ∕mol∕molecule)")
+    E_rot_sum = weighted_sum("E_rot_molecule (kJ∕mol∕molecule)")
+    S_vib_mol_sum = weighted_sum("S_vib_molecule (J∕K∕mol∕molecule)")
+    kT_sum = weighted_sum("kT (kJ∕mol)") # equals the pV term per molecule in the ideal gas approximation
+
+    E_latt = df_crystal["E_el_crystal (kJ∕mol∕unit cell)"] * beta - E_el_mol_sum
+    ΔE_vib = E_vib_mol_sum - df_crystal["E_vib_crystal (kJ∕mol∕unit cell)"] * beta
+    ΔH_sub = -E_latt + ΔE_vib + E_trans_sum + E_rot_sum + kT_sum
+    ΔS_sub_vib = S_vib_mol_sum - df_crystal["S_vib_crystal (J∕K∕mol∕unit cell)"] * beta
+
+    return {
+        "E_latt": E_latt,
+        "ΔE_vib": ΔE_vib,
+        "ΔH_sub": ΔH_sub,
+        "ΔS_sub_vib": ΔS_sub_vib,
+        "V_molar": V_molar,
+        "n_formula_units": n_formula_units,
+        "nu": nu,
+        "beta": beta,
+        "formula_unit": _format_formula_unit(nu),
+    }
+
+
 def sublimation(df_crystal, df_molecule):
-    """    
+    """
     Vibrational energy, lattice energy, and sublimation enthalpy
     defined as in ref 1. Additional definitions in ref 2.
 
     The returned data frame will include NaNs for temperatures
     where the computation of the equilibrium cell volume has failed.
-    
+
     Approximations used in the sublimation enthalpy:
-    
+
     - harmonic approximation of crystal and molecular vibrations
     - noninteracting particle in a box approximation
       for the translations of the isolated molecule
     - rigid rotor/asymmetric top approximation for the rotations
       of the isolated molecule
-    
+
     1. Della Pia, Zen, Alfe, Michaelides, How Accurate are Simulations
        and Experiments for the Lattice Energies of Molecular Crystals?
        Phys. Rev. Lett. 133, 046401 (2024); doi: 10.1103/PhysRevLett.133.046401
@@ -416,51 +541,66 @@ def sublimation(df_crystal, df_molecule):
        set of molecular crystals,
        Phys. Chem. Chem. Phys. 21, 24333 (2019), doi: 10.1039/c9cp04488d
     """
-    
-    n_atoms_molecule = df_molecule["n_atoms_molecule"]
-    
+    n_atoms_molecule = int(df_molecule["n_atoms_molecule"].iloc[0])
+
     assert df_crystal["unit_cell_type"].nunique() == 1
     unit_cell_type = df_crystal["unit_cell_type"].iloc[0]
-    
     if unit_cell_type == "conventional":
-        n_atoms_unit_cell = df_crystal["n_atoms_conventional_cell"]
+        n_atoms_unit_cell = int(df_crystal["n_atoms_conventional_cell"].iloc[0])
     else:
-        n_atoms_unit_cell = df_crystal["n_atoms_primitive_cell"]
-        
-    beta = n_atoms_molecule / n_atoms_unit_cell
-    
-    V_Ang3 = df_crystal["V_crystal (Å³∕unit cell)"]
-    V_molar = V_Ang3 * 1.0E-24 * ase.units.mol * beta  # cm**3/mol/molecule
+        n_atoms_unit_cell = int(df_crystal["n_atoms_primitive_cell"].iloc[0])
 
-    E_latt = (
-        df_crystal["E_el_crystal (kJ∕mol∕unit cell)"] * beta
-        - df_molecule["E_el_molecule (kJ∕mol∕molecule)"]
-    ) # kJ/mol/molecule
-        
-    ΔE_vib = (
-        df_molecule["E_vib_molecule (kJ∕mol∕molecule)"]
-        - df_crystal["E_vib_crystal (kJ∕mol∕unit cell)"] * beta
-        ) # kJ/mol/molecule
-        
-    ΔH_sub = (
-        -E_latt
-        + ΔE_vib
-        + df_molecule["E_trans_molecule (kJ∕mol∕molecule)"]
-        + df_molecule["E_rot_molecule (kJ∕mol∕molecule)"]
-        + df_molecule["kT (kJ∕mol)"] # the pV term per molecule in the ideal gas approximation
-    ) # kJ/mol/molecule
-        
-    ΔS_sub_vib = (
-        df_molecule["S_vib_molecule (J∕K∕mol∕molecule)"]
-        - df_crystal["S_vib_crystal (J∕K∕mol∕unit cell)"] * beta
-    ) # J/K/mol/molecule
+    assert n_atoms_unit_cell % n_atoms_molecule == 0, (
+        f"n_atoms_unit_cell ({n_atoms_unit_cell}) is not divisible by "
+        f"n_atoms_molecule ({n_atoms_molecule}); the unit cell does not "
+        f"contain an integer number of copies of the supplied molecule."
+    )
+    Z = n_atoms_unit_cell // n_atoms_molecule
+
+    terms = _formula_unit_terms(
+        df_crystal=df_crystal,
+        df_molecules=[df_molecule],
+        n_equivalent=np.array([Z], dtype=np.int64),
+    )
 
     df = pd.DataFrame({
         "T (K)": df_molecule["T (K)"],
-        "E_latt (kJ∕mol∕molecule)": E_latt,
-        "ΔE_vib (kJ∕mol∕molecule)": ΔE_vib,
-        "ΔH_sub (kJ∕mol∕molecule)": ΔH_sub,
-        "ΔS_sub_vib (J∕K∕mol∕molecule)": ΔS_sub_vib,
-        "V_crystal (cm³∕mol∕molecule)": V_molar
+        "E_latt (kJ∕mol∕molecule)": terms["E_latt"],
+        "ΔE_vib (kJ∕mol∕molecule)": terms["ΔE_vib"],
+        "ΔH_sub (kJ∕mol∕molecule)": terms["ΔH_sub"],
+        "ΔS_sub_vib (J∕K∕mol∕molecule)": terms["ΔS_sub_vib"],
+        "V_crystal (cm³∕mol∕molecule)": terms["V_molar"],
+    })
+    return df
+
+
+def sublimation_multi_molecule(df_crystal, df_molecules, n_equivalent):
+    """
+    Sublimation thermodynamics for crystals with more than one
+    crystallographically distinct molecule in the asymmetric unit
+    (Z' > 1).
+
+    Quantities are reported per formula unit. A formula unit contains
+    ν_i molecules of unique type i with ν_i = n_equivalent[i] / gcd,
+    and the unit cell contains n_formula_units = gcd(n_equivalent) formula units.
+    All multiplicities in n_equivalent must be in the same frame as the
+    unit cell carried by df_crystal (primitive in the QHA workflow).
+    """
+    terms = _formula_unit_terms(
+        df_crystal=df_crystal,
+        df_molecules=df_molecules,
+        n_equivalent=n_equivalent,
+    )
+
+    df = pd.DataFrame({
+        "T (K)": df_molecules[0]["T (K)"],
+        "E_latt (kJ∕mol∕formula unit)": terms["E_latt"],
+        "ΔE_vib (kJ∕mol∕formula unit)": terms["ΔE_vib"],
+        "ΔH_sub (kJ∕mol∕formula unit)": terms["ΔH_sub"],
+        "ΔS_sub_vib (J∕K∕mol∕formula unit)": terms["ΔS_sub_vib"],
+        "V_crystal (cm³∕mol∕formula unit)": terms["V_molar"],
+        "n_molecules_unique": len(df_molecules),
+        "n_formula_units (1∕unit cell)": terms["n_formula_units"],
+        "formula_unit": terms["formula_unit"],
     })
     return df
