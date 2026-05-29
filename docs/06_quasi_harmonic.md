@@ -74,7 +74,7 @@ mbe_automation.run(properties_config)
 
 For crystals with more than one crystallographically distinct molecule in the asymmetric unit (Z' > 1) the workflow needs a gas-phase reference per unique molecule. The `molecule` field of `FreeEnergy` accepts three input forms:
 
-1. **Single `ase.Atoms` / `Structure` (Z' = 1).** The historical API. Used unchanged for crystals with a single unique molecule type.
+1. **Single `ase.Atoms` / `Structure` (Z' = 1).** Used for crystals with a single unique molecule type.
 
 2. **Single `ase.Atoms` / `Structure` (Z' > 1, conformers of the same species).** When more than one unique molecule is detected in the relaxed primitive cell but the user supplies a single reference, the workflow assumes all detected molecules are conformers of the same species that share a gas-phase minimum, and replicates the reference across them. The workflow prints a one-line notice listing the assumed multiplicities. A validation rule rejects the replication if the detected unique molecules do not share the same chemical composition.
 
