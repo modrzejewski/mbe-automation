@@ -108,7 +108,7 @@ def _sequential_loop(
 
     if compute_feature_vectors:
         assert _is_mace(calculator)
-        n_features = calculator.n_invariant_features()
+        n_features = calculator.n_invariant_features
         if average_over_atoms:
             feature_vectors = np.zeros((n_frames, n_features))
         else:
@@ -211,7 +211,7 @@ def _parallel_loop(
         forces = None
 
     if compute_feature_vectors:
-        n_features = calculator.n_invariant_features()
+        n_features = calculator.n_invariant_features
         if average_over_atoms:
             feature_vectors = np.zeros((structure.n_frames, n_features))
         else:
