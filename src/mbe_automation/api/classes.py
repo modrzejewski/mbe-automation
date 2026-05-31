@@ -1470,7 +1470,7 @@ def _resolve_chunk_indices(
     n_frames: int,
     chunk: Tuple[int, int] | None,
     selected_frames: npt.NDArray[np.int64] | None
-) -> npt.NDArray[np.int64]:
+) -> npt.NDArray[np.int64] | None:
     """
     Resolve the subset of frames to process based on chunk distribution.
     
@@ -1480,14 +1480,15 @@ def _resolve_chunk_indices(
     
     If chunk is None, returns selected_frames (or all frames if None).
     """
+    if chunk is None:
+        return selected_frames
+
     # 1. Determine pool of frames
     if selected_frames is not None:
         pool = selected_frames
     else:
         pool = np.arange(n_frames)
-        
-    if chunk is None:
-        return pool
+
 
     idx, n_chunks = chunk
     
