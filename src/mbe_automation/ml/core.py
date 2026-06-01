@@ -131,6 +131,8 @@ def subsample(
             raise ValueError(f"Invalid compare option: {compare}")
         
     elif feature_vectors_type == "averaged_environments":
+        if compare == "atomic_feature_vectors":
+            raise ValueError("Cannot use compare='atomic_feature_vectors' with feature_vectors_type='averaged_environments'")
         vectors_to_compare = feature_vectors
 
     assert n_frames >= n_samples
