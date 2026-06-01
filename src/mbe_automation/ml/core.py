@@ -100,6 +100,7 @@ def subsample(
         feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES],
         n_samples: int,
         algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+        compare: Literal["atomic_feature_vectors", "averaged_feature_vectors"] = "averaged_feature_vectors",
         rng: np.random.Generator | None = None
 ) -> npt.NDArray[np.integer]:
     """
@@ -122,10 +123,15 @@ def subsample(
     if feature_vectors_type == "atomic":
         n_atoms = feature_vectors.shape[1]
         n_features = feature_vectors.shape[2]
-        features_averaged = _average_over_atoms(feature_vectors)
+        if compare == "averaged_feature_vectors":
+            vectors_to_compare = _average_over_atoms(feature_vectors)
+        elif compare == "atomic_feature_vectors":
+            vectors_to_compare = feature_vectors.reshape(n_frames, -1)
+        else:
+            raise ValueError(f"Invalid compare option: {compare}")
         
     elif feature_vectors_type == "averaged_environments":
-        features_averaged = feature_vectors
+        vectors_to_compare = feature_vectors
 
     assert n_frames >= n_samples
     assert algorithm in SUBSAMPLING_ALGOS
@@ -134,7 +140,7 @@ def subsample(
         return np.arange(n_frames, dtype=int)
     
     scaler = sklearn.preprocessing.StandardScaler()
-    scaled_features = scaler.fit_transform(features_averaged)
+    scaled_features = scaler.fit_transform(vectors_to_compare)
 
     if algorithm == "farthest_point_sampling":
         selected_frames = _farthest_point_sampling(

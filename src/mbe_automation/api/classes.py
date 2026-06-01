@@ -702,10 +702,17 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             self,
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+            compare: Literal["atomic_feature_vectors", "averaged_feature_vectors"] = "averaged_feature_vectors",
             rng: np.random.Generator | None = None,
     ) -> Structure:
         return Structure(**vars(
-            _subsample_structure(self, n, algorithm, rng)
+            _subsample_structure(
+                struct=self,
+                n=n,
+                algorithm=algorithm,
+                compare=compare,
+                rng=rng,
+            )
         ))
 
     def select(
@@ -848,10 +855,17 @@ class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
             self,
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+            compare: Literal["atomic_feature_vectors", "averaged_feature_vectors"] = "averaged_feature_vectors",
             rng: np.random.Generator | None = None,
     ) -> Trajectory:
         return Trajectory(**vars(
-            _subsample_trajectory(self, n, algorithm, rng)
+            _subsample_trajectory(
+                traj=self,
+                n=n,
+                algorithm=algorithm,
+                compare=compare,
+                rng=rng,
+            )
         ))
 
     def run(
@@ -957,10 +971,17 @@ class MolecularCrystal(_MolecularCrystal, _AtomicEnergiesCalc):
             self,
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+            compare: Literal["atomic_feature_vectors", "averaged_feature_vectors"] = "averaged_feature_vectors",
             rng: np.random.Generator | None = None,
     ) -> MolecularCrystal:
         return MolecularCrystal(
-            supercell=_subsample_structure(self.supercell, n, algorithm, rng),
+            supercell=_subsample_structure(
+                struct=self.supercell,
+                n=n,
+                algorithm=algorithm,
+                compare=compare,
+                rng=rng,
+            ),
             index_map=self.index_map,
             centers_of_mass=self.centers_of_mass,
             identical_composition=self.identical_composition,
@@ -1016,10 +1037,17 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             self,
             n: int,
             algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+            compare: Literal["atomic_feature_vectors", "averaged_feature_vectors"] = "averaged_feature_vectors",
             rng: np.random.Generator | None = None,
     ) -> FiniteSubsystem:
         return FiniteSubsystem(
-            cluster_of_molecules=_subsample_structure(self.cluster_of_molecules, n, algorithm, rng),
+            cluster_of_molecules=_subsample_structure(
+                struct=self.cluster_of_molecules,
+                n=n,
+                algorithm=algorithm,
+                compare=compare,
+                rng=rng,
+            ),
             molecule_indices=self.molecule_indices,
             n_molecules=self.n_molecules
         )
@@ -1293,6 +1321,7 @@ def _subsample_structure(
         struct: _Structure,
         n: int,
         algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+        compare: Literal["atomic_feature_vectors", "averaged_feature_vectors"] = "averaged_feature_vectors",
         rng: np.random.Generator | None = None,
     ) -> _Structure:
         """
@@ -1314,11 +1343,18 @@ def _subsample_structure(
                 "are permuted between frames."
             )
         
+        if compare == "atomic_feature_vectors" and struct.feature_vectors_type != "atomic":
+            raise ValueError(
+                "compare='atomic_feature_vectors' requires feature_vectors_type='atomic'."
+            )
+        
+        assert struct.feature_vectors is not None
         selected_indices = mbe_automation.ml.core.subsample(
             feature_vectors=struct.feature_vectors,
             feature_vectors_type=struct.feature_vectors_type,
             n_samples=n,
             algorithm=algorithm,
+            compare=compare,
             rng=rng,
         )
         
@@ -1372,6 +1408,7 @@ def _subsample_trajectory(
         traj: _Trajectory,
         n: int,
         algorithm: Literal[*SUBSAMPLING_ALGOS] = "farthest_point_sampling",
+        compare: Literal["atomic_feature_vectors", "averaged_feature_vectors"] = "averaged_feature_vectors",
         rng: np.random.Generator | None = None,
 ) -> _Trajectory:
         """
@@ -1391,11 +1428,18 @@ def _subsample_trajectory(
                 "are permuted between frames."
             )
                 
+        if compare == "atomic_feature_vectors" and traj.feature_vectors_type != "atomic":
+            raise ValueError(
+                "compare='atomic_feature_vectors' requires feature_vectors_type='atomic'."
+            )
+                
+        assert traj.feature_vectors is not None
         selected_indices = mbe_automation.ml.core.subsample(
             feature_vectors=traj.feature_vectors,
             feature_vectors_type=traj.feature_vectors_type,
             n_samples=n,
             algorithm=algorithm,
+            compare=compare,
             rng=rng,
         )
         
