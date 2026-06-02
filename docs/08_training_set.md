@@ -139,6 +139,7 @@ The subsampling process is based on feature vectors, which are numerical represe
 |-------------|---------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
 | `n`         | The number of frames to select from the dataset.                                                                                                  | -                            |
 | `algorithm` | The algorithm to use for subsampling. Options are `"farthest_point_sampling"` and `"kmeans"`. Both methods aim to select a diverse subset of frames by analyzing their feature vectors. | `"farthest_point_sampling"`  |
+| `compare`   | The type of feature vectors to compute distances on. Options are `"averaged_feature_vectors"` and `"atomic_feature_vectors"`. Using `"atomic_feature_vectors"` requires that the feature vectors are atomic and **the user guarantees there is no permutation of atoms between frames**. | `"averaged_feature_vectors"` |
 
 ### Example Usage
 
