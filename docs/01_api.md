@@ -11,20 +11,22 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 
 ## Table of Contents
 
-* [1. Core Representations & Operations](#1-core-representations--operations)
+* [1. Workflow Execution](#1-workflow-execution)
+    * [run](#run)
+* [2. Core Representations & Operations](#2-core-representations--operations)
     * [Structure](#structure)
     * [Trajectory](#trajectory)
     * [Minimum](#minimum)
-* [2. Quasi-Harmonic Thermodynamics](#2-quasi-harmonic-thermodynamics)
+* [3. Quasi-Harmonic Thermodynamics](#3-quasi-harmonic-thermodynamics)
     * [FreeEnergy](#freeenergy)
     * [MoleculeRef](#moleculeref)
     * [EEC (Empirical Electronic Energy Correction)](#eec-empirical-electronic-energy-correction)
     * [DebyeModel](#debyemodel)
     * [ForceConstants](#forceconstants)
-* [3. Molecular Dynamics](#3-molecular-dynamics)
+* [4. Molecular Dynamics](#4-molecular-dynamics)
     * [Enthalpy](#enthalpy)
     * [ClassicalMD](#classicalmd)
-* [4. Training Set Generation & Data Management](#4-training-set-generation--data-management)
+* [5. Training Set Generation & Data Management](#5-training-set-generation--data-management)
     * [Dataset](#dataset)
     * [AtomicReference](#atomicreference)
     * [MolecularCrystal](#molecularcrystal)
@@ -34,13 +36,13 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
     * [PhononSampling](#phononsampling)
     * [FiniteSubsystemFilter](#finitesubsystemfilter)
     * [PhononFilter](#phononfilter)
-* [5. Interatomic Potentials & Calculators](#5-interatomic-potentials--calculators)
+* [6. Interatomic Potentials & Calculators](#6-interatomic-potentials--calculators)
     * [MACE](#mace)
     * [DeltaMACE](#deltamace)
     * [UMA](#uma)
     * [PySCF (DFT & HF)](#pyscf-dft--hf)
     * [DFTB+ (Semi-empirical)](#dftb-semi-empirical)
-* [6. Data Storage & Retrieval](#6-data-storage--retrieval)
+* [7. Data Storage & Retrieval](#7-data-storage--retrieval)
     * [read](#read)
     * [tree](#tree)
     * [DatasetKeys](#datasetkeys)
@@ -48,11 +50,35 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 
 ---
 
-## 1. Core Representations & Operations
+## 1. Workflow Execution
+
+The entry point to all automated workflows in the library is the `run` function.
+
+### `run`
+
+**Location:** `mbe_automation.run`
+Dispatches the job to the specific workflow based on the provided configuration type.
+```python
+from mbe_automation import run
+from mbe_automation.configs.quasi_harmonic import FreeEnergy
+
+# Create a configuration object
+config = FreeEnergy(...)
+
+# Start the workflow
+run(config)
+```
+The `run` function automatically detects the available computational resources (CPUs and GPUs) and initializes the parallel execution environment before starting the calculation. It currently supports configurations for Quasi-Harmonic Dynamics (`FreeEnergy`), Molecular Dynamics (`Enthalpy`), and Training Set Generation (`MDSampling`, `PhononSampling`).
+
+---
+
+## 2. Core Representations & Operations
 
 Classes representing the basic physical states of chemical systems and operations like structure relaxation that are universally applied across workflows.
 
 ### `Structure`
+
+**Location:** `mbe_automation.Structure`
 
 Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single frame or a sequence of frames of equal size (e.g., from a short trajectory or a collection of configurations).
 
@@ -76,6 +102,8 @@ Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single
 *   **`atomic_reference`**: Calculates ground-state energies for all unique isolated atoms.
 
 ### `Trajectory`
+
+**Location:** `mbe_automation.Trajectory`
 
 Time evolution of an atomistic system generated with molecular dynamics. Includes time-dependent properties like positions, velocities, kinetic energies, and thermodynamic variables.
 
@@ -110,7 +138,7 @@ Configuration object for energy minimization and structural relaxation.
 
 ---
 
-## 2. Quasi-Harmonic Thermodynamics
+## 3. Quasi-Harmonic Thermodynamics
 
 Classes configuring and supporting the calculation of finite-temperature thermodynamic properties using the Quasi-Harmonic Approximation.
 
@@ -198,6 +226,8 @@ Configuration object for the Debye model fit used to predict equilibrium volumes
 
 ### `ForceConstants`
 
+**Location:** `mbe_automation.ForceConstants`
+
 Second order force constants and associated physical quantities used to compute phonon properties. Needed for frequencies and dynamical matrix eigenvectors. Evaluated in the context of Quasi-Harmonic Dynamics.
 
 #### Methods
@@ -213,7 +243,7 @@ Second order force constants and associated physical quantities used to compute 
 
 ---
 
-## 3. Molecular Dynamics
+## 4. Molecular Dynamics
 
 Classes configuring the numerical integration and property tracking for classical molecular dynamics propagation.
 
@@ -265,11 +295,13 @@ Configures the numerical integration and thermodynamic ensembles for classical m
 
 ---
 
-## 4. Training Set Generation & Data Management
+## 5. Training Set Generation & Data Management
 
 Classes for creating datasets, sampling conformational space, and filtering data for MLIP training.
 
 ### `Dataset`
+
+**Location:** `mbe_automation.Dataset`
 
 A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets.
 
@@ -281,6 +313,8 @@ A container class that holds a collection of `Structure` or `FiniteSubsystem` ob
 
 ### `AtomicReference`
 
+**Location:** `mbe_automation.AtomicReference`
+
 Isolated atom energies required to generate reference energy for MLIP baselines. Stores data at multiple levels of theory.
 
 #### Methods
@@ -289,6 +323,8 @@ Isolated atom energies required to generate reference energy for MLIP baselines.
 *   **`levels_of_theory`**: Lists available levels of theory in the atomic reference.
 
 ### `MolecularCrystal`
+
+**Location:** `mbe_automation.MolecularCrystal`
 
 Periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). Serves as an intermediate necessary for finite cluster extraction.
 
@@ -302,12 +338,16 @@ Periodic crystal structure with additional topological information about its con
 
 ### `MolecularComposition`
 
+**Location:** `mbe_automation.MolecularComposition`
+
 Decomposition of the periodic unit cell into unique and non-unique molecules.
 
 #### Methods
 *   **`from_xyz_file`**: Loads a composition and performs molecular identification.
 
 ### `FiniteSubsystem`
+
+**Location:** `mbe_automation.FiniteSubsystem`
 
 Finite clusters of molecules extracted from a periodic structure or trajectory. Includes all geometric information of `Structure`, supplemented with extra data which enables tracing back the cleaved molecules to their positions in the cell of the original `MolecularCrystal`. Used to generate training data for fragment-based methods.
 
@@ -387,11 +427,13 @@ Specifies which phonon modes to include in the `PhononSampling` workflow.
 
 ---
 
-## 5. Interatomic Potentials & Calculators
+## 6. Interatomic Potentials & Calculators
 
 The `mbe_automation.calculators` module provides interfaces to computational backends. These calculators inherit from the standard ASE `Calculator` interface but add **Level of Theory Tracking** (used to tag HDF5 data) and **Multi-GPU Parallelization** using Ray.
 
 ### `MACE`
+
+**Location:** `mbe_automation.calculators.MACE`
 
 Wraps the `mace-torch` calculator with automatic device selection and Ray actor serialization.
 
@@ -402,6 +444,8 @@ Wraps the `mace-torch` calculator with automatic device selection and Ray actor 
 
 ### `DeltaMACE`
 
+**Location:** `mbe_automation.calculators.DeltaMACE`
+
 Implements a delta-learning model, combining a baseline model with additive correction models.
 
 | Parameter | Type | Default | Description |
@@ -411,6 +455,8 @@ Implements a delta-learning model, combining a baseline model with additive corr
 
 ### `UMA`
 
+**Location:** `mbe_automation.calculators.UMA`
+
 Wraps the Universal Machine learning potential for Atomistic simulations (UMA) via `fairchem`.
 
 | Parameter | Type | Default | Description |
@@ -419,6 +465,8 @@ Wraps the Universal Machine learning potential for Atomistic simulations (UMA) v
 | `task_name` | `str` | `"omc"` | Task/head for predictions. |
 
 ### `PySCF` (DFT & HF)
+
+**Location:** `mbe_automation.calculators.DFT` and `mbe_automation.calculators.HF`
 
 Interface to PySCF (CPU) and GPU4PySCF (GPU) for Hartree-Fock and DFT calculations. **Stateless** design to allow processing different atomic configurations with one instance. Factory functions `DFT` and `HF` are provided.
 
@@ -434,15 +482,19 @@ Interface to PySCF (CPU) and GPU4PySCF (GPU) for Hartree-Fock and DFT calculatio
 
 ### `DFTB+` (Semi-empirical)
 
+**Location:** `mbe_automation.calculators` (factory functions `GFN2_xTB`, `DFTB3_D4`, etc.)
+
 Wraps the ASE `Dftb` calculator. **Stateless** design. Factory functions like `GFN2_xTB` and `DFTB3_D4` are provided for ease of use.
 
 ---
 
-## 6. Data Storage & Retrieval
+## 7. Data Storage & Retrieval
 
 The `mbe_automation` library stores all its persistent data in HDF5 files. The following utility functions and classes are provided for reading, inspecting, querying, and managing datasets.
 
 ### `read`
+
+**Location:** `mbe_automation.read`
 Loads any supported system type from an HDF5 dataset automatically based on the stored internal `dataclass` attribute.
 ```python
 from mbe_automation import read
@@ -452,6 +504,8 @@ data = read(dataset="properties.hdf5", key="quasi_harmonic/crystal")
 ```
 
 ### `tree`
+
+**Location:** `mbe_automation.tree`
 Inspects and visualizes the structure of a dataset file. Prints the hierarchy of groups, datasets, and their attributes.
 ```python
 import mbe_automation
@@ -460,6 +514,8 @@ mbe_automation.tree("properties.hdf5")
 ```
 
 ### `DatasetKeys`
+
+**Location:** `mbe_automation.DatasetKeys`
 Provides a programmatic way to iterate over keys in a dataset file. It supports method chaining to filter keys based on data types, physical properties, or naming conventions.
 ```python
 from mbe_automation import DatasetKeys
@@ -475,6 +531,8 @@ for key in DatasetKeys("properties.hdf5").trajectories().periodic().starts_with(
 *   **Path:** `.starts_with(root_key)`, `.excludes(root_key)`
 
 ### `delete`
+
+**Location:** `mbe_automation.storage.delete`
 Deletes a specific group or dataset from an HDF5 file.
 ```python
 from mbe_automation.storage import delete
