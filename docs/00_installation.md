@@ -1,20 +1,53 @@
 # Installation
 
-The program integrates several scientific codes into a unified workflow, including:
 
-*   **MACE** and **UMA:** MLIP models for energies and forces.
-*   **phonopy:** Phonon calculations and vibrational properties.
-*   **pymatgen:** Crystal structure analysis and manipulation.
-*   **ASE:** Geometry relaxation and molecular dynamics simulations.
-*   **PySCF** and **GPU4PySCF:** Mean-field electronic structure calculations.
-*   **MRCC** and **beyond-rpa**: High-fidelity data points from correlated wave-function theory.
+- [Quick Start: Most Frequent Scenarios](#quick-start-most-frequent-scenarios)
+  - [Scenario A: Install with MACE and PySCF on GPU](#scenario-a-install-with-mace-and-pyscf-on-gpu)
+  - [Scenario B: Install with UMA on GPU](#scenario-b-install-with-uma-on-gpu)
+- [Detailed Step-by-Step Installation](#detailed-step-by-step-installation)
+  - [1. Create a Virtual Environment](#1-create-a-virtual-environment)
+  - [2. Clone the Repository](#2-clone-the-repository)
+  - [3. Install the Program](#3-install-the-program)
+- [Supported Backends](#supported-backends)
 
-- [Create a Virtual Environment](#1-create-a-virtual-environment)
-- [Clone the Repository](#2-clone-the-repository)
-- [Install the Program](#3-install-the-program)
-- [Supported Backends](#4-supported-backends)
+## Quick Start: Most Frequent Scenarios
 
-## 1. Create a Virtual Environment
+> **Important:** Before running these commands on an HPC cluster, you may need to load the CUDA module. This is system-specific and beyond the scope of this manual, but typically looks like:
+
+```bash
+module load CUDA/12.8
+```
+
+### Scenario A: Install with MACE and PySCF on GPU
+
+This is the recommended installation for full functionality on GPU-accelerated systems.
+
+```bash
+mkdir -p ~/.virtualenvs
+python3 -m venv ~/.virtualenvs/mbe_env
+source ~/.virtualenvs/mbe_env/bin/activate
+git clone --recurse-submodules https://github.com/modrzejewski/mbe-automation.git
+cd mbe-automation
+pip install -e ".[mace,gpu-cuda12]"
+```
+*(Note: If you are on a CUDA 11 system, replace `gpu-cuda12` with `gpu-cuda11`)*
+
+### Scenario B: Install with UMA on GPU
+
+If you prefer using UMA instead of MACE. Note that as of April 12th, 2026, MACE and UMA cannot be installed in the same environment due to dependency conflicts.
+
+```bash
+mkdir -p ~/.virtualenvs
+python3 -m venv ~/.virtualenvs/mbe_env
+source ~/.virtualenvs/mbe_env/bin/activate
+git clone --recurse-submodules https://github.com/modrzejewski/mbe-automation.git
+cd mbe-automation
+pip install -e ".[uma]"
+```
+
+## Detailed Step-by-Step Installation
+
+### 1. Create a Virtual Environment
 
 It is highly recommended to install the program in a dedicated Python virtual environment to avoid conflicts with other packages.
 
@@ -39,7 +72,7 @@ source ~/.virtualenvs/mbe_env/bin/activate
 
 Your shell prompt should now be prefixed with `(mbe_env)`, indicating that the virtual environment is active.
 
-## 2. Clone the Repository
+### 2. Clone the Repository
 
 Navigate to the directory where you want to store the project and clone the `mbe-automation` repository from GitHub:
 
@@ -62,7 +95,7 @@ The `--recurse-submodules` flag initializes and downloads them automatically. If
 git submodule update --init --recursive
 ```
 
-## 3. Install the Program
+### 3. Install the Program
 
 With the virtual environment active, install the program and its dependencies in editable mode using `pip`. The `-e` flag allows you to make changes to the source code without needing to reinstall the package.
 
@@ -94,7 +127,7 @@ The installation process may take several minutes.
 
 Once the installation is complete, the `mbe-automation` program is ready to use.
 
-## 4. Supported Backends
+## Supported Backends
 
 The `mbe-automation` package supports several calculation methods. While some dependencies are installed automatically via `pip`, others (like binary executables) must be installed separately and made available in your system's PATH.
 
