@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import mpmath
-from mbe_automation.dynamics.harmonic import thermodynamics
+from mbe_automation.dynamics.harmonic import crystal_thermo
 from phonopy.physical_units import get_physical_units
 
 def get_ref_thermo(freqs_THz, temperatures_K, dps=50):
@@ -110,7 +110,7 @@ def format_comparison_table(df_test, df_ref, label):
 
 def test_thermo_precision():
     """
-    Stress test thermodynamics.run with synthetic data at extreme ranges.
+    Stress test crystal_thermo.run with synthetic data at extreme ranges.
     Uses 2D input with explicit weights.
     """
     print("\nStarting thermodynamic precision stress tests (synthetic data)...")
@@ -122,7 +122,7 @@ def test_thermo_precision():
     # Extreme temperature range
     temps = np.array([1e-12, 1e-9, 1e-6, 1e-3, 300.0, 1e6]) # K
     
-    df_test = thermodynamics.run(freqs, temps, weights)
+    df_test = crystal_thermo.run(freqs, temps, weights)
     df_ref = get_ref_thermo(freqs[0], temps)
     
     table, max_err = format_comparison_table(df_test, df_ref, "Synthetic Stress Test (Absolute Zero to 10^6 K)")
@@ -147,10 +147,10 @@ def test_thermo_gamma_point_default_weights():
     temps = np.array([0.0, 100.0, 300.0, 500.0])
 
     # Call with default weights=None (gamma-point path)
-    df_gamma = thermodynamics.run(freqs_THz=freqs_1d, temperatures_K=temps)
+    df_gamma = crystal_thermo.run(freqs_THz=freqs_1d, temperatures_K=temps)
 
     # Call with explicit 2D input
-    df_explicit = thermodynamics.run(
+    df_explicit = crystal_thermo.run(
         freqs_THz=freqs_1d.reshape(1, -1),
         weights=np.array([1.0]),
         temperatures_K=temps
@@ -168,11 +168,11 @@ def test_thermo_shape_assertions():
 
     # 2D freqs without weights should fail
     with pytest.raises(AssertionError, match="gamma-point"):
-        thermodynamics.run(freqs_THz=freqs_2d, temperatures_K=temps)
+        crystal_thermo.run(freqs_THz=freqs_2d, temperatures_K=temps)
 
     # Mismatched q-point count should fail
     with pytest.raises(AssertionError, match="Shape mismatch"):
-        thermodynamics.run(
+        crystal_thermo.run(
             freqs_THz=freqs_2d,
             weights=np.array([1.0, 2.0]),  # 2 weights for 1 q-point
             temperatures_K=temps

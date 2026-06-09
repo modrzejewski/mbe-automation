@@ -8,7 +8,7 @@ import mbe_automation.common.resources
 import mbe_automation.configs.refinement
 from mbe_automation.dynamics.harmonic.refinement_v3 import _NOMORE_AVAILABLE
 import mbe_automation.dynamics.harmonic.refinement_v3
-import mbe_automation.dynamics.harmonic.thermodynamics
+import mbe_automation.dynamics.harmonic.crystal_thermo
 import mbe_automation.storage
 
 from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
@@ -86,12 +86,12 @@ def run(
         "ω_refined (cm⁻¹)": refined_freqs_cm1
     })
 
-    df_thermo_gamma = mbe_automation.dynamics.harmonic.thermodynamics.run(
+    df_thermo_gamma = mbe_automation.dynamics.harmonic.crystal_thermo.run(
         freqs_THz=initial_freqs_thz,
         temperatures_K=config.temperatures_K
     )
 
-    df_thermo = mbe_automation.dynamics.harmonic.thermodynamics.run(
+    df_thermo = mbe_automation.dynamics.harmonic.crystal_thermo.run(
         freqs_THz=refined_freqs_thz,
         temperatures_K=config.temperatures_K
     )
