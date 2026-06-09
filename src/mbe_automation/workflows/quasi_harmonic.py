@@ -220,6 +220,7 @@ def _relaxed_single_molecule(
         dataset,
         root_key,
         temperatures_K,
+        gas_pressure_GPa,
         input_label,
         relaxed_label,
 ):
@@ -258,6 +259,7 @@ def _relaxed_single_molecule(
         vibrations,
         temperatures_K,
         system_label=relaxed_label,
+        gas_pressure_GPa=gas_pressure_GPa,
     )
     return relaxed_molecule, vibrations, df_molecule
 
@@ -272,6 +274,7 @@ def _process_gas_phase_molecules(
         dataset,
         root_key,
         temperatures_K,
+        gas_pressure_GPa,
 ):
     """
     Run _relaxed_single_molecule for each ref. Label scheme:
@@ -292,6 +295,7 @@ def _process_gas_phase_molecules(
             dataset=dataset,
             root_key=root_key,
             temperatures_K=temperatures_K,
+            gas_pressure_GPa=gas_pressure_GPa,
             input_label=(
                 "molecule[input]" if single_molecule_mode
                 else f"molecule[input,{symbols[k]}]"
@@ -473,6 +477,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             dataset=config.dataset,
             root_key=config.root_key,
             temperatures_K=config.temperatures_K,
+            gas_pressure_GPa=config.pressure_GPa,
         )
         n_formula_units = np.gcd.reduce(n_equivalent_primitive)
         mbe_automation.storage.save_attribute(
