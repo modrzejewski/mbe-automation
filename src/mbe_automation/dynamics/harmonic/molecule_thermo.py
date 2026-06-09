@@ -9,6 +9,8 @@ from pymatgen.core import Molecule
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.symmetry.analyzer import PointGroupAnalyzer
 
+from mbe_automation.dynamics.harmonic.crystal_thermo import stable_log1mexp
+
 
 def _principal_moments(
     pga: PointGroupAnalyzer,
@@ -282,7 +284,7 @@ def _vibrational_functions(
             x = hbar_omega / (kB * temp)  # dimensionless
             bose_factor = 1 / np.expm1(x)
             E_modes = hbar_omega * (1/2 + bose_factor)  # eV
-            S_modes = kB * (x * bose_factor - np.log1p(-np.exp(-x)))  # eV∕K
+            S_modes = kB * (x * bose_factor - stable_log1mexp(x))  # eV∕K
         E_vib[i] = np.sum(E_modes)  # eV
         S_vib[i] = np.sum(S_modes)  # eV∕K
 

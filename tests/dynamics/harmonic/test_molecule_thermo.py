@@ -26,13 +26,17 @@ from ase.calculators.emt import EMT
 from ase.optimize import BFGS
 from ase.thermochemistry import IdealGasThermo
 from phonopy.physical_units import get_physical_units
+from pymatgen.core import Element
 
 import mbe_automation.dynamics.harmonic.molecule_thermo as molecule_thermo
 
 # 1 bar, matching IdealGasThermo's reference pressure
 PRESSURE_PA = 1e5
 PRESSURE_GPA = PRESSURE_PA * 1e-9
-TEMPERATURES_K = np.array([298.15, 400.0, 500.0])
+TEMPERATURES_K = np.array([
+    1.0, 2.0, 5.0, 10.0, 30.0, 50.0, 100.0, 120.0, 150.0,
+    200.0, 250.0, 298.15, 400.0, 500.0, 700.0,
+])
 
 _UNITS = get_physical_units()
 EV_TO_KJ_MOL = _UNITS.EvTokJmol  # eV → kJ/mol
@@ -72,9 +76,13 @@ def _relaxed_atoms(formula):
 
 
 def _vib_energies_eV(n_atoms, geometry):
-    """A deterministic spread of plausible vibrational mode energies (eV)."""
+    """
+    A deterministic spread of plausible vibrational mode energies (eV), including
+    very soft modes that drive x = ℏω/k_BT into the small-x regime at high T.
+    """
     n_vib = 3 * n_atoms - (5 if geometry == "linear" else 6)
-    return np.linspace(0.03, 0.45, n_vib)
+    soft = np.array([1e-5, 1e-4, 1e-3])  # very soft modes (small x at high T)
+    return np.concatenate([soft, np.linspace(0.03, 0.45, n_vib - len(soft))])
 
 
 def _build_inputs(case):
@@ -118,10 +126,12 @@ def _ase_entropy_components(thermo, temperature_K, pressure_Pa):
     return components
 
 
-def _rel_error(value, reference):
-    if abs(reference) > 1e-12:
-        return abs(value - reference) / abs(reference)
-    return abs(value - reference)
+def _assert_close(value, reference, rtol, atol):
+    """Combined relative/absolute tolerance, robust near entropy zero-crossings."""
+    assert abs(value - reference) <= atol + rtol * abs(reference), (
+        f"{value} vs {reference}: |Δ|={abs(value - reference):.3e} "
+        f"> tol={atol + rtol * abs(reference):.3e}"
+    )
 
 
 @pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
@@ -145,13 +155,10 @@ def test_entropy_components_vs_ase(case):
         s_rot = row["S_rot_molecule (J∕K∕mol∕molecule)"]
         s_vib = row["S_vib_molecule (J∕K∕mol∕molecule)"]
 
-        assert _rel_error(s_trans, ase_components["S_trans"]) < 1e-3
-        assert _rel_error(s_rot, ase_components["S_rot"]) < 1e-3
+        _assert_close(s_trans, ase_components["S_trans"], rtol=1e-3, atol=1e-2)
+        _assert_close(s_rot, ase_components["S_rot"], rtol=1e-3, atol=1e-2)
         # ASE prints S_vib with few digits, so compare loosely.
-        assert (
-            _rel_error(s_vib, ase_components["S_vib"]) < 1e-2
-            or abs(s_vib - ase_components["S_vib"]) < 1e-2
-        )
+        _assert_close(s_vib, ase_components["S_vib"], rtol=1e-2, atol=1e-2)
 
 
 @pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
@@ -180,7 +187,7 @@ def test_gibbs_and_total_entropy_vs_ase(case):
             pressure=PRESSURE_PA,
             verbose=False,
         ) * EV_TO_J_MOL_K
-        assert _rel_error(s_total, s_ase) < 1e-3
+        _assert_close(s_total, s_ase, rtol=1e-3, atol=1e-2)
 
         g_new = row["G_tot_molecule (kJ∕mol∕molecule)"]
         g_ase = thermo.get_gibbs_energy(
@@ -188,7 +195,38 @@ def test_gibbs_and_total_entropy_vs_ase(case):
             pressure=PRESSURE_PA,
             verbose=False,
         ) * EV_TO_KJ_MOL
-        assert _rel_error(g_new, g_ase) < 1e-4
+        _assert_close(g_new, g_ase, rtol=1e-4, atol=1e-2)
+
+
+@pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
+def test_moments_of_inertia_vs_ase(case):
+    """
+    Principal moments of inertia match ASE's get_moments_of_inertia.
+
+    molecule_thermo takes atomic masses from pymatgen's element table while ASE
+    uses its own; the two standard-weight tables differ by ~6e-5 (e.g. H), and
+    AseAtomsAdaptor does not carry masses across. To test the inertia
+    computation itself rather than the mass tables, ASE is given the same
+    pymatgen masses, after which the two agree to machine precision.
+    """
+    atoms, _, _ = _build_inputs(case)
+    pmg = molecule_thermo.AseAtomsAdaptor.get_molecule(atoms)
+    pga = molecule_thermo.PointGroupAnalyzer(pmg, tolerance=0.3)
+    moments = molecule_thermo._principal_moments(pga)  # kg·m², ascending
+
+    ase_atoms = atoms.copy()
+    ase_atoms.set_masses(
+        [float(Element(s).atomic_mass) for s in ase_atoms.get_chemical_symbols()]
+    )
+    # ASE reports amu·Å²; convert to kg·m² with the same constant used internally.
+    ase_moments = np.sort(ase_atoms.get_moments_of_inertia()) * _UNITS.AMU * 1e-20
+
+    np.testing.assert_allclose(
+        moments,
+        ase_moments,
+        rtol=1e-9,
+        atol=1e-12 * np.max(ase_moments),  # admits the vanishing linear moment
+    )
 
 
 def test_vibrational_zero_kelvin_stable():
