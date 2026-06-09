@@ -433,7 +433,7 @@ def run(
         + df["E_vib_molecule (kJ∕mol∕molecule)"]
         + df["E_trans_molecule (kJ∕mol∕molecule)"]
         + df["E_rot_molecule (kJ∕mol∕molecule)"]
-        + df["kT (kJ∕mol)"]
+        + df["kT (kJ∕mol)"] # pV term in the ideal gas model
     )  # kJ∕mol∕molecule
     S_tot = (
         df["S_vib_molecule (J∕K∕mol∕molecule)"]
