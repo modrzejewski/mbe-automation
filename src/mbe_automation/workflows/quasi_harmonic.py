@@ -803,6 +803,16 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     df_thermal_expansion = mbe_automation.dynamics.harmonic.crystal_thermo.fit_thermal_expansion_properties(
         df_crystal_equilibrium=df_crystal_qha
     )
+    #
+    # Reindex the sparse, valid-only frames onto the full temperature index of
+    # df_crystal_eos so that every horizontally-concatenated frame shares one
+    # consistent index. Temperatures where the EOS minimization failed are
+    # NaN-filled in all volume-dependent columns. This must happen *after*
+    # fit_thermal_expansion_properties, which requires the contiguous valid rows
+    # for its numerical differentiation and would break on NaN rows.
+    #
+    df_crystal_qha = df_crystal_qha.reindex(df_crystal_eos.index)
+    df_thermal_expansion = df_thermal_expansion.reindex(df_crystal_eos.index)
     if df_molecules is not None:
         df_sublimation_qha = _compute_sublimation_df(
             df_crystal=df_crystal_qha,
@@ -819,8 +829,14 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         ], axis=1)
 
     else:
+        #
+        # Source "T (K)" from the full-index df_crystal_eos so it is never NaN
+        # at failed temperatures (df_crystal_qha["T (K)"] is NaN there after the
+        # reindex above).
+        #
         df_quasi_harmonic = pd.concat([
-            df_crystal_qha,
+            df_crystal_eos[["T (K)"]],
+            df_crystal_qha.drop(columns=["T (K)"]),
             df_thermal_expansion.drop(columns=["T (K)"]),
             df_crystal_eos.drop(columns=["T (K)"]),
         ], axis=1)
@@ -833,8 +849,14 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     if config.save_csv:
         df_quasi_harmonic.to_csv(os.path.join(config.work_dir, "thermodynamics_equilibrium_volume.csv"))
 
+    #
+    # Compare the interpolated Gibbs free energy against the actual one only at
+    # temperatures with a valid equilibrium volume. After the reindex above,
+    # df_crystal_qha["G_tot_crystal ..."] is NaN at failed temperatures, so drop
+    # those before computing the RMSD.
+    #
     G_tot_diff = (df_crystal_eos["G_tot_crystal_eos (kJ∕mol∕unit cell)"]
-                  - df_crystal_qha["G_tot_crystal (kJ∕mol∕unit cell)"])
+                  - df_crystal_qha["G_tot_crystal (kJ∕mol∕unit cell)"]).dropna()
     G_RMSD_per_atom = np.sqrt((G_tot_diff**2).mean()) / len(unit_cell_V0)
     print(f"Accuracy check for the interpolated Gibbs free energy:")
     print(f"RMSD(interpolated-actual) = {G_RMSD_per_atom:.5f} kJ∕mol∕atom")
