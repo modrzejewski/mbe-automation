@@ -78,7 +78,7 @@ For crystals with more than one crystallographically distinct molecule in the as
 
 2. **Single `ase.Atoms` / `Structure` (Z' > 1, conformers of the same species).** When more than one unique molecule is detected in the relaxed primitive cell but the user supplies a single reference, the workflow assumes all detected molecules are conformers of the same species that share a gas-phase minimum, and replicates the reference across them. The workflow prints a one-line notice listing the assumed multiplicities. A validation rule rejects the replication if the detected unique molecules do not share the same chemical composition.
 
-3. **`list[MoleculeRef]` (any Z').** Explicit list, one [`MoleculeRef`](./03_configuration_classes.md#moleculeref-class) per unique molecule. Required for co-crystals or any case where the asymmetric unit contains chemically distinct species.
+3. **`list[MoleculeRef]` (any Z').** Explicit list, one [`MoleculeRef`](./01_api.md#moleculeref) per unique molecule. Required for co-crystals or any case where the asymmetric unit contains chemically distinct species.
 
 ### Replicated single reference (conformational polymorphs)
 
@@ -167,7 +167,7 @@ EEC provides two independent capabilities that can be used separately or togethe
 
 2. **External baseline substitution** — replaces the MLIP static cold curve with an external baseline built from user-supplied EOS parameters (`baseline_V0`, `baseline_B0_GPa`, `baseline_B0_prime`). The functional form is controlled by `baseline_curve_type`: Birch–Murnaghan EOS (default) or a 3rd-order Taylor polynomial around $V_0$. Useful when the MLIP static cold curve should be replaced by an external source, e.g. a high-level DFT or coupled-cluster curve. Can be used with `reference_state_forcing="none"` to substitute the curve without any additional empirical forcing.
 
-The EEC contribution is added to the crystal's electronic energy and propagated into all derived thermodynamic functions. To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the [`EEC`](./03_configuration_classes.md#eec-class) dataclass from `mbe_automation.configs.quasi_harmonic`.
+The EEC contribution is added to the crystal's electronic energy and propagated into all derived thermodynamic functions. To use EEC, add the `electronic_energy_correction` parameter to the `FreeEnergy` configuration object. You must import the [`EEC`](./01_api.md#eec-empirical-electronic-energy-correction) dataclass from `mbe_automation.configs.quasi_harmonic`.
 
 For the explicit forcing modes (`"linear"`, `"inverse_volume"`, `"rigid_shift"`) the equation of state must be set to `"spline"` (which is the default), because the correction parameter is derived from a cubic-spline fit of $G(V)$. The implicit `"rebase_to_reference"` mode performs no such fit and accepts any supported equation of state. When using any reference state forcing, $T_{\text{ref}}$ must be present in the `temperatures_K` array.
 
@@ -325,17 +325,17 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 
 The `max_fit_temperature_K` parameter (default: 200.0 K) defines the trust region: only EOS-minimum volumes at temperatures below this threshold are used. Requires at least 3 points.
 
-For more details on its configuration, see the [`DebyeModel` class documentation](03_configuration_classes.md#debyemodel-class).
+For more details on its configuration, see the [`DebyeModel` class documentation](01_api.md#debyemodel).
 
 If the fit cannot be performed (fewer than 3 points below the threshold), the workflow prints a warning and falls back to `volume_curve="eos_minimum"` automatically — no exception is raised and the calculation continues. The `"volume_curve"` column in the output CSV records which source was actually used, reflecting any such fallback.
 
 ## Adjustable parameters
 
-Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./03_configuration_classes.md) chapter.
+Detailed descriptions of the configuration classes can be found in the [API Reference](./01_api.md) chapter.
 
-*   **[`FreeEnergy`](./03_configuration_classes.md#freeenergy-class)**: Main configuration for the quasi-harmonic workflow.
-*   **[`Minimum`](./03_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
-*   **[`EEC`](./03_configuration_classes.md#eec-class)**: Configuration for the Empirical Electronic Energy Correction (EEC).
+*   **[`FreeEnergy`](./01_api.md#freeenergy)**: Main configuration for the quasi-harmonic workflow.
+*   **[`Minimum`](./01_api.md#minimum)**: Configuration for geometry optimization.
+*   **[`EEC`](./01_api.md#eec-empirical-electronic-energy-correction)**: Configuration for the Empirical Electronic Energy Correction (EEC).
 
 ## Computational Bottlenecks
 

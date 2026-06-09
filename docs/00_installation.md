@@ -107,4 +107,4 @@ The `mbe-automation` package supports several calculation methods. While some de
 | DFTB+MBD, DFTB3-D4 | `dftb+` (Executable) |
 | GFN1-xTB, GFN2-xTB | `dftb+` (Executable) |
 
-† These methods are available on both GPUs (via `gpu4pyscf`) and CPUs (via `pyscf`). The CPU implementation is significantly slower and should only be used for debugging. To use GPU, you must [install the optional `gpu-cuda` dependencies](#3-install-the-program) defined in `pyproject.toml` (e.g., `gpu-cuda12` for CUDA 12). See [Supported DFT Methods](02_calculators.md#supported-dft-methods) for a list of available functionals.
+† These methods are available on both GPUs (via `gpu4pyscf`) and CPUs (via `pyscf`). The CPU implementation is significantly slower and should only be used for debugging. To use GPU, you must [install the optional `gpu-cuda` dependencies](#3-install-the-program) defined in `pyproject.toml` (e.g., `gpu-cuda12` for CUDA 12). See [Supported DFT Methods](01_api.md#pyscf-dft--hf) for a list of available functionals.
