@@ -480,6 +480,30 @@ Interface to PySCF (CPU) and GPU4PySCF (GPU) for Hartree-Fock and DFT calculatio
 | `verbose` | `int` | `0` | Verbosity level for PySCF. |
 | `max_memory_mb` | `int` \| `None` | `None` | Maximum memory usage in MB. |
 
+#### Supported Density Functionals
+
+| Functional | Family | Dispersion Correction |
+| :--- | :--- | :--- |
+| `wb97m-v` | Meta-GGA (Range-separated hybrid) | VV10 |
+| `wb97m-d3` | Meta-GGA (Range-separated hybrid) | D3(BJ) |
+| `wb97x-d3` | GGA (Range-separated hybrid) | D3(BJ) |
+| `wb97x-d4` | GGA (Range-separated hybrid) | D4 |
+| `b3lyp-d3` | Hybrid GGA | D3(BJ) |
+| `b3lyp-d4` | Hybrid GGA | D4 |
+| `pbe-d3` | GGA | D3(BJ) |
+| `pbe-d4` | GGA | D4 |
+| `pbe0-d3` | Hybrid GGA | D3(BJ) |
+| `pbe0-d4` | Hybrid GGA | D4 |
+| `r2scan-d4` | Meta-GGA | D4 |
+
+#### Supported Basis Sets
+
+| Basis Family | Options |
+| :--- | :--- |
+| **Double-zeta** | `def2-svp`, `def2-svpd` |
+| **Triple-zeta** | `def2-tzvp`, `def2-tzvpp`, `def2-tzvpd`, `def2-tzvppd`, `def2-mtzvpp` |
+| **Quadruple-zeta**| `def2-qzvp`, `def2-qzvpp`, `def2-qzvpd`, `def2-qzvppd` |
+
 ### `DFTB+` (Semi-empirical)
 
 **Location:** `mbe_automation.calculators` (factory functions `GFN2_xTB`, `DFTB3_D4`, etc.)
