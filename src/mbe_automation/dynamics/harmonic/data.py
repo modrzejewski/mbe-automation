@@ -36,6 +36,7 @@ _GAS_PHASE_ENERGY_CONTRIBS = (
     "all_freqs_real_molecule",
     "n_atoms_molecule",
     "system_label_molecule",
+    "point_group_molecule",
 )
 
 

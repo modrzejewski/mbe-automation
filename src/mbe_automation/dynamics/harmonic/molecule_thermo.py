@@ -1,4 +1,6 @@
 from __future__ import annotations
+from typing import Literal
+
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -9,6 +11,7 @@ from pymatgen.core import Molecule
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.symmetry.analyzer import PointGroupAnalyzer
 
+import mbe_automation.common.display
 from mbe_automation.dynamics.harmonic.crystal_thermo import stable_log1mexp
 
 
@@ -80,7 +83,7 @@ def _symmetry_number(
 def _rotor_type(
     molecule: Molecule,
     pga: PointGroupAnalyzer,
-) -> str:
+) -> Literal["monatomic", "linear", "nonlinear"]:
     """
     Classify the molecule as ``"monatomic"``, ``"linear"``, or ``"nonlinear"``.
     """
@@ -168,9 +171,10 @@ def s_rot(
 
 def translation_rotation(
     molecule: Molecule,
+    pga: PointGroupAnalyzer,
+    rotor_type: Literal["monatomic", "linear", "nonlinear"],
     temperatures_K: npt.NDArray[np.float64],
     pressure_GPa: float,
-    tolerance_angs: float = 0.3,
 ) -> pd.DataFrame:
     """
     Translational and rotational entropies and energies of an isolated molecule
@@ -178,12 +182,10 @@ def translation_rotation(
 
     Args:
         molecule: molecular geometry.
+        pga: PointGroupAnalyzer instance.
+        rotor_type: 'linear', 'nonlinear', or 'monatomic'.
         temperatures_K: temperatures (K).
         pressure_GPa: pressure (GPa).
-        tolerance_angs: distance tolerance (Å) for detecting the molecular point
-            group and its rotational symmetry number; the default 0.3 Å is
-            deliberately loose so the idealized symmetry is recovered from a
-            relaxed, imperfectly symmetric geometry.
 
     Returns:
         Translational and rotational molar entropies (J∕K∕mol) and energies
@@ -197,15 +199,6 @@ def translation_rotation(
     T = np.asarray(temperatures_K, dtype=np.float64)  # K
     assert T.ndim == 1, (
         f"temperatures_K must be 1D (n_temperatures,), got shape {T.shape}"
-    )
-
-    pga = PointGroupAnalyzer(molecule, tolerance=tolerance_angs)
-    rotor_type = _rotor_type(molecule, pga)
-    print(
-        f"point group: {pga.sch_symbol}, "
-        f"σ: {_symmetry_number(pga)}, "
-        f"rotor type: {rotor_type}",
-        flush=True,
     )
 
     S_trans = s_trans(
@@ -235,6 +228,7 @@ def translation_rotation(
         "E_trans_molecule (kJ∕mol∕molecule)": E_trans,
         "E_rot_molecule (kJ∕mol∕molecule)": E_rot,
         "kT (kJ∕mol)": kT,
+        "point_group_molecule": pga.sch_symbol,
     })
 
 
@@ -407,11 +401,27 @@ def run(
 
     molecule = AseAtomsAdaptor.get_molecule(system)
 
+    pga = PointGroupAnalyzer(molecule, tolerance=tolerance_angs)
+    rotor_type = _rotor_type(molecule, pga)
+
+    mbe_automation.common.display.framed("Thermodynamics in gas phase")
+    T_min, T_max = np.min(T), np.max(T)
+    T_str = f"{len(T)} points ({T_min:g} - {T_max:g} K)" if len(T) > 1 else f"{T[0]:g} K"
+
+    print(f"{'formula':<30}{molecule.composition.reduced_formula}")
+    print(f"{'n_atoms':<30}{len(molecule)}")
+    print(f"{'point group':<30}{pga.sch_symbol}")
+    print(f"{'σ':<30}{_symmetry_number(pga)}")
+    print(f"{'rotor type':<30}{rotor_type}")
+    print(f"{'temperatures':<30}{T_str}")
+    print(f"{'pressure':<30}{pressure_GPa} GPa", flush=True)
+
     df_transrot = translation_rotation(
         molecule=molecule,
+        pga=pga,
+        rotor_type=rotor_type,
         temperatures_K=T,
         pressure_GPa=pressure_GPa,
-        tolerance_angs=tolerance_angs,
     )
     df_vib = vibrational(
         molecule=molecule,
