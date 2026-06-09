@@ -454,18 +454,25 @@ def _formula_unit_terms(df_crystal, df_molecules, n_equivalent):
     E_trans_sum = weighted_sum("E_trans_molecule (kJ∕mol∕molecule)")
     E_rot_sum = weighted_sum("E_rot_molecule (kJ∕mol∕molecule)")
     S_vib_mol_sum = weighted_sum("S_vib_molecule (J∕K∕mol∕molecule)")
-    kT_sum = weighted_sum("kT (kJ∕mol)") # equals the pV term per molecule in the ideal gas approximation
+    S_trans_sum = weighted_sum("S_trans_molecule (J∕K∕mol∕molecule)")
+    S_rot_sum = weighted_sum("S_rot_molecule (J∕K∕mol∕molecule)")
+    kT_sum = weighted_sum("kT (kJ∕mol)") # equals the pV term in the ideal gas approximation
 
     E_latt = df_crystal["E_el_crystal (kJ∕mol∕unit cell)"] * beta - E_el_mol_sum
     ΔE_vib = E_vib_mol_sum - df_crystal["E_vib_crystal (kJ∕mol∕unit cell)"] * beta
     ΔH_sub = -E_latt + ΔE_vib + E_trans_sum + E_rot_sum + kT_sum
     ΔS_sub_vib = S_vib_mol_sum - df_crystal["S_vib_crystal (J∕K∕mol∕unit cell)"] * beta
 
+    ΔS_sub = ΔS_sub_vib + S_trans_sum + S_rot_sum
+    ΔG_sub = ΔH_sub - df_crystal["T (K)"] * ΔS_sub / 1000.0
+
     return {
         "E_latt": E_latt,
         "ΔE_vib": ΔE_vib,
         "ΔH_sub": ΔH_sub,
         "ΔS_sub_vib": ΔS_sub_vib,
+        "ΔS_sub": ΔS_sub,
+        "ΔG_sub": ΔG_sub,
         "V_molar": V_molar,
         "n_formula_units": n_formula_units,
         "nu": nu,
@@ -525,6 +532,8 @@ def sublimation(df_crystal, df_molecule):
         "ΔE_vib (kJ∕mol∕molecule)": terms["ΔE_vib"],
         "ΔH_sub (kJ∕mol∕molecule)": terms["ΔH_sub"],
         "ΔS_sub_vib (J∕K∕mol∕molecule)": terms["ΔS_sub_vib"],
+        "ΔS_sub (J∕K∕mol∕molecule)": terms["ΔS_sub"],
+        "ΔG_sub (kJ∕mol∕molecule)": terms["ΔG_sub"],
         "V_crystal (cm³∕mol∕molecule)": terms["V_molar"],
     })
     return df
@@ -554,6 +563,8 @@ def sublimation_multi_molecule(df_crystal, df_molecules, n_equivalent):
         "ΔE_vib (kJ∕mol∕formula unit)": terms["ΔE_vib"],
         "ΔH_sub (kJ∕mol∕formula unit)": terms["ΔH_sub"],
         "ΔS_sub_vib (J∕K∕mol∕formula unit)": terms["ΔS_sub_vib"],
+        "ΔS_sub (J∕K∕mol∕formula unit)": terms["ΔS_sub"],
+        "ΔG_sub (kJ∕mol∕formula unit)": terms["ΔG_sub"],
         "V_crystal (cm³∕mol∕formula unit)": terms["V_molar"],
         "n_molecules_unique": len(df_molecules),
         "n_formula_units (1∕unit cell)": terms["n_formula_units"],
