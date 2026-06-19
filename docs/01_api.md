@@ -126,15 +126,15 @@ Configuration object for energy minimization and structural relaxation.
 
 | Parameter | Description | Default Value |
 | --- | --- | --- |
-| `max_force_on_atom_eV_A` | Maximum residual force threshold (eV/Å). | `1.0E-4` |
-| `max_n_steps` | Maximum number of steps in the geometry relaxation. | `1000` |
-| `cell_relaxation` | Relaxation mode: "full", "constant_volume", or "only_atoms". | `"constant_volume"` |
-| `transform` | Refines symmetry: `"to_symmetrized_primitive_cell"`, `"to_symmetrized_conventional_cell"`, or `"no_transformation"`. | `"to_symmetrized_primitive_cell"` |
-| `symmetry_tolerance_loose` | Tolerance (Å) for symmetry detection on imperfect structures. | `1.0E-2` |
-| `symmetry_tolerance_strict` | Tolerance (Å) for strict symmetry detection. | `1.0E-5` |
-| `backend` | Software used for relaxation: "ase" or "dftb". | `"ase"` |
-| `algo_primary` / `algo_fallback` | Algorithms for ASE relaxation ("PreconLBFGS", "PreconFIRE"). | `"PreconLBFGS"` / `"PreconFIRE"` |
-| `save_structure_files` | If `True`, saves relaxed structures (`.xyz` or `.cif`) to `work_dir`. | `True` |
+| `max_force_on_atom_eV_A` | Maximum residual force threshold after geometry relaxation (eV/Å). Should be tight (e.g., 5.0E-3 or 1.0E-4) for space group recognition or phonon calculations. | `1.0E-4` |
+| `max_n_steps` | Maximum number of steps in the geometry relaxation algorithm. | `1000` |
+| `cell_relaxation` | Relaxed degrees of freedom for periodic systems: "full", "constant_volume", or "only_atoms". Note: for thermal expansion calculations, it must be either "full" or "constant_volume". | `"constant_volume"` |
+| `transform` | Refines the space group symmetry after geometry relaxation of the unit cell: `"to_symmetrized_primitive_cell"`, `"to_symmetrized_conventional_cell"`, or `"no_transformation"`. | `"to_symmetrized_primitive_cell"` |
+| symmetry_tolerance_loose | Tolerance (Å) for symmetry detection of imperfect structures after relaxation. | 1.0E-2 |
+| symmetry_tolerance_strict | Tolerance (Å) for definite symmetry detection after symmetrization. | 1.0E-5 |
+| backend | Software for geometry relaxation: "ase" (Atomic Simulation Environment) or "dftb" (DFTB+ package with semiempirical Hamiltonians). | "ase" |
+| algo_primary / algo_fallback | Algorithms for structure relaxation in ASE. If algo_primary fails, algo_fallback is used. | "PreconLBFGS" / "PreconFIRE" |
+| save_structure_files | If True, saves the final relaxed structure to the working directory (work_dir). | True |
 
 ---
 
@@ -155,21 +155,21 @@ Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 | `calculator` | MLIP calculator for energies and forces. | - |
 | `molecule` | Initial, non-relaxed structure(s) of the isolated molecule(s). For Z' > 1, pass a `list[MoleculeRef]`. If `None`, sublimation free energy is not computed. | `None` |
 | `relaxation` | An instance of `Minimum` configuring geometry relaxation parameters. | `Minimum()` |
-| `temperatures_K` | Array of temperatures (in Kelvin) for the calculation. | `np.array([298.15])` |
-| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) to detect nonequivalent molecules. | `1.0E-5` |
+| temperatures_K | Range of temperatures (K) for phonon and thermodynamic property calculations. | np.array([298.15]) |
+| unique_molecules_energy_thresh | Energy threshold (eV/atom) to detect nonequivalent molecules. Molecules A and B are nonequivalent if ||E_pot(A) - E_pot(B)|| > unique_molecules_energy_thresh. | 1.0E-5 |
 | `supercell_radius` | Minimum point-periodic image distance for phonon calculations (Å). | `25.0` |
 | `supercell_matrix` | Supercell transformation matrix. If specified, `supercell_radius` is ignored. | `None` |
 | `supercell_diagonal` | If `True`, create a diagonal supercell. | `False` |
-| `supercell_displacement` | Displacement length (Å) for numerical differentiation. | `0.01` |
-| `fourier_interpolation_mesh` | Mesh for Brillouin zone integration. | `150.0` |
-| `thermal_expansion` | If `True`, performs volumetric thermal expansion calculations. | `True` |
+| supercell_displacement | Displacement length (Å) for numerical differentiation. | 0.01 |
+| fourier_interpolation_mesh | Fourier interpolation mesh for Brillouin zone integration. Can be a float (distance in Å defining the supercell) or a 3-component array of grid points. | 150.0 |
+| thermal_expansion | If True, perform volumetric thermal expansion by sampling volumes/pressures and minimizing F(V;T). If False, compute phonons on a single relaxed structure (harmonic approximation). | True |
 | `eos_sampling` | Algorithm for sampling the F(V) curve: "pressure", "volume", or "uniform_scaling". | `"volume"` |
 | `volume_range` | Scaling factors applied to V0. | `np.array([0.96, ..., 1.08])` |
 | `pressure_GPa` | External pressure (GPa). | `1.0E-4` |
 | `thermal_pressures_GPa` | Thermal effective isotropic pressures (GPa). | `np.array([0.2, ..., -0.6])` |
 | `equation_of_state` | Equation of state for the F(V) curve: "birch_murnaghan", "vinet", "polynomial", or "spline". | `"spline"` |
-| `debye_model` | Configuration for the Debye model fit. | `DebyeModel()` |
-| `volume_curve` | Source of equilibrium volumes V(T): `"eos_minimum"` or `"debye"`. | `"eos_minimum"` |
+| debye_model | Debye model for equilibrium cell volume extrapolation/interpolation. Used if G(V, p) is flat or the minimum is outside the sampled volume range. | DebyeModel() |
+| volume_curve | Source of equilibrium volumes V(T) for the QHA temperature loop: "eos_minimum" (from G(V) EOS minimization) or "debye" (from Debye model fit, more robust at high temperatures). | "eos_minimum" |
 | `imaginary_mode_threshold` | Threshold (THz) for imaginary phonon frequencies. | `-0.1` |
 | `filter_out_imaginary_acoustic` | Filter out data points with imaginary acoustic modes. | `True` |
 | `filter_out_imaginary_optical` | Filter out data points with imaginary optical modes. | `True` |
@@ -260,10 +260,12 @@ Configuration object for NVT/NPT thermodynamic averages from molecular dynamics.
 | `calculator` | MLIP calculator for energies and forces. | - |
 | `md_molecule` | An instance of `ClassicalMD` configuring MD for the isolated molecule. | - |
 | `md_crystal` | An instance of `ClassicalMD` configuring MD for the crystal. | - |
-| `temperatures_K` | Target temperatures (in Kelvin). Can be single float or array. | `298.15` |
-| `pressures_GPa` | Target pressures (in GPa). Can be single float or array. | `1.0E-4` |
-| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) to detect nonequivalent molecules. | `1.0E-5` |
-| `relaxation` | An instance of `Minimum` configuring geometry relaxation parameters. | `Minimum()` |
+| `temperatures_K` | Target temperatures (K). Can be single float or array. | `298.15` |
+| `pressures_GPa` | Target pressures (GPa). Can be single float or array. | `1.0E-4` |
+| unique_molecules_energy_thresh | Energy threshold (eV/atom) to detect nonequivalent molecules. Molecules A and B are nonequivalent if ||E_pot(A) - E_pot(B)|| > unique_molecules_energy_thresh. | 1.0E-5 |
+| unique_molecules_rmsd_thresh | RMSD threshold (Å) to detect structurally nonequivalent molecules. | 0.1 |
+| unique_molecules_match_mode | Match mode to detect nonequivalent molecules ("energy_only", "rmsd_only", or "combined"). | "energy_only" |
+| relaxation | Geometry relaxation parameters. | Minimum() |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
 | `dataset` | The main dataset file with all data. | `"./properties.hdf5"` |
 | `root_key` | Root path in the dataset file. | `"md"` |
@@ -279,17 +281,17 @@ Configures the numerical integration and thermodynamic ensembles for classical m
 
 | Parameter | Description | Default Value |
 | --- | --- | --- |
-| `time_total_fs` | Total simulation time in femtoseconds. | `50000.0` |
-| `time_step_fs` | Time step for the integration algorithm. | `0.5` |
-| `sampling_interval_fs` | Interval for trajectory sampling. | `50.0` |
-| `time_equilibration_fs` | Initial period of the simulation discarded for equilibration. | `5000.0` |
-| `ensemble` | Thermodynamic ensemble ("NVT" or "NPT"). | `"NVT"` |
-| `nvt_algo` | Thermostat algorithm for NVT simulations ("csvr", etc.). | `"csvr"` |
-| `npt_algo` | Barostat/thermostat algorithm for NPT ("mtk_full", etc.). | `"mtk_full"` |
-| `thermostat_time_fs` | Thermostat relaxation time. | `100.0` |
-| `barostat_time_fs` | Barostat relaxation time. | `1000.0` |
+| time_total_fs | Total simulation time, including equilibration (fs). | 50000.0 |
+| time_step_fs | Propagation time step (fs), depending on the fastest vibration. | 0.5 |
+| sampling_interval_fs | Trajectory sampling interval (fs) used to compute expectation values. | 50.0 |
+| time_equilibration_fs | Equilibration time (fs) before trajectory sampling begins. | 5000.0 |
+| `ensemble` | Thermodynamic ensemble: `"NVT"` or `"NPT"`. | `"NVT"` |
+| `nvt_algo` | Thermostat algorithm for NVT simulations (e.g., `"csvr"` for Canonical sampling through velocity rescaling, or `"nose_hoover_chain"`). | `"csvr"` |
+| `npt_algo` | Barostat/thermostat algorithm for NPT simulations (e.g., `"mtk_isotropic"`, `"mtk_full"`). | `"mtk_full"` |
+| `thermostat_time_fs` | Thermostat relaxation time (in femtoseconds). | `100.0` |
+| `barostat_time_fs` | Barostat relaxation time (in femtoseconds). | `1000.0` |
 | `tchain` / `pchain` | Number of thermostats/barostats in chain. | `3` |
-| `supercell_radius` | Minimum point-periodic image distance (Å). | `25.0` |
+| `supercell_radius` | Minimum point-periodic image distance (Å) in the supercell used to compute phonons. | `25.0` |
 | `supercell_matrix` | Supercell transformation matrix. | `None` |
 | `supercell_diagonal` | If `True`, create a diagonal supercell. | `False` |
 
