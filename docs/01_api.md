@@ -1,6 +1,6 @@
 # API Reference
 
-This chapter provides a comprehensive reference for the core data classes, configuration objects, and computational calculators used in `mbe_automation`. They are organized into physical and operational themes.
+This chapter provides a comprehensive reference for the core data classes, configuration objects, and computational calculators used in `mbe_automation`. They are logically organized into core data structures and workflow configurations.
 
 All core data classes and calculators can be imported directly from the top-level package or their respective modules:
 ```python
@@ -13,36 +13,34 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 
 * [1. Workflow Execution](#1-workflow-execution)
     * [run](#run)
-* [2. Core Representations & Operations](#2-core-representations--operations)
+* [2. Core Data Structures](#2-core-data-structures)
     * [Structure](#structure)
     * [Trajectory](#trajectory)
+    * [MolecularCrystal](#molecularcrystal)
+    * [MolecularComposition](#molecularcomposition)
+    * [FiniteSubsystem](#finitesubsystem)
+    * [ForceConstants](#forceconstants)
+    * [Dataset](#dataset)
+    * [AtomicReference](#atomicreference)
+* [3. Workflow Configurations](#3-workflow-configurations)
     * [Minimum](#minimum)
-* [3. Quasi-Harmonic Thermodynamics](#3-quasi-harmonic-thermodynamics)
     * [FreeEnergy](#freeenergy)
     * [MoleculeRef](#moleculeref)
     * [EEC (Empirical Electronic Energy Correction)](#eec-empirical-electronic-energy-correction)
     * [DebyeModel](#debyemodel)
-    * [ForceConstants](#forceconstants)
-* [4. Molecular Dynamics](#4-molecular-dynamics)
     * [Enthalpy](#enthalpy)
     * [ClassicalMD](#classicalmd)
-* [5. Training Set Generation & Data Management](#5-training-set-generation--data-management)
-    * [Dataset](#dataset)
-    * [AtomicReference](#atomicreference)
-    * [MolecularCrystal](#molecularcrystal)
-    * [MolecularComposition](#molecularcomposition)
-    * [FiniteSubsystem](#finitesubsystem)
     * [MDSampling](#mdsampling)
     * [PhononSampling](#phononsampling)
     * [FiniteSubsystemFilter](#finitesubsystemfilter)
     * [PhononFilter](#phononfilter)
-* [6. Interatomic Potentials & Calculators](#6-interatomic-potentials--calculators)
+* [4. Interatomic Potentials & Calculators](#4-interatomic-potentials--calculators)
     * [MACE](#mace)
     * [DeltaMACE](#deltamace)
     * [UMA](#uma)
     * [PySCF (DFT & HF)](#pyscf-dft--hf)
     * [DFTB+ (Semi-empirical)](#dftb-semi-empirical)
-* [7. Data Storage & Retrieval](#7-data-storage--retrieval)
+* [5. Data Storage & Retrieval](#5-data-storage--retrieval)
     * [read](#read)
     * [tree](#tree)
     * [DatasetKeys](#datasetkeys)
@@ -51,6 +49,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 ---
 
 ## 1. Workflow Execution
+
 
 The entry point to all automated workflows in the library is the `run` function.
 
@@ -73,9 +72,9 @@ The `run` function automatically detects the available computational resources (
 
 ---
 
-## 2. Core Representations & Operations
+## 2. Core Data Structures
 
-Classes representing the basic physical states of chemical systems and operations like structure relaxation that are universally applied across workflows.
+Classes representing the basic physical states of chemical systems and collections of data. These classes support reading from and saving to dataset files.
 
 ### Structure
 
@@ -119,6 +118,89 @@ Time evolution of an atomistic system generated with molecular dynamics. Include
 *   **`energies_at_level_of_theory` / `forces_at_level_of_theory`**: Returns energies/forces at a given level of theory.
 *   **`unique_elements` / `atomic_reference`**: Elemental properties and isolated atom energies.
 
+### MolecularCrystal
+
+🔗 [`mbe_automation.MolecularCrystal`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L948)
+
+Periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). Serves as an intermediate necessary for finite cluster extraction.
+
+#### Methods
+*   **`read` / `save`**: Load from or save to an HDF5 dataset.
+*   **`subsample`**: Selects a representative subset of frames.
+*   **`extract_finite_subsystems`**: Extracts finite clusters of molecules (e.g., dimers, trimers) based on distance or number of molecules.
+*   **`positions`**: Returns positions of specific molecules in the crystal.
+*   **`atomic_numbers`**: Returns atomic numbers of specific molecules in the crystal.
+*   **`unique_elements` / `atomic_reference`**: Elemental properties and isolated atom energies.
+
+### MolecularComposition
+
+🔗 [`mbe_automation.MolecularComposition`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L59)
+
+Decomposition of the periodic unit cell into unique and non-unique molecules.
+
+#### Methods
+*   **`from_xyz_file`**: Loads a composition and performs molecular identification.
+
+### FiniteSubsystem
+
+🔗 [`mbe_automation.FiniteSubsystem`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L1011)
+
+Finite clusters of molecules extracted from a periodic structure or trajectory. Includes all geometric information of `Structure`, supplemented with extra data which enables tracing back the cleaved molecules to their positions in the cell of the original `MolecularCrystal`. Used to generate training data for fragment-based methods.
+
+#### Methods
+*   **`read` / `save`**: Load from or save to an HDF5 dataset.
+*   **`subsample` / `select`**: Sample or select specific frames.
+*   **`run`**: Executes a calculator on the finite clusters.
+*   **`to_mace_dataset`**: Exports the data to MACE-compatible XYZ files.
+*   **`random_split`**: Randomly splits the frames into multiple objects.
+*   **`unique_elements` / `atomic_reference`**: Elemental properties and isolated atom energies.
+
+### ForceConstants
+
+🔗 [`mbe_automation.ForceConstants`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L254)
+
+Second order force constants and associated physical quantities used to compute phonon properties. Needed for frequencies and dynamical matrix eigenvectors. Evaluated in the context of Quasi-Harmonic Dynamics.
+
+#### Methods
+*   **`read` / `save`**: Load from or save to a dataset file.
+*   **`frequencies_and_eigenvectors`**: Calculates phonon frequencies and eigenvectors at specific k-points (provided as list or numpy array, defaults to Gamma point). Supports band tracking via `track_bands=True` and dynamical matrix symmetrization via `symmetrize_Dq=True`.
+*   **`k_point_grid`**: Generates a k-point mesh for the system.
+*   **`to_phonopy`**: Converts the object to a Phonopy object.
+*   **`thermal_displacements`**: Computes thermal displacement properties (ADPs).
+*   **`to_cif_file`**: Saves the primitive cell to a CIF file (can include ADPs).
+*   **`gruneisen_parameters`**: Computes Gruneisen parameters at a given k-point.
+*   **`refine`**: Refines phonon frequencies against experimental ADPs using the NoMoRe library.
+*   **`thermodynamics`**: Computes thermodynamic properties (vib energy, entropy, etc.) at given temperatures.
+
+### Dataset
+
+🔗 [`mbe_automation.Dataset`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L1139)
+
+A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets.
+
+#### Methods
+*   **`append`**: Adds a structure or subsystem to the dataset collection.
+*   **`statistics`**: Prints statistical summaries of the dataset (e.g. mean/std of energies).
+*   **`to_mace_dataset`**: Exports data to MACE-compatible XYZ files.
+*   **`unique_elements` / `atomic_reference`**: Elemental properties and isolated atom energies.
+
+### AtomicReference
+
+🔗 [`mbe_automation.AtomicReference`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L207)
+
+Isolated atom energies required to generate reference energy for MLIP baselines. Stores data at multiple levels of theory.
+
+#### Methods
+*   **`read` / `save`**: Load from or save to an HDF5 dataset.
+*   **`from_atomic_numbers`**: Creates an `AtomicReference` from a list of atomic numbers and a calculator.
+*   **`levels_of_theory`**: Lists available levels of theory in the atomic reference.
+
+---
+
+## 3. Workflow Configurations
+
+Configuration objects that define calculation parameters and options. They are grouped by their respective workflows.
+
 ### Minimum
 
 🔗 [`mbe_automation.configs.structure.Minimum`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/structure.py#L23)
@@ -138,10 +220,6 @@ Configuration object for energy minimization and structural relaxation.
 | save_structure_files | If True, saves the final relaxed structure to the working directory (work_dir). | True |
 
 ---
-
-## 3. Quasi-Harmonic Thermodynamics
-
-Classes configuring and supporting the calculation of finite-temperature thermodynamic properties using the Quasi-Harmonic Approximation.
 
 ### FreeEnergy
 
@@ -225,29 +303,6 @@ Configuration object for the Debye model fit used to predict equilibrium volumes
 | --- | --- | --- |
 | `max_fit_temperature_K` | Upper boundary of the trust region (K) for fitting. | `200.0` |
 
-### ForceConstants
-
-🔗 [`mbe_automation.ForceConstants`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L254)
-
-Second order force constants and associated physical quantities used to compute phonon properties. Needed for frequencies and dynamical matrix eigenvectors. Evaluated in the context of Quasi-Harmonic Dynamics.
-
-#### Methods
-*   **`read` / `save`**: Load from or save to a dataset file.
-*   **`frequencies_and_eigenvectors`**: Calculates phonon frequencies and eigenvectors at specific k-points (provided as list or numpy array, defaults to Gamma point). Supports band tracking via `track_bands=True` and dynamical matrix symmetrization via `symmetrize_Dq=True`.
-*   **`k_point_grid`**: Generates a k-point mesh for the system.
-*   **`to_phonopy`**: Converts the object to a Phonopy object.
-*   **`thermal_displacements`**: Computes thermal displacement properties (ADPs).
-*   **`to_cif_file`**: Saves the primitive cell to a CIF file (can include ADPs).
-*   **`gruneisen_parameters`**: Computes Gruneisen parameters at a given k-point.
-*   **`refine`**: Refines phonon frequencies against experimental ADPs using the NoMoRe library.
-*   **`thermodynamics`**: Computes thermodynamic properties (vib energy, entropy, etc.) at given temperatures.
-
----
-
-## 4. Molecular Dynamics
-
-Classes configuring the numerical integration and property tracking for classical molecular dynamics propagation.
-
 ### Enthalpy
 
 🔗 [`mbe_automation.configs.md.Enthalpy`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/md.py#L161)
@@ -297,70 +352,6 @@ Configures the numerical integration and thermodynamic ensembles for classical m
 | `supercell_diagonal` | If `True`, create a diagonal supercell. | `False` |
 
 ---
-
-## 5. Training Set Generation & Data Management
-
-Classes for creating datasets, sampling conformational space, and filtering data for MLIP training.
-
-### Dataset
-
-🔗 [`mbe_automation.Dataset`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L1139)
-
-A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets.
-
-#### Methods
-*   **`append`**: Adds a structure or subsystem to the dataset collection.
-*   **`statistics`**: Prints statistical summaries of the dataset (e.g. mean/std of energies).
-*   **`to_mace_dataset`**: Exports data to MACE-compatible XYZ files.
-*   **`unique_elements` / `atomic_reference`**: Elemental properties and isolated atom energies.
-
-### AtomicReference
-
-🔗 [`mbe_automation.AtomicReference`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L207)
-
-Isolated atom energies required to generate reference energy for MLIP baselines. Stores data at multiple levels of theory.
-
-#### Methods
-*   **`read` / `save`**: Load from or save to an HDF5 dataset.
-*   **`from_atomic_numbers`**: Creates an `AtomicReference` from a list of atomic numbers and a calculator.
-*   **`levels_of_theory`**: Lists available levels of theory in the atomic reference.
-
-### MolecularCrystal
-
-🔗 [`mbe_automation.MolecularCrystal`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L948)
-
-Periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). Serves as an intermediate necessary for finite cluster extraction.
-
-#### Methods
-*   **`read` / `save`**: Load from or save to an HDF5 dataset.
-*   **`subsample`**: Selects a representative subset of frames.
-*   **`extract_finite_subsystems`**: Extracts finite clusters of molecules (e.g., dimers, trimers) based on distance or number of molecules.
-*   **`positions`**: Returns positions of specific molecules in the crystal.
-*   **`atomic_numbers`**: Returns atomic numbers of specific molecules in the crystal.
-*   **`unique_elements` / `atomic_reference`**: Elemental properties and isolated atom energies.
-
-### MolecularComposition
-
-🔗 [`mbe_automation.MolecularComposition`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L59)
-
-Decomposition of the periodic unit cell into unique and non-unique molecules.
-
-#### Methods
-*   **`from_xyz_file`**: Loads a composition and performs molecular identification.
-
-### FiniteSubsystem
-
-🔗 [`mbe_automation.FiniteSubsystem`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L1011)
-
-Finite clusters of molecules extracted from a periodic structure or trajectory. Includes all geometric information of `Structure`, supplemented with extra data which enables tracing back the cleaved molecules to their positions in the cell of the original `MolecularCrystal`. Used to generate training data for fragment-based methods.
-
-#### Methods
-*   **`read` / `save`**: Load from or save to an HDF5 dataset.
-*   **`subsample` / `select`**: Sample or select specific frames.
-*   **`run`**: Executes a calculator on the finite clusters.
-*   **`to_mace_dataset`**: Exports the data to MACE-compatible XYZ files.
-*   **`random_split`**: Randomly splits the frames into multiple objects.
-*   **`unique_elements` / `atomic_reference`**: Elemental properties and isolated atom energies.
 
 ### MDSampling
 
@@ -430,8 +421,7 @@ Specifies which phonon modes to include in the `PhononSampling` workflow.
 
 ---
 
-## 6. Interatomic Potentials & Calculators
-
+## 4. Interatomic Potentials & Calculators
 The `mbe_automation.calculators` module provides interfaces to computational backends. These calculators inherit from the standard ASE `Calculator` interface but add **Level of Theory Tracking** (used to tag dataset data) and **Multi-GPU Parallelization** using Ray.
 
 ### MACE
@@ -515,8 +505,7 @@ Wraps the ASE `Dftb` calculator. **Stateless** design. Factory functions like `G
 
 ---
 
-## 7. Data Storage & Retrieval
-
+## 5. Data Storage & Retrieval
 The `mbe_automation` library stores all its persistent data in dataset files. The following utility functions and classes are provided for reading, inspecting, querying, and managing datasets.
 
 ### read
