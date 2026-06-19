@@ -387,8 +387,8 @@ Configuration for generating distorted structures by sampling along normal mode 
 
 | Parameter | Description | Default Value |
 | --- | --- | --- |
-| `force_constants_dataset` | Path to HDF5 file containing force constants. | `./properties.hdf5` |
-| `force_constants_key` | Key within the HDF5 file. | `"training/quasi_harmonic/phonons/..."` |
+| `force_constants_dataset` | Path to dataset file containing force constants. | `./properties.hdf5` |
+| `force_constants_key` | Key within the dataset file. | `"training/quasi_harmonic/phonons/..."` |
 | `calculator` | MLIP calculator. | - |
 | `features_calculator` | Calculator used to compute feature vectors. | `None` |
 | `temperature_K` | Temperature for phonon sampling. | `298.15` |
