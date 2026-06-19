@@ -83,8 +83,8 @@ Classes representing the basic physical states of chemical systems and operation
 Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single frame or a sequence of frames of equal size (e.g., from a short trajectory or a collection of configurations).
 
 #### Methods
-*   **`read`**: Load the object from an HDF5 dataset.
-*   **`save`**: Saves the object to an HDF5 dataset. Supports `update_properties` mode to update energies, forces, and feature vectors (if missing), without overwriting geometry.
+*   **`read`**: Load the object from a dataset file.
+*   **`save`**: Saves the object to a dataset file. Supports `update_properties` mode to update energies, forces, and feature vectors (if missing), without overwriting geometry.
 *   **`from_xyz_file`**: Creates a structure object from an XYZ file. Takes `read_path`, `transform` (symmetry transformation, default `"to_symmetrized_primitive_cell"`), and `symprec` (symmetry tolerance).
 *   **`subsample`**: Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). Requires feature vectors.
 *   **`select`**: Returns a new object containing only the specified frames (by index).
