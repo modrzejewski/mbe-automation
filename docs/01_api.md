@@ -231,7 +231,7 @@ Configuration object for the Debye model fit used to predict equilibrium volumes
 Second order force constants and associated physical quantities used to compute phonon properties. Needed for frequencies and dynamical matrix eigenvectors. Evaluated in the context of Quasi-Harmonic Dynamics.
 
 #### Methods
-*   **`read` / `save`**: Load from or save to an HDF5 dataset.
+*   **`read` / `save`**: Load from or save to a dataset file.
 *   **`frequencies_and_eigenvectors`**: Calculates phonon frequencies and eigenvectors at specific k-points (provided as list or numpy array, defaults to Gamma point). Supports band tracking via `track_bands=True` and dynamical matrix symmetrization via `symmetrize_Dq=True`.
 *   **`k_point_grid`**: Generates a k-point mesh for the system.
 *   **`to_phonopy`**: Converts the object to a Phonopy object.
