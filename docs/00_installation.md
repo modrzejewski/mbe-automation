@@ -28,7 +28,7 @@ pip install --no-cache-dir -e ".[mace,gpu-cuda12]"
 *(Note: If you are on a CUDA 11 system, replace `gpu-cuda12` with `gpu-cuda11`)*
 
 > **Note on Editable Mode**
-> The `-e` flag installs the package in "editable" mode. This means that any changes you make to the source code will be immediately available without needing to reinstall the package. If you pull the latest changes from the GitHub repository, you will have access to the newest version of the program. However, if the required libraries in `pyproject.toml` have changed, you will need to re-run `pip install --no-cache-dir -e .` in your virtual environment to ensure all dependencies are up to date.
+> The -e flag installs the package in editable mode, making source code changes immediately available. If dependencies in pyproject.toml change, re-run the installation command with the appropriate extras to update them.
 
 ### Scenario B: Install with UMA on GPU
 
