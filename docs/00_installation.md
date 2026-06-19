@@ -1,4 +1,4 @@
-# Installation
+# Setup & Installation
 
 - [Quick Start: Most Frequent Scenarios](#quick-start-most-frequent-scenarios)
   - [Scenario A: Install with MACE and PySCF on GPU](#scenario-a-install-with-mace-and-pyscf-on-gpu)

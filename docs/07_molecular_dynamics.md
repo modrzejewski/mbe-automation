@@ -10,7 +10,7 @@ This workflow is designed for performing molecular dynamics (MD) simulations to 
 
 ## Setup
 
-The initial setup requires importing the necessary modules and defining the system's structures and the MLIP calculator.
+Setup involves importing necessary modules and defining the system's structures and the machine learning interatomic potential (MLIP) calculator.
 
 ```python
 import numpy as np
