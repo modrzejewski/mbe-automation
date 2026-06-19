@@ -160,9 +160,9 @@ Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 | `supercell_radius` | Minimum point-periodic image distance for phonon calculations (Å). | `25.0` |
 | `supercell_matrix` | Supercell transformation matrix. If specified, `supercell_radius` is ignored. | `None` |
 | `supercell_diagonal` | If `True`, create a diagonal supercell. | `False` |
-| `supercell_displacement` | Displacement length (Å) used for numerical differentiation. | `0.01` |
-| `fourier_interpolation_mesh` | Fourier interpolation mesh used to perform integration over the Brillouin zone. Can be a float (distance in Å defining the supercell) or a 3-component array with explicit number of grid points. | `150.0` |
-| `thermal_expansion` | If `True`, performs volumetric thermal expansion calculations by sampling volumes/pressures and minimizing F(V;T). If `False`, phonon calculations are performed only on a single relaxed structure (harmonic approximation). | `True` |
+| supercell_displacement | Displacement length (Å) for numerical differentiation. | 0.01 |
+| fourier_interpolation_mesh | Fourier interpolation mesh for Brillouin zone integration. Can be a float (distance in Å defining the supercell) or a 3-component array of grid points. | 150.0 |
+| thermal_expansion | If True, perform volumetric thermal expansion by sampling volumes/pressures and minimizing F(V;T). If False, compute phonons on a single relaxed structure (harmonic approximation). | True |
 | `eos_sampling` | Algorithm for sampling the F(V) curve: "pressure", "volume", or "uniform_scaling". | `"volume"` |
 | `volume_range` | Scaling factors applied to V0. | `np.array([0.96, ..., 1.08])` |
 | `pressure_GPa` | External pressure (GPa). | `1.0E-4` |
