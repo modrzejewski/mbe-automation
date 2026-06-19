@@ -168,8 +168,8 @@ Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 | `pressure_GPa` | External pressure (GPa). | `1.0E-4` |
 | `thermal_pressures_GPa` | Thermal effective isotropic pressures (GPa). | `np.array([0.2, ..., -0.6])` |
 | `equation_of_state` | Equation of state for the F(V) curve: "birch_murnaghan", "vinet", "polynomial", or "spline". | `"spline"` |
-| `debye_model` | Debye model for equilibrium cell volume extrapolation/interpolation. Use if G(V, p) is flat or the minimum is outside the sampled volume range. | `DebyeModel()` |
-| `volume_curve` | Source of equilibrium volumes V(T) used in the QHA temperature loop: `"eos_minimum"` (from G(V) EOS minimization) or `"debye"` (from Debye model fit, more robust at high temps). | `"eos_minimum"` |
+| debye_model | Debye model for equilibrium cell volume extrapolation/interpolation. Used if G(V, p) is flat or the minimum is outside the sampled volume range. | DebyeModel() |
+| volume_curve | Source of equilibrium volumes V(T) for the QHA temperature loop: "eos_minimum" (from G(V) EOS minimization) or "debye" (from Debye model fit, more robust at high temperatures). | "eos_minimum" |
 | `imaginary_mode_threshold` | Threshold (THz) for imaginary phonon frequencies. | `-0.1` |
 | `filter_out_imaginary_acoustic` | Filter out data points with imaginary acoustic modes. | `True` |
 | `filter_out_imaginary_optical` | Filter out data points with imaginary optical modes. | `True` |
