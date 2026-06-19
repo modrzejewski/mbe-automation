@@ -262,10 +262,10 @@ Configuration object for NVT/NPT thermodynamic averages from molecular dynamics.
 | `md_crystal` | An instance of `ClassicalMD` configuring MD for the crystal. | - |
 | `temperatures_K` | Target temperatures (K). Can be single float or array. | `298.15` |
 | `pressures_GPa` | Target pressures (GPa). Can be single float or array. | `1.0E-4` |
-| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell. Molecules A and B are considered nonequivalent if `\|\|E_pot(A)-E_pot(B)\|\| > unique_molecules_energy_thresh`. | `1.0E-5` |
-| `unique_molecules_rmsd_thresh` | RMSD threshold (Angstroms) used to detect nonequivalent molecules in the input unit cell based on their structures. | `0.1` |
-| `unique_molecules_match_mode` | Match mode used to detect nonequivalent molecules ("energy_only", "rmsd_only", or "combined"). | `"energy_only"` |
-| `relaxation` | Parameters controlling geometry relaxation, an instance of `Minimum`. | `Minimum()` |
+| unique_molecules_energy_thresh | Energy threshold (eV/atom) to detect nonequivalent molecules. Molecules A and B are nonequivalent if ||E_pot(A) - E_pot(B)|| > unique_molecules_energy_thresh. | 1.0E-5 |
+| unique_molecules_rmsd_thresh | RMSD threshold (Å) to detect structurally nonequivalent molecules. | 0.1 |
+| unique_molecules_match_mode | Match mode to detect nonequivalent molecules ("energy_only", "rmsd_only", or "combined"). | "energy_only" |
+| relaxation | Geometry relaxation parameters. | Minimum() |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
 | `dataset` | The main HDF5 file with all data. | `"./properties.hdf5"` |
 | `root_key` | Root path in the HDF5 dataset. | `"md"` |
