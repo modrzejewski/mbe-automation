@@ -56,7 +56,7 @@ The entry point to all automated workflows in the library is the `run` function.
 
 ### `run`
 
-**Location:** [`mbe_automation.run`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/workflow_entrypoint.py#L17)
+> 📍 **Location:** [`mbe_automation.run`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/workflow_entrypoint.py#L17)
 Dispatches the job to the specific workflow based on the provided configuration type.
 ```python
 from mbe_automation import run
@@ -78,7 +78,7 @@ Classes representing the basic physical states of chemical systems and operation
 
 ### `Structure`
 
-**Location:** [`mbe_automation.Structure`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L661)
+> 📍 **Location:** [`mbe_automation.Structure`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L661)
 
 Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single frame or a sequence of frames of equal size (e.g., from a short trajectory or a collection of configurations).
 
@@ -103,7 +103,7 @@ Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single
 
 ### `Trajectory`
 
-**Location:** [`mbe_automation.Trajectory`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L843)
+> 📍 **Location:** [`mbe_automation.Trajectory`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L843)
 
 Time evolution of an atomistic system generated with molecular dynamics. Includes time-dependent properties like positions, velocities, kinetic energies, and thermodynamic variables.
 
@@ -120,7 +120,7 @@ Time evolution of an atomistic system generated with molecular dynamics. Include
 
 ### `Minimum`
 
-**Location:** [`mbe_automation.configs.structure.Minimum`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/structure.py#L23)
+> 📍 **Location:** [`mbe_automation.configs.structure.Minimum`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/structure.py#L23)
 
 Configuration object for energy minimization and structural relaxation.
 
@@ -144,7 +144,7 @@ Classes configuring and supporting the calculation of finite-temperature thermod
 
 ### `FreeEnergy`
 
-**Location:** [`mbe_automation.configs.quasi_harmonic.FreeEnergy`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/quasi_harmonic.py#L48)
+> 📍 **Location:** [`mbe_automation.configs.quasi_harmonic.FreeEnergy`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/quasi_harmonic.py#L48)
 
 Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 
@@ -184,7 +184,7 @@ Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 
 ### `MoleculeRef`
 
-**Location:** [`mbe_automation.configs.quasi_harmonic.MoleculeRef`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/quasi_harmonic.py#L23)
+> 📍 **Location:** [`mbe_automation.configs.quasi_harmonic.MoleculeRef`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/quasi_harmonic.py#L23)
 
 Gas-phase reference for one crystallographically distinct molecule in a Z' > 1 crystal.
 
@@ -196,7 +196,7 @@ Gas-phase reference for one crystallographically distinct molecule in a Z' > 1 c
 
 ### `EEC` (Empirical Electronic Energy Correction)
 
-**Location:** [`mbe_automation.configs.quasi_harmonic.EEC`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/dynamics/harmonic/eec.py#L204) (alias for `mbe_automation.dynamics.harmonic.eec.EECConfig`)
+> 📍 **Location:** [`mbe_automation.configs.quasi_harmonic.EEC`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/dynamics/harmonic/eec.py#L204) (alias for `mbe_automation.dynamics.harmonic.eec.EECConfig`)
 
 Provides capabilities for reference state forcing and external baseline substitution of the cold curve.
 
@@ -216,7 +216,7 @@ Provides capabilities for reference state forcing and external baseline substitu
 
 ### `DebyeModel`
 
-**Location:** [`mbe_automation.configs.quasi_harmonic.DebyeModel`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/dynamics/harmonic/eec.py#L148)
+> 📍 **Location:** [`mbe_automation.configs.quasi_harmonic.DebyeModel`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/dynamics/harmonic/eec.py#L148)
 
 Configuration object for the Debye model fit used to predict equilibrium volumes $V(T)$.
 
@@ -226,7 +226,7 @@ Configuration object for the Debye model fit used to predict equilibrium volumes
 
 ### `ForceConstants`
 
-**Location:** [`mbe_automation.ForceConstants`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L254)
+> 📍 **Location:** [`mbe_automation.ForceConstants`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L254)
 
 Second order force constants and associated physical quantities used to compute phonon properties. Needed for frequencies and dynamical matrix eigenvectors. Evaluated in the context of Quasi-Harmonic Dynamics.
 
@@ -249,7 +249,7 @@ Classes configuring the numerical integration and property tracking for classica
 
 ### `Enthalpy`
 
-**Location:** [`mbe_automation.configs.md.Enthalpy`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/md.py#L161)
+> 📍 **Location:** [`mbe_automation.configs.md.Enthalpy`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/md.py#L161)
 
 Configuration object for NVT/NPT thermodynamic averages from molecular dynamics.
 
@@ -275,7 +275,7 @@ Configuration object for NVT/NPT thermodynamic averages from molecular dynamics.
 
 ### `ClassicalMD`
 
-**Location:** [`mbe_automation.configs.md.ClassicalMD`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/md.py#L16)
+> 📍 **Location:** [`mbe_automation.configs.md.ClassicalMD`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/md.py#L16)
 
 Configures the numerical integration and thermodynamic ensembles for classical molecular dynamics propagation.
 
@@ -303,7 +303,7 @@ Classes for creating datasets, sampling conformational space, and filtering data
 
 ### `Dataset`
 
-**Location:** [`mbe_automation.Dataset`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L1139)
+> 📍 **Location:** [`mbe_automation.Dataset`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L1139)
 
 A container class that holds a collection of `Structure` or `FiniteSubsystem` objects. Aggregates data for machine learning training sets.
 
@@ -315,7 +315,7 @@ A container class that holds a collection of `Structure` or `FiniteSubsystem` ob
 
 ### `AtomicReference`
 
-**Location:** [`mbe_automation.AtomicReference`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L207)
+> 📍 **Location:** [`mbe_automation.AtomicReference`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L207)
 
 Isolated atom energies required to generate reference energy for MLIP baselines. Stores data at multiple levels of theory.
 
@@ -326,7 +326,7 @@ Isolated atom energies required to generate reference energy for MLIP baselines.
 
 ### `MolecularCrystal`
 
-**Location:** [`mbe_automation.MolecularCrystal`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L948)
+> 📍 **Location:** [`mbe_automation.MolecularCrystal`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L948)
 
 Periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). Serves as an intermediate necessary for finite cluster extraction.
 
@@ -340,7 +340,7 @@ Periodic crystal structure with additional topological information about its con
 
 ### `MolecularComposition`
 
-**Location:** [`mbe_automation.MolecularComposition`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L59)
+> 📍 **Location:** [`mbe_automation.MolecularComposition`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L59)
 
 Decomposition of the periodic unit cell into unique and non-unique molecules.
 
@@ -349,7 +349,7 @@ Decomposition of the periodic unit cell into unique and non-unique molecules.
 
 ### `FiniteSubsystem`
 
-**Location:** [`mbe_automation.FiniteSubsystem`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L1011)
+> 📍 **Location:** [`mbe_automation.FiniteSubsystem`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L1011)
 
 Finite clusters of molecules extracted from a periodic structure or trajectory. Includes all geometric information of `Structure`, supplemented with extra data which enables tracing back the cleaved molecules to their positions in the cell of the original `MolecularCrystal`. Used to generate training data for fragment-based methods.
 
@@ -363,7 +363,7 @@ Finite clusters of molecules extracted from a periodic structure or trajectory. 
 
 ### `MDSampling`
 
-**Location:** [`mbe_automation.configs.training.MDSampling`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/training.py#L159)
+> 📍 **Location:** [`mbe_automation.configs.training.MDSampling`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/training.py#L159)
 
 Configuration for generating distorted structures via Molecular Dynamics sampling.
 
@@ -383,7 +383,7 @@ Configuration for generating distorted structures via Molecular Dynamics samplin
 
 ### `PhononSampling`
 
-**Location:** [`mbe_automation.configs.training.PhononSampling`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/training.py#L18)
+> 📍 **Location:** [`mbe_automation.configs.training.PhononSampling`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/training.py#L18)
 
 Configuration for generating distorted structures by sampling along normal mode coordinates.
 
@@ -403,7 +403,7 @@ Configuration for generating distorted structures by sampling along normal mode 
 
 ### `FiniteSubsystemFilter`
 
-**Location:** [`mbe_automation.structure.clusters.FiniteSubsystemFilter`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/clusters.py#L16)
+> 📍 **Location:** [`mbe_automation.structure.clusters.FiniteSubsystemFilter`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/clusters.py#L16)
 
 Specifies how finite molecular clusters are extracted from periodic frames.
 
@@ -416,7 +416,7 @@ Specifies how finite molecular clusters are extracted from periodic frames.
 
 ### `PhononFilter`
 
-**Location:** [`mbe_automation.dynamics.harmonic.modes.PhononFilter`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/dynamics/harmonic/modes.py#L42)
+> 📍 **Location:** [`mbe_automation.dynamics.harmonic.modes.PhononFilter`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/dynamics/harmonic/modes.py#L42)
 
 Specifies which phonon modes to include in the `PhononSampling` workflow.
 
@@ -435,7 +435,7 @@ The `mbe_automation.calculators` module provides interfaces to computational bac
 
 ### `MACE`
 
-**Location:** [`mbe_automation.calculators.MACE`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/mace.py#L17)
+> 📍 **Location:** [`mbe_automation.calculators.MACE`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/mace.py#L17)
 
 Wraps the `mace-torch` calculator with automatic device selection and Ray actor serialization.
 
@@ -446,7 +446,7 @@ Wraps the `mace-torch` calculator with automatic device selection and Ray actor 
 
 ### `DeltaMACE`
 
-**Location:** [`mbe_automation.calculators.DeltaMACE`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/mace.py#L101)
+> 📍 **Location:** [`mbe_automation.calculators.DeltaMACE`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/mace.py#L101)
 
 Implements a delta-learning model, combining a baseline model with additive correction models.
 
@@ -457,7 +457,7 @@ Implements a delta-learning model, combining a baseline model with additive corr
 
 ### `UMA`
 
-**Location:** [`mbe_automation.calculators.UMA`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/uma.py#L12)
+> 📍 **Location:** [`mbe_automation.calculators.UMA`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/uma.py#L12)
 
 Wraps the Universal Machine learning potential for Atomistic simulations (UMA) via `fairchem`.
 
@@ -468,7 +468,7 @@ Wraps the Universal Machine learning potential for Atomistic simulations (UMA) v
 
 ### `PySCF` (DFT & HF)
 
-**Location:** [`mbe_automation.calculators.DFT`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/pyscf.py#L110) and [`mbe_automation.calculators.HF`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/pyscf.py#L78)
+> 📍 **Location:** [`mbe_automation.calculators.DFT`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/pyscf.py#L110) and [`mbe_automation.calculators.HF`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/pyscf.py#L78)
 
 Interface to PySCF (CPU) and GPU4PySCF (GPU) for Hartree-Fock and DFT calculations. **Stateless** design to allow processing different atomic configurations with one instance. Factory functions `DFT` and `HF` are provided.
 
@@ -508,7 +508,7 @@ Interface to PySCF (CPU) and GPU4PySCF (GPU) for Hartree-Fock and DFT calculatio
 
 ### `DFTB+` (Semi-empirical)
 
-**Location:** [`mbe_automation.calculators`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/dftb.py) (factory functions `GFN2_xTB`, `DFTB3_D4`, etc.)
+> 📍 **Location:** [`mbe_automation.calculators`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/dftb.py) (factory functions `GFN2_xTB`, `DFTB3_D4`, etc.)
 
 Wraps the ASE `Dftb` calculator. **Stateless** design. Factory functions like `GFN2_xTB` and `DFTB3_D4` are provided for ease of use.
 
@@ -529,7 +529,7 @@ data = read(dataset="properties.hdf5", key="quasi_harmonic/crystal")
 
 ### `tree`
 
-**Location:** [`mbe_automation.tree`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/storage/inspect.py#L232)
+> 📍 **Location:** [`mbe_automation.tree`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/storage/inspect.py#L232)
 Inspects and visualizes the structure of a dataset file. Prints the hierarchy of groups, datasets, and their attributes.
 ```python
 import mbe_automation
@@ -539,7 +539,7 @@ mbe_automation.tree("properties.hdf5")
 
 ### `DatasetKeys`
 
-**Location:** [`mbe_automation.DatasetKeys`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/storage/inspect.py#L30)
+> 📍 **Location:** [`mbe_automation.DatasetKeys`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/storage/inspect.py#L30)
 Provides a programmatic way to iterate over keys in a dataset file. It supports method chaining to filter keys based on data types, physical properties, or naming conventions.
 ```python
 from mbe_automation import DatasetKeys
@@ -556,7 +556,7 @@ for key in DatasetKeys("properties.hdf5").trajectories().periodic().starts_with(
 
 ### `delete`
 
-**Location:** [`mbe_automation.storage.delete`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/storage/tools.py#L57)
+> 📍 **Location:** [`mbe_automation.storage.delete`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/storage/tools.py#L57)
 Deletes a specific group or dataset from a dataset file.
 ```python
 from mbe_automation.storage import delete
