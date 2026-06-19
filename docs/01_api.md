@@ -108,7 +108,7 @@ Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single
 Time evolution of an atomistic system generated with molecular dynamics. Includes time-dependent properties like positions, velocities, kinetic energies, and thermodynamic variables.
 
 #### Methods
-*   **`read` / `save`**: Load from or save to an HDF5 dataset.
+*   **`read` / `save`**: Load from or save to a dataset file.
 *   **`subsample` / `select`**: Sample or select specific frames.
 *   **`run`**: Executes a calculator on the trajectory frames.
 *   **`to_mace_dataset`**: Exports the data to MACE-compatible XYZ files.
