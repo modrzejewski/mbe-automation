@@ -429,7 +429,7 @@ Specifies which phonon modes to include in the `PhononSampling` workflow.
 
 ## 6. Interatomic Potentials & Calculators
 
-The `mbe_automation.calculators` module provides interfaces to computational backends. These calculators inherit from the standard ASE `Calculator` interface but add **Level of Theory Tracking** (used to tag HDF5 data) and **Multi-GPU Parallelization** using Ray.
+The `mbe_automation.calculators` module provides interfaces to computational backends. These calculators inherit from the standard ASE `Calculator` interface but add **Level of Theory Tracking** (used to tag dataset data) and **Multi-GPU Parallelization** using Ray.
 
 ### `MACE`
 
