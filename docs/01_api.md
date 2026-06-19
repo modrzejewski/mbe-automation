@@ -155,8 +155,8 @@ Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 | `calculator` | MLIP calculator for energies and forces. | - |
 | `molecule` | Initial, non-relaxed structure(s) of the isolated molecule(s). For Z' > 1, pass a `list[MoleculeRef]`. If `None`, sublimation free energy is not computed. | `None` |
 | `relaxation` | An instance of `Minimum` configuring geometry relaxation parameters. | `Minimum()` |
-| `temperatures_K` | Range of temperatures (K) at which phonons and thermodynamic properties are computed. | `np.array([298.15])` |
-| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell. Molecules A and B are considered nonequivalent if `\|\|E_pot(A)-E_pot(B)\|\| > unique_molecules_energy_thresh`. | `1.0E-5` |
+| temperatures_K | Range of temperatures (K) for phonon and thermodynamic property calculations. | np.array([298.15]) |
+| unique_molecules_energy_thresh | Energy threshold (eV/atom) to detect nonequivalent molecules. Molecules A and B are nonequivalent if ||E_pot(A) - E_pot(B)|| > unique_molecules_energy_thresh. | 1.0E-5 |
 | `supercell_radius` | Minimum point-periodic image distance for phonon calculations (Å). | `25.0` |
 | `supercell_matrix` | Supercell transformation matrix. If specified, `supercell_radius` is ignored. | `None` |
 | `supercell_diagonal` | If `True`, create a diagonal supercell. | `False` |
