@@ -375,8 +375,8 @@ Configuration for generating distorted structures via Molecular Dynamics samplin
 | `temperatures_K` / `pressures_GPa` | Target temperatures and pressures. | `298.15` / `1.0E-4` |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter`. | `FiniteSubsystemFilter()` |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
-| `dataset` | The main HDF5 file with all data. | `"./properties.hdf5"` |
-| `root_key` | Root path in the HDF5 dataset. | `"training/md_sampling"` |
+| `dataset` | The main dataset file with all data. | `"./properties.hdf5"` |
+| `root_key` | Root path in the dataset file. | `"training/md_sampling"` |
 | `verbose` | Verbosity of the program's output. | `0` |
 
 ### `PhononSampling`
