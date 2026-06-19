@@ -48,7 +48,7 @@ pip install -e ".[uma]"
 
 ### 1. Create a Virtual Environment
 
-It is highly recommended that you install the program in a dedicated Python virtual environment to avoid conflicts with other packages.
+Install the program in a dedicated Python virtual environment to avoid conflicts with other packages.
 
 First, create a directory for your virtual environments if it doesn't already exist:
 
