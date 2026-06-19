@@ -176,8 +176,8 @@ Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 | `filter_out_broken_symmetry` | Filter out data points where space group differs from reference. | `True` |
 | `filter_out_extrapolated_minimum` | Filter out EOS fits where minimum is outside sampling interval. | `True` |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
-| `dataset` | The main HDF5 file with all data. | `"./properties.hdf5"` |
-| `root_key` | Root path in the HDF5 dataset. | `"quasi_harmonic"` |
+| `dataset` | The main dataset file with all data. | `"./properties.hdf5"` |
+| `root_key` | Root path in the dataset file. | `"quasi_harmonic"` |
 | `verbose` | Verbosity of the program's output. `0` suppresses warnings. | `0` |
 | `save_plots` | If `True`, save plots of the simulation results. | `True` |
 | `save_csv` | If `True`, save CSV files of the simulation results. | `True` |
