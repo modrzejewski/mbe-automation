@@ -130,11 +130,11 @@ Configuration object for energy minimization and structural relaxation.
 | `max_n_steps` | Maximum number of steps in the geometry relaxation algorithm. | `1000` |
 | `cell_relaxation` | Relaxed degrees of freedom for periodic systems: "full", "constant_volume", or "only_atoms". Note: for thermal expansion calculations, it must be either "full" or "constant_volume". | `"constant_volume"` |
 | `transform` | Refines the space group symmetry after geometry relaxation of the unit cell: `"to_symmetrized_primitive_cell"`, `"to_symmetrized_conventional_cell"`, or `"no_transformation"`. | `"to_symmetrized_primitive_cell"` |
-| `symmetry_tolerance_loose` | Tolerance (Å) used for symmetry detection for imperfect structures after relaxation with a finite convergence threshold. | `1.0E-2` |
-| `symmetry_tolerance_strict` | Tolerance (Å) used for definite symmetry detection after symmetrization. | `1.0E-5` |
-| `backend` | Software used to perform the geometry relaxation: "ase" (atomic simulation environment) or "dftb" (dftb+ package with semiempirical hamiltonians). | `"ase"` |
-| `algo_primary` / `algo_fallback` | Algorithms applied for structure relaxation in ASE. If `algo_primary` fails, `algo_fallback` is used. | `"PreconLBFGS"` / `"PreconFIRE"` |
-| `save_structure_files` | If `True`, saves final relaxed structure as an `.xyz` or `.cif` file in the working directory (`work_dir`). | `True` |
+| symmetry_tolerance_loose | Tolerance (Å) for symmetry detection of imperfect structures after relaxation. | 1.0E-2 |
+| symmetry_tolerance_strict | Tolerance (Å) for definite symmetry detection after symmetrization. | 1.0E-5 |
+| backend | Software for geometry relaxation: "ase" (Atomic Simulation Environment) or "dftb" (DFTB+ package with semiempirical Hamiltonians). | "ase" |
+| algo_primary / algo_fallback | Algorithms for structure relaxation in ASE. If algo_primary fails, algo_fallback is used. | "PreconLBFGS" / "PreconFIRE" |
+| save_structure_files | If True, saves the final relaxed structure to the working directory (work_dir). | True |
 
 ---
 
