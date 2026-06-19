@@ -13,7 +13,7 @@
   - [`FiniteSubsystemFilter`](#finitesubsystemfilter-class)
   - [`PhononFilter`](#phononfilter-class)
 - [Subsampling](#subsampling)
-- [Updates to and Existing Dataset](#updates-to-an-existing-dataset)
+- [Updates to an Existing Dataset](#updates-to-an-existing-dataset)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
 
@@ -21,7 +21,7 @@ This workflow generates a diverse set of configurations for delta-learning a mac
 
 ## Setup
 
-The initial setup involves importing the necessary modules and defining the parameters for the workflow.
+Setup involves importing necessary modules and defining the parameters for the workflow.
 
 ```python
 import numpy as np
