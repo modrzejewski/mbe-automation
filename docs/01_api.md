@@ -516,10 +516,10 @@ Wraps the ASE `Dftb` calculator. **Stateless** design. Factory functions like `G
 
 The `mbe_automation` library stores all its persistent data in HDF5 files. The following utility functions and classes are provided for reading, inspecting, querying, and managing datasets.
 
-### `read`
+The `mbe_automation` library stores all its persistent data in dataset files. The following utility functions and classes are provided for reading, inspecting, querying, and managing datasets.
 
-**Location:** `mbe_automation.read`
-Loads any supported system type from an HDF5 dataset automatically based on the stored internal `dataclass` attribute.
+### `read`
+Loads any supported system type from a dataset file automatically based on the stored internal `dataclass` attribute.
 ```python
 from mbe_automation import read
 
