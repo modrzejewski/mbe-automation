@@ -281,10 +281,10 @@ Configures the numerical integration and thermodynamic ensembles for classical m
 
 | Parameter | Description | Default Value |
 | --- | --- | --- |
-| `time_total_fs` | Total time of the MD simulation including the equilibration time (in femtoseconds). | `50000.0` |
-| `time_step_fs` | Propagation time step (in femtoseconds). Depends on the fastest vibration in the system. | `0.5` |
-| `sampling_interval_fs` | Interval for trajectory sampling (in femtoseconds). Expectation values will be obtained by averaging over the sampled trajectory data points. | `50.0` |
-| `time_equilibration_fs` | Time after which the system is assumed to reach thermal equilibrium (in femtoseconds). Trajectory points are sampled only at t > `time_equilibration_fs`. | `5000.0` |
+| time_total_fs | Total simulation time, including equilibration (fs). | 50000.0 |
+| time_step_fs | Propagation time step (fs), depending on the fastest vibration. | 0.5 |
+| sampling_interval_fs | Trajectory sampling interval (fs) used to compute expectation values. | 50.0 |
+| time_equilibration_fs | Equilibration time (fs) before trajectory sampling begins. | 5000.0 |
 | `ensemble` | Thermodynamic ensemble: `"NVT"` or `"NPT"`. | `"NVT"` |
 | `nvt_algo` | Thermostat algorithm for NVT simulations (e.g., `"csvr"` for Canonical sampling through velocity rescaling, or `"nose_hoover_chain"`). | `"csvr"` |
 | `npt_algo` | Barostat/thermostat algorithm for NPT simulations (e.g., `"mtk_isotropic"`, `"mtk_full"`). | `"mtk_full"` |
