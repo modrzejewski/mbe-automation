@@ -557,7 +557,7 @@ for key in DatasetKeys("properties.hdf5").trajectories().periodic().starts_with(
 ### `delete`
 
 **Location:** `mbe_automation.storage.delete`
-Deletes a specific group or dataset from an HDF5 file.
+Deletes a specific group or dataset from a dataset file.
 ```python
 from mbe_automation.storage import delete
 
