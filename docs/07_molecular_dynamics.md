@@ -10,7 +10,7 @@ This workflow is designed for performing molecular dynamics (MD) simulations to 
 
 ## Setup
 
-The initial setup requires importing the necessary modules and defining the system's structures and the MLIP calculator.
+Setup involves importing necessary modules and defining the system's structures and the machine learning interatomic potential (MLIP) calculator.
 
 ```python
 import numpy as np
@@ -63,10 +63,10 @@ mbe_automation.run(md_config)
 
 ## Adjustable parameters
 
-Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./03_configuration_classes.md) chapter.
+Detailed descriptions of the configuration classes can be found in the [API Reference](./01_api.md) chapter.
 
-*   **[`Enthalpy`](./03_configuration_classes.md#enthalpy-class)**: Main configuration for the molecular dynamics workflow.
-*   **[`ClassicalMD`](./03_configuration_classes.md#classicalmd-class)**: Configuration for the MD simulation parameters.
+*   **[`Enthalpy`](./01_api.md#enthalpy)**: Main configuration for the molecular dynamics workflow.
+*   **[`ClassicalMD`](./01_api.md#classicalmd)**: Configuration for the MD simulation parameters.
 
 ## Computational Bottlenecks
 

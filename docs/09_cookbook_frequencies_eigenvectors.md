@@ -99,7 +99,7 @@ You can refine the calculated phonon frequencies to better match the experimenta
 
 This is possible if:
 1.  You have a CIF file containing the experimental data (anisotropic displacement parameters and structure factors).
-2.  The corresponding structure was optimized without changing the lattice vectors and cell volume (i.e., using the `cell_relaxation="only_atoms"` in the [Minimum](03_configuration_classes.md#minimum-configuration) configuration class).
+2.  The corresponding structure was optimized without changing the lattice vectors and cell volume (i.e., using the `cell_relaxation="only_atoms"` in the [Minimum](01_api.md#minimum) configuration class).
 
 ```python
 import numpy as np
