@@ -333,6 +333,11 @@ def vibrational(
     n_atoms = len(molecule)
     pga = PointGroupAnalyzer(molecule, tolerance=tolerance_angs)
     rotor_type = _rotor_type(molecule, pga)
+
+    # Sort energies by absolute magnitude so that the rigid-body modes (near zero)
+    # are strictly at the beginning of the array.
+    energies_eV = energies_eV[np.argsort(np.abs(energies_eV))]
+
     if rotor_type == "nonlinear":
         energies_eV = energies_eV[-(3 * n_atoms - 6):]
     elif rotor_type == "linear":
