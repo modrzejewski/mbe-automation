@@ -39,18 +39,6 @@ class ThermalExpansionProperties:
     alpha_L_b_conv: npt.NDArray[np.float64]
     alpha_L_c_conv: npt.NDArray[np.float64]
 
-
-def stable_log1mexp(
-    x: npt.NDArray[np.float64],
-) -> npt.NDArray[np.float64]:
-    """Numerically stable log(1 − e^{−x}) for x > 0."""
-    return np.where(
-        x <= np.log(2),
-        np.log(-np.expm1(-x)),
-        np.log1p(-np.exp(-x)),
-    )
-
-
 def run(
     freqs_THz: npt.NDArray[np.float64],
     temperatures_K: npt.NDArray[np.float64],
@@ -142,7 +130,7 @@ def run(
             bose_factor = 1.0 / np.expm1(x)
             
             E_modes = valid_hbar_omega * (0.5 + bose_factor)
-            S_modes = kB * (x * bose_factor - stable_log1mexp(x))
+            S_modes = kB * (x * bose_factor - np.log1p(-np.exp(-x)))
             C_modes = kB * x**2 * bose_factor * (bose_factor + 1.0)
 
         # Weighted sum normalized by total weight

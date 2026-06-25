@@ -16,7 +16,9 @@ Library for high-level automation of thermodynamics modeling with machine-learni
 
 ## Basics
 
-*   [API Reference](./01_api.md)
+*   [API Data Classes](./01_api_classes.md)
+*   [Calculators](./02_calculators.md)
+*   [Configuration Classes](./03_configuration_classes.md)
 *   [Working with HDF5 Datasets](./04_working_with_hdf5_datasets.md)
 *   [Computational Bottlenecks](./05_bottlenecks.md)
 

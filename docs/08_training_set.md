@@ -13,7 +13,7 @@
   - [`FiniteSubsystemFilter`](#finitesubsystemfilter-class)
   - [`PhononFilter`](#phononfilter-class)
 - [Subsampling](#subsampling)
-- [Updates to an Existing Dataset](#updates-to-an-existing-dataset)
+- [Updates to and Existing Dataset](#updates-to-an-existing-dataset)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Complete Input Files](#complete-input-files)
 
@@ -21,7 +21,7 @@ This workflow generates a diverse set of configurations for delta-learning a mac
 
 ## Setup
 
-Setup involves importing necessary modules and defining the parameters for the workflow.
+The initial setup involves importing the necessary modules and defining the parameters for the workflow.
 
 ```python
 import numpy as np
@@ -117,15 +117,15 @@ mbe_automation.run(phonon_sampling_config)
 
 ## Adjustable parameters
 
-Detailed descriptions of the configuration classes can be found in the [API Reference](./01_api.md) chapter.
+Detailed descriptions of the configuration classes can be found in the [Configuration Classes](./03_configuration_classes.md) chapter.
 
-*   **[`MDSampling`](./01_api.md#mdsampling)**: Configuration for the MD sampling stage.
-*   **[`PhononSampling`](./01_api.md#phononsampling)**: Configuration for the phonon sampling stage.
-*   **[`ClassicalMD`](./01_api.md#classicalmd)**: Configuration for the MD simulation parameters within `MDSampling`.
-*   **[`FreeEnergy`](./01_api.md#freeenergy)**: Configuration for the force constants calculation.
-*   **[`Minimum`](./01_api.md#minimum)**: Configuration for geometry optimization.
-*   **[`FiniteSubsystemFilter`](./01_api.md#finitesubsystemfilter)**: Configuration for extracting molecular clusters.
-*   **[`PhononFilter`](./01_api.md#phononfilter)**: Configuration for selecting phonon modes.
+*   **[`MDSampling`](./03_configuration_classes.md#mdsampling-class)**: Configuration for the MD sampling stage.
+*   **[`PhononSampling`](./03_configuration_classes.md#phononsampling-class)**: Configuration for the phonon sampling stage.
+*   **[`ClassicalMD`](./03_configuration_classes.md#classicalmd-class)**: Configuration for the MD simulation parameters within `MDSampling`.
+*   **[`FreeEnergy`](./03_configuration_classes.md#freeenergy-class)**: Configuration for the force constants calculation.
+*   **[`Minimum`](./03_configuration_classes.md#minimum-class)**: Configuration for geometry optimization.
+*   **[`FiniteSubsystemFilter`](./03_configuration_classes.md#finitesubsystemfilter-class)**: Configuration for extracting molecular clusters.
+*   **[`PhononFilter`](./03_configuration_classes.md#phononfilter-class)**: Configuration for selecting phonon modes.
 
 ## Subsampling
 

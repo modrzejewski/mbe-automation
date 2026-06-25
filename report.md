@@ -37,3 +37,10 @@ Neither branch contains a fundamental mathematical error in its formulation of v
 However, introducing multiple sets of physical constants from different libraries into the same physical pipeline can cause inconsistency. For instance, if the crystal vibrational properties are calculated using `phonopy` (which they likely are, given the workflow), and the molecule vibrational properties are calculated using `ase`, the workflow will combine energies that disagree on the exact definitions of $k_B$ and $N_A$. This creates small, non-physical offsets when calculating energetic differences like the sublimation free energy.
 
 Therefore, the `development` branch's custom implementation that unifies the constants across the framework (by relying on `phonopy.physical_units`) is considered **correct and superior**. The approach in the `main` branch can be deemed **incorrect in the context of the broader workflow** because it introduces constant-related inconsistencies by using `ase.units`.
+
+## Historical Context: November 2025
+To ensure a thorough analysis, the `main` branch codebase from the first week of November 2025 (specifically commit `f195ec7`, dated Nov 4, 2025) was also examined.
+
+In that historical commit, the computation of molecular thermodynamic functions was implemented inside the `molecule` function in `src/mbe_automation/dynamics/harmonic/data.py`. The implementation utilized `ase.thermochemistry.HarmonicThermo` and `ase.units` for fundamental physical constants. This is exactly identical to the current implementation found in the `main` branch.
+
+Therefore, the essential differences between the codebase from November 2025 and the current `development` branch remain the same as described above: the transition from `ase` to `phonopy` constants and the shift from using `ase.thermochemistry.HarmonicThermo` to the explicit `_vibrational_functions` custom implementation to maintain global constant consistency.

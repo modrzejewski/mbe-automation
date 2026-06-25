@@ -22,7 +22,7 @@ except ImportError:
     _NOMORE_AVAILABLE = False
 
 import mbe_automation.common.display
-import mbe_automation.dynamics.harmonic.crystal_thermo
+import mbe_automation.dynamics.harmonic.thermodynamics
 
 from phonopy.physical_units import get_physical_units as _get_physical_units
 MIN_FREQ_CM1 = 10.0
@@ -225,7 +225,7 @@ def _exec_strategy(
     # Vibrational thermodynamics at the refinement temperature
     # ------------------------------------------------------------------
     freqs_THz = result["full_x"] * _CM1_TO_THZ   # (n_modes,) cm⁻¹ → THz
-    thermo_df = mbe_automation.dynamics.harmonic.crystal_thermo.run(
+    thermo_df = mbe_automation.dynamics.harmonic.thermodynamics.run(
         freqs_THz=freqs_THz,
         temperatures_K=np.array([phonon_data.temperature]),
         weights=None,   # single Γ-point

@@ -225,11 +225,11 @@ class GammaPointGruneisenModel:
         """
         import ase.units
         from phonopy.physical_units import get_physical_units
-        from mbe_automation.dynamics.harmonic import crystal_thermo
+        from mbe_automation.dynamics.harmonic import thermodynamics
 
         freqs_THz = self.propagate_frequencies(volume)
 
-        df_vib = crystal_thermo.run(
+        df_vib = thermodynamics.run(
             freqs_THz=np.atleast_2d(freqs_THz),
             weights=np.array([1.0]),
             temperatures_K=temperatures_K

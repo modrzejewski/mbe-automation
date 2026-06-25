@@ -12,7 +12,6 @@ from typing import Literal
 import mbe_automation.structure.molecule
 import mbe_automation.structure.crystal
 import mbe_automation.dynamics.harmonic.display
-import mbe_automation.dynamics.harmonic.molecule_thermo
 import mbe_automation.storage
 from mbe_automation.dynamics.harmonic.eec import EEC
 
@@ -30,13 +29,9 @@ _GAS_PHASE_ENERGY_CONTRIBS = (
     "E_trans_molecule (kJ∕mol∕molecule)",
     "E_rot_molecule (kJ∕mol∕molecule)",
     "kT (kJ∕mol)",
-    "S_trans_molecule (J∕K∕mol∕molecule)",
-    "S_rot_molecule (J∕K∕mol∕molecule)",
-    "G_tot_molecule (kJ∕mol∕molecule)",
     "all_freqs_real_molecule",
     "n_atoms_molecule",
     "system_label_molecule",
-    "point_group_molecule",
 )
 
 
@@ -149,20 +144,68 @@ def molecule(
         system,
         vibrations,
         temperatures,
-        system_label,
-        gas_pressure_GPa,
+        system_label
 ):
     """
-    Compute gas-phase molecular thermodynamic functions (ideal gas, rigid rotor,
-    harmonic) by delegating to molecule_thermo.run.
+    Compute vibrational thermodynamic functions for a molecule.
     """
-    return mbe_automation.dynamics.harmonic.molecule_thermo.run(
-        system=system,
-        vibrations=vibrations,
-        temperatures_K=temperatures,
-        system_label=system_label,
-        pressure_GPa=gas_pressure_GPa,
-    )
+    vib_energies = vibrations.get_energies() # eV
+    n_atoms = len(system)
+    rotor_type, _ = mbe_automation.structure.molecule.analyze_geometry(system)
+    print(f"rotor type: {rotor_type}")
+    if rotor_type == "nonlinear":
+        vib_energies = vib_energies[-(3 * n_atoms - 6):]
+    elif rotor_type == "linear":
+        vib_energies = vib_energies[-(3 * n_atoms - 5):]
+    elif rotor_type == "monatomic":
+        vib_energies = []
+    else:
+        raise ValueError(f"Unsupported geometry: {rotor_type}")
+
+    thermo = ase.thermochemistry.HarmonicThermo(vib_energies, ignore_imag_modes=True)
+    if thermo.n_imag == 0:
+        all_freqs_real = True
+    else:
+        all_freqs_real = False
+    print(f"Number of imaginary modes: {thermo.n_imag}")
+
+    n_temperatures = len(temperatures)
+    F_vib = np.zeros(n_temperatures)
+    S_vib = np.zeros(n_temperatures)
+    E_vib = np.zeros(n_temperatures)
+    ZPE = thermo.get_ZPE_correction() / (ase.units.kJ / ase.units.mol) # kJ/mol/molecule
+
+    for i, T in enumerate(temperatures):
+        F_vib[i] = thermo.get_helmholtz_energy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol
+        S_vib[i] = thermo.get_entropy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol*1000
+        E_vib[i] = thermo.get_internal_energy(T, verbose=False) * ase.units.eV/ase.units.kJ*ase.units.mol
+
+    kbT = ase.units.kB * temperatures / (ase.units.kJ / ase.units.mol) # kb*T in kJ/mol
+    E_trans = 3/2 * kbT
+    if rotor_type == "nonlinear":
+        E_rot = 3/2 * kbT
+    elif rotor_type == "linear":
+        E_rot = kbT
+    elif rotor_type == "monatomic":
+        E_rot = np.zeros_like(temperatures)
+
+    E_el = system.get_potential_energy() / (ase.units.kJ / ase.units.mol) # kJ/mol/molecule
+
+    df = pd.DataFrame({
+        "T (K)": temperatures,
+        "E_el_molecule (kJ∕mol∕molecule)": E_el,
+        "E_vib_molecule (kJ∕mol∕molecule)": E_vib,
+        "S_vib_molecule (J∕K∕mol∕molecule)": S_vib,
+        "F_vib_molecule (kJ∕mol∕molecule)": F_vib,
+        "ZPE_molecule (kJ∕mol∕molecule)": ZPE,
+        "E_trans_molecule (kJ∕mol∕molecule)": E_trans,
+        "E_rot_molecule (kJ∕mol∕molecule)": E_rot,
+        "kT (kJ∕mol)": kbT, # equals the pV term per molecule in the ideal gas approximation
+        "all_freqs_real_molecule": all_freqs_real,
+        "n_atoms_molecule": n_atoms,
+        "system_label_molecule": system_label
+        })
+    return df
 
 
 def update_with_eec(
@@ -455,25 +498,18 @@ def _formula_unit_terms(df_crystal, df_molecules, n_equivalent):
     E_trans_sum = weighted_sum("E_trans_molecule (kJ∕mol∕molecule)")
     E_rot_sum = weighted_sum("E_rot_molecule (kJ∕mol∕molecule)")
     S_vib_mol_sum = weighted_sum("S_vib_molecule (J∕K∕mol∕molecule)")
-    S_trans_sum = weighted_sum("S_trans_molecule (J∕K∕mol∕molecule)")
-    S_rot_sum = weighted_sum("S_rot_molecule (J∕K∕mol∕molecule)")
-    kT_sum = weighted_sum("kT (kJ∕mol)") # equals the pV term in the ideal gas approximation
-    pV_crystal = df_crystal["pV_crystal (kJ∕mol∕unit cell)"] * beta
+    kT_sum = weighted_sum("kT (kJ∕mol)") # equals the pV term per molecule in the ideal gas approximation
 
     E_latt = df_crystal["E_el_crystal (kJ∕mol∕unit cell)"] * beta - E_el_mol_sum
     ΔE_vib = E_vib_mol_sum - df_crystal["E_vib_crystal (kJ∕mol∕unit cell)"] * beta
-    ΔH_sub = -E_latt + ΔE_vib + E_trans_sum + E_rot_sum + kT_sum - pV_crystal
+    ΔH_sub = -E_latt + ΔE_vib + E_trans_sum + E_rot_sum + kT_sum
     ΔS_sub_vib = S_vib_mol_sum - df_crystal["S_vib_crystal (J∕K∕mol∕unit cell)"] * beta
-    ΔS_sub = ΔS_sub_vib + S_trans_sum + S_rot_sum
-    ΔG_sub = ΔH_sub - df_crystal["T (K)"] * ΔS_sub / 1000.0
 
     return {
         "E_latt": E_latt,
         "ΔE_vib": ΔE_vib,
         "ΔH_sub": ΔH_sub,
         "ΔS_sub_vib": ΔS_sub_vib,
-        "ΔS_sub": ΔS_sub,
-        "ΔG_sub": ΔG_sub,
         "V_molar": V_molar,
         "n_formula_units": n_formula_units,
         "nu": nu,
@@ -533,8 +569,6 @@ def sublimation(df_crystal, df_molecule):
         "ΔE_vib (kJ∕mol∕molecule)": terms["ΔE_vib"],
         "ΔH_sub (kJ∕mol∕molecule)": terms["ΔH_sub"],
         "ΔS_sub_vib (J∕K∕mol∕molecule)": terms["ΔS_sub_vib"],
-        "ΔS_sub (J∕K∕mol∕molecule)": terms["ΔS_sub"],
-        "ΔG_sub (kJ∕mol∕molecule)": terms["ΔG_sub"],
         "V_crystal (cm³∕mol∕molecule)": terms["V_molar"],
     })
     return df
@@ -564,8 +598,6 @@ def sublimation_multi_molecule(df_crystal, df_molecules, n_equivalent):
         "ΔE_vib (kJ∕mol∕formula unit)": terms["ΔE_vib"],
         "ΔH_sub (kJ∕mol∕formula unit)": terms["ΔH_sub"],
         "ΔS_sub_vib (J∕K∕mol∕formula unit)": terms["ΔS_sub_vib"],
-        "ΔS_sub (J∕K∕mol∕formula unit)": terms["ΔS_sub"],
-        "ΔG_sub (kJ∕mol∕formula unit)": terms["ΔG_sub"],
         "V_crystal (cm³∕mol∕formula unit)": terms["V_molar"],
         "n_molecules_unique": len(df_molecules),
         "n_formula_units (1∕unit cell)": terms["n_formula_units"],
