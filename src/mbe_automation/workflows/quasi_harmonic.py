@@ -308,6 +308,24 @@ def _process_gas_phase_molecules(
         df_molecules.append(df_molecule)
     return df_molecules
 
+    
+def _assert_consistent_temps(df_test, df_reference, label):
+    """
+    Verify that the 'T (K)' column in df_test strictly aligns with df_reference
+    wherever df_test has a valid temperature.
+    """
+    valid_idx = df_test["T (K)"].dropna().index
+    if not np.allclose(
+        df_test.loc[valid_idx, "T (K)"],
+        df_reference.loc[valid_idx, "T (K)"],
+        atol=1e-8,
+    ):
+        raise ValueError(
+            f"Temperature alignment mismatch between {label} "
+            "and EOS data frames. This should never happen "
+            "and indicates a bug that should be reported to the developers."
+        )
+
 
 def _tag_molecule_dfs_for_concat(df_molecules):
     """
@@ -818,6 +836,16 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         molecule_dfs_for_concat = _tag_molecule_dfs_for_concat(df_molecules)
         df_crystal_qha = df_crystal_qha.reindex(df_crystal_eos.index)
         df_thermal_expansion = df_thermal_expansion.reindex(df_crystal_eos.index)
+        
+        #
+        # Verify strict alignment of temperatures to ensure pandas axis=1
+        # concatenation operates on physically matching rows
+        #
+        _assert_consistent_temps(df_sublimation_qha, df_crystal_eos, "sublimation")
+        _assert_consistent_temps(df_crystal_qha, df_crystal_eos, "QHA")
+        for k, df_mol in enumerate(df_molecules):
+            _assert_consistent_temps(df_mol, df_crystal_eos, f"molecule_{k}")
+
         df_quasi_harmonic = pd.concat([
             df_sublimation_qha,
             df_crystal_qha.drop(columns=["T (K)"]),
@@ -829,6 +857,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     else:
         df_crystal_qha = df_crystal_qha.reindex(df_crystal_eos.index)
         df_thermal_expansion = df_thermal_expansion.reindex(df_crystal_eos.index)
+        
+        #
+        # Verify strict alignment of temperatures to ensure pandas axis=1
+        # concatenation operates on physically matching rows
+        #
+        _assert_consistent_temps(df_crystal_qha, df_crystal_eos, "QHA")
+        
         #
         # Source "T (K)" from the full-index df_crystal_eos so it is never NaN
         # at the failed temperatures.
