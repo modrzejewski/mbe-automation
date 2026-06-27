@@ -47,7 +47,7 @@ from mbe_automation.storage.core import (
 from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_LOOSE
 import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
-import mbe_automation.dynamics.harmonic.thermodynamics
+import mbe_automation.dynamics.harmonic.crystal_thermo
 import mbe_automation.dynamics.harmonic.brillouin_zone
 import mbe_automation.dynamics.harmonic.gruneisen
 
@@ -651,7 +651,7 @@ class ForceConstants(_ForceConstants):
             symprec=symprec,
         )
         
-        return mbe_automation.dynamics.harmonic.thermodynamics.run(
+        return mbe_automation.dynamics.harmonic.crystal_thermo.run(
             freqs_THz=freqs_THz,
             weights=weights,
             temperatures_K=temperatures_K
