@@ -52,5 +52,30 @@ The verification follows the execution path of the gas-phase molecular processin
 
    Inside `molecule_thermo.run`, the electronic energy is extracted directly from the `system` (which is the `relaxed_molecule`). Furthermore, the principal moments of inertia, rotational symmetry number, and rotor type are all derived directly from the coordinates of this relaxed geometry to build the translational, rotational, vibrational, and electronic contributions to the molar energy, entropy, and Gibbs free energy.
 
+## Git History Investigation
+
+An investigation of the git history (`main` branch) related to the molecule thermodynamic property evaluation reveals the evolution of the implementation and highlights past errors.
+
+### Fundamental Changes
+
+* **Commit `166aecd` (Jun 9, 2026):** *molecule thermodynamics module with gibbs free energy included*
+  A major overhaul introduced the native implementation in `molecule_thermo.py`. Prior to this commit, thermodynamic properties were computed directly in `mbe_automation.dynamics.harmonic.data.molecule` utilizing `ase.thermochemistry.HarmonicThermo` (see diff of `data.py` in `62b4a2f`). The new custom native implementation explicitly uses fundamental constants from `phonopy.physical_units` for consistency with the crystal thermodynamics and employs `pymatgen`'s `PointGroupAnalyzer` to automatically derive the symmetry number ($\sigma$), point group, and rotor type.
+
+* **Commit `62b4a2f` (Jun 9, 2026):** *linked to molecule thermo to qha workflow*
+  This commit completely hooked up the workflow to utilize the new native thermodynamic evaluations by replacing the inner logic of `data.molecule()` with a call to `molecule_thermo.run()`.
+
+### Errors and Bug Fixes
+
+Several key errors impacted the calculation of molecule properties in the history:
+
+* **Commit `615950f` (Jun 25, 2026):** *sorting of molecule frequencies*
+  Before this patch, vibrational frequencies extracted from the molecule were simply sliced off at the beginning without ensuring they were correctly ordered. Because rigid-body translation/rotation modes correspond to near-zero frequencies, they must be at the very beginning of the array. The fix introduced an explicit sort by absolute magnitude `energies_eV[np.argsort(np.abs(energies_eV))]` before removing the lowest modes (based on rotor type) to prevent spurious results.
+
+* **Commit `ddaf786` (Jun 9, 2026):** *fixed handling of nans*
+  While merging dataframes in `quasi_harmonic.py`, missing temperature data points (where the equilibrium crystal volume search failed) produced NaNs across volume-dependent parameters, corrupting downstream calculations. A patch corrected the order of the dataframe reindexing. The `df_crystal_qha` needed to remain sparse (and contiguous) during the execution of numerical derivatives for thermal expansion and sublimation functions, and reindexing was properly deferred until *just before* dataframe concatenation to correctly align with gas phase `df_molecules` that lacked those failures. The initial fix was in `6d2df11` and was further stabilized in `ddaf786`.
+
+* **Commit `27ed5d0` (Oct 31, 2025):** *corrected drop of "T (K)" columns (#62)* / **Commit `919cd13` (Oct 31, 2025):**
+  An earlier issue caused pandas columns to be improperly dropped directly using `del df["T (K)"]` which mutated the underlying data frames in a way that caused downstream concatenation to fail or include duplicates. This was corrected to gracefully drop columns only during the `pd.concat` step, ensuring the integrity of the individual data structures.
+
 ## Conclusion
-The codebase properly separates the input reference from the relaxed geometry. The relaxation explicitly yields a `relaxed_molecule` `ase.Atoms` object which is then passed sequentially to both the harmonic vibrations routine and the thermodynamic property evaluator. Therefore, the implementation is valid and correctly evaluates the gas-phase thermodynamics at the optimized geometry.
+The codebase properly separates the input reference from the relaxed geometry. The relaxation explicitly yields a `relaxed_molecule` `ase.Atoms` object which is then passed sequentially to both the harmonic vibrations routine and the thermodynamic property evaluator. Therefore, the implementation is valid and correctly evaluates the gas-phase thermodynamics at the optimized geometry. In the recent history, the project improved on its theoretical robustness by utilizing a dedicated module that calculates properties directly matching crystal constants and fixed important data formatting bugs, resulting in a more resilient pipeline.
