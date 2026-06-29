@@ -452,15 +452,38 @@ class Trajectory(Structure):
 
 @dataclass
 class MolecularCrystal:
+    """
+    Representation of a molecular crystal and its constituent molecules.
+
+    A defining feature of this class is that the atomic positions in the
+    `supercell` are spatially contiguous. The structure is unwrapped such that
+    no covalent bonds cross periodic boundaries, ensuring each molecule exists
+    as a complete, unbroken cluster of atoms in Cartesian space.
+
+    Attributes
+    ----------
+    supercell : Structure
+        The underlying periodic atomic structure encompassing all molecules.
+    index_map : List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
+        Mapping of molecule index to the corresponding atomic indices within the `supercell`.
+    centers_of_mass : npt.NDArray[np.floating]
+        Centers of mass for molecules in the reference frame which was used in a call 
+        to `structure.clusters.identify_molecules`. Note that the reference frame may no 
+        longer be present as one of the frames in a `MolecularCrystal` object returned 
+        by `MolecularCrystal.subsample`.
+    identical_composition : bool
+        Indicates whether all identified molecules share identical atomic composition.
+    n_molecules : int
+        Total number of identified molecules in the supercell.
+    central_molecule_index : int
+        Index of the molecule serving as the spatial reference origin (e.g., for cluster expansion).
+    min_distances_to_central_molecule : npt.NDArray[np.floating]
+        Shortest interatomic distance between each molecule and the central reference molecule.
+    max_distances_to_central_molecule : npt.NDArray[np.floating]
+        Longest interatomic distance between each molecule and the central reference molecule.
+    """
     supercell: Structure
     index_map: List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
-    #
-    # COM locations for molecules *in the reference frame*
-    # which was used in a call to structure.clusters.identify_molecules.
-    # Note that the reference frame may no longer be present as
-    # one of the frames in a MoleculeCrystal object returned
-    # by MolecularCrystal.subsample.
-    #
     centers_of_mass: npt.NDArray[np.floating] 
     identical_composition: bool
     n_molecules: int

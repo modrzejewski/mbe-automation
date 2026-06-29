@@ -122,7 +122,7 @@ Time evolution of an atomistic system generated with molecular dynamics. Include
 
 🔗 [`mbe_automation.MolecularCrystal`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/api/classes.py#L948)
 
-Periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). Serves as an intermediate necessary for finite cluster extraction.
+Periodic crystal structure with additional topological information about its constituent molecules (e.g., connectivity, centers of mass, molecule indices). A defining feature of this class is that the atomic positions in the supercell are spatially contiguous—the structure is explicitly unwrapped so that no covalent bonds cross periodic boundaries, ensuring each molecule exists as a complete, unbroken cluster of atoms in Cartesian space. Serves as an intermediate necessary for finite cluster extraction.
 
 #### Methods
 *   **`read` / `save`**: Load from or save to an HDF5 dataset.

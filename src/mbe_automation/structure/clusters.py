@@ -747,7 +747,7 @@ def identify_molecules(
         raise ValueError(f"Cannot use {match_mode} match_mode when calculator is None.")
 
     if energy_thresh is None:
-        energy_thresh = 1.0E-3
+        energy_thresh = 1.0E-5
     if rmsd_thresh is None:
         rmsd_thresh = 0.1
 
