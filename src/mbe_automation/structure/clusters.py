@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Literal, Dict
+from typing import List, Literal, Dict, Tuple
 import math
 import itertools
 from collections import deque
@@ -39,6 +39,30 @@ from mbe_automation.configs.clusters import NUMBER_SELECTION, DISTANCE_SELECTION
 from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueClustersFilter
 from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
 
+@dataclass
+class SupercellMolecules:
+    """
+    Atomic coordinates of molecules propagated in a supercell. Handles
+    the case where there were multiple unique molecules present in 
+    the initial unit cell.
+
+    Attributes:
+        n_molecules_nonunique: Total count of all molecules in the supercell.
+        n_molecules_unique: Count of unique molecules.
+        n_equivalent: Array where n_equivalent[k] specifies the number of occurences
+        of the k-th unique molecule.
+        positions: List of atomic coordinates. positions[k] has shape (n_equivalent[k], n_atoms, 3).
+        atomic_numbers: List of atomic numbers. atomic_numbers[k] has shape (n_equivalent[k], n_atoms).
+        masses: List of atomic masses. masses[k] has shape (n_equivalent[k], n_atoms).
+    """
+    n_molecules_nonunique: int
+    n_molecules_unique: int
+    n_equivalent: npt.NDArray[np.int64]
+    positions: List[npt.NDArray[np.float64]]
+    atomic_numbers: List[npt.NDArray[np.int64]]
+    masses: List[npt.NDArray[np.float64]]
+
+
 @dataclass(kw_only=True)
 class MolecularComposition:
     """
@@ -63,6 +87,16 @@ class MolecularComposition:
     n_molecules_unique: int
     n_equivalent: npt.NDArray[np.int64]
     groups: list[npt.NDArray[np.int64]]
+
+    def expand_to_supercell(
+            self, 
+            supercell_size: List[int] | Tuple[int, int, int] | npt.NDArray[np.int64],
+            frame_index: int = 0
+    ) -> SupercellMolecules:
+        """
+        Extract the properties of identical molecules propagated in an [nx, ny, nz] supercell.
+        """
+        return _expand_to_supercell(self, supercell_size, frame_index)
 
     def extract_relaxed_unique_molecules(
             self,
@@ -824,6 +858,80 @@ def identify_molecules(
         n_molecules_unique=n_molecules_unique,
         n_equivalent=n_equivalent,
         groups=groups,
+    )
+
+
+def _expand_to_supercell(
+        composition: MolecularComposition,
+        supercell_size: List[int] | Tuple[int, int, int] | npt.NDArray[np.int64],
+        frame_index: int = 0
+) -> SupercellMolecules:
+    """Generate arrays of coordinates, atomic numbers, and masses for the 
+    molecules identified in the unit cell, propagated to the specified supercell.
+
+    Args:
+        composition: Base molecular composition.
+        supercell_size: Dimensions of the supercell [nx, ny, nz].
+        frame_index: Index of the reference frame to extract positions from.
+
+    Returns:
+        SupercellMolecules object containing propagated atomic properties.
+    """
+    nx, ny, nz = supercell_size
+    
+    unit_cell = composition.molecular_crystal.supercell
+    variable_cell = unit_cell.variable_cell
+    n_cells = nx * ny * nz
+    
+    if variable_cell:
+        unit_cell_vectors = unit_cell.cell_vectors[frame_index]
+    else:
+        unit_cell_vectors = unit_cell.cell_vectors
+        
+    i_range = np.arange(-(nx // 2), nx - (nx // 2))
+    j_range = np.arange(-(ny // 2), ny - (ny // 2))
+    k_range = np.arange(-(nz // 2), nz - (nz // 2))
+    
+    I, J, K = np.meshgrid(i_range, j_range, k_range, indexing='ij')
+    shifts_frac = np.column_stack((I.ravel(), J.ravel(), K.ravel()))
+    shifts_cart = shifts_frac @ unit_cell_vectors
+    
+    positions_list = []
+    atomic_numbers_list = []
+    masses_list = []
+    is_multi_frame = (unit_cell.positions.ndim == 3)
+    
+    for u in range(composition.n_molecules_unique):
+        mol_unique = composition.molecules_unique[u]
+        
+        group_indices = composition.groups[u]
+        if isinstance(composition.molecular_crystal.index_map, np.ndarray):
+            atom_indices = composition.molecular_crystal.index_map[group_indices]
+        else:
+            atom_indices = np.array([composition.molecular_crystal.index_map[idx] for idx in group_indices])
+            
+        if is_multi_frame:
+            base_pos = unit_cell.positions[frame_index, atom_indices, :]
+        else:
+            base_pos = unit_cell.positions[atom_indices, :]
+            
+        base_an = unit_cell.atomic_numbers[atom_indices]
+        base_masses = unit_cell.masses[atom_indices]
+        
+        pos_supercell = base_pos[np.newaxis, :, :, :] + shifts_cart[:, np.newaxis, np.newaxis, :]
+        pos_supercell = pos_supercell.reshape(-1, mol_unique.n_atoms, 3)
+        positions_list.append(pos_supercell)
+        
+        atomic_numbers_list.append(np.tile(base_an, (n_cells, 1)))
+        masses_list.append(np.tile(base_masses, (n_cells, 1)))
+        
+    return SupercellMolecules(
+        n_molecules_nonunique=int(composition.n_molecules_nonunique * n_cells),
+        n_molecules_unique=int(composition.n_molecules_unique),
+        n_equivalent=np.array(composition.n_equivalent * n_cells, dtype=np.int64),
+        positions=positions_list,
+        atomic_numbers=atomic_numbers_list,
+        masses=masses_list
     )
 
 
