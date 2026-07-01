@@ -6,6 +6,7 @@ import math
 import itertools
 from collections import deque
 import time
+import sys
 import numpy as np
 import numpy.typing as npt
 import ase.geometry
@@ -42,18 +43,27 @@ from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
 @dataclass
 class SupercellMolecules:
     """
-    Atomic coordinates of molecules propagated in a supercell. Handles
-    the case where there were multiple unique molecules present in 
+    Atomic coordinates of molecules propagated in a supercell. 
+    
+    Handles the case where there were multiple unique molecules present in 
     the initial unit cell.
 
     Attributes:
         n_molecules_nonunique: Total count of all molecules in the supercell.
         n_molecules_unique: Count of unique molecules.
-        n_equivalent: Array where n_equivalent[k] specifies the number of occurences
-        of the k-th unique molecule.
-        positions: List of atomic coordinates. positions[k] has shape (n_equivalent[k], n_atoms, 3).
-        atomic_numbers: List of atomic numbers. atomic_numbers[k] has shape (n_equivalent[k], n_atoms).
-        masses: List of atomic masses. masses[k] has shape (n_equivalent[k], n_atoms).
+        n_equivalent: Array where `n_equivalent[k]` specifies the number 
+            of occurences of the k-th unique molecule.
+        positions: List of atomic coordinates. `positions[k]` has shape 
+            `(n_equivalent[k], n_atoms, 3)`.
+        atomic_numbers: List of atomic numbers. `atomic_numbers[k]` has shape 
+            `(n_equivalent[k], n_atoms)`.
+        masses: List of atomic masses. `masses[k]` has shape 
+            `(n_equivalent[k], n_atoms)`.
+        centers_of_mass: List of centers of mass. `centers_of_mass[k]` has shape 
+            `(n_equivalent[k], 3)`.
+        min_distance_to_ref_molecule: List of arrays where the k-th array has shape 
+            `(n_molecules_unique, n_equivalent[k])` representing the minimum 
+            atom-atom distance to each reference molecule.
     """
     n_molecules_nonunique: int
     n_molecules_unique: int
@@ -61,6 +71,8 @@ class SupercellMolecules:
     positions: List[npt.NDArray[np.float64]]
     atomic_numbers: List[npt.NDArray[np.int64]]
     masses: List[npt.NDArray[np.float64]]
+    centers_of_mass: List[npt.NDArray[np.float64]]
+    min_distance_to_ref_molecule: List[npt.NDArray[np.float64]]
 
 
 @dataclass(kw_only=True)
@@ -87,6 +99,10 @@ class MolecularComposition:
     n_molecules_unique: int
     n_equivalent: npt.NDArray[np.int64]
     groups: list[npt.NDArray[np.int64]]
+
+    @property
+    def identical_composition(self) -> bool:
+        return self.molecular_crystal.identical_composition
 
     def expand_to_supercell(
             self, 
@@ -861,6 +877,38 @@ def identify_molecules(
     )
 
 
+def _shortest_atom_atom_distance(
+    ref_pos: npt.NDArray[np.float64], 
+    target_positions: npt.NDArray[np.float64]
+) -> npt.NDArray[np.float64]:
+    """
+    Computes the shortest atom-atom distance between a reference molecule 
+    and a set of target molecules in a fully vectorized manner.
+    
+    Args:
+        ref_pos: Shape (n_atoms_ref, 3)
+        target_positions: Shape (n_targets, n_atoms_target, 3)
+        
+    Returns:
+        1D array of shape (n_targets,) with the minimum distances.
+    """
+    n_targets, n_atoms_target, _ = target_positions.shape
+    
+    # Reshape targets to a flat list of coordinates (n_targets * n_atoms_target, 3)
+    flat_targets = target_positions.reshape(-1, 3)
+    
+    # Compute distances from all target atoms to all reference atoms
+    # Resulting shape: (n_targets * n_atoms_target, n_atoms_ref)
+    dists = scipy.spatial.distance.cdist(flat_targets, ref_pos)
+    
+    # Find the minimum distance to ANY atom in the reference molecule for each target atom
+    # Reshape back to group by target molecule: (n_targets, n_atoms_target)
+    min_dists_per_target_atom = np.min(dists, axis=1).reshape(n_targets, n_atoms_target)
+    
+    # Find the minimum distance for each target molecule
+    return np.min(min_dists_per_target_atom, axis=1)
+
+
 def _expand_to_supercell(
         composition: MolecularComposition,
         supercell_size: List[int] | Tuple[int, int, int] | npt.NDArray[np.int64],
@@ -888,27 +936,34 @@ def _expand_to_supercell(
     else:
         unit_cell_vectors = unit_cell.cell_vectors
         
-    i_range = np.arange(-(nx // 2), nx - (nx // 2))
-    j_range = np.arange(-(ny // 2), ny - (ny // 2))
-    k_range = np.arange(-(nz // 2), nz - (nz // 2))
-    
-    I, J, K = np.meshgrid(i_range, j_range, k_range, indexing='ij')
+    I, J, K = np.meshgrid(
+        np.arange(-(nx // 2), nx - (nx // 2)),
+        np.arange(-(ny // 2), ny - (ny // 2)),
+        np.arange(-(nz // 2), nz - (nz // 2)),
+        indexing='ij'
+    )
     shifts_frac = np.column_stack((I.ravel(), J.ravel(), K.ravel()))
     shifts_cart = shifts_frac @ unit_cell_vectors
     
     positions_list = []
     atomic_numbers_list = []
     masses_list = []
+    centers_of_mass_list = []
     is_multi_frame = (unit_cell.positions.ndim == 3)
     
     for u in range(composition.n_molecules_unique):
         mol_unique = composition.molecules_unique[u]
         
-        group_indices = composition.groups[u]
-        if isinstance(composition.molecular_crystal.index_map, np.ndarray):
-            atom_indices = composition.molecular_crystal.index_map[group_indices]
+        # `atom_indices` is a rank-2 array (2D matrix) of shape:
+        # (n_equivalent_molecules, n_atoms_per_molecule)
+        molecule_indices = composition.groups[u]
+        if composition.identical_composition:
+            atom_indices = composition.molecular_crystal.index_map[molecule_indices]
         else:
-            atom_indices = np.array([composition.molecular_crystal.index_map[idx] for idx in group_indices])
+            atom_indices = np.array([
+                composition.molecular_crystal.index_map[idx] 
+                for idx in molecule_indices
+            ])
             
         if is_multi_frame:
             base_pos = unit_cell.positions[frame_index, atom_indices, :]
@@ -925,13 +980,53 @@ def _expand_to_supercell(
         atomic_numbers_list.append(np.tile(base_an, (n_cells, 1)))
         masses_list.append(np.tile(base_masses, (n_cells, 1)))
         
+    total_mass = 0.0
+    total_mass_r = np.zeros(3)
+    for u in range(composition.n_molecules_unique):
+        p = positions_list[u]
+        m = masses_list[u]
+        total_mass += np.sum(m)
+        total_mass_r += np.sum(p * m[:, :, np.newaxis], axis=(0, 1))
+        
+    total_com = total_mass_r / total_mass
+    
+    for u in range(composition.n_molecules_unique):
+        positions_list[u] -= total_com
+        p = positions_list[u]
+        m = masses_list[u]
+        coms = np.sum(p * m[:, :, np.newaxis], axis=1) / np.sum(m, axis=1)[:, np.newaxis]
+        
+        distances_to_origin = np.linalg.norm(coms, axis=1)
+        sort_indices = np.argsort(distances_to_origin)
+        
+        positions_list[u] = positions_list[u][sort_indices]
+        atomic_numbers_list[u] = atomic_numbers_list[u][sort_indices]
+        masses_list[u] = masses_list[u][sort_indices]
+        coms = coms[sort_indices]
+        
+        centers_of_mass_list.append(coms)
+        
+    min_distance_to_ref_molecule = []
+    for u in range(composition.n_molecules_unique):
+        dist_matrix = np.zeros((composition.n_molecules_unique, composition.n_equivalent[u] * n_cells))
+        
+        for v in range(composition.n_molecules_unique):
+            dist_matrix[v, :] = _shortest_atom_atom_distance(
+                positions_list[v][0], 
+                positions_list[u]
+            )
+            
+        min_distance_to_ref_molecule.append(dist_matrix)
+        
     return SupercellMolecules(
-        n_molecules_nonunique=int(composition.n_molecules_nonunique * n_cells),
-        n_molecules_unique=int(composition.n_molecules_unique),
+        n_molecules_nonunique=composition.n_molecules_nonunique * n_cells,
+        n_molecules_unique=composition.n_molecules_unique,
         n_equivalent=np.array(composition.n_equivalent * n_cells, dtype=np.int64),
         positions=positions_list,
         atomic_numbers=atomic_numbers_list,
-        masses=masses_list
+        masses=masses_list,
+        centers_of_mass=centers_of_mass_list,
+        min_distance_to_ref_molecule=min_distance_to_ref_molecule
     )
 
 
