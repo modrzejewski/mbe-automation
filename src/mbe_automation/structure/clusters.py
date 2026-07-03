@@ -1408,39 +1408,41 @@ def _filter_candidates_by_min_rij(
     n_candidates = [len(c) for c in candidate_to_supercell]
     unique_u, counts = np.unique(composition, return_counts=True)
     
-    # 1. Vectorized combination generation (all candidates of required types)
+    # `cands_per_u` generates combinations of candidate indices for each unique molecule type.
+    # Example: If a cluster needs two molecules of type 0 (counts=2), and there are 4 candidates
+    # of type 0 in the supercell, the generator yields: (0, 1), (0, 2), (0, 3), (1, 2), ...
     cands_per_u = (
         itertools.combinations(range(n_candidates[u]), n)
         for u, n in zip(unique_u, counts)
     )
     
-    # Flatten the product of combinations: ((0, 1), (2,)) -> [0, 1, 2]
-    cluster_indices = np.array([
+    # itertools.product takes the Cartesian product of these type-specific combinations.
+    # Flatten the grouped combinations: ((0, 1), (2,)) -> [0, 1, 2]
+    all_clusters = np.array([
         [idx for group in sub for idx in group] 
         for sub in itertools.product(*cands_per_u)
     ], dtype=np.int64)
     
-    if len(cluster_indices) == 0:
+    if len(all_clusters) == 0:
         return ReducibleClusters(
             n_clusters=0,
             composition=composition,
             clusters=np.empty((0, cluster_size), dtype=np.int64),
-            candidate_to_supercell=candidate_to_supercell
+            candidate_to_supercell=candidate_to_supercell,
         )
         
-    # 2. Vectorized internal distance checks
-    valid_mask = np.ones(len(cluster_indices), dtype=bool)
+    within_cutoff = np.ones(len(all_clusters), dtype=bool)
     for i, j in itertools.combinations(range(cluster_size), 2):
         u1, u2 = composition[i], composition[j]
-        c1, c2 = cluster_indices[:, i], cluster_indices[:, j]
-        valid_mask &= (min_rij[u1][u2][c1, c2] < max_min_rij)
+        c1, c2 = all_clusters[:, i], all_clusters[:, j]
+        within_cutoff &= (min_rij[u1][u2][c1, c2] < max_min_rij)
             
-    valid_cluster_indices = cluster_indices[valid_mask]
+    filtered_clusters = all_clusters[within_cutoff]
     
     return ReducibleClusters(
-        n_clusters=len(valid_cluster_indices),
+        n_clusters=len(filtered_clusters),
         composition=composition,
-        clusters=valid_cluster_indices,
+        clusters=filtered_clusters,
         candidate_to_supercell=candidate_to_supercell
     )
 
