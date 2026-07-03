@@ -517,17 +517,6 @@ class MolecularCrystal:
             
         return selected_positions
 
-@dataclass(kw_only=True)
-class UniqueClusters:
-    """
-    Symmetry-unique molecular clusters within a MolecularCrystal.
-    """
-    n_clusters: int
-    cluster_composition: Tuple[int, ...]
-    molecule_indices: npt.NDArray[np.integer] # Shape (n_unique_clusters, n_cluster_size)
-    weights: npt.NDArray[np.integer]
-    min_distances: npt.NDArray[np.floating]  # Shape: (n_unique_clusters, n_pairs)
-    max_distances: npt.NDArray[np.floating]  # Shape: (n_unique_clusters, n_pairs)
 
 @dataclass
 class FiniteSubsystem:
@@ -1673,37 +1662,7 @@ def read_attribute(
     return attribute_value
 
 
-def save_unique_clusters(
-        dataset: str,
-        key: str,
-        clusters: UniqueClusters
-) -> None:
-    """Save a UniqueClusters object to a dataset."""
 
-    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with dataset_file(dataset, "a") as f:
-        if key in f:
-            del f[key]
-        group = f.create_group(key)
-        group.attrs["dataclass"] = "UniqueClusters"
-        group.attrs["n_clusters"] = clusters.n_clusters
-        group.create_dataset("molecule_indices", data=clusters.molecule_indices)
-        group.create_dataset("weights", data=clusters.weights)
-        group.create_dataset("min_distances (Å)", data=clusters.min_distances)
-        group.create_dataset("max_distances (Å)", data=clusters.max_distances)
-
-
-def read_unique_clusters(dataset: str, key: str) -> UniqueClusters:
-    """Read a UniqueClusters object from a dataset."""
-    with dataset_file(dataset, "r") as f:
-        group = f[key]
-        return UniqueClusters(
-            n_clusters=group.attrs["n_clusters"],
-            molecule_indices=group["molecule_indices"][...],
-            weights=group["weights"][...],
-            min_distances=group["min_distances (Å)"][...],
-            max_distances=group["max_distances (Å)"][...],
-        )
 
 
 def _save_only(

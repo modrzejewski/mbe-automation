@@ -17,8 +17,8 @@ from .calculators import (
 
 from .storage.core import (
     EOSCurves,
-    UniqueClusters,
 )
+
 from .storage import (
     tree,
     DatasetKeys,

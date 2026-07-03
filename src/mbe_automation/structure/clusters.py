@@ -35,7 +35,7 @@ import mbe_automation.structure.crystal
 import mbe_automation.structure.molecule
 import mbe_automation.common.display
 import mbe_automation.calculators.core
-from mbe_automation.storage.core import MolecularCrystal, UniqueClusters
+from mbe_automation.storage.core import MolecularCrystal
 from mbe_automation.configs.clusters import NUMBER_SELECTION, DISTANCE_SELECTION
 from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueClustersFilter
 from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
@@ -110,6 +110,9 @@ class ReducibleClusters:
     composition: Tuple[int, ...]
     clusters: npt.NDArray[np.int64]
     candidate_to_supercell: List[npt.NDArray[np.int64]]
+    sorted_min_rij: npt.NDArray[np.float64]
+    sorted_max_rij: npt.NDArray[np.float64]
+    alignment_thresh: float
 
     def __len__(self) -> int:
         return self.n_clusters
@@ -130,39 +133,34 @@ class ReducibleClusters:
         row = self.clusters[cluster_idx]
         return tuple(self.candidate_to_supercell[u][c_idx] for u, c_idx in zip(self.composition, row))
         
-    def sorted_min_rij(
-        self, 
-        cluster_idx: int, 
-        min_rij: List[List[npt.NDArray[np.float64]]]
-    ) -> npt.NDArray[np.float64]:
+    def fast_compare(self, cluster_idx: int, ref_min_dists: npt.NDArray[np.float64]) -> bool:
         """
-        Returns the sorted minimum intermolecular distances for a specific cluster.
+        Check if max absolute difference of sorted minimum distances is within threshold.
         """
-        row = self.clusters[cluster_idx].tolist()
-        pairs = itertools.combinations(range(len(self.composition)), 2)
-        
-        return np.sort([
-            min_rij[self.composition[i]][self.composition[j]][row[i], row[j]] 
-            for i, j in pairs
-        ])
-
-    def sorted_max_rij(
-        self, 
-        cluster_idx: int, 
-        max_rij: List[List[npt.NDArray[np.float64]]]
-    ) -> npt.NDArray[np.float64]:
-        """
-        Returns the sorted maximum intermolecular distances for a specific cluster.
-        """
-        row = self.clusters[cluster_idx].tolist()
-        pairs = itertools.combinations(range(len(self.composition)), 2)
-        
-        return np.sort([
-            max_rij[self.composition[i]][self.composition[j]][row[i], row[j]] 
-            for i, j in pairs
-        ])
+        return bool(np.max(np.abs(self.sorted_min_rij[cluster_idx] - ref_min_dists)) < self.alignment_thresh)
 
 
+@dataclass(kw_only=True)
+class UniqueClusters:
+    """
+    Symmetry-unique molecular clusters within a molecular crystal.
+    
+    Attributes:
+        n_clusters: Number of symmetry-unique clusters.
+        cluster_composition: Tuple of molecule types defining the cluster composition.
+        structures: A single `Structure` object where `n_frames` corresponds to the number of symmetry-unique clusters. Contains the Cartesian coordinates (`positions`) of all clusters.
+        weights: Multiplicities of the symmetry-unique clusters within the supercell.
+        min_distances: Minimum atom-atom distances for all intermolecular pairs. Shape: (n_clusters, n_pairs).
+        max_distances: Maximum atom-atom distances for all intermolecular pairs. Shape: (n_clusters, n_pairs).
+    """
+    n_clusters: int
+    cluster_composition: Tuple[int, ...]
+    structures: mbe_automation.storage.core.Structure
+    weights: npt.NDArray[np.int64]
+    min_distances: npt.NDArray[np.float64]
+    max_distances: npt.NDArray[np.float64]
+
+    
 @dataclass(kw_only=True)
 class MolecularComposition:
     """
@@ -1247,7 +1245,7 @@ def extract_finite_subsystem(
     return finite_subsystems
 
 
-def _global_candidates(
+def _candidates_within_sphere(
     supercell_molecules: SupercellMolecules,
     unique_cluster_filter: UniqueClustersFilter,
 ) -> Tuple[List[npt.NDArray[np.int64]], List[npt.NDArray[np.float64]]]:
@@ -1386,7 +1384,9 @@ def _filter_candidates_by_min_rij(
     composition: Tuple[int, ...],
     max_min_rij: float,
     min_rij: List[List[npt.NDArray[np.float64]]],
+    max_rij: List[List[npt.NDArray[np.float64]]],
     candidate_to_supercell: List[npt.NDArray[np.int64]],
+    alignment_thresh: float,
 ) -> ReducibleClusters:
     """
     Find all symmetry-reducible clusters for a given composition that satisfy all minimum intermolecular distance constraints.
@@ -1398,7 +1398,9 @@ def _filter_candidates_by_min_rij(
         composition: A sorted tuple representing the cluster composition (e.g., `(0, 0, 1)`).
         max_min_rij: The maximum distance threshold.
         min_rij: Minimum distance matrices between candidate instances.
+        max_rij: Maximum distance matrices between candidate instances.
         candidate_to_supercell: Reference mapping table to attach to the output dataclass.
+        alignment_thresh: Threshold for distance comparisons.
         
     Returns:
         ReducibleClusters: A dataclass containing the composition, total count, 
@@ -1429,29 +1431,56 @@ def _filter_candidates_by_min_rij(
             composition=composition,
             clusters=np.empty((0, cluster_size), dtype=np.int64),
             candidate_to_supercell=candidate_to_supercell,
+            sorted_min_rij=np.empty((0, 0), dtype=np.float64),
+            sorted_max_rij=np.empty((0, 0), dtype=np.float64),
+            alignment_thresh=alignment_thresh,
         )
         
     within_cutoff = np.ones(len(all_clusters), dtype=bool)
-    for i, j in itertools.combinations(range(cluster_size), 2):
+    pairs = list(itertools.combinations(range(cluster_size), 2))
+    for i, j in pairs:
         u1, u2 = composition[i], composition[j]
         c1, c2 = all_clusters[:, i], all_clusters[:, j]
         within_cutoff &= (min_rij[u1][u2][c1, c2] < max_min_rij)
             
     filtered_clusters = all_clusters[within_cutoff]
-    
+
+    if len(filtered_clusters) > 0 and len(pairs) > 0:
+        min_dists = []
+        max_dists = []
+        for i, j in pairs:
+            u1, u2 = composition[i], composition[j]
+            c1, c2 = filtered_clusters[:, i], filtered_clusters[:, j]
+            min_dists.append(min_rij[u1][u2][c1, c2])
+            max_dists.append(max_rij[u1][u2][c1, c2])
+        sorted_min_rij = np.sort(np.column_stack(min_dists), axis=1)
+        sorted_max_rij = np.sort(np.column_stack(max_dists), axis=1)
+    else:
+        n_pairs = len(pairs)
+        sorted_min_rij = np.empty((len(filtered_clusters), n_pairs), dtype=np.float64)
+        sorted_max_rij = np.empty((len(filtered_clusters), n_pairs), dtype=np.float64)
+
     return ReducibleClusters(
         n_clusters=len(filtered_clusters),
         composition=composition,
         clusters=filtered_clusters,
-        candidate_to_supercell=candidate_to_supercell
+        candidate_to_supercell=candidate_to_supercell,
+        sorted_min_rij=sorted_min_rij,
+        sorted_max_rij=sorted_max_rij,
+        alignment_thresh=alignment_thresh,
     )
+
+
+def _composition_to_string(composition: Tuple[int, ...]) -> str:
+    """Convert a composition tuple like (0, 0, 1) to a letter string like 'AAB'."""
+    return "".join(chr(65 + u) for u in composition)
 
 
 def _symmetry_unique_clusters(
     supercell_molecules: SupercellMolecules,
     unique_cluster_filter: UniqueClustersFilter,
     key: str | None = None, # dataset key (only to display a message)
-) -> Dict[str, List[UniqueClusters]]:
+) -> Dict[str, UniqueClusters]:
 
     cluster_size_map = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
 
@@ -1470,7 +1499,7 @@ def _symmetry_unique_clusters(
     print(f"align_mirror_images  {unique_cluster_filter.align_mirror_images}")
     print(f"algorithm            {unique_cluster_filter.algorithm}")
 
-    candidate_to_supercell, candidate_positions = _global_candidates(
+    candidate_to_supercell, candidate_positions = _candidates_within_sphere(
         supercell_molecules=supercell_molecules,
         unique_cluster_filter=unique_cluster_filter,
     )
@@ -1492,7 +1521,9 @@ def _symmetry_unique_clusters(
                 composition=comp,
                 max_min_rij=max_min_rij,
                 min_rij=min_rij,
+                max_rij=max_rij,
                 candidate_to_supercell=candidate_to_supercell,
+                alignment_thresh=unique_cluster_filter.alignment_thresh,
             )
             
             if reducible.n_clusters == 0:
@@ -1504,7 +1535,8 @@ def _symmetry_unique_clusters(
                 "min_dists_list": [],
                 "max_dists_list": [],
                 "positions_list": [],
-                "atomic_numbers_list": []
+                "atomic_numbers_list": [],
+                "masses_list": []
             }
             comp_data = clusters_by_comp[comp]
             
@@ -1517,27 +1549,25 @@ def _symmetry_unique_clusters(
 
             # 3. Type-Aware Clustering Loop
             for cluster_idx, eq_indices in enumerate(progress):
-                # Extract min/max distances
-                min_dists_current = reducible.sorted_min_rij(cluster_idx, min_rij)
-                max_dists_current = reducible.sorted_max_rij(cluster_idx, max_rij)
+                min_dists_current = reducible.sorted_min_rij[cluster_idx]
+                max_dists_current = reducible.sorted_max_rij[cluster_idx]
                 
-                # The canonical `comp` order is already sorted.
-                
-                # Extract positions and atomic numbers for the current combination
                 positions_current_list = []
                 atomic_numbers_current_list = []
+                masses_current_list = []
                 for u, eq_i in zip(comp, eq_indices):
                     positions_current_list.append(supercell_molecules.positions[u][eq_i])
                     atomic_numbers_current_list.append(supercell_molecules.atomic_numbers[u][eq_i])
+                    masses_current_list.append(supercell_molecules.masses[u][eq_i])
                     
                 positions_current = np.concatenate(positions_current_list, axis=0)
                 atomic_numbers_current = np.concatenate(atomic_numbers_current_list, axis=0)
+                masses_current = np.concatenate(masses_current_list, axis=0)
             
                 is_unique = True
                 for i in range(len(comp_data["indices_list"])):
                     min_dists_ref = comp_data["min_dists_list"][i]
-                    if (np.max(np.abs(min_dists_current - min_dists_ref)) <
-                        unique_cluster_filter.alignment_thresh):
+                    if reducible.fast_compare(cluster_idx, min_dists_ref):
                         
                         positions_ref = comp_data["positions_list"][i]
                         atomic_numbers_ref = comp_data["atomic_numbers_list"][i]
@@ -1562,30 +1592,36 @@ def _symmetry_unique_clusters(
                     comp_data["max_dists_list"].append(max_dists_current)
                     comp_data["positions_list"].append(positions_current)
                     comp_data["atomic_numbers_list"].append(atomic_numbers_current)
+                    comp_data["masses_list"].append(masses_current)
 
         if not clusters_by_comp:
             continue
             
-        results[cluster_type] = []
         for composition, comp_data in clusters_by_comp.items():
             if not comp_data["indices_list"]:
                 continue
                 
-            molecule_indices_arr = np.array(comp_data["indices_list"], dtype=np.int64)
-            weights_arr = np.array(comp_data["weights_list"], dtype=np.int64)
-            
-            n_clusters_comp = len(molecule_indices_arr)
-            
-            results[cluster_type].append(
-                UniqueClusters(
-                    n_clusters=n_clusters_comp,
-                    cluster_composition=composition,
-                    molecule_indices=molecule_indices_arr,
-                    weights=weights_arr,
-                    min_distances=(np.array(comp_data["min_dists_list"]) if cluster_size > 1 else np.array([])),
-                    max_distances=(np.array(comp_data["max_dists_list"]) if cluster_size > 1 else np.array([])),
-                )
+            struct = mbe_automation.storage.core.Structure(
+                positions=np.stack(comp_data["positions_list"], axis=0),
+                atomic_numbers=comp_data["atomic_numbers_list"][0],
+                masses=comp_data["masses_list"][0],
+                cell_vectors=None,
+                n_frames=len(comp_data["weights_list"]),
+                n_atoms=comp_data["positions_list"][0].shape[0],
             )
-            print(f"Found {n_clusters_comp} symmetry-unique {cluster_type} of composition {composition}")
+            
+            comp_str = _composition_to_string(composition)
+            result_key = f"{cluster_type}[{comp_str}]"
+            
+            results[result_key] = UniqueClusters(
+                n_clusters=len(comp_data["weights_list"]),
+                cluster_composition=composition,
+                structures=struct,
+                weights=np.array(comp_data["weights_list"], dtype=np.int64),
+                min_distances=(np.array(comp_data["min_dists_list"]) if cluster_size > 1 else np.array([])),
+                max_distances=(np.array(comp_data["max_dists_list"]) if cluster_size > 1 else np.array([])),
+            )
+            
+            print(f"Found {len(comp_data['weights_list'])} symmetry-unique {cluster_type} of composition {composition}")
 
     return results
