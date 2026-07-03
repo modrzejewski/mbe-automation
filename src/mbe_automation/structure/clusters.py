@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Literal, Dict, Tuple
+from typing import List, Literal, Dict, Tuple, Iterator
 import math
 import itertools
 from collections import deque
@@ -73,6 +73,94 @@ class SupercellMolecules:
     masses: List[npt.NDArray[np.float64]]
     centers_of_mass: List[npt.NDArray[np.float64]]
     min_distance_to_ref_molecule: List[npt.NDArray[np.float64]]
+
+    def symmetry_unique_clusters(
+        self,
+        unique_cluster_filter: UniqueClustersFilter,
+        key: str | None = None,
+    ) -> Dict[str, List[UniqueClusters]]:
+        """
+        Extract symmetry-unique molecular clusters from the supercell.
+        """
+        return _symmetry_unique_clusters(
+            supercell_molecules=self,
+            unique_cluster_filter=unique_cluster_filter,
+            key=key,
+        )
+
+
+@dataclass
+class ReducibleClusters:
+    """
+    A collection of symmetry-reducible clusters of a given composition
+    that satisfy all intermolecular distance constraints.
+    
+    Attributes:
+        n_clusters: The total number of valid clusters identified for this composition.
+        composition: A sorted tuple defining the molecular types in the clusters.
+        clusters: Array of shape `(n_clusters, cluster_size)` containing 
+            the candidate indices `c_idx`. The molecule type for the k-th column 
+            is given by `composition[k]`. For example, if `composition` is `(0, 0, 1)`,
+            a row `[0, 5, 2]` represents a cluster formed by the 0th candidate of type 0, 
+            the 5th candidate of type 0, and the 2nd candidate of type 1.
+        candidate_to_supercell: List of arrays mapping candidate indices `c_idx` to supercell 
+            molecule indices `eq_i` for each unique molecule type.
+    """
+    n_clusters: int
+    composition: Tuple[int, ...]
+    clusters: npt.NDArray[np.int64]
+    candidate_to_supercell: List[npt.NDArray[np.int64]]
+
+    def __len__(self) -> int:
+        return self.n_clusters
+        
+    def __getitem__(self, cluster_idx: int) -> Tuple[int, ...]:
+        """
+        Returns the mapped supercell molecule indices `eq_i` for the requested cluster.
+        
+        Note: This implicitly translates the internal candidate indices (`c_idx`) 
+        stored in `self.clusters` into the global supercell coordinate space.
+        """
+        return self.to_supercell_indices(cluster_idx)
+
+    def to_supercell_indices(self, cluster_idx: int) -> Tuple[int, ...]:
+        """
+        Returns the tuple of supercell molecule indices `eq_i` for a specific cluster.
+        """
+        row = self.clusters[cluster_idx]
+        return tuple(self.candidate_to_supercell[u][c_idx] for u, c_idx in zip(self.composition, row))
+        
+    def sorted_min_rij(
+        self, 
+        cluster_idx: int, 
+        min_rij: List[List[npt.NDArray[np.float64]]]
+    ) -> npt.NDArray[np.float64]:
+        """
+        Returns the sorted minimum intermolecular distances for a specific cluster.
+        """
+        row = self.clusters[cluster_idx].tolist()
+        pairs = itertools.combinations(range(len(self.composition)), 2)
+        
+        return np.sort([
+            min_rij[self.composition[i]][self.composition[j]][row[i], row[j]] 
+            for i, j in pairs
+        ])
+
+    def sorted_max_rij(
+        self, 
+        cluster_idx: int, 
+        max_rij: List[List[npt.NDArray[np.float64]]]
+    ) -> npt.NDArray[np.float64]:
+        """
+        Returns the sorted maximum intermolecular distances for a specific cluster.
+        """
+        row = self.clusters[cluster_idx].tolist()
+        pairs = itertools.combinations(range(len(self.composition)), 2)
+        
+        return np.sort([
+            max_rij[self.composition[i]][self.composition[j]][row[i], row[j]] 
+            for i, j in pairs
+        ])
 
 
 @dataclass(kw_only=True)
@@ -1159,20 +1247,209 @@ def extract_finite_subsystem(
     return finite_subsystems
 
 
-def extract_unique_clusters(
-    molecular_crystal: MolecularCrystal,
+def _global_candidates(
+    supercell_molecules: SupercellMolecules,
     unique_cluster_filter: UniqueClustersFilter,
-    frame_index: int = 0,
-    key: str | None = None, # dataset key (only to display a message)
-) -> Dict[str, UniqueClusters]:
-
-    assert (0 <= frame_index < molecular_crystal.supercell.n_frames)
-    assert molecular_crystal.supercell.atomic_numbers.ndim == 1
+) -> Tuple[List[npt.NDArray[np.int64]], List[npt.NDArray[np.float64]]]:
+    """
+    Filter supercell molecules to those within the distance cutoff from any central reference molecule.
     
-    if molecular_crystal.supercell.positions.ndim == 3:
-        positions_supercell = molecular_crystal.supercell.positions[frame_index]
-    else:
-        positions_supercell = molecular_crystal.supercell.positions
+    A candidate is a molecule that is close enough to the reference molecule that it might be 
+    included in at least some of the molecular clusters according to the filtering criteria.
+    
+    Resolve candidates by their unique molecule type `u`. Always include central reference 
+    molecules (instance index 0) in the candidate pools, regardless of the cutoff.
+    
+    Args:
+        supercell_molecules: The propagated supercell data containing coordinates and distances.
+        unique_cluster_filter: The filter containing cutoffs for inclusion in the candidate pool.
+        
+    Returns:
+        candidate_to_supercell: List of arrays (length n_unique) containing the supercell 
+                                molecule indices of the valid candidates.
+        candidate_positions: List of arrays (length n_unique) containing the coordinates 
+                             of the valid candidates.
+    """
+    max_cutoff = max(unique_cluster_filter.cutoffs.values())
+    n_unique = supercell_molecules.n_molecules_unique
+    candidate_to_supercell = []
+    candidate_positions = []
+
+    for u in range(n_unique):
+        # min_distance_to_ref_molecule[u] has shape (n_molecules_unique, N_eq[u])
+        dist_to_any_ref = np.min(supercell_molecules.min_distance_to_ref_molecule[u], axis=0)
+        
+        mask = dist_to_any_ref < max_cutoff
+        # Ensure reference molecules (instance index 0) are strictly included
+        mask[0] = True
+        
+        eq_indices = np.where(mask)[0]
+        
+        candidate_to_supercell.append(eq_indices)
+        candidate_positions.append(supercell_molecules.positions[u][eq_indices])
+        
+    return candidate_to_supercell, candidate_positions
+
+
+def _intermolecular_distances(
+    positions_a: npt.NDArray[np.float64], 
+    positions_b: npt.NDArray[np.float64]
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    """
+    Computes the shortest and longest atom-atom distances between two sets of molecules.
+    
+    Args:
+        positions_a: Shape (n_a, n_atoms_a, 3)
+        positions_b: Shape (n_b, n_atoms_b, 3)
+        
+    Returns:
+        min_dists, max_dists: Arrays of shape (n_a, n_b) containing the minimum and maximum 
+                              distances between each pair of molecules.
+    """
+    n_a, n_atoms_a, _ = positions_a.shape
+    n_b, n_atoms_b, _ = positions_b.shape
+    
+    flat_a = positions_a.reshape(-1, 3)
+    flat_b = positions_b.reshape(-1, 3)
+    
+    # Shape: (n_a * n_atoms_a, n_b * n_atoms_b)
+    dists = scipy.spatial.distance.cdist(flat_a, flat_b)
+    
+    # Reshape to (n_a, n_atoms_a, n_b, n_atoms_b)
+    dists = dists.reshape(n_a, n_atoms_a, n_b, n_atoms_b)
+    
+    # Minimum and maximum distances between molecules
+    min_dists = np.min(dists, axis=(1, 3)) # Shape: (n_a, n_b)
+    max_dists = np.max(dists, axis=(1, 3)) # Shape: (n_a, n_b)
+    
+    return min_dists, max_dists
+
+
+def _candidate_distances(
+    candidate_positions: List[npt.NDArray[np.float64]],
+) -> Tuple[List[List[npt.NDArray[np.float64]]], List[List[npt.NDArray[np.float64]]]]:
+    """
+    Calculate the minimum and maximum distance matrices between candidates 
+    resolved into groups corresponding to unique molecules (u, v).
+    
+    Args:
+        candidate_positions: List of arrays containing the coordinates of valid 
+            candidates, grouped by unique molecule type. `candidate_positions[u]` 
+            is a numpy array of shape `(N_u, N_atoms, 3)` representing all 
+            candidate molecules of type `u`.
+                             
+    Returns:
+        min_rij: A nested list where `min_rij[u][v]` is a numpy array of shape 
+            `(N_u, N_v)` containing the minimum distances between candidate 
+            instances of type `u` and type `v`.
+            
+            Example: `min_rij[0][1][i, j]` is the shortest atom-atom distance 
+            between the i-th candidate of type 0 and the j-th candidate of type 1.
+            
+        max_rij: A nested list of the same structure, containing the maximum 
+            distances.
+    """
+    n_unique = len(candidate_positions)
+    min_rij = [[np.empty(0) for _ in range(n_unique)] for _ in range(n_unique)]
+    max_rij = [[np.empty(0) for _ in range(n_unique)] for _ in range(n_unique)]
+    
+    for u in range(n_unique):
+        for v in range(u, n_unique):
+            min_d, max_d = _intermolecular_distances(
+                candidate_positions[u], 
+                candidate_positions[v]
+            )
+            min_rij[u][v] = min_d
+            max_rij[u][v] = max_d
+            if u != v:
+                min_rij[v][u] = min_d.T
+                max_rij[v][u] = max_d.T
+                
+    return min_rij, max_rij
+
+
+def _canonical_cluster_types(n_unique: int, cluster_size: int) -> Iterator[Tuple[int, ...]]:
+    """
+    Generate all possible canonical cluster compositions.
+    
+    For a given number of unique molecules in the asymmetric unit (n_unique) and a target 
+    cluster size, this function yields sorted tuples representing all valid molecular 
+    compositions.
+    
+    Example: for n_unique=2 (types 0, 1) and cluster_size=3 (trimers), this yields:
+    (0, 0, 0), (0, 0, 1), (0, 1, 1), (1, 1, 1).
+    """
+    return itertools.combinations_with_replacement(range(n_unique), cluster_size)
+
+
+def _filter_candidates_by_min_rij(
+    composition: Tuple[int, ...],
+    max_min_rij: float,
+    min_rij: List[List[npt.NDArray[np.float64]]],
+    candidate_to_supercell: List[npt.NDArray[np.int64]],
+) -> ReducibleClusters:
+    """
+    Find all symmetry-reducible clusters for a given composition that satisfy all minimum intermolecular distance constraints.
+    
+    A cluster satisfies the constraints if the minimum intermolecular distance between ANY two molecules
+    in the cluster is strictly less than the `max_min_rij`.
+    
+    Args:
+        composition: A sorted tuple representing the cluster composition (e.g., `(0, 0, 1)`).
+        max_min_rij: The maximum distance threshold.
+        min_rij: Minimum distance matrices between candidate instances.
+        candidate_to_supercell: Reference mapping table to attach to the output dataclass.
+        
+    Returns:
+        ReducibleClusters: A dataclass containing the composition, total count, 
+            and an array of valid cluster indices.
+    """
+    cluster_size = len(composition)
+    n_candidates = [len(c) for c in candidate_to_supercell]
+    unique_u, counts = np.unique(composition, return_counts=True)
+    
+    # 1. Vectorized combination generation (all candidates of required types)
+    cands_per_u = (
+        itertools.combinations(range(n_candidates[u]), n)
+        for u, n in zip(unique_u, counts)
+    )
+    
+    # Flatten the product of combinations: ((0, 1), (2,)) -> [0, 1, 2]
+    cluster_indices = np.array([
+        [idx for group in sub for idx in group] 
+        for sub in itertools.product(*cands_per_u)
+    ], dtype=np.int64)
+    
+    if len(cluster_indices) == 0:
+        return ReducibleClusters(
+            n_clusters=0,
+            composition=composition,
+            clusters=np.empty((0, cluster_size), dtype=np.int64),
+            candidate_to_supercell=candidate_to_supercell
+        )
+        
+    # 2. Vectorized internal distance checks
+    valid_mask = np.ones(len(cluster_indices), dtype=bool)
+    for i, j in itertools.combinations(range(cluster_size), 2):
+        u1, u2 = composition[i], composition[j]
+        c1, c2 = cluster_indices[:, i], cluster_indices[:, j]
+        valid_mask &= (min_rij[u1][u2][c1, c2] < max_min_rij)
+            
+    valid_cluster_indices = cluster_indices[valid_mask]
+    
+    return ReducibleClusters(
+        n_clusters=len(valid_cluster_indices),
+        composition=composition,
+        clusters=valid_cluster_indices,
+        candidate_to_supercell=candidate_to_supercell
+    )
+
+
+def _symmetry_unique_clusters(
+    supercell_molecules: SupercellMolecules,
+    unique_cluster_filter: UniqueClustersFilter,
+    key: str | None = None, # dataset key (only to display a message)
+) -> Dict[str, List[UniqueClusters]]:
 
     cluster_size_map = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
 
@@ -1191,186 +1468,122 @@ def extract_unique_clusters(
     print(f"align_mirror_images  {unique_cluster_filter.align_mirror_images}")
     print(f"algorithm            {unique_cluster_filter.algorithm}")
 
-    max_cutoff = 0.0
-    if unique_cluster_filter.cutoffs:
-        max_cutoff = max(unique_cluster_filter.cutoffs.values())
+    candidate_to_supercell, candidate_positions = _global_candidates(
+        supercell_molecules=supercell_molecules,
+        unique_cluster_filter=unique_cluster_filter,
+    )
+    n_unique = supercell_molecules.n_molecules_unique
 
-    central_molecule_idx = molecular_crystal.central_molecule_index
-    #
-    # Pre-filter molecules based on the largest cutoff radius.
-    #
-    candidate_molecule_indices = np.where(
-        molecular_crystal.min_distances_to_central_molecule < max_cutoff
-    )[0]
-
-    if molecular_crystal.central_molecule_index not in candidate_molecule_indices:
-        candidate_molecule_indices = np.append(
-            candidate_molecule_indices,
-            molecular_crystal.central_molecule_index
-        )
-
-    n_mols = molecular_crystal.n_molecules
-    min_rij = np.full((n_mols, n_mols), np.inf)
-    max_rij = np.full((n_mols, n_mols), np.inf)
-
-    if len(candidate_molecule_indices) > 1:
-        #
-        # Extract all atomic positions for candidate
-        # molecules into a single array
-        #
-        all_positions = []
-        mol_slices = [0]
-
-        for mol_idx in candidate_molecule_indices:
-            atom_indices = molecular_crystal.index_map[mol_idx]
-            positions = positions_supercell[atom_indices, :]
-            all_positions.append(positions)
-            mol_slices.append(mol_slices[-1] + len(atom_indices))
-
-        mol_slices = np.array(mol_slices)
-        all_positions = np.concatenate(all_positions, axis=0)
-        #
-        # Calculate all atom-atom distances at once
-        #
-        dist_matrix = scipy.spatial.distance.cdist(all_positions, all_positions)
-        #
-        # Now, extract the min and max atom-atom distances
-        # for each pair of molecules
-        #
-        for i in range(len(candidate_molecule_indices)):
-            for j in range(i + 1, len(candidate_molecule_indices)):
-                mol_idx1 = candidate_molecule_indices[i]
-                mol_idx2 = candidate_molecule_indices[j]
-
-                start1, end1 = mol_slices[i], mol_slices[i+1]
-                start2, end2 = mol_slices[j], mol_slices[j+1]
-
-                sub_matrix = dist_matrix[start1:end1, start2:end2]
-                min_dist = np.min(sub_matrix)
-                max_dist = np.max(sub_matrix)
-
-                min_rij[mol_idx1, mol_idx2] = min_dist
-                min_rij[mol_idx2, mol_idx1] = min_dist
-                max_rij[mol_idx1, mol_idx2] = max_dist
-                max_rij[mol_idx2, mol_idx1] = max_dist
+    min_rij, max_rij = _candidate_distances(candidate_positions)
 
     results = {}
 
     for cluster_type in unique_cluster_filter.cluster_types:
-        cutoff = unique_cluster_filter.cutoffs[cluster_type]
-        n = cluster_size_map[cluster_type]
-        #
-        # Filter neighbors according to distance to the center
-        #
-        filtered_neighbors = [
-            i for i in candidate_molecule_indices if (
-                i != molecular_crystal.central_molecule_index and
-                min_rij[molecular_crystal.central_molecule_index, i] < cutoff
-            )
-        ]
-        print(f"{cluster_type} with cutoff < {cutoff:.2f} Å...")
+        max_min_rij = unique_cluster_filter.cutoffs[cluster_type]
+        cluster_size = cluster_size_map[cluster_type]
+        print(f"{cluster_type} with max_min_rij < {max_min_rij:.2f} Å...")
         
-        progress = mbe_automation.common.display.Progress(
-            iterable=itertools.combinations(filtered_neighbors, n - 1),
-            n_total_steps=scipy.special.comb(len(filtered_neighbors), n - 1, exact=True),
-            label="",
-        )
-
-        unique_indices_list = []
-        unique_weights_list = []
-        unique_min_dists_list = []
-        unique_max_dists_list = []
-
-        for combo in progress:
-            indices_current = np.array([
-                molecular_crystal.central_molecule_index
-            ] + list(combo))
-            #            
-            # Filter neighbors according to the remaining
-            # molecule-molecule distances
-            #
-            within_cutoff = True
-            if n > 2:
-                for i, j in itertools.combinations(combo, 2):
-                    if min_rij[i, j] >= cutoff:
-                        within_cutoff = False
-                        break
-
-            if not within_cutoff:
+        clusters_by_comp = {}
+        
+        for comp in _canonical_cluster_types(n_unique, cluster_size):
+            reducible = _filter_candidates_by_min_rij(
+                composition=comp,
+                max_min_rij=max_min_rij,
+                min_rij=min_rij,
+                candidate_to_supercell=candidate_to_supercell,
+            )
+            
+            if reducible.n_clusters == 0:
                 continue
-
-            min_dists_current = np.sort(
-                [min_rij[p1, p2] for p1, p2 in itertools.combinations(indices_current, 2)]
+                
+            clusters_by_comp[comp] = {
+                "indices_list": [],
+                "weights_list": [],
+                "min_dists_list": [],
+                "max_dists_list": [],
+                "positions_list": [],
+                "atomic_numbers_list": []
+            }
+            comp_data = clusters_by_comp[comp]
+            
+            comp_str = "-".join(str(c) for c in comp)
+            progress = mbe_automation.common.display.Progress(
+                iterable=reducible,
+                n_total_steps=len(reducible),
+                label=f"type {comp_str}",
             )
-            max_dists_current = np.sort(
-                [max_rij[p1, p2] for p1, p2 in itertools.combinations(indices_current, 2)]
-            )
-            positions_current = molecular_crystal.positions(
-                molecule_indices=indices_current,
-                frame_index=frame_index,
-            )
-            atomic_numbers_current = molecular_crystal.atomic_numbers(
-                molecule_indices=indices_current,
-            )
-            is_unique = True
-            #
-            # Run a loop over all previously accepted clusters to check
-            # if the current cluster is symmetry-unique
-            #
-            for i, indices_ref in enumerate(unique_indices_list):
-                # 
-                # Quick, distance-only test here is design to avoid
-                # unnecessary expensive tests using RMSD.
-                #
-                min_dists_ref = unique_min_dists_list[i]                
-                if (np.max(np.abs(min_dists_current - min_dists_ref)) <
-                    unique_cluster_filter.alignment_thresh):
 
-                    positions_ref = molecular_crystal.positions(
-                        molecule_indices=indices_ref,
-                        frame_index=frame_index,
-                    )
-                    atomic_numbers_ref = molecular_crystal.atomic_numbers(
-                        molecule_indices=indices_ref,
-                    )
-                    rmsd = mbe_automation.structure.molecule.match(
-                        positions_a=positions_current,
-                        atomic_numbers_a=atomic_numbers_current,
-                        positions_b=positions_ref,
-                        atomic_numbers_b=atomic_numbers_ref,
-                        align_mirror_images=unique_cluster_filter.align_mirror_images,
-                        algorithm=unique_cluster_filter.algorithm,
-                    )
-                    if rmsd < unique_cluster_filter.alignment_thresh:
-                        #
-                        # At this point, the expensive check has confirmed
-                        # that we have found an equivalent cluster which
-                        # is already on the accepted list.
-                        #
-                        is_unique = False
-                        unique_weights_list[i] += 1
-                        break
+            # 3. Type-Aware Clustering Loop
+            for cluster_idx, eq_indices in enumerate(progress):
+                # Extract min/max distances
+                min_dists_current = reducible.sorted_min_rij(cluster_idx, min_rij)
+                max_dists_current = reducible.sorted_max_rij(cluster_idx, max_rij)
+                
+                # The canonical `comp` order is already sorted.
+                
+                # Extract positions and atomic numbers for the current combination
+                positions_current_list = []
+                atomic_numbers_current_list = []
+                for u, eq_i in zip(comp, eq_indices):
+                    positions_current_list.append(supercell_molecules.positions[u][eq_i])
+                    atomic_numbers_current_list.append(supercell_molecules.atomic_numbers[u][eq_i])
+                    
+                positions_current = np.concatenate(positions_current_list, axis=0)
+                atomic_numbers_current = np.concatenate(atomic_numbers_current_list, axis=0)
+            
+                is_unique = True
+                for i in range(len(comp_data["indices_list"])):
+                    min_dists_ref = comp_data["min_dists_list"][i]
+                    if (np.max(np.abs(min_dists_current - min_dists_ref)) <
+                        unique_cluster_filter.alignment_thresh):
+                        
+                        positions_ref = comp_data["positions_list"][i]
+                        atomic_numbers_ref = comp_data["atomic_numbers_list"][i]
+                        
+                        rmsd = mbe_automation.structure.molecule.match(
+                            positions_a=positions_current,
+                            atomic_numbers_a=atomic_numbers_current,
+                            positions_b=positions_ref,
+                            atomic_numbers_b=atomic_numbers_ref,
+                            align_mirror_images=unique_cluster_filter.align_mirror_images,
+                            algorithm=unique_cluster_filter.algorithm,
+                        )
+                        if rmsd < unique_cluster_filter.alignment_thresh:
+                            is_unique = False
+                            comp_data["weights_list"][i] += 1
+                            break
 
-            if is_unique:
-                unique_indices_list.append(indices_current)
-                unique_weights_list.append(1)
-                unique_min_dists_list.append(min_dists_current)
-                unique_max_dists_list.append(max_dists_current)
+                if is_unique:
+                    comp_data["indices_list"].append(eq_indices)
+                    comp_data["weights_list"].append(1)
+                    comp_data["min_dists_list"].append(min_dists_current)
+                    comp_data["max_dists_list"].append(max_dists_current)
+                    comp_data["positions_list"].append(positions_current)
+                    comp_data["atomic_numbers_list"].append(atomic_numbers_current)
 
-        if not unique_indices_list:
+        if not clusters_by_comp:
             continue
-
-        molecule_indices_arr = np.array(unique_indices_list)
-        weights_arr = np.array(unique_weights_list)
-
-        results[cluster_type] = UniqueClusters(
-            n_clusters=len(molecule_indices_arr),
-            molecule_indices=molecule_indices_arr,
-            weights=weights_arr,
-            min_distances=(np.array(unique_min_dists_list) if n > 1 else np.array([])),
-            max_distances=(np.array(unique_max_dists_list) if n > 1 else np.array([])),
-        )
-
-        print(f"Found {results[cluster_type].n_clusters} symmetry-unique {cluster_type}")
+            
+        results[cluster_type] = []
+        for composition, comp_data in clusters_by_comp.items():
+            if not comp_data["indices_list"]:
+                continue
+                
+            molecule_indices_arr = np.array(comp_data["indices_list"], dtype=np.int64)
+            weights_arr = np.array(comp_data["weights_list"], dtype=np.int64)
+            
+            n_clusters_comp = len(molecule_indices_arr)
+            
+            results[cluster_type].append(
+                UniqueClusters(
+                    n_clusters=n_clusters_comp,
+                    cluster_composition=composition,
+                    molecule_indices=molecule_indices_arr,
+                    weights=weights_arr,
+                    min_distances=(np.array(comp_data["min_dists_list"]) if cluster_size > 1 else np.array([])),
+                    max_distances=(np.array(comp_data["max_dists_list"]) if cluster_size > 1 else np.array([])),
+                )
+            )
+            print(f"Found {n_clusters_comp} symmetry-unique {cluster_type} of composition {composition}")
 
     return results

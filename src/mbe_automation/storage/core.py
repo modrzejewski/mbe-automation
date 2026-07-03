@@ -523,6 +523,7 @@ class UniqueClusters:
     Symmetry-unique molecular clusters within a MolecularCrystal.
     """
     n_clusters: int
+    cluster_composition: Tuple[int, ...]
     molecule_indices: npt.NDArray[np.integer] # Shape (n_unique_clusters, n_cluster_size)
     weights: npt.NDArray[np.integer]
     min_distances: npt.NDArray[np.floating]  # Shape: (n_unique_clusters, n_pairs)
