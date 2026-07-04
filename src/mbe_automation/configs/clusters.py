@@ -83,7 +83,6 @@ class UniqueClustersFilter:
         default_factory=lambda: {"monomers": 30.0, "dimers": 15.0, "trimers": 10.0}
     )
     alignment_thresh: float = 1.0e-4 # Å
-    align_mirror_images: bool = True
     algorithm: Literal["ase", "pymatgen"] | None = None
 
     def __post_init__(self):
