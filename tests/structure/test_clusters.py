@@ -6,9 +6,9 @@ from mbe_automation.api.classes import MolecularComposition, Structure
 from mbe_automation.configs.clusters import UniqueClustersFilter
 from mbe_automation import MACE
 
-def test_extract_unique_clusters_helicene():
-    """Extract symmetry-unique clusters from a 2x2x2 supercell of helicene."""
-    cif_path = Path(__file__).parent / "helicene.cif"
+def extract_unique_clusters(cif_path: str | Path):
+    """Extract symmetry-unique clusters from a 2x2x2 supercell."""
+    cif_path = Path(cif_path)
     crystal = Structure.from_xyz_file(cif_path)
     calc = MACE(
         model_path="~/models/mace/mace-mh-1.model", 
@@ -33,3 +33,14 @@ def test_extract_unique_clusters_helicene():
     assert clusters is not None
     assert isinstance(clusters, dict)
     assert len(clusters) > 0
+
+
+if __name__ == "__main__":
+    import sys
+    
+    if len(sys.argv) > 1:
+        target_cif = Path(sys.argv[1])
+    else:
+        target_cif = Path(__file__).parent / "helicene.cif"
+        
+    extract_unique_clusters(target_cif)
