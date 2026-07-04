@@ -178,7 +178,8 @@ class UniqueClusters:
     generated from a molecular crystal unit cell.
     
     Attributes:
-        n_clusters: Number of symmetry-unique clusters.
+        n_clusters_unique: Number of symmetry-unique clusters.
+        n_clusters_reducible: Number of candidate reducible clusters prior to symmetry reduction.
         composition: Tuple of molecule types defining the cluster composition.
         structures: A single `Structure` object where `n_frames` corresponds 
             to the number of symmetry-unique clusters. Contains the Cartesian 
@@ -193,7 +194,8 @@ class UniqueClusters:
         max_distances: Maximum atom-atom distances for all intermolecular pairs. 
             Shape: (n_clusters, n_pairs).
     """
-    n_clusters: int
+    n_clusters_unique: int
+    n_clusters_reducible: int
     composition: Tuple[int, ...]
     structures: mbe_automation.storage.core.Structure
     reference_molecules: Tuple[mbe_automation.storage.core.Structure, ...]
@@ -1587,34 +1589,21 @@ def _print_cluster_summary(
     results: Dict[str, UniqueClusters],
 ) -> None:
     """Print a lightweight summary table of the extracted clusters."""
-    
-    counts_per_type = {
-        cluster_type: 0 
-        for cluster_type in unique_cluster_filter.cluster_types
-    }
-    
-    for key, unique_clusters in results.items():
-        cluster_type = key.split("[")[0]
-        if cluster_type in counts_per_type:
-            counts_per_type[cluster_type] += unique_clusters.n_clusters
-            
-    col_w = 20
-    header_1 = f"{'':<{col_w}}   {'':<{col_w}}   {'symmetry-unique':<{col_w}}"
-    header_2 = f"{'cluster type':<{col_w}}   {'r_cutoff [Å]':<{col_w}}   {'clusters':<{col_w}}"
+    col_w = 22
+    header = f"{'composition':<{col_w}}   {'r_cutoff [Å]':<{col_w}}   {'n_clusters_reducible':<{col_w}}   {'n_clusters_unique':<{col_w}}"
     
     data_rows = []
-    for cluster_type in unique_cluster_filter.cluster_types:
-        count = counts_per_type[cluster_type]
-        cutoff = unique_cluster_filter.cutoffs[cluster_type]
-        row = f"{cluster_type:<{col_w}}   {cutoff:<{col_w}.2f}   {count:<{col_w}}"
+    for key, unique_clusters in results.items():
+        base_type = key.split("[")[0]
+        cutoff = unique_cluster_filter.cutoffs[base_type]
+        row = f"{key:<{col_w}}   {cutoff:<{col_w}.1f}   {unique_clusters.n_clusters_reducible:<{col_w}}   {unique_clusters.n_clusters_unique:<{col_w}}"
         data_rows.append(row)
         
-    n = max(len(header_1), max(len(d) for d in data_rows))
+    n = max(len(header), max((len(d) for d in data_rows), default=0))
     
     print("")
     mbe_automation.common.display.dotted_separator(n)
-    print(header_1)
-    print(header_2)
+    print(header)
     mbe_automation.common.display.dotted_separator(n)
     for row in data_rows:
         print(row)
@@ -1754,7 +1743,8 @@ def _symmetry_unique_clusters(
             result_key = f"{cluster_type}[{comp_str}]"
             
             results[result_key] = UniqueClusters(
-                n_clusters=len(accumulator.weights),
+                n_clusters_unique=len(accumulator.weights),
+                n_clusters_reducible=reducible.n_clusters,
                 composition=composition,
                 structures=accumulator.to_structure(),
                 reference_molecules=supercell_molecules.reference_molecules(),
