@@ -2,13 +2,23 @@
 
 from pathlib import Path
 import pytest
-from mbe_automation.api.classes import MolecularComposition
+from mbe_automation.api.classes import MolecularComposition, Structure
 from mbe_automation.configs.clusters import UniqueClustersFilter
+from mbe_automation import MACE
 
 def test_extract_unique_clusters_helicene():
     """Extract symmetry-unique clusters from a 2x2x2 supercell of helicene."""
     cif_path = Path(__file__).parent / "helicene.cif"
-    comp = MolecularComposition.from_xyz_file(cif_path, match_mode="rmsd_only", rmsd_thresh=0.1)
+    crystal = Structure.from_xyz_file(cif_path)
+    calc = MACE(
+        model_path="~/models/mace/mace-mh-1.model", 
+        head="omol"
+    )
+    
+    comp = MolecularComposition(
+        crystal=crystal,
+        calculator=calc,
+    )
     supercell = comp.expand_to_supercell([2, 2, 2])
     
     unique_cluster_filter = UniqueClustersFilter(
