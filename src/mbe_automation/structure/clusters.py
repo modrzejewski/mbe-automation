@@ -82,11 +82,16 @@ class SupercellMolecules:
         """
         Extract symmetry-unique molecular clusters from the supercell.
         """
-        return _symmetry_unique_clusters(
+        results = _symmetry_unique_clusters(
             supercell_molecules=self,
             unique_cluster_filter=unique_cluster_filter,
             key=key,
         )
+        _print_cluster_summary(
+            unique_cluster_filter=unique_cluster_filter,
+            results=results,
+        )
+        return results
 
     def reference_molecules(self) -> Tuple[mbe_automation.storage.core.Structure, ...]:
         """
@@ -169,16 +174,24 @@ class ReducibleClusters:
 @dataclass(kw_only=True)
 class UniqueClusters:
     """
-    Symmetry-unique molecular clusters within a molecular crystal.
+    Symmetry-unique molecular clusters extracted from a periodic supercell 
+    generated from a molecular crystal unit cell.
     
     Attributes:
         n_clusters: Number of symmetry-unique clusters.
         composition: Tuple of molecule types defining the cluster composition.
-        structures: A single `Structure` object where `n_frames` corresponds to the number of symmetry-unique clusters. Contains the Cartesian coordinates (`positions`) of all clusters.
-        reference_molecules: Tuple of `Structure` objects representing the unique molecules of the unit cell. Its length matches the number of unique molecules, allowing it to be indexed by the integers in `composition`.
+        structures: A single `Structure` object where `n_frames` corresponds 
+            to the number of symmetry-unique clusters. Contains the Cartesian 
+            coordinates (`positions`) of all clusters.
+        reference_molecules: Tuple of `Structure` objects representing the 
+            unique molecules of the unit cell. Its length matches the number 
+            of unique molecules, allowing it to be indexed by the integers 
+            in `composition`.
         weights: Multiplicities of the symmetry-unique clusters within the supercell.
-        min_distances: Minimum atom-atom distances for all intermolecular pairs. Shape: (n_clusters, n_pairs).
-        max_distances: Maximum atom-atom distances for all intermolecular pairs. Shape: (n_clusters, n_pairs).
+        min_distances: Minimum atom-atom distances for all intermolecular pairs. 
+            Shape: (n_clusters, n_pairs).
+        max_distances: Maximum atom-atom distances for all intermolecular pairs. 
+            Shape: (n_clusters, n_pairs).
     """
     n_clusters: int
     composition: Tuple[int, ...]
@@ -1567,6 +1580,46 @@ def _cluster_size(cluster_type: str) -> int:
             f"Supported types: {list(sizes.keys())}"
         )
     return sizes[cluster_type]
+
+
+def _print_cluster_summary(
+    unique_cluster_filter: UniqueClustersFilter,
+    results: Dict[str, UniqueClusters],
+) -> None:
+    """Print a lightweight summary table of the extracted clusters."""
+    
+    counts_per_type = {
+        cluster_type: 0 
+        for cluster_type in unique_cluster_filter.cluster_types
+    }
+    
+    for key, unique_clusters in results.items():
+        cluster_type = key.split("[")[0]
+        if cluster_type in counts_per_type:
+            counts_per_type[cluster_type] += unique_clusters.n_clusters
+            
+    col_w = 20
+    header_1 = f"{'':<{col_w}}   {'':<{col_w}}   {'symmetry-unique':<{col_w}}"
+    header_2 = f"{'cluster type':<{col_w}}   {'r_cutoff [Å]':<{col_w}}   {'clusters':<{col_w}}"
+    
+    data_rows = []
+    for cluster_type in unique_cluster_filter.cluster_types:
+        count = counts_per_type[cluster_type]
+        cutoff = unique_cluster_filter.cutoffs[cluster_type]
+        row = f"{cluster_type:<{col_w}}   {cutoff:<{col_w}.2f}   {count:<{col_w}}"
+        data_rows.append(row)
+        
+    n = max(len(header_1), max(len(d) for d in data_rows))
+    
+    print("")
+    mbe_automation.common.display.dotted_separator(n)
+    print(header_1)
+    print(header_2)
+    mbe_automation.common.display.dotted_separator(n)
+    for row in data_rows:
+        print(row)
+    mbe_automation.common.display.dotted_separator(n)
+    print("")
 
 
 def _symmetry_unique_clusters(
