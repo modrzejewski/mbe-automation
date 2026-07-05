@@ -170,6 +170,32 @@ class ReducibleClusters:
             < self.alignment_thresh
         )
 
+    def sort(self, tolerance: float = 1e-5) -> None:
+        """
+        Sort the reducible clusters in-place based on their minimum intermolecular 
+        distances, from most tightly bound to least tightly bound.
+        """
+        if self.n_clusters <= 1 or self.sorted_min_rij.shape[1] == 0:
+            return
+            
+        n_cols = self.sorted_min_rij.shape[1]
+        discretized = np.zeros_like(self.sorted_min_rij, dtype=np.int64)
+        
+        for col in range(n_cols):
+            col_data = self.sorted_min_rij[:, col]
+            flat = np.sort(col_data)
+            
+            jumps = np.diff(flat) > tolerance
+            boundaries = flat[:-1][jumps] + np.diff(flat)[jumps] / 2.0
+            discretized[:, col] = np.digitize(col_data, boundaries)
+            
+        keys = discretized.T[::-1]
+        sort_indices = np.lexsort(keys)
+        
+        self.clusters = self.clusters[sort_indices]
+        self.sorted_min_rij = self.sorted_min_rij[sort_indices]
+        self.sorted_max_rij = self.sorted_max_rij[sort_indices]
+
 
 @dataclass(kw_only=True)
 class UniqueClusters:
@@ -202,6 +228,17 @@ class UniqueClusters:
     weights: npt.NDArray[np.int64]
     min_distances: npt.NDArray[np.float64]
     max_distances: npt.NDArray[np.float64]
+
+    def labels(self) -> List[str]:
+        """Generate a list of formatted string labels for all unique clusters."""
+        return [
+            _cluster_label(
+                composition=self.composition,
+                unique_cluster_index=i,
+                n_clusters_unique=self.n_clusters_unique,
+            )
+            for i in range(self.n_clusters_unique)
+        ]
 
 
 @dataclass
@@ -1573,6 +1610,34 @@ def _composition_to_string(composition: Tuple[int, ...]) -> str:
     return "".join(chr(65 + u) for u in composition)
 
 
+def _cluster_label(
+    composition: Tuple[int, ...], 
+    unique_cluster_index: int,
+    n_clusters_unique: int,
+) -> str:
+    """
+    Generate a unique, human-readable label for a specific molecular cluster instance.
+    
+    Args:
+        composition: A sorted tuple representing the cluster composition (e.g., (0, 0, 1)).
+        unique_cluster_index: The index of this unique cluster among its type.
+        n_clusters_unique: Total number of unique clusters of this type.
+            
+    Returns:
+        A formatted string label, e.g., "02-dimer[AB]".
+    """
+    size = len(composition)
+    prefixes = {1: "monomer", 2: "dimer", 3: "trimer", 4: "tetramer"}
+    prefix = prefixes[size]
+    
+    comp_str = _composition_to_string(composition)
+    
+    d_cluster = len(str(max(1, n_clusters_unique - 1)))
+    cluster_idx_str = str(unique_cluster_index).zfill(d_cluster)
+    
+    return f"{cluster_idx_str}-{prefix}[{comp_str}]"
+
+
 def _cluster_size(cluster_type: str) -> int:
     """Map cluster type name to the number of molecules in the cluster."""
     sizes = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
@@ -1647,88 +1712,81 @@ def _symmetry_unique_clusters(
         cluster_size = _cluster_size(cluster_type)
         print(f"{cluster_type} with max_min_rij < {max_min_rij:.2f} Å...")
         
-        clusters_by_comp = {}
-        
-        for comp in _canonical_cluster_types(n_unique, cluster_size):
+        for composition in _canonical_cluster_types(n_unique, cluster_size):
             reducible = _filter_candidates_by_min_rij(
-                composition=comp,
+                composition=composition,
                 max_min_rij=max_min_rij,
                 min_rij=min_rij,
                 max_rij=max_rij,
                 candidate_to_supercell=candidate_to_supercell,
                 alignment_thresh=unique_cluster_filter.alignment_thresh,
             )
+            reducible.sort()
             
             if reducible.n_clusters == 0:
                 continue
                 
             accumulator = _ClusterAccumulator.empty()
-            clusters_by_comp[comp] = (accumulator, reducible)
 
             if cluster_size == 1:
                 # All monomers of the same type are crystallographically equivalent.
                 # Take the central reference molecule (index 0) as the unique representative.
-                u = comp[0]
+                u = composition[0]
                 accumulator.supercell_molecule_indices.append((0,))
                 accumulator.weights.append(1)
                 accumulator.reducible_cluster_indices.append(0)
                 accumulator.positions.append(supercell_molecules.positions[u][0])
                 accumulator.atomic_numbers.append(supercell_molecules.atomic_numbers[u][0])
                 accumulator.masses.append(supercell_molecules.masses[u][0])
-                continue
-            
-            progress = mbe_automation.common.display.Progress(
-                iterable=reducible,
-                n_total_steps=len(reducible),
-                label=f"type {_composition_to_string(comp)}",
-            )
-
-            for cluster_idx, eq_indices in enumerate(progress):
-                positions_current_list = []
-                atomic_numbers_current_list = []
-                masses_current_list = []
-                for u, eq_i in zip(comp, eq_indices):
-                    positions_current_list.append(supercell_molecules.positions[u][eq_i])
-                    atomic_numbers_current_list.append(supercell_molecules.atomic_numbers[u][eq_i])
-                    masses_current_list.append(supercell_molecules.masses[u][eq_i])
-                    
-                positions_current = np.concatenate(positions_current_list, axis=0)
-                atomic_numbers_current = np.concatenate(atomic_numbers_current_list, axis=0)
-                masses_current = np.concatenate(masses_current_list, axis=0)
-            
-                is_unique = True
-                for i in range(len(accumulator.supercell_molecule_indices)):
-                    ref_cluster_idx = accumulator.reducible_cluster_indices[i]
-                    if reducible.fast_compare(cluster_idx, ref_cluster_idx):
+            else:
+                for cluster_idx, eq_indices in enumerate(
+                    mbe_automation.common.display.Progress(
+                        iterable=reducible,
+                        n_total_steps=len(reducible),
+                        label=f"type {_composition_to_string(composition)}",
+                    )
+                ):
+                    positions_current_list = []
+                    atomic_numbers_current_list = []
+                    masses_current_list = []
+                    for u, eq_i in zip(composition, eq_indices):
+                        positions_current_list.append(supercell_molecules.positions[u][eq_i])
+                        atomic_numbers_current_list.append(supercell_molecules.atomic_numbers[u][eq_i])
+                        masses_current_list.append(supercell_molecules.masses[u][eq_i])
                         
-                        positions_ref = accumulator.positions[i]
-                        atomic_numbers_ref = accumulator.atomic_numbers[i]
-                        
-                        rmsd = mbe_automation.structure.molecule.match(
-                            positions_a=positions_current,
-                            atomic_numbers_a=atomic_numbers_current,
-                            positions_b=positions_ref,
-                            atomic_numbers_b=atomic_numbers_ref,
-                            align_mirror_images=True,
-                            algorithm=unique_cluster_filter.algorithm,
-                        )
-                        if rmsd < unique_cluster_filter.alignment_thresh:
-                            is_unique = False
-                            accumulator.weights[i] += 1
-                            break
-
-                if is_unique:
-                    accumulator.supercell_molecule_indices.append(eq_indices)
-                    accumulator.weights.append(1)
-                    accumulator.reducible_cluster_indices.append(cluster_idx)
-                    accumulator.positions.append(positions_current)
-                    accumulator.atomic_numbers.append(atomic_numbers_current)
-                    accumulator.masses.append(masses_current)
+                    positions_current = np.concatenate(positions_current_list, axis=0)
+                    atomic_numbers_current = np.concatenate(atomic_numbers_current_list, axis=0)
+                    masses_current = np.concatenate(masses_current_list, axis=0)
+                
+                    is_unique = True
+                    for i in range(len(accumulator.supercell_molecule_indices)):
+                        ref_cluster_idx = accumulator.reducible_cluster_indices[i]
+                        if reducible.fast_compare(cluster_idx, ref_cluster_idx):
+                            
+                            positions_ref = accumulator.positions[i]
+                            atomic_numbers_ref = accumulator.atomic_numbers[i]
+                            
+                            rmsd = mbe_automation.structure.molecule.match(
+                                positions_a=positions_current,
+                                atomic_numbers_a=atomic_numbers_current,
+                                positions_b=positions_ref,
+                                atomic_numbers_b=atomic_numbers_ref,
+                                align_mirror_images=True,
+                                algorithm=unique_cluster_filter.algorithm,
+                            )
+                            if rmsd < unique_cluster_filter.alignment_thresh:
+                                is_unique = False
+                                accumulator.weights[i] += 1
+                                break
+    
+                    if is_unique:
+                        accumulator.supercell_molecule_indices.append(eq_indices)
+                        accumulator.weights.append(1)
+                        accumulator.reducible_cluster_indices.append(cluster_idx)
+                        accumulator.positions.append(positions_current)
+                        accumulator.atomic_numbers.append(atomic_numbers_current)
+                        accumulator.masses.append(masses_current)
             
-        if not clusters_by_comp:
-            continue
-            
-        for composition, (accumulator, reducible) in clusters_by_comp.items():
             if not accumulator.supercell_molecule_indices:
                 continue
                 
