@@ -9,6 +9,7 @@ import time
 import sys
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 import ase.geometry
 import ase.io
 import ase.build
@@ -52,7 +53,8 @@ class SupercellMolecules:
         n_molecules_nonunique: Total count of all molecules in the supercell.
         n_molecules_unique: Count of unique molecules.
         n_equivalent: Array where `n_equivalent[k]` specifies the number 
-            of occurences of the k-th unique molecule.
+            of occurences of the k-th unique molecule in the supercell.
+        n_unit_cells: Number of unit cells used to construct this supercell.
         positions: List of atomic coordinates. `positions[k]` has shape 
             `(n_equivalent[k], n_atoms, 3)`.
         atomic_numbers: List of atomic numbers. `atomic_numbers[k]` has shape 
@@ -68,6 +70,7 @@ class SupercellMolecules:
     n_molecules_nonunique: int
     n_molecules_unique: int
     n_equivalent: npt.NDArray[np.int64]
+    n_unit_cells: int
     positions: List[npt.NDArray[np.float64]]
     atomic_numbers: List[npt.NDArray[np.int64]]
     masses: List[npt.NDArray[np.float64]]
@@ -189,7 +192,7 @@ class ReducibleClusters:
             boundaries = flat[:-1][jumps] + np.diff(flat)[jumps] / 2.0
             discretized[:, col] = np.digitize(col_data, boundaries)
             
-        keys = discretized.T[::-1]
+        keys = discretized.T
         sort_indices = np.lexsort(keys)
         
         self.clusters = self.clusters[sort_indices]
@@ -215,10 +218,12 @@ class UniqueClusters:
             of unique molecules, allowing it to be indexed by the integers 
             in `composition`.
         weights: Multiplicities of the symmetry-unique clusters within the supercell.
-        min_distances: Minimum atom-atom distances for all intermolecular pairs. 
-            Shape: (n_clusters, n_pairs).
-        max_distances: Maximum atom-atom distances for all intermolecular pairs. 
-            Shape: (n_clusters, n_pairs).
+        n_molecules_equivalent: Number of equivalent molecules for each unique type 
+            in the original unit cell.
+        sorted_min_rij: Minimum atom-atom distances for all intermolecular pairs, 
+            sorted according to `ReducibleClusters.sort`. Shape: (n_clusters, n_pairs).
+        sorted_max_rij: Maximum atom-atom distances for all intermolecular pairs, 
+            sorted according to `ReducibleClusters.sort`. Shape: (n_clusters, n_pairs).
     """
     n_clusters_unique: int
     n_clusters_reducible: int
@@ -226,8 +231,55 @@ class UniqueClusters:
     structures: mbe_automation.storage.core.Structure
     reference_molecules: Tuple[mbe_automation.storage.core.Structure, ...]
     weights: npt.NDArray[np.int64]
-    min_distances: npt.NDArray[np.float64]
-    max_distances: npt.NDArray[np.float64]
+    n_molecules_equivalent: npt.NDArray[np.int64]
+    sorted_min_rij: npt.NDArray[np.float64]
+    sorted_max_rij: npt.NDArray[np.float64]
+
+    def to_data_frame(self) -> "pd.DataFrame":
+        """
+        Export cluster data to a pandas DataFrame.
+        
+        Returns:
+            A pandas DataFrame with the following columns:
+                - system: The string label of the cluster.
+                - symmetry_weight (1∕[Ref]): The symmetry multiplicity of the 
+                  cluster, where [Ref] is the reference molecule (A, B, C, etc.).
+                - symmetry_weight (1∕unit cell): The symmetry multiplicity of the 
+                  cluster normalized per unit cell.
+                - n_molecules[X] (1∕unit cell): The number of molecules of type 
+                  X in the unit cell.
+                - min_rij (Å): min(i∈X, j∈Y) r_ij (dimers only)
+                - max_rij (Å): max(i∈X, j∈Y) r_ij (dimers only)
+                - min_min_rij (Å): min(X,Y) min(i∈X, j∈Y) r_ij (trimers and larger)
+                - max_min_rij (Å): max(X,Y) min(i∈X, j∈Y) r_ij (trimers and larger)
+                - min_max_rij (Å): min(X,Y) max(i∈X, j∈Y) r_ij (trimers and larger)
+                - max_max_rij (Å): max(X,Y) max(i∈X, j∈Y) r_ij (trimers and larger)
+                  (where X, Y are distinct molecules in the cluster, and i, j 
+                  are their respective atoms; omitted for monomers).
+        """
+        ref_mol_label = _unique_molecule_label(self.composition[0])
+        data = {
+            "system": self.labels(),
+            f"symmetry_weight (1∕{ref_mol_label})": self.weights,
+            "symmetry_weight (1∕unit cell)": (
+                self.weights * self.n_molecules_equivalent[self.composition[0]]
+            ),
+        }
+
+        for u in range(len(self.reference_molecules)):
+            mol_label = _unique_molecule_label(u)
+            data[f"n_molecules[{mol_label}] (1∕unit cell)"] = self.n_molecules_equivalent[u]
+
+        if len(self.composition) == 2:
+            data["min_rij (Å)"] = self.sorted_min_rij[:, 0]
+            data["max_rij (Å)"] = self.sorted_max_rij[:, 0]
+        elif len(self.composition) > 2:
+            data["min_min_rij (Å)"] = self.sorted_min_rij[:, 0]
+            data["max_min_rij (Å)"] = self.sorted_min_rij[:, -1]
+            data["min_max_rij (Å)"] = self.sorted_max_rij[:, 0]
+            data["max_max_rij (Å)"] = self.sorted_max_rij[:, -1]
+
+        return pd.DataFrame(data)
 
     def labels(self) -> List[str]:
         """Generate a list of formatted string labels for all unique clusters."""
@@ -1241,7 +1293,8 @@ def _expand_to_supercell(
     return SupercellMolecules(
         n_molecules_nonunique=composition.n_molecules_nonunique * n_cells,
         n_molecules_unique=composition.n_molecules_unique,
-        n_equivalent=np.array(composition.n_equivalent * n_cells, dtype=np.int64),
+        n_equivalent=composition.n_equivalent * n_cells,
+        n_unit_cells=n_cells,
         positions=positions_list,
         atomic_numbers=atomic_numbers_list,
         masses=masses_list,
@@ -1605,9 +1658,20 @@ def _filter_candidates_by_min_rij(
     )
 
 
+def _unique_molecule_label(molecule_type_index: int) -> str:
+    """
+    Map a unique molecule index to a letter label (0 -> A, 1 -> B, etc.).
+    
+    These labels represent the crystallographically unique molecules found in 
+    the unit cell, and the resulting symbols are used to describe the unit 
+    cell's composition.
+    """
+    return chr(65 + molecule_type_index)
+
+
 def _composition_to_string(composition: Tuple[int, ...]) -> str:
     """Convert a composition tuple like (0, 0, 1) to a letter string like 'AAB'."""
-    return "".join(chr(65 + u) for u in composition)
+    return "".join(_unique_molecule_label(u) for u in composition)
 
 
 def _cluster_label(
@@ -1807,8 +1871,9 @@ def _symmetry_unique_clusters(
                 structures=accumulator.to_structure(),
                 reference_molecules=supercell_molecules.reference_molecules(),
                 weights=np.array(accumulator.weights, dtype=np.int64),
-                min_distances=min_distances,
-                max_distances=max_distances,
+                n_molecules_equivalent=supercell_molecules.n_equivalent // supercell_molecules.n_unit_cells,
+                sorted_min_rij=min_distances,
+                sorted_max_rij=max_distances,
             )
             
             print(f"Found {len(accumulator.weights)} symmetry-unique {cluster_type} of composition {composition}")

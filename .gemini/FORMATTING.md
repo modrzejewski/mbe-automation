@@ -17,6 +17,7 @@ def find_degenerate_frequencies(
 
 ## Import Ordering
 
+*   **Global Imports:** All dependencies should be imported at the top of the module. Do not use local imports inside functions or methods.
 *   **Project Imports:** Imports from `nomore_ase` and `mbe_automation` should be placed **after** all other imports (e.g., standard library, `numpy`, `scipy`).
 *   **Separation:** Include a blank line between the general imports and the project-specific imports.
 
@@ -49,3 +50,7 @@ mbe_automation.dynamics.harmonic.bands.reorder(
 *   **Division in Unit Labels:** When a unit label appears in a dataframe column name or dictionary key (e.g. `"V_crystal (Å³∕unit cell)"`, `"S_vib (J∕K∕mol)"`), use the DIVISION SLASH (U+2215, `∕`) instead of the ordinary solidus (U+002F, `/`).
     *   **Rationale:** Such keys are commonly persisted as HDF5 dataset names, where `/` is a reserved path separator. Using `∕` prevents collisions with the HDF5 hierarchy.
     *   **Scope:** This rule applies to unit labels inside keys/column names/metadata. In free-form prose, docstrings, or arithmetic expressions, keep the ordinary `/`.
+
+## Docstrings
+
+*   **Line Breaks:** Docstrings should be formatted with elegant line breaks to ensure readability without horizontal scrolling. Wrap long lines (preferably around 80-100 characters) and maintain proper indentation for lists and descriptions.
