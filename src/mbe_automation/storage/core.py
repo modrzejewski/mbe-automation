@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Tuple, Literal, overload, Dict
 import pymatgen
+import pymatgen.core.periodic_table
 import pandas as pd
 import phonopy
 from phonopy import Phonopy
@@ -310,6 +311,45 @@ class Structure:
         from .views import to_pymatgen
         return to_pymatgen(structure=self, frame_index=frame_index)
 
+    def to_xyz_string(self, frame_index: int = 0, n_digits: int = 6) -> str:
+        """
+        Generate a raw XYZ-formatted coordinate block for a specific frame.
+        
+        The output is formatted deterministically (fixed precision, no negative 
+        zeros) for hashing.
+        
+        Args:
+            frame_index: The index of the frame/cluster to export.
+            n_digits: Number of decimal digits for the atomic coordinates.
+            
+        Returns:
+            A string containing `{element} {x} {y} {z}` for each atom, 
+            without header lines, stripped of leading/trailing whitespace.
+        """
+        n_atoms = self.n_atoms
+        
+        if self.multi_frame:
+            positions = self.positions[frame_index]
+        else:
+            positions = self.positions
+            
+        # Vectorized rounding and negative zero elimination
+        # Adding 0.0 forces IEEE 754 to convert any -0.0 into a positive 0.0
+        positions = np.round(positions, n_digits) + 0.0
+            
+        if self.permuted_between_frames:
+            atomic_numbers = self.atomic_numbers[frame_index]
+        else:
+            atomic_numbers = self.atomic_numbers
+            
+        lines = []
+        for i in range(n_atoms):
+            element_symbol = pymatgen.core.periodic_table.Element.from_Z(atomic_numbers[i]).symbol
+            x, y, z = positions[i]
+            lines.append(f"{element_symbol:<2} {x:14.{n_digits}f} {y:14.{n_digits}f} {z:14.{n_digits}f}")
+            
+        return "\n".join(lines).strip()
+
     def lattice(self, frame_index: int = 0) -> pymatgen.core.Lattice:
         assert self.periodic, "Structure must be periodic."
         if self.variable_cell:
@@ -325,6 +365,10 @@ class Structure:
     @property
     def permuted_between_frames(self) -> bool:
         return (self.atomic_numbers.ndim == 2)
+
+    @property
+    def multi_frame(self) -> bool:
+        return (self.positions.ndim == 3)
 
     @property
     def variable_cell(self) -> bool:

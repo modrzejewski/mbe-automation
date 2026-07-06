@@ -7,6 +7,7 @@ import itertools
 from collections import deque
 import time
 import sys
+import hashlib
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -213,10 +214,12 @@ class UniqueClusters:
         structures: A single `Structure` object where `n_frames` corresponds 
             to the number of symmetry-unique clusters. Contains the Cartesian 
             coordinates (`positions`) of all clusters.
-        reference_molecules: Tuple of `Structure` objects representing the 
-            unique molecules of the unit cell. Its length matches the number 
-            of unique molecules, allowing it to be indexed by the integers 
-            in `composition`.
+        reference_molecules: Tuple of `Structure` objects representing all 
+            unique molecules of the unit cell. Its length matches the total 
+            number of unique molecules, allowing it to be indexed by the 
+            integers in `composition`. Note that this tuple includes all unit 
+            cell molecules, e.g., those that might not appear in this type 
+            of cluster.
         weights: Multiplicities of the symmetry-unique clusters within the supercell.
         n_molecules_equivalent: Number of equivalent molecules for each unique type 
             in the original unit cell.
@@ -248,12 +251,12 @@ class UniqueClusters:
                   cluster normalized per unit cell.
                 - n_molecules[X] (1∕unit cell): The number of molecules of type 
                   X in the unit cell.
-                - min_rij (Å): min(i∈X, j∈Y) r_ij (dimers only)
-                - max_rij (Å): max(i∈X, j∈Y) r_ij (dimers only)
-                - min_min_rij (Å): min(X,Y) min(i∈X, j∈Y) r_ij (trimers and larger)
-                - max_min_rij (Å): max(X,Y) min(i∈X, j∈Y) r_ij (trimers and larger)
-                - min_max_rij (Å): min(X,Y) max(i∈X, j∈Y) r_ij (trimers and larger)
-                - max_max_rij (Å): max(X,Y) max(i∈X, j∈Y) r_ij (trimers and larger)
+                - min_r (Å): min(i∈X, j∈Y) r_ij (dimers only)
+                - max_r (Å): max(i∈X, j∈Y) r_ij (dimers only)
+                - min_min_r (Å): min(X,Y) min(i∈X, j∈Y) r_ij (trimers and larger)
+                - max_min_r (Å): max(X,Y) min(i∈X, j∈Y) r_ij (trimers and larger)
+                - min_max_r (Å): min(X,Y) max(i∈X, j∈Y) r_ij (trimers and larger)
+                - max_max_r (Å): max(X,Y) max(i∈X, j∈Y) r_ij (trimers and larger)
                   (where X, Y are distinct molecules in the cluster, and i, j 
                   are their respective atoms; omitted for monomers).
         """
@@ -271,13 +274,13 @@ class UniqueClusters:
             data[f"n_molecules[{mol_label}] (1∕unit cell)"] = self.n_molecules_equivalent[u]
 
         if len(self.composition) == 2:
-            data["min_rij (Å)"] = self.sorted_min_rij[:, 0]
-            data["max_rij (Å)"] = self.sorted_max_rij[:, 0]
+            data["min_r (Å)"] = self.sorted_min_rij[:, 0]
+            data["max_r (Å)"] = self.sorted_max_rij[:, 0]
         elif len(self.composition) > 2:
-            data["min_min_rij (Å)"] = self.sorted_min_rij[:, 0]
-            data["max_min_rij (Å)"] = self.sorted_min_rij[:, -1]
-            data["min_max_rij (Å)"] = self.sorted_max_rij[:, 0]
-            data["max_max_rij (Å)"] = self.sorted_max_rij[:, -1]
+            data["min_min_r (Å)"] = self.sorted_min_rij[:, 0]
+            data["max_min_r (Å)"] = self.sorted_min_rij[:, -1]
+            data["min_max_r (Å)"] = self.sorted_max_rij[:, 0]
+            data["max_max_r (Å)"] = self.sorted_max_rij[:, -1]
 
         return pd.DataFrame(data)
 
@@ -288,6 +291,7 @@ class UniqueClusters:
                 composition=self.composition,
                 unique_cluster_index=i,
                 n_clusters_unique=self.n_clusters_unique,
+                cluster=self.structures,
             )
             for i in range(self.n_clusters_unique)
         ]
@@ -1678,6 +1682,7 @@ def _cluster_label(
     composition: Tuple[int, ...], 
     unique_cluster_index: int,
     n_clusters_unique: int,
+    cluster: mbe_automation.storage.core.Structure,
 ) -> str:
     """
     Generate a unique, human-readable label for a specific molecular cluster instance.
@@ -1686,9 +1691,10 @@ def _cluster_label(
         composition: A sorted tuple representing the cluster composition (e.g., (0, 0, 1)).
         unique_cluster_index: The index of this unique cluster among its type.
         n_clusters_unique: Total number of unique clusters of this type.
+        cluster: The structure object containing the cluster to hash.
             
     Returns:
-        A formatted string label, e.g., "02-dimer[AB]".
+        A formatted string label, e.g., "02-dimer[AB]-a1b2c3d4e5f6g7h8".
     """
     size = len(composition)
     prefixes = {1: "monomer", 2: "dimer", 3: "trimer", 4: "tetramer"}
@@ -1699,7 +1705,35 @@ def _cluster_label(
     d_cluster = len(str(max(1, n_clusters_unique - 1)))
     cluster_idx_str = str(unique_cluster_index).zfill(d_cluster)
     
-    return f"{cluster_idx_str}-{prefix}[{comp_str}]"
+    cluster_hash = _cluster_hash(
+        cluster, 
+        frame_index=unique_cluster_index, 
+        n_chars=16,
+    )
+    
+    return f"{cluster_idx_str}-{prefix}[{comp_str}]-{cluster_hash}"
+
+
+def _cluster_hash(
+    cluster: mbe_automation.storage.core.Structure, 
+    frame_index: int,
+    n_chars: int | None = None,
+) -> str:
+    """
+    Generate a reproducible SHA-256 hash from the deterministic XYZ representation 
+    of a specific cluster frame.
+    
+    Args:
+        cluster: The structure object containing the cluster.
+        frame_index: The specific frame index to hash.
+        n_chars: Optional number of characters to return from the hex digest.
+    """
+    xyz_string = cluster.to_xyz_string(frame_index=frame_index)
+    full_hash = hashlib.sha256(xyz_string.encode("utf-8")).hexdigest()
+    
+    if n_chars is not None:
+        return full_hash[:n_chars]
+    return full_hash
 
 
 def _cluster_size(cluster_type: str) -> int:
