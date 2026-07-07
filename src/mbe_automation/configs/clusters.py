@@ -79,8 +79,8 @@ class UniqueClustersFilter:
     cluster_types: List[str] = field(
         default_factory=lambda: ["monomers", "dimers", "trimers"]
     )
-    cutoffs: Dict[str, float] = field(
-        default_factory=lambda: {"monomers": 30.0, "dimers": 15.0, "trimers": 10.0}
+    cutoffs: Dict[str, float | None] = field(
+        default_factory=lambda: {"monomers": None, "dimers": 15.0, "trimers": 10.0}
     )
     alignment_thresh: float = 1.0e-4 # Å
     algorithm: Literal["ase", "pymatgen"] | None = None
@@ -88,7 +88,7 @@ class UniqueClustersFilter:
     def __post_init__(self):
         missing_keys = [
             ctype for ctype in self.cluster_types
-            if ctype not in self.cutoffs
+            if ctype not in self.cutoffs and ctype != "monomers"
         ]
         if missing_keys:
             raise ValueError(
