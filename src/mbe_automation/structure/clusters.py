@@ -43,7 +43,7 @@ from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueCluster
 from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
 
 @dataclass
-class _SupercellMolecules:
+class SupercellMolecules:
     """
     Atomic coordinates of molecules propagated in a supercell. 
     
@@ -115,7 +115,7 @@ class _SupercellMolecules:
 
 
 @dataclass
-class _ReducibleClusters:
+class ReducibleClusters:
     """
     A collection of symmetry-reducible clusters of a given composition
     that satisfy all intermolecular distance constraints.
@@ -224,9 +224,9 @@ class UniqueClusters:
         n_molecules_equivalent: Number of equivalent molecules for each unique type 
             in the original unit cell.
         sorted_min_rij: Minimum atom-atom distances for all intermolecular pairs, 
-            sorted according to `_ReducibleClusters.sort`. Shape: (n_clusters, n_pairs).
+            sorted according to `ReducibleClusters.sort`. Shape: (n_clusters, n_pairs).
         sorted_max_rij: Maximum atom-atom distances for all intermolecular pairs, 
-            sorted according to `_ReducibleClusters.sort`. Shape: (n_clusters, n_pairs).
+            sorted according to `ReducibleClusters.sort`. Shape: (n_clusters, n_pairs).
     """
     n_clusters_unique: int
     n_clusters_reducible: int
@@ -341,7 +341,7 @@ class _ClusterAccumulator:
     Attributes:
         supercell_molecule_indices: Supercell molecule indices defining each unique cluster.
         weights: Symmetry multiplicities (number of equivalent copies in the supercell).
-        reducible_cluster_indices: Positions within the parent ``_ReducibleClusters`` array,
+        reducible_cluster_indices: Positions within the parent ``ReducibleClusters`` array,
             used to look up precomputed distance data.
         positions: Concatenated Cartesian coordinates of each cluster.
         atomic_numbers: Concatenated atomic numbers of each cluster.
@@ -414,15 +414,48 @@ class MolecularComposition:
     def identical_composition(self) -> bool:
         return self.molecular_crystal.identical_composition
 
+    def atomic_properties(
+        self, 
+        unique_molecule_index: int, 
+        frame_index: int = 0
+    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+        """
+        Extract the positions, atomic numbers, and masses for all molecules of a given unique type.
+        """
+        molecule_indices = self.groups[unique_molecule_index]
+        if self.identical_composition:
+            atom_indices = self.molecular_crystal.index_map[molecule_indices]
+        else:
+            atom_indices = np.array([
+                self.molecular_crystal.index_map[idx] 
+                for idx in molecule_indices
+            ])
+            
+        unit_cell = self.molecular_crystal.supercell
+        
+        if unit_cell.multi_frame:
+            positions = unit_cell.positions[frame_index, atom_indices, :]
+        else:
+            positions = unit_cell.positions[atom_indices, :]
+            
+        if unit_cell.permuted_between_frames:
+            atomic_numbers = unit_cell.atomic_numbers[frame_index, atom_indices]
+            masses = unit_cell.masses[frame_index, atom_indices]
+        else:
+            atomic_numbers = unit_cell.atomic_numbers[atom_indices]
+            masses = unit_cell.masses[atom_indices]
+        
+        return positions, atomic_numbers, masses
+
     def expand_to_supercell(
             self, 
-            supercell_size: List[int] | Tuple[int, int, int] | npt.NDArray[np.int64],
+            cutoff: float,
             frame_index: int = 0
-    ) -> _SupercellMolecules:
+    ) -> SupercellMolecules:
         """
-        Extract the properties of identical molecules propagated in an [nx, ny, nz] supercell.
+        Extract the properties of identical molecules propagated in an automatically determined supercell.
         """
-        return _expand_to_supercell(self, supercell_size, frame_index)
+        return _expand_to_supercell(self, cutoff=cutoff, frame_index=frame_index)
 
     def extract_relaxed_unique_molecules(
             self,
@@ -1219,72 +1252,146 @@ def _shortest_atom_atom_distance(
     return np.min(min_dists_per_target_atom, axis=1)
 
 
+def _cartesian_supercell_shifts(
+    supercell_size: List[int] | Tuple[int, int, int] | npt.NDArray[np.int64],
+    cell_vectors: npt.NDArray[np.float64],
+    boundary_axis: int | None = None
+) -> npt.NDArray[np.float64]:
+    """
+    Generate Cartesian shift vectors for supercell construction.
+
+    Args:
+        supercell_size: Current dimensions of the supercell [nx, ny, nz].
+        cell_vectors: The 3x3 array of unit cell vectors.
+        boundary_axis: If specified (0, 1, or 2), generates shifts ONLY for 
+            the newly added outer boundary layers (+n, -n) along this axis.
+    """
+    ranges = []
+    for i, sz in enumerate(supercell_size):
+        if boundary_axis is not None and i == boundary_axis:
+            n = sz // 2 + 1
+            ranges.append(np.array([n, -n]))
+        else:
+            ranges.append(np.arange(-(sz // 2), sz - (sz // 2)))
+            
+    I, J, K = np.meshgrid(*ranges, indexing='ij')
+    shifts_frac = np.column_stack((I.ravel(), J.ravel(), K.ravel()))
+    return shifts_frac @ cell_vectors
+
+
+def _batch_shift(
+    positions: npt.NDArray[np.float64],
+    shifts: npt.NDArray[np.float64]
+) -> npt.NDArray[np.float64]:
+    """
+    Shift a batch of molecules by multiple Cartesian translation vectors.
+    
+    Args:
+        positions: Array of shape (n_molecules, n_atoms, 3).
+        shifts: Array of shape (n_shifts, 3).
+        
+    Returns:
+        Array of shape (n_shifts * n_molecules, n_atoms, 3).
+    """
+    shifted = positions[np.newaxis, :, :, :] + shifts[:, np.newaxis, np.newaxis, :]
+    return shifted.reshape(-1, positions.shape[1], 3)
+
+
+def _supercell_size(
+    composition: MolecularComposition,
+    cutoff: float,
+    frame_index: int = 0
+) -> npt.NDArray[np.int64]:
+    """
+    Iteratively determine the minimal supercell dimensions required to encompass
+    a given cutoff distance by checking explicit intermolecular distances 
+    between central unit cell molecules and newly added boundary molecules.
+    """
+    unit_cell = composition.molecular_crystal.supercell
+    if unit_cell.variable_cell:
+        unit_cell_vectors = unit_cell.cell_vectors[frame_index]
+    else:
+        unit_cell_vectors = unit_cell.cell_vectors
+        
+    # Extract base positions for molecules naturally grouped by their unique type
+    central_batches = [
+        composition.atomic_properties(u, frame_index)[0] 
+        for u in range(composition.n_molecules_unique)
+    ]
+        
+    supercell_size = np.array([1, 1, 1], dtype=np.int64)
+    
+    expanded = True
+    while expanded:
+        expanded = False
+        # Iterate over each crystallographic direction (a, b, c)
+        for i in range(3):
+            while True:
+                # Generate the Cartesian shifts for the boundary cells added in this step
+                shifts = _cartesian_supercell_shifts(supercell_size, unit_cell_vectors, boundary_axis=i)
+                
+                min_dist = np.inf
+                
+                # Check distances between all central molecule batches and explicitly shifted target batches
+                for batch_ref in central_batches:
+                    for batch_target in central_batches:
+                        # Shift the target batch explicitly across all boundary shifts using the helper
+                        shifted_targets = _batch_shift(batch_target, shifts)
+                        
+                        # Compute minimum distances matrix between all references and shifted targets
+                        dists, _ = _intermolecular_distances(batch_ref, shifted_targets)
+                        min_dist = min(min_dist, np.min(dists))
+                
+                # If the boundary molecules interact with the central cell, accept the expanded size
+                if min_dist < cutoff:
+                    supercell_size[i] += 2
+                    expanded = True
+                else:
+                    # We have reached convergence for this specific direction in the current pass
+                    break
+                
+    return supercell_size
+
+
 def _expand_to_supercell(
         composition: MolecularComposition,
-        supercell_size: List[int] | Tuple[int, int, int] | npt.NDArray[np.int64],
+        cutoff: float,
         frame_index: int = 0
-) -> _SupercellMolecules:
+) -> SupercellMolecules:
     """Generate arrays of coordinates, atomic numbers, and masses for the 
     molecules identified in the unit cell, propagated to the specified supercell.
 
     Args:
         composition: Base molecular composition.
-        supercell_size: Dimensions of the supercell [nx, ny, nz].
+        cutoff: Cutoff distance in Angstroms for building the supercell.
         frame_index: Index of the reference frame to extract positions from.
 
     Returns:
-        _SupercellMolecules object containing propagated atomic properties.
+        SupercellMolecules object containing propagated atomic properties.
     """
-    nx, ny, nz = supercell_size
-    
     unit_cell = composition.molecular_crystal.supercell
     variable_cell = unit_cell.variable_cell
-    n_cells = nx * ny * nz
     
     if variable_cell:
         unit_cell_vectors = unit_cell.cell_vectors[frame_index]
     else:
         unit_cell_vectors = unit_cell.cell_vectors
+
+    supercell_size = _supercell_size(composition, cutoff, frame_index)
         
-    I, J, K = np.meshgrid(
-        np.arange(-(nx // 2), nx - (nx // 2)),
-        np.arange(-(ny // 2), ny - (ny // 2)),
-        np.arange(-(nz // 2), nz - (nz // 2)),
-        indexing='ij'
-    )
-    shifts_frac = np.column_stack((I.ravel(), J.ravel(), K.ravel()))
-    shifts_cart = shifts_frac @ unit_cell_vectors
+    nx, ny, nz = supercell_size
+    n_cells = nx * ny * nz
+    shifts_cart = _cartesian_supercell_shifts(supercell_size, unit_cell_vectors)
     
     positions_list = []
     atomic_numbers_list = []
     masses_list = []
     centers_of_mass_list = []
-    is_multi_frame = (unit_cell.positions.ndim == 3)
     
     for u in range(composition.n_molecules_unique):
-        mol_unique = composition.molecules_unique[u]
+        base_pos, base_an, base_masses = composition.atomic_properties(u, frame_index)
         
-        # `atom_indices` is a rank-2 array (2D matrix) of shape:
-        # (n_equivalent_molecules, n_atoms_per_molecule)
-        molecule_indices = composition.groups[u]
-        if composition.identical_composition:
-            atom_indices = composition.molecular_crystal.index_map[molecule_indices]
-        else:
-            atom_indices = np.array([
-                composition.molecular_crystal.index_map[idx] 
-                for idx in molecule_indices
-            ])
-            
-        if is_multi_frame:
-            base_pos = unit_cell.positions[frame_index, atom_indices, :]
-        else:
-            base_pos = unit_cell.positions[atom_indices, :]
-            
-        base_an = unit_cell.atomic_numbers[atom_indices]
-        base_masses = unit_cell.masses[atom_indices]
-        
-        pos_supercell = base_pos[np.newaxis, :, :, :] + shifts_cart[:, np.newaxis, np.newaxis, :]
-        pos_supercell = pos_supercell.reshape(-1, mol_unique.n_atoms, 3)
+        pos_supercell = _batch_shift(base_pos, shifts_cart)
         positions_list.append(pos_supercell)
         
         atomic_numbers_list.append(np.tile(base_an, (n_cells, 1)))
@@ -1328,7 +1435,7 @@ def _expand_to_supercell(
             
         min_distance_to_ref_molecule.append(dist_matrix)
         
-    return _SupercellMolecules(
+    return SupercellMolecules(
         n_molecules_nonunique=composition.n_molecules_nonunique * n_cells,
         n_molecules_unique=composition.n_molecules_unique,
         n_equivalent=composition.n_equivalent * n_cells,
@@ -1471,7 +1578,7 @@ def extract_finite_subsystem(
 
 
 def _candidates_within_sphere(
-    supercell_molecules: _SupercellMolecules,
+    supercell_molecules: SupercellMolecules,
     unique_cluster_filter: UniqueClustersFilter,
 ) -> Tuple[List[npt.NDArray[np.int64]], List[npt.NDArray[np.float64]]]:
     """
@@ -1612,7 +1719,7 @@ def _filter_candidates_by_min_rij(
     max_rij: List[List[npt.NDArray[np.float64]]],
     candidate_to_supercell: List[npt.NDArray[np.int64]],
     alignment_thresh: float,
-) -> _ReducibleClusters:
+) -> ReducibleClusters:
     """
     Find all symmetry-reducible clusters for a given composition that satisfy all minimum intermolecular distance constraints.
     
@@ -1628,7 +1735,7 @@ def _filter_candidates_by_min_rij(
         alignment_thresh: Threshold for distance comparisons.
         
     Returns:
-        _ReducibleClusters: A dataclass containing the composition, total count, 
+        ReducibleClusters: A dataclass containing the composition, total count, 
             and an array of valid cluster indices.
     """
     cluster_size = len(composition)
@@ -1651,7 +1758,7 @@ def _filter_candidates_by_min_rij(
     ], dtype=np.int64)
     
     if len(all_clusters) == 0:
-        return _ReducibleClusters(
+        return ReducibleClusters(
             n_clusters=0,
             composition=composition,
             clusters=np.empty((0, cluster_size), dtype=np.int64),
@@ -1685,7 +1792,7 @@ def _filter_candidates_by_min_rij(
         sorted_min_rij = np.empty((len(filtered_clusters), n_pairs), dtype=np.float64)
         sorted_max_rij = np.empty((len(filtered_clusters), n_pairs), dtype=np.float64)
 
-    return _ReducibleClusters(
+    return ReducibleClusters(
         n_clusters=len(filtered_clusters),
         composition=composition,
         clusters=filtered_clusters,
@@ -1809,7 +1916,7 @@ def _print_cluster_summary(
 
 
 def _symmetry_unique_clusters(
-    supercell_molecules: _SupercellMolecules,
+    supercell_molecules: SupercellMolecules,
     unique_cluster_filter: UniqueClustersFilter,
     key: str | None = None, # dataset key (only to display a message)
 ) -> Dict[str, UniqueClusters]:

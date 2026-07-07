@@ -19,12 +19,12 @@ def extract_unique_clusters(cif_path: str | Path):
         crystal=crystal,
         calculator=calc,
     )
-    supercell = comp.expand_to_supercell([2, 2, 2])
-    
     unique_cluster_filter = UniqueClustersFilter(
         cluster_types=["monomers", "dimers", "trimers"],
         cutoffs={"monomers": 30.0, "dimers": 15.0, "trimers": 10.0}
     )
+    
+    supercell = comp.expand_to_supercell(cutoff=max(unique_cluster_filter.cutoffs.values()))
     
     clusters = supercell.symmetry_unique_clusters(
         unique_cluster_filter=unique_cluster_filter,
