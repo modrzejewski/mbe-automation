@@ -1610,7 +1610,7 @@ def _candidates_within_sphere(
         candidate_positions: List of arrays (length n_unique) containing the coordinates 
                              of the valid candidates.
     """
-    max_cutoff = max(unique_cluster_filter.cutoffs.values())
+    max_cutoff = max([v for v in unique_cluster_filter.cutoffs.values() if v is not None], default=0.0)
     n_unique = supercell_molecules.n_molecules_unique
     candidate_to_supercell = []
     candidate_positions = []
@@ -1724,7 +1724,7 @@ def _canonical_cluster_types(n_unique: int, cluster_size: int) -> Iterator[Tuple
 
 def _filter_candidates_by_min_rij(
     composition: Tuple[int, ...],
-    max_min_rij: float,
+    max_min_rij: float | None,
     min_rij: List[List[npt.NDArray[np.float64]]],
     max_rij: List[List[npt.NDArray[np.float64]]],
     candidate_to_supercell: List[npt.NDArray[np.int64]],
@@ -1780,10 +1780,11 @@ def _filter_candidates_by_min_rij(
         
     within_cutoff = np.ones(len(all_clusters), dtype=bool)
     pairs = list(itertools.combinations(range(cluster_size), 2))
-    for i, j in pairs:
-        u1, u2 = composition[i], composition[j]
-        c1, c2 = all_clusters[:, i], all_clusters[:, j]
-        within_cutoff &= (min_rij[u1][u2][c1, c2] < max_min_rij)
+    if max_min_rij is not None:
+        for i, j in pairs:
+            u1, u2 = composition[i], composition[j]
+            c1, c2 = all_clusters[:, i], all_clusters[:, j]
+            within_cutoff &= (min_rij[u1][u2][c1, c2] < max_min_rij)
             
     filtered_clusters = all_clusters[within_cutoff]
 
@@ -1909,8 +1910,11 @@ def _print_cluster_summary(
     data_rows = []
     for key, unique_clusters in results.items():
         base_type = key.split("[")[0]
-        cutoff = unique_cluster_filter.cutoffs[base_type]
-        row = f"{key:<{col_w}}   {cutoff:<{col_w}.1f}   {unique_clusters.n_clusters_reducible:<{col_w}}   {unique_clusters.n_clusters_unique:<{col_w}}"
+        cutoff = unique_cluster_filter.cutoffs.get(base_type)
+        if cutoff is None:
+            row = f"{key:<{col_w}}   {'N/A':<{col_w}}   {unique_clusters.n_clusters_reducible:<{col_w}}   {unique_clusters.n_clusters_unique:<{col_w}}"
+        else:
+            row = f"{key:<{col_w}}   {cutoff:<{col_w}.1f}   {unique_clusters.n_clusters_reducible:<{col_w}}   {unique_clusters.n_clusters_unique:<{col_w}}"
         data_rows.append(row)
         
     n = max(len(header), max((len(d) for d in data_rows), default=0))
@@ -1957,9 +1961,12 @@ def _symmetry_unique_clusters(
     results = {}
 
     for cluster_type in unique_cluster_filter.cluster_types:
-        max_min_rij = unique_cluster_filter.cutoffs[cluster_type]
+        max_min_rij = unique_cluster_filter.cutoffs.get(cluster_type)
         cluster_size = _cluster_size(cluster_type)
-        print(f"{cluster_type} with max_min_rij < {max_min_rij:.2f} Å...")
+        if max_min_rij is not None:
+            print(f"{cluster_type} with max_min_rij < {max_min_rij:.1f} Å...")
+        else:
+            print(f"{cluster_type}...")
         
         for composition in _canonical_cluster_types(n_unique, cluster_size):
             reducible = _filter_candidates_by_min_rij(
