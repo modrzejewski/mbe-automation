@@ -43,7 +43,7 @@ from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueCluster
 from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_LOOSE
 
 @dataclass
-class SupercellMolecules:
+class _SupercellMolecules:
     """
     Atomic coordinates of molecules propagated in a supercell. 
     
@@ -115,7 +115,7 @@ class SupercellMolecules:
 
 
 @dataclass
-class ReducibleClusters:
+class _ReducibleClusters:
     """
     A collection of symmetry-reducible clusters of a given composition
     that satisfy all intermolecular distance constraints.
@@ -224,9 +224,9 @@ class UniqueClusters:
         n_molecules_equivalent: Number of equivalent molecules for each unique type 
             in the original unit cell.
         sorted_min_rij: Minimum atom-atom distances for all intermolecular pairs, 
-            sorted according to `ReducibleClusters.sort`. Shape: (n_clusters, n_pairs).
+            sorted according to `_ReducibleClusters.sort`. Shape: (n_clusters, n_pairs).
         sorted_max_rij: Maximum atom-atom distances for all intermolecular pairs, 
-            sorted according to `ReducibleClusters.sort`. Shape: (n_clusters, n_pairs).
+            sorted according to `_ReducibleClusters.sort`. Shape: (n_clusters, n_pairs).
     """
     n_clusters_unique: int
     n_clusters_reducible: int
@@ -296,6 +296,40 @@ class UniqueClusters:
             for i in range(self.n_clusters_unique)
         ]
 
+    def to_xyz(self, dir: Path | str) -> None:
+        """
+        Export all symmetry-unique clusters as individual standard XYZ files.
+        
+        Args:
+            dir: Target directory where the .xyz files will be saved. 
+                 Will be created if it does not exist.
+        """
+        out_dir = Path(dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        
+        labels = self.labels()
+        n_atoms_total = self.structures.n_atoms
+        
+        mol_sizes = [str(self.reference_molecules[u].n_atoms) for u in self.composition]
+        comment_line = " ".join(mol_sizes) if len(mol_sizes) > 1 else ""
+        
+        for i, label in enumerate(labels):
+            xyz_body = self.structures.to_xyz_string(frame_index=i)
+            xyz_content = f"{n_atoms_total}\n{comment_line}\n{xyz_body}\n"
+            
+            file_path = out_dir / f"{label}.xyz"
+            file_path.write_text(xyz_content, encoding="utf-8")
+
+    def to_csv(self, file_path: Path | str) -> None:
+        """
+        Export cluster properties to a CSV file. The output contains all symmetry 
+        weights required to assemble the lattice energy via the many-body expansion.
+        
+        Args:
+            file_path: The destination path for the .csv file.
+        """
+        self.to_data_frame().to_csv(file_path, index=False, float_format="%.3f")
+
 
 @dataclass
 class _ClusterAccumulator:
@@ -307,7 +341,7 @@ class _ClusterAccumulator:
     Attributes:
         supercell_molecule_indices: Supercell molecule indices defining each unique cluster.
         weights: Symmetry multiplicities (number of equivalent copies in the supercell).
-        reducible_cluster_indices: Positions within the parent ``ReducibleClusters`` array,
+        reducible_cluster_indices: Positions within the parent ``_ReducibleClusters`` array,
             used to look up precomputed distance data.
         positions: Concatenated Cartesian coordinates of each cluster.
         atomic_numbers: Concatenated atomic numbers of each cluster.
@@ -384,7 +418,7 @@ class MolecularComposition:
             self, 
             supercell_size: List[int] | Tuple[int, int, int] | npt.NDArray[np.int64],
             frame_index: int = 0
-    ) -> SupercellMolecules:
+    ) -> _SupercellMolecules:
         """
         Extract the properties of identical molecules propagated in an [nx, ny, nz] supercell.
         """
@@ -1189,7 +1223,7 @@ def _expand_to_supercell(
         composition: MolecularComposition,
         supercell_size: List[int] | Tuple[int, int, int] | npt.NDArray[np.int64],
         frame_index: int = 0
-) -> SupercellMolecules:
+) -> _SupercellMolecules:
     """Generate arrays of coordinates, atomic numbers, and masses for the 
     molecules identified in the unit cell, propagated to the specified supercell.
 
@@ -1199,7 +1233,7 @@ def _expand_to_supercell(
         frame_index: Index of the reference frame to extract positions from.
 
     Returns:
-        SupercellMolecules object containing propagated atomic properties.
+        _SupercellMolecules object containing propagated atomic properties.
     """
     nx, ny, nz = supercell_size
     
@@ -1294,7 +1328,7 @@ def _expand_to_supercell(
             
         min_distance_to_ref_molecule.append(dist_matrix)
         
-    return SupercellMolecules(
+    return _SupercellMolecules(
         n_molecules_nonunique=composition.n_molecules_nonunique * n_cells,
         n_molecules_unique=composition.n_molecules_unique,
         n_equivalent=composition.n_equivalent * n_cells,
@@ -1437,7 +1471,7 @@ def extract_finite_subsystem(
 
 
 def _candidates_within_sphere(
-    supercell_molecules: SupercellMolecules,
+    supercell_molecules: _SupercellMolecules,
     unique_cluster_filter: UniqueClustersFilter,
 ) -> Tuple[List[npt.NDArray[np.int64]], List[npt.NDArray[np.float64]]]:
     """
@@ -1578,7 +1612,7 @@ def _filter_candidates_by_min_rij(
     max_rij: List[List[npt.NDArray[np.float64]]],
     candidate_to_supercell: List[npt.NDArray[np.int64]],
     alignment_thresh: float,
-) -> ReducibleClusters:
+) -> _ReducibleClusters:
     """
     Find all symmetry-reducible clusters for a given composition that satisfy all minimum intermolecular distance constraints.
     
@@ -1594,7 +1628,7 @@ def _filter_candidates_by_min_rij(
         alignment_thresh: Threshold for distance comparisons.
         
     Returns:
-        ReducibleClusters: A dataclass containing the composition, total count, 
+        _ReducibleClusters: A dataclass containing the composition, total count, 
             and an array of valid cluster indices.
     """
     cluster_size = len(composition)
@@ -1617,7 +1651,7 @@ def _filter_candidates_by_min_rij(
     ], dtype=np.int64)
     
     if len(all_clusters) == 0:
-        return ReducibleClusters(
+        return _ReducibleClusters(
             n_clusters=0,
             composition=composition,
             clusters=np.empty((0, cluster_size), dtype=np.int64),
@@ -1651,7 +1685,7 @@ def _filter_candidates_by_min_rij(
         sorted_min_rij = np.empty((len(filtered_clusters), n_pairs), dtype=np.float64)
         sorted_max_rij = np.empty((len(filtered_clusters), n_pairs), dtype=np.float64)
 
-    return ReducibleClusters(
+    return _ReducibleClusters(
         n_clusters=len(filtered_clusters),
         composition=composition,
         clusters=filtered_clusters,
@@ -1775,7 +1809,7 @@ def _print_cluster_summary(
 
 
 def _symmetry_unique_clusters(
-    supercell_molecules: SupercellMolecules,
+    supercell_molecules: _SupercellMolecules,
     unique_cluster_filter: UniqueClustersFilter,
     key: str | None = None, # dataset key (only to display a message)
 ) -> Dict[str, UniqueClusters]:
