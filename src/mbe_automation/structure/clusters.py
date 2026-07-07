@@ -178,22 +178,28 @@ class ReducibleClusters:
         """
         Sort the reducible clusters in-place based on their minimum intermolecular 
         distances, from most tightly bound to least tightly bound.
+        
+        The primary sort key is the maximum minimum intermolecular distance
+        within the cluster, ensuring that the most compact clusters (those with 
+        the smallest max min distance) receive the lowest indices.
         """
         if self.n_clusters <= 1 or self.sorted_min_rij.shape[1] == 0:
             return
             
-        n_cols = self.sorted_min_rij.shape[1]
+        n_molecular_pairs = self.sorted_min_rij.shape[1]
         discretized = np.zeros_like(self.sorted_min_rij, dtype=np.int64)
         
-        for col in range(n_cols):
-            col_data = self.sorted_min_rij[:, col]
-            flat = np.sort(col_data)
-            
-            jumps = np.diff(flat) > tolerance
-            boundaries = flat[:-1][jumps] + np.diff(flat)[jumps] / 2.0
-            discretized[:, col] = np.digitize(col_data, boundaries)
+        for pair in range(n_molecular_pairs):
+            pair_data = self.sorted_min_rij[:, pair]
+            distances = np.sort(pair_data)
+            jumps = np.diff(distances) > tolerance
+            boundaries = distances[:-1][jumps] + np.diff(distances)[jumps] / 2.0
+            discretized[:, pair] = np.digitize(pair_data, boundaries)
             
         keys = discretized.T
+        # np.lexsort uses the last row of `keys` (which corresponds to the 
+        # last column of discretized, i.e., the max min distance) as the 
+        # primary sort key. This ensures the most compact clusters come first.
         sort_indices = np.lexsort(keys)
         
         self.clusters = self.clusters[sort_indices]
@@ -311,6 +317,10 @@ class UniqueClusters:
         n_atoms_total = self.structures.n_atoms
         
         mol_sizes = [str(self.reference_molecules[u].n_atoms) for u in self.composition]
+        # The XYZ comment line (second line) stores space-separated atomic counts for each
+        # constituent molecule (e.g., "15 15" for a dimer of two 15-atom molecules).
+        # This is used by external tools to reconstruct molecular boundaries.
+        # It is left empty for monomers.
         comment_line = " ".join(mol_sizes) if len(mol_sizes) > 1 else ""
         
         for i, label in enumerate(labels):
@@ -2010,6 +2020,8 @@ def _symmetry_unique_clusters(
                                 atomic_numbers_a=atomic_numbers_current,
                                 positions_b=positions_ref,
                                 atomic_numbers_b=atomic_numbers_ref,
+                                # Mirror images are matched because the primary goal of this code
+                                # is computing the lattice energy, not isomer-dependent properties.
                                 align_mirror_images=True,
                                 algorithm=unique_cluster_filter.algorithm,
                             )
