@@ -144,9 +144,55 @@ In v4.0.0, the explicit `--nac` flag in the CLI was removed, and NAC is now enab
 **The Change:**
 Phonopy v4.0.0 altered how sampling meshes behave when they break the primitive-cell point-group symmetry. Meshes specified by a length (float input) are now rebuilt as a generalized regular grid that strictly keeps full point-group symmetry.
 
-**Explanation:**
-This may lead to slight numerical differences in mesh-based calculations (like thermal properties) between v2.43.2 and v4.x within `mbe-automation`. The `interp_mesh` passed to `run_mesh` in `mbe_automation.dynamics.harmonic.core` will now be subjected to this stricter symmetry enforcement, potentially altering the exact q-point weights and densities. This requires verification via unit tests (comparing v2 numerical outputs vs v4 outputs for thermodynamic properties).
+**Explanation and Source Code Analysis:**
+In phonopy versions prior to v4.0.0 (e.g., 3.x), if a requested grid broke point-group symmetry (e.g., due to an incompatible half-grid shift), `phonopy` would simply warn the user and fall back to using only time-reversal symmetry (dropping point-group symmetry).
 
+*Phonopy 3.x Logic (Simplified `phonopy/phonon/mesh.py`):*
+```python
+            if "Grid symmetry is broken" in str(exc):
+                warnings.warn(
+                    "BZGrid construction with point-group symmetry failed... "
+                    "Falling back to time-reversal-only ir-grid reduction.",
+                )
+                self._bzgrid = BZGrid(
+                    self._mesh,
+                    lattice=lattice,
+                    is_shift=self._is_shift,
+                    is_time_reversal=is_time_reversal, # Point group symmetry effectively dropped
+                )
+```
+
+In phonopy 4.x, this fallback has been significantly improved. To preserve full point-group symmetry when a length-based mesh breaks symmetry on the primitive cell, the grid is now automatically rebuilt as a **generalized regular grid (GRG)** anchored to the conventional cell.
+
+*Phonopy 4.x Logic (`phonopy/phonon/mesh.py` - `_fallback_bzgrid`):*
+```python
+        if mesh_length is not None and primitive_symmetry is not None:
+            try:
+                self._bzgrid = BZGrid(
+                    float(mesh_length),
+                    lattice=lattice,
+                    symmetry_dataset=primitive_symmetry.dataset,
+                    is_shift=self._is_shift,
+                    is_time_reversal=is_time_reversal,
+                    use_grg=True, # <--- Uses generalized regular grid!
+                    lang=lang,
+                )
+                old_mesh = self._mesh.tolist()
+                self._mesh = np.array(self._bzgrid.D_diag, dtype="int64")
+                warnings.warn(
+                    f"Mesh {old_mesh} from length input {float(mesh_length)} "
+                    f"is incompatible with the primitive-cell point group; "
+                    f"rebuilt as a generalized regular grid "
+                    f"(D_diag={self._mesh.tolist()}) anchored to the "
+                    f"conventional cell to keep full point-group symmetry. "
+                    f"mesh_numbers may differ from the regular-grid value.",
+                    MeshGRGridFallbackWarning,
+```
+
+**Impact on `mbe-automation`:**
+Because the mesh is rebuilt into a GR-grid anchored to the conventional cell, the resulting mesh dimensions (`self._mesh`) and q-point weights may differ numerically from what `length2mesh` would have naively generated in v2.x/v3.x.
+
+Consequently, mesh-based thermodynamic calculations (like thermal properties) triggered via `run_mesh` in `mbe_automation.dynamics.harmonic.core` will now be subjected to this stricter symmetry grid enforcement. If any unit tests in `mbe-automation` hardcode exact expected thermodynamic quantities based on these asymmetric meshes, they will need to be updated to match the new, highly symmetric outputs.
 
 ### 5. Displacement Generation Behavior (v4.5.0 / Unreleased / v4.x context)
 
