@@ -17,19 +17,14 @@ This file provides instructions for AI agents interacting with this repository.
 
 ---
 
-## Documentation, Comments, and Naming
+## Naming
 
-* **Language Style:** Use short, direct language adhering to the standards of technical writing. Minimize the number of words. Avoid non-essential adjectives and adverbs.
-* **Docstrings:** Use the imperative mood. (e.g., "Print a 3x3 matrix", not "Prints a 3x3 matrix").
-* **Code Comments:** Comments must be short. Explain *only* nontrivial parts of the code.
-* **Abstraction:** In documentation, abstract from technical details, formats, or technologies that may change. For example, use "dataset file" or "storage" instead of "HDF5 file" or "HDF5 dataset file".
 * **Naming:** Function and variable names must correspond to their physical meaning. Avoid unnecessary words (e.g., "data", "container").
 
 ---
 
 ## Python Coding Style
 
-* **In-Function Comments:** Do not place comments in the body of a function. The logical flow and called function names should suffice for understanding.
 * **Strings:** Use quotation marks (`"`) instead of apostrophes (`'`) for defining strings.
 * **Fractions:** Represent physical or mathematical formulas using fractions as `a/b` (e.g., `3/2` or `3.0/2.0` instead of `1.5`). Do not change existing fractions in the code.
 

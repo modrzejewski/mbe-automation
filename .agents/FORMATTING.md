@@ -51,6 +51,4 @@ mbe_automation.dynamics.harmonic.bands.reorder(
     *   **Rationale:** Such keys are commonly persisted as HDF5 dataset names, where `/` is a reserved path separator. Using `∕` prevents collisions with the HDF5 hierarchy.
     *   **Scope:** This rule applies to unit labels inside keys/column names/metadata. In free-form prose, docstrings, or arithmetic expressions, keep the ordinary `/`.
 
-## Docstrings
 
-*   **Line Breaks:** Docstrings should be formatted with elegant line breaks to ensure readability without horizontal scrolling. Wrap long lines (preferably around 80-100 characters) and maintain proper indentation for lists and descriptions.
