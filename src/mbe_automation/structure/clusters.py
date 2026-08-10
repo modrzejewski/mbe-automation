@@ -120,10 +120,10 @@ class ReducibleClusters:
     A collection of symmetry-reducible clusters of a given composition
     that satisfy all intermolecular distance constraints.
 
-    ## Key Concepts
-    - **Candidates:** Molecules pre-filtered by distance to avoid $O(N^K)$ scaling. 
+    Concepts
+    - Candidates: Molecules pre-filtered by distance to avoid O(N**K) scaling. 
       Sorted by distance to the unit cell's center of mass.
-    - **Candidate Indices (`c_idx`):** Local indices for candidates. Mapped to 
+    - Candidate indices (`c_idx`): Local indices for candidates. Mapped to 
       global supercell indices (`eq_i`) via `candidate_to_supercell`.
     
     Attributes:

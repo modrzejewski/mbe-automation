@@ -60,6 +60,17 @@ class MBE:
                                    #
     dataset: str | Path = "./properties.hdf5"
     root_key: str = "many_body_expansion"
+                                   #
+                                   # Whether to save the symmetry-unique clusters to .xyz files.
+                                   # The .xyz files for individual clusters are saved in a 
+                                   # dedicated subdirectory of work_dir.
+                                   #
+    save_xyz: bool = True
+                                   #
+                                   # Whether to save the symmetry-unique clusters metadata 
+                                   # (such as symmetry numbers and characteristic distances) to .csv files.
+                                   #
+    save_csv: bool = True
 
     def __post_init__(self):
         if isinstance(self.crystal, ase.Atoms):

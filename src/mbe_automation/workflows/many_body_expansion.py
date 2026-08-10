@@ -39,13 +39,15 @@ def run(config: mbe_automation.configs.many_body_expansion.MBE):
     )
 
     for cluster_type, clusters in unique_clusters.items():
-        xyz_dir = Path(config.work_dir) / "xyz" / cluster_type
-        csv_dir = Path(config.work_dir) / "csv"
-        csv_dir.mkdir(parents=True, exist_ok=True)
-        csv_file = csv_dir / f"{cluster_type}.csv"
-        
-        clusters.to_xyz(dir=xyz_dir)
-        clusters.to_csv(file_path=csv_file)
+        if config.save_xyz:
+            xyz_dir = Path(config.work_dir) / "xyz" / cluster_type
+            clusters.to_xyz(dir=xyz_dir)
+            
+        if config.save_csv:
+            csv_dir = Path(config.work_dir) / "csv"
+            csv_dir.mkdir(parents=True, exist_ok=True)
+            csv_file = csv_dir / f"{cluster_type}.csv"
+            clusters.to_csv(file_path=csv_file)
 
     print("MBE clustering workflow completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)
