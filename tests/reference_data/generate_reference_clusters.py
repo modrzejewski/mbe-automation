@@ -73,6 +73,14 @@ def main():
                     print(f"  Copied reference for {cluster_type} -> {dest_file}")
                 else:
                     print(f"  WARNING: Output CSV for {cluster_type} not found at {csv_file}")
+                
+                # Archive the XYZ geometries
+                src_xyz_dir = directory_structure.XYZ_DIRS[cluster_type]
+                dest_zip_base = dest_file.parent.parent / cluster_type
+                
+                if Path(src_xyz_dir).exists() and any(Path(src_xyz_dir).iterdir()):
+                    shutil.make_archive(str(dest_zip_base), 'zip', src_xyz_dir)
+                    print(f"  Archived XYZ geometries -> {dest_zip_base}.zip")
 
 if __name__ == "__main__":
     main()
