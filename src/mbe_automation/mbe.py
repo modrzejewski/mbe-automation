@@ -15,7 +15,7 @@ import pymatgen.io.ase
 import mbe_automation.structure.compare as compare
 import mbe_automation.structure.clusters as clusters
 import mbe_automation.structure.crystal as crystal
-import mbe_automation.ml.data_clustering as data_clustering
+
 
     
 def Make(UnitCellFile, Cutoffs, RequestedClusterTypes, MonomerRelaxation, PBCEmbedding,

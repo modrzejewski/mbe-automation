@@ -122,7 +122,12 @@ class ReducibleClusters:
 
     Concepts
     - Candidates: Molecules pre-filtered by distance to avoid O(N**K) scaling. 
-      Sorted by distance to the unit cell's center of mass.
+      A candidate of type `u` is any molecule of type `u` which falls within 
+      the cutoff sphere of any of the reference molecules (i.e. if there are 3 
+      unique molecules in the asymmetric unit, the candidate pool for `u` includes 
+      molecules within the cutoff of reference molecule A, reference molecule B, 
+      or reference molecule C). Candidates are sorted by distance to the unit 
+      cell's center of mass.
     - Candidate indices (`c_idx`): Local indices for candidates. Mapped to 
       global supercell indices (`eq_i`) via `candidate_to_supercell`.
     
@@ -1606,8 +1611,10 @@ def _candidates_within_sphere(
     """
     Filter supercell molecules to those within the distance cutoff from any central reference molecule.
     
-    A candidate is a molecule that is close enough to the reference molecule that it might be 
-    included in at least some of the molecular clusters according to the filtering criteria.
+    A candidate of type `u` is any molecule of type `u` which falls within the cutoff sphere of 
+    any of the reference molecules (i.e. if there are 3 unique molecules in the asymmetric unit, 
+    the candidate pool for `u` includes molecules within the cutoff of reference molecule A, 
+    reference molecule B, or reference molecule C).
     
     Resolve candidates by their unique molecule type `u`. Always include central reference 
     molecules (instance index 0) in the candidate pools, regardless of the cutoff.
@@ -1762,20 +1769,29 @@ def _filter_candidates_by_min_rij(
     """
     cluster_size = len(composition)
     n_candidates = [len(c) for c in candidate_to_supercell]
-    unique_u, counts = np.unique(composition, return_counts=True)
+    
+    # Anchor the leftmost molecule to candidate 0 (the reference molecule of a given type) 
+    # to eliminate translational degrees of freedom.
+    anchor_u = composition[0]
+    remaining_composition = composition[1:]
+    
+    unique_u, counts = np.unique(remaining_composition, return_counts=True)
+    
+    cands_lists = [range(n) for n in n_candidates]
+    cands_lists[anchor_u] = range(1, n_candidates[anchor_u])
     
     # `cands_per_u` generates combinations of candidate indices for each unique molecule type.
     # Example: If a cluster needs two molecules of type 0 (counts=2), and there are 4 candidates
     # of type 0 in the supercell, the generator yields: (0, 1), (0, 2), (0, 3), (1, 2), ...
     cands_per_u = (
-        itertools.combinations(range(n_candidates[u]), n)
+        itertools.combinations(cands_lists[u], n)
         for u, n in zip(unique_u, counts)
     )
     
     # itertools.product takes the Cartesian product of these type-specific combinations.
     # Flatten the grouped combinations: ((0, 1), (2,)) -> [0, 1, 2]
     all_clusters = np.array([
-        [idx for group in sub for idx in group] 
+        [0] + [idx for group in sub for idx in group] 
         for sub in itertools.product(*cands_per_u)
     ], dtype=np.int64)
     
@@ -1960,7 +1976,11 @@ def _symmetry_unique_clusters(
 
     print(f"cluster_types        {unique_cluster_filter.cluster_types}")
     print(f"alignment_thresh     {unique_cluster_filter.alignment_thresh} Å")
-    print(f"algorithm            {unique_cluster_filter.algorithm}")
+    algo_display = (
+        unique_cluster_filter.algorithm 
+        or f"{mbe_automation.structure.molecule.DEFAULT_MATCH_ALGO} (default)"
+    )
+    print(f"algorithm            {algo_display}")
 
     candidate_to_supercell, candidate_positions = _candidates_within_sphere(
         supercell_molecules=supercell_molecules,

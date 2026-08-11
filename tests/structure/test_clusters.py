@@ -12,43 +12,12 @@ from mbe_automation.configs.many_body_expansion import MBE
 from mbe_automation.configs.clusters import UniqueClustersFilter
 
 TESTS_DIR = Path(__file__).parent.parent
-X23_DIR = TESTS_DIR / "xyz" / "X23"
-MACE_MODELS_DIR = TESTS_DIR / "mace_models" / "Pia_et_al_Chem_Sci_2025"
+MATCH_ALGO = "irmsd"
 
-TEST_CASES = [
-    {
-        "name": "1,4-cyclohexanedione",
-        "crystal_path": X23_DIR / "01_1,4-cyclohexanedione" / "solid.xyz",
-        "model_path": MACE_MODELS_DIR / "01_cyclohexanedione" / "MACE_model_swa.model"
-    },
-    {
-        "name": "acetic_acid",
-        "crystal_path": X23_DIR / "02_acetic_acid" / "solid.xyz",
-        "model_path": MACE_MODELS_DIR / "02_acetic_acid" / "MACE_model_swa.model"
-    },
-    {
-        "name": "adamantane",
-        "crystal_path": X23_DIR / "03_adamantane" / "solid.xyz",
-        "model_path": MACE_MODELS_DIR / "03_adamantane" / "MACE_model_swa.model"
-    },
-    {
-        "name": "ammonia",
-        "crystal_path": X23_DIR / "04_ammonia" / "solid.xyz",
-        "model_path": MACE_MODELS_DIR / "04_ammonia" / "MACE_model_swa.model"
-    },
-    {
-        "name": "anthracene",
-        "crystal_path": X23_DIR / "05_anthracene" / "solid.xyz",
-        "model_path": MACE_MODELS_DIR / "05_anthracene" / "MACE_model_swa.model"
-    },
-    {
-        "name": "benzene",
-        "crystal_path": X23_DIR / "06_benzene" / "solid.xyz",
-        "model_path": MACE_MODELS_DIR / "06_benzene" / "MACE_model_swa.model"
-    }
-]
+from tests.reference_data.test_cases import TEST_CASES
+TEST_CASES_WITH_MODELS = [c for c in TEST_CASES if c["model_path"] is not None]
 
-@pytest.mark.parametrize("case", TEST_CASES, ids=[c["name"] for c in TEST_CASES])
+@pytest.mark.parametrize("case", TEST_CASES_WITH_MODELS, ids=[c["name"] for c in TEST_CASES_WITH_MODELS])
 def test_extract_unique_clusters(case):
     _run_cluster_extraction(case)
 
@@ -75,7 +44,8 @@ def _run_cluster_extraction(case, work_dir=None):
 
     unique_cluster_filter = UniqueClustersFilter(
         cluster_types=["monomers", "dimers", "trimers"],
-        cutoffs={"dimers": 15.0, "trimers": 10.0} 
+        cutoffs={"dimers": 15.0, "trimers": 10.0},
+        algorithm=MATCH_ALGO,
     )
 
     with tempfile.TemporaryDirectory() as temp_dir:

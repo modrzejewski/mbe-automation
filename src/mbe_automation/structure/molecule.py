@@ -15,6 +15,7 @@ except (ImportError, OSError):
     irmsd = None  # type: ignore[assignment]
     _IRMSD_AVAILABLE = False
 
+DEFAULT_MATCH_ALGO = "ase"
 
 def to_pyscf(atoms: ase.Atoms, charge: int = 0, spin: int = 0) -> pyscf.gto.Mole:
     """
@@ -216,7 +217,7 @@ def match(
         return np.nan
 
     if algorithm is None:
-        algorithm = "pymatgen"
+        algorithm = DEFAULT_MATCH_ALGO
 
     _match_algorithms = {
         "ase": _match_ase,
