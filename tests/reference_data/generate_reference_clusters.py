@@ -34,7 +34,7 @@ def main():
             ProjectDirectory = Path(temp_dir) / system_name
             # We source the input XYZ directly from the TEST_CASES dictionary
             # e.g., tests/xyz/X23/01_1,4-cyclohexanedione/solid.xyz
-            UnitCellFile = case['crystal_path']
+            UnitCellFile = str(case['crystal_path'])
             
             directory_structure.SetUp(
                 ProjectDirectory,
