@@ -49,6 +49,7 @@ pyscf = ">=2.12.0"
 pyscf-dispersion = "*"
 mace-torch = { path = "src/mace" }
 graph-longrange = { path = "src/graph_electrostatics" }
+irmsd = "==0.1.1"
 
 # --- Feature: GPU CUDA 12 ---
 [feature.cuda12.pypi-dependencies]

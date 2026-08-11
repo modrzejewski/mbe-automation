@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Literal, Tuple, Optional, List
+from typing import Literal, Tuple
 import numpy as np
 import numpy.typing as npt
 import ase
@@ -7,6 +7,14 @@ import pyscf
 import pyscf.hessian.thermo
 import pymatgen.core
 import pymatgen.analysis.molecule_matcher
+
+try:
+    import irmsd
+    _IRMSD_AVAILABLE = True
+except (ImportError, OSError):
+    irmsd = None  # type: ignore[assignment]
+    _IRMSD_AVAILABLE = False
+
 
 def to_pyscf(atoms: ase.Atoms, charge: int = 0, spin: int = 0) -> pyscf.gto.Mole:
     """
@@ -131,25 +139,71 @@ def _match_pymatgen(
     rmsd = np.sqrt(3.0) * rmsd 
 
     return rmsd
-    
+
+
+def _match_irmsd(
+        positions_a: npt.NDArray[np.floating],
+        atomic_numbers_a: npt.NDArray[np.integer],
+        positions_b: npt.NDArray[np.floating],
+        atomic_numbers_b: npt.NDArray[np.integer],
+        align_mirror_images: bool,
+) -> float:
+    if not _IRMSD_AVAILABLE:
+        raise ImportError(
+            "The 'irmsd' package is required for algorithm='irmsd'. "
+            "Install mbe-automation with the 'irmsd' extra."
+        )
+
+    assert irmsd is not None
+
+    def _irmsd_value(
+            positions_b_current: npt.NDArray[np.floating],
+    ) -> float:
+        rmsd, _, _, _, _ = irmsd.get_irmsd(
+            atomic_numbers_a,
+            positions_a,
+            atomic_numbers_b,
+            positions_b_current,
+            iinversion=2,
+        )
+        return float(rmsd)
+
+    rmsd = _irmsd_value(positions_b)
+
+    if align_mirror_images:
+        positions_b_mirror = positions_b * [1, -1, 1]
+        rmsd = min(rmsd, _irmsd_value(positions_b_mirror))
+
+    return rmsd
+
+
 def match(
         positions_a: npt.NDArray[np.floating],
         atomic_numbers_a: npt.NDArray[np.integer],
         positions_b: npt.NDArray[np.floating],
         atomic_numbers_b: npt.NDArray[np.integer],
         align_mirror_images: bool = False,
-        algorithm: Literal["ase", "pymatgen"] | None = None,
+        algorithm: Literal["ase", "pymatgen", "irmsd"] | None = None,
 ):
     """
     Compute root-mean square difference between atomic positions
     of two molecules. The structures can correspond to permuted
     lists of atoms.
 
-    As of April 4th, 2026, the pymatgen algorithm yields
-    lower RMSDs in the tesing script. Thus, we select it
-    as the default algorithm.
+    All backends return the per-atom RMSD in Angstrom. If
+    ``align_mirror_images`` is true, the ordinary and explicitly
+    mirrored structures are compared and the smaller RMSD is returned.
+
+    The pymatgen algorithm is used by default. The optional iRMSD
+    backend can be selected with ``algorithm="irmsd"``.
 
     Returns np.nan if the atomic compositions (number and types of atoms) differ.
+
+    Raises:
+        ImportError: If ``algorithm="irmsd"`` is requested but the
+            optional ``irmsd`` package is unavailable.
+        ValueError: If ``algorithm`` is not one of ``"ase"``,
+            ``"pymatgen"``, or ``"irmsd"``.
     """
 
     if len(atomic_numbers_a) != len(atomic_numbers_b):
@@ -167,6 +221,7 @@ def match(
     _match_algorithms = {
         "ase": _match_ase,
         "pymatgen": _match_pymatgen,
+        "irmsd": _match_irmsd,
     }
 
     try:

@@ -36,6 +36,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+irmsd = [
+  "irmsd==0.1.1",
+]
 mace = [
   "mace-torch>=0.3.15",
 ]

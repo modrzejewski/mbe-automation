@@ -83,7 +83,7 @@ class UniqueClustersFilter:
         default_factory=lambda: {"monomers": None, "dimers": 15.0, "trimers": 10.0}
     )
     alignment_thresh: float = 1.0e-4 # Å
-    algorithm: Literal["ase", "pymatgen"] | None = None
+    algorithm: Literal["ase", "pymatgen", "irmsd"] | None = None
 
     def __post_init__(self):
         missing_keys = [
