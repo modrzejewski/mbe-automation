@@ -38,8 +38,8 @@ def main():
             
             directory_structure.SetUp(
                 ProjectDirectory,
-                UnitCellFile,
-                MethodsMBE
+                MethodsMBE,
+                []
             )
             
             mbe.Make(
