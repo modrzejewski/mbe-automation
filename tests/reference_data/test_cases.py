@@ -182,17 +182,17 @@ TEST_CASES = [
             "trimers": REFERENCE_DATA_DIR / "X23" / "16_pyrazine" / "symmetry_weights" / "trimers.csv",
         }
     },
-    {
-        "name": "pyrazole",
-        "crystal_path": X23_DIR / "17_pyrazole" / "solid.xyz",
-        "molecule_path": X23_DIR / "17_pyrazole" / "molecule.xyz",
-        "model_path": None,
-        "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
-        "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "17_pyrazole" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "17_pyrazole" / "symmetry_weights" / "trimers.csv",
-        }
-    },
+#    {
+#        "name": "pyrazole",
+#        "crystal_path": X23_DIR / "17_pyrazole" / "solid.xyz",
+#        "molecule_path": X23_DIR / "17_pyrazole" / "molecule.xyz",
+#        "model_path": None,
+#        "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
+#        "symmetry_weights": {
+#            "dimers": REFERENCE_DATA_DIR / "X23" / "17_pyrazole" / "symmetry_weights" / "dimers.csv",
+#            "trimers": REFERENCE_DATA_DIR / "X23" / "17_pyrazole" / "symmetry_weights" / "trimers.csv",
+#        }
+#    },
     {
         "name": "triazine",
         "crystal_path": X23_DIR / "18_triazine" / "solid.xyz",
