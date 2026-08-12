@@ -11,6 +11,8 @@ except ImportError:
     print("Error: tblite is required to run this script. Please install it.", file=sys.stderr)
     sys.exit(1)
 
+from tqdm import tqdm
+
 # Ensure the project root is in sys.path for standalone execution
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -48,12 +50,8 @@ def main():
             with zipfile.ZipFile(zip_path, 'r') as z:
                 # Sort to process systematically
                 sorted_namelist = sorted([n for n in z.namelist() if n.endswith('.xyz')])
-                total_files = len(sorted_namelist)
                 
-                for i, filename in enumerate(sorted_namelist):
-                    if i > 0 and i % 10 == 0:
-                        print(f"    Processed {i}/{total_files} clusters...", flush=True)
-                        
+                for filename in tqdm(sorted_namelist, desc=f"  Processing {cluster_type}"):
                     try:
                         # Extract the System ID from the prefix (e.g. '000-dimer-0000-0001.xyz')
                         system_id = int(filename.split('-')[0])
@@ -61,13 +59,8 @@ def main():
                         xyz_data = z.read(filename).decode('utf-8').strip()
                         atoms = ase.io.read(StringIO(xyz_data), format='xyz')
                         
-                        # Assign TBLite GFN2-xTB calculator with high accuracy
-                        atoms.calc = TBLite(method="GFN2-xTB", accuracy=30)
-                        
-                        # Get total energy in eV
+                        atoms.calc = TBLite(method="GFN2-xTB", accuracy=30, verbosity=0)
                         total_energy = atoms.get_potential_energy()
-                        
-                        # Convert to energy per atom
                         energy_per_atom = total_energy / len(atoms)
                         
                         results.append({
@@ -80,7 +73,8 @@ def main():
             if results:
                 df_energies = pd.DataFrame(results)
                 df_energies.to_csv(out_csv, index=False)
-                print(f"  [SUCCESS] Wrote {len(results)} energies to {out_csv.name}")
+                out_csv_rel = out_csv.relative_to(PROJECT_ROOT / "tests")
+                print(f"  [SUCCESS] Wrote {len(results)} energies to {out_csv_rel}")
 
 if __name__ == "__main__":
     main()
