@@ -46,13 +46,48 @@ def _find_safe_cutoff(distances: np.ndarray, t: float, tolerance: float = 1e-3) 
     # Prefer a gap slightly above t to include clusters exactly on the boundary
     return centers[np.argmin(np.abs(centers - (t + tolerance)))] if len(centers) else t
 
+def _recompute_weights_from_energies(
+    df_reference: pd.DataFrame, 
+    df_energies: pd.DataFrame, 
+    energy_tol: float = 1.0e-5
+) -> pd.DataFrame:
+    """Recompute true symmetry weights by merging legacy clusters with identical energies."""
+    
+    # The legacy CSV has "System" as formatted string (e.g. "000").
+    # Ensure they match before merging.
+    df_reference['System'] = df_reference['System'].astype(str).str.zfill(3)
+    df_energies['System'] = df_energies['System'].astype(str).str.zfill(3)
+    
+    df_merged = pd.merge(df_reference, df_energies, on='System')
+    
+    # Sort by energy to allow sequential grouping
+    df_merged = df_merged.sort_values(by='Energy (eV/atom)')
+    
+    # Group by tolerance: increment group ID when difference exceeds tolerance
+    is_new_group = df_merged['Energy (eV/atom)'].diff() > energy_tol
+    df_merged['Energy_Group'] = is_new_group.cumsum()
+    
+    # Aggregate weights and average distances
+    df_energy_based = df_merged.groupby('Energy_Group').agg({
+        'Weight': 'sum',
+        'SumAvRij': 'mean',
+        'MaxMinRij': 'mean',
+        'MaxCOMRij': 'mean'
+    }).reset_index(drop=True)
+    
+    # Sort distances to match expected structure
+    df_energy_based = df_energy_based.sort_values(by='MaxMinRij').reset_index(drop=True)
+    return df_energy_based
+
+
 def _assert_cumulative_weights_equal(
     df_reference: pd.DataFrame, 
     df_generated: pd.DataFrame, 
     max_cutoff: float, 
     cluster_type: str, 
     system_name: str,
-    distance_column: str
+    distance_column: str,
+    require_exact_match: bool = False
 ) -> None:
     """Assert cumulative physical sums match and unique clusters are equal or better.
     
@@ -63,6 +98,7 @@ def _assert_cumulative_weights_equal(
         cluster_type: Label for cluster type (e.g., 'dimers').
         system_name: Name of the chemical system being evaluated.
         distance_column: Name of the distance column in df_generated (e.g., 'min_r (Å)').
+        require_exact_match: If true, asserts gen_uniq == ref_uniq rather than gen_uniq <= ref_uniq.
     """
     
     thresholds = np.arange(0.0, max_cutoff + 0.5, 0.5)
@@ -100,7 +136,11 @@ def _assert_cumulative_weights_equal(
         print(f"{t:<12.1f} | {ref_phys:<17} {gen_phys:<16} | {ref_uniq:<17} {gen_uniq:<16} {status:<8} {efficiency:<10}")
         
         assert phys_match, f"Physical count mismatch at {t} A: {ref_phys} vs {gen_phys}"
-        assert gen_uniq <= ref_uniq, f"Modern pipeline generated worse symmetry (more unique clusters) at {t} A: {gen_uniq} vs {ref_uniq}"
+        
+        if require_exact_match:
+            assert gen_uniq == ref_uniq, f"Exact match required: Modern pipeline generated {gen_uniq} unique clusters, expected exactly {ref_uniq} at {t} A"
+        else:
+            assert gen_uniq <= ref_uniq, f"Modern pipeline generated worse symmetry (more unique clusters) at {t} A: {gen_uniq} vs {ref_uniq}"
         
     dotted_separator(120)
 
@@ -116,17 +156,33 @@ def _verify_symmetry_weights(case: dict, work_dir: Path) -> None:
     csv_dir = work_dir / "csv"
     assert csv_dir.exists(), f"CSV directory missing: {csv_dir}"
     
-    generated_dimers_path = csv_dir / "dimers[AA].csv"
-    if generated_dimers_path.exists():
-        df_generated = pd.read_csv(generated_dimers_path)
-        df_reference = pd.read_csv(case["symmetry_weights"]["dimers"], skipinitialspace=True)
-        _assert_cumulative_weights_equal(df_reference, df_generated, DIMER_CUTOFF, "dimers", case["name"], "min_r (Å)")
+    cluster_configs = [
+        ("dimers", DIMER_CUTOFF, "dimers[AA].csv", "min_r (Å)"),
+        ("trimers", TRIMER_CUTOFF, "trimers[AAA].csv", "max_min_r (Å)")
+    ]
+    
+    for cluster_type, cutoff, csv_name, dist_col in cluster_configs:
+        generated_csv_path = csv_dir / csv_name
+        legacy_csv_path = case["symmetry_weights"].get(cluster_type)
         
-    generated_trimers_path = csv_dir / "trimers[AAA].csv"
-    if generated_trimers_path.exists():
-        df_generated = pd.read_csv(generated_trimers_path)
-        df_reference = pd.read_csv(case["symmetry_weights"]["trimers"], skipinitialspace=True)
-        _assert_cumulative_weights_equal(df_reference, df_generated, TRIMER_CUTOFF, "trimers", case["name"], "max_min_r (Å)")
+        if generated_csv_path.exists() and legacy_csv_path and Path(legacy_csv_path).exists():
+            df_generated = pd.read_csv(generated_csv_path)
+            df_reference = pd.read_csv(legacy_csv_path, skipinitialspace=True)
+            
+            # 1. Run standard legacy test
+            _assert_cumulative_weights_equal(
+                df_reference, df_generated, cutoff, cluster_type, case["name"], dist_col
+            )
+            
+            # 2. Check if xTB energies are available to run a strict upgrade test
+            energies_csv_path = Path(legacy_csv_path).parent.parent / "energies" / f"{cluster_type}_gfn2-xtb.csv"
+            if energies_csv_path.exists():
+                df_energies = pd.read_csv(energies_csv_path, skipinitialspace=True)
+                df_energy_based = _recompute_weights_from_energies(df_reference, df_energies)
+                
+                _assert_cumulative_weights_equal(
+                    df_energy_based, df_generated, cutoff, cluster_type, case["name"] + " (xTB Validated)", dist_col, require_exact_match=True
+                )
 
 def _run_cluster_extraction(case: dict, work_dir: Path) -> None:
     """Execute MBE cluster extraction pipeline for a given test case.
