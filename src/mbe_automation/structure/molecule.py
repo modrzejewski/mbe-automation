@@ -15,7 +15,7 @@ except (ImportError, OSError):
     irmsd = None  # type: ignore[assignment]
     _IRMSD_AVAILABLE = False
 
-DEFAULT_MATCH_ALGO = "ase"
+DEFAULT_MATCH_ALGO = "irmsd"
 
 def to_pyscf(atoms: ase.Atoms, charge: int = 0, spin: int = 0) -> pyscf.gto.Mole:
     """
@@ -152,7 +152,7 @@ def _match_irmsd(
     if not _IRMSD_AVAILABLE:
         raise ImportError(
             "The 'irmsd' package is required for algorithm='irmsd'. "
-            "Install mbe-automation with the 'irmsd' extra."
+            "It is a core dependency, but appears to be missing in your environment."
         )
 
     assert irmsd is not None
@@ -195,16 +195,7 @@ def match(
     ``align_mirror_images`` is true, the ordinary and explicitly
     mirrored structures are compared and the smaller RMSD is returned.
 
-    The pymatgen algorithm is used by default. The optional iRMSD
-    backend can be selected with ``algorithm="irmsd"``.
-
     Returns np.nan if the atomic compositions (number and types of atoms) differ.
-
-    Raises:
-        ImportError: If ``algorithm="irmsd"`` is requested but the
-            optional ``irmsd`` package is unavailable.
-        ValueError: If ``algorithm`` is not one of ``"ase"``,
-            ``"pymatgen"``, or ``"irmsd"``.
     """
 
     if len(atomic_numbers_a) != len(atomic_numbers_b):
