@@ -58,7 +58,7 @@ def main():
                         # Extract the System ID from the prefix (e.g. '000-dimer-0000-0001.xyz')
                         system_id = int(filename.split('-')[0])
                         
-                        xyz_data = z.read(filename).decode('utf-8')
+                        xyz_data = z.read(filename).decode('utf-8').strip()
                         atoms = ase.io.read(StringIO(xyz_data), format='xyz')
                         
                         # Assign TBLite GFN2-xTB calculator with high accuracy
