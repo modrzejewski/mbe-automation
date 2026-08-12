@@ -33,9 +33,11 @@ dependencies = [
   "pymatviz",
   "chemiscope",
   "gemmi",
+  "irmsd==0.1.1",
 ]
 
 [project.optional-dependencies]
+
 mace = [
   "mace-torch>=0.3.15",
 ]

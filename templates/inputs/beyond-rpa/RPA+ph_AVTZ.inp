@@ -1,0 +1,16 @@
+basis aug-cc-pVTZ
+
+scf
+ xcfunc HF
+end
+
+rpa
+ accuracy default
+ TheoryLevel RPA+ph
+end
+
+xyz
+{NATOMS_LIST}
+{COORDINATES}
+end
+

@@ -93,7 +93,7 @@ def _build_inputs(case):
     # modes that molecule_thermo slices off by rotor type; ASE gets only the real
     # vibrations.
     n_pad = 3 * len(atoms) - len(real_vib_eV)
-    full_vib_eV = np.concatenate([np.full(n_pad, 1e-4), real_vib_eV])
+    full_vib_eV = np.concatenate([np.full(n_pad, 1e-7), real_vib_eV])
     return atoms, _VibrationsStub(full_vib_eV), real_vib_eV
 
 

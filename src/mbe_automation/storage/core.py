@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Tuple, Literal, overload, Dict
 import pymatgen
+import pymatgen.core.periodic_table
 import pandas as pd
 import phonopy
 from phonopy import Phonopy
@@ -310,6 +311,45 @@ class Structure:
         from .views import to_pymatgen
         return to_pymatgen(structure=self, frame_index=frame_index)
 
+    def to_xyz_string(self, frame_index: int = 0, n_digits: int = 6) -> str:
+        """
+        Generate a raw XYZ-formatted coordinate block for a specific frame.
+        
+        The output is formatted deterministically (fixed precision, no negative 
+        zeros) for hashing.
+        
+        Args:
+            frame_index: The index of the frame/cluster to export.
+            n_digits: Number of decimal digits for the atomic coordinates.
+            
+        Returns:
+            A string containing `{element} {x} {y} {z}` for each atom, 
+            without header lines, stripped of leading/trailing whitespace.
+        """
+        n_atoms = self.n_atoms
+        
+        if self.multi_frame:
+            positions = self.positions[frame_index]
+        else:
+            positions = self.positions
+            
+        # Vectorized rounding and negative zero elimination
+        # Adding 0.0 forces IEEE 754 to convert any -0.0 into a positive 0.0
+        positions = np.round(positions, n_digits) + 0.0
+            
+        if self.permuted_between_frames:
+            atomic_numbers = self.atomic_numbers[frame_index]
+        else:
+            atomic_numbers = self.atomic_numbers
+            
+        lines = []
+        for i in range(n_atoms):
+            element_symbol = pymatgen.core.periodic_table.Element.from_Z(atomic_numbers[i]).symbol
+            x, y, z = positions[i]
+            lines.append(f"{element_symbol:<2} {x:14.{n_digits}f} {y:14.{n_digits}f} {z:14.{n_digits}f}")
+            
+        return "\n".join(lines).strip()
+
     def lattice(self, frame_index: int = 0) -> pymatgen.core.Lattice:
         assert self.periodic, "Structure must be periodic."
         if self.variable_cell:
@@ -325,6 +365,10 @@ class Structure:
     @property
     def permuted_between_frames(self) -> bool:
         return (self.atomic_numbers.ndim == 2)
+
+    @property
+    def multi_frame(self) -> bool:
+        return (self.positions.ndim == 3)
 
     @property
     def variable_cell(self) -> bool:
@@ -452,15 +496,38 @@ class Trajectory(Structure):
 
 @dataclass
 class MolecularCrystal:
+    """
+    Representation of a molecular crystal and its constituent molecules.
+
+    A defining feature of this class is that the atomic positions in the
+    `supercell` are spatially contiguous. The structure is unwrapped such that
+    no covalent bonds cross periodic boundaries, ensuring each molecule exists
+    as a complete, unbroken cluster of atoms in Cartesian space.
+
+    Attributes
+    ----------
+    supercell : Structure
+        The underlying periodic atomic structure encompassing all molecules.
+    index_map : List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
+        Mapping of molecule index to the corresponding atomic indices within the `supercell`.
+    centers_of_mass : npt.NDArray[np.floating]
+        Centers of mass for molecules in the reference frame which was used in a call 
+        to `structure.clusters.identify_molecules`. Note that the reference frame may no 
+        longer be present as one of the frames in a `MolecularCrystal` object returned 
+        by `MolecularCrystal.subsample`.
+    identical_composition : bool
+        Indicates whether all identified molecules share identical atomic composition.
+    n_molecules : int
+        Total number of identified molecules in the supercell.
+    central_molecule_index : int
+        Index of the molecule serving as the spatial reference origin (e.g., for cluster expansion).
+    min_distances_to_central_molecule : npt.NDArray[np.floating]
+        Shortest interatomic distance between each molecule and the central reference molecule.
+    max_distances_to_central_molecule : npt.NDArray[np.floating]
+        Longest interatomic distance between each molecule and the central reference molecule.
+    """
     supercell: Structure
     index_map: List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
-    #
-    # COM locations for molecules *in the reference frame*
-    # which was used in a call to structure.clusters.identify_molecules.
-    # Note that the reference frame may no longer be present as
-    # one of the frames in a MoleculeCrystal object returned
-    # by MolecularCrystal.subsample.
-    #
     centers_of_mass: npt.NDArray[np.floating] 
     identical_composition: bool
     n_molecules: int
@@ -494,16 +561,6 @@ class MolecularCrystal:
             
         return selected_positions
 
-@dataclass(kw_only=True)
-class UniqueClusters:
-    """
-    Symmetry-unique molecular clusters within a MolecularCrystal.
-    """
-    n_clusters: int
-    molecule_indices: npt.NDArray[np.integer] # Shape (n_unique_clusters, n_cluster_size)
-    weights: npt.NDArray[np.integer]
-    min_distances: npt.NDArray[np.floating]  # Shape: (n_unique_clusters, n_pairs)
-    max_distances: npt.NDArray[np.floating]  # Shape: (n_unique_clusters, n_pairs)
 
 @dataclass
 class FiniteSubsystem:
@@ -1649,37 +1706,7 @@ def read_attribute(
     return attribute_value
 
 
-def save_unique_clusters(
-        dataset: str,
-        key: str,
-        clusters: UniqueClusters
-) -> None:
-    """Save a UniqueClusters object to a dataset."""
 
-    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
-    with dataset_file(dataset, "a") as f:
-        if key in f:
-            del f[key]
-        group = f.create_group(key)
-        group.attrs["dataclass"] = "UniqueClusters"
-        group.attrs["n_clusters"] = clusters.n_clusters
-        group.create_dataset("molecule_indices", data=clusters.molecule_indices)
-        group.create_dataset("weights", data=clusters.weights)
-        group.create_dataset("min_distances (Å)", data=clusters.min_distances)
-        group.create_dataset("max_distances (Å)", data=clusters.max_distances)
-
-
-def read_unique_clusters(dataset: str, key: str) -> UniqueClusters:
-    """Read a UniqueClusters object from a dataset."""
-    with dataset_file(dataset, "r") as f:
-        group = f[key]
-        return UniqueClusters(
-            n_clusters=group.attrs["n_clusters"],
-            molecule_indices=group["molecule_indices"][...],
-            weights=group["weights"][...],
-            min_distances=group["min_distances (Å)"][...],
-            max_distances=group["max_distances (Å)"][...],
-        )
 
 
 def _save_only(
