@@ -1,0 +1,10 @@
+The model files in this directory are unaltered files published in the 
+Supporting Information of:
+
+Flaviano Della Pia, Benjamin X. Shi, Venkat Kapil, Andrea Zen, 
+Dario Alfè, Angelos Michaelides
+
+Accurate and efficient machine learning interatomic potentials 
+for finite temperature modelling of molecular crystals
+
+Chem. Sci. 16, 11419 (2025); doi: 10.1039/d5sc01325a
