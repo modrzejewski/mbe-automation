@@ -2031,7 +2031,7 @@ def _symmetry_unique_clusters(
                     mbe_automation.common.display.Progress(
                         iterable=reducible,
                         n_total_steps=len(reducible),
-                        label=f"type {_composition_to_string(composition)}",
+                        label=f"of {cluster_type} {_composition_to_string(composition)}",
                     )
                 ):
                     positions_current_list = []
@@ -2102,6 +2102,6 @@ def _symmetry_unique_clusters(
                 sorted_max_rij=max_distances,
             )
             
-            print(f"Found {len(accumulator.weights)} symmetry-unique {cluster_type} of composition {composition}")
+            print(f"Found {len(accumulator.weights)} symmetry-unique {cluster_type} of composition {_composition_to_string(composition)}")
 
     return results

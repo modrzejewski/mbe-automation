@@ -13,8 +13,12 @@ TEST_CASES = [
         "model_path": MACE_MODELS_DIR / "01_cyclohexanedione" / "MACE_model_swa.model",
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "01_1,4-cyclohexanedione" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "01_1,4-cyclohexanedione" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "01_1,4-cyclohexanedione" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "01_1,4-cyclohexanedione" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "01_1,4-cyclohexanedione" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "01_1,4-cyclohexanedione" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -24,8 +28,12 @@ TEST_CASES = [
         "model_path": MACE_MODELS_DIR / "02_acetic_acid" / "MACE_model_swa.model",
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "02_acetic_acid" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "02_acetic_acid" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "02_acetic_acid" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "02_acetic_acid" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "02_acetic_acid" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "02_acetic_acid" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -35,8 +43,12 @@ TEST_CASES = [
         "model_path": MACE_MODELS_DIR / "03_adamantane" / "MACE_model_swa.model",
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "03_adamantane" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "03_adamantane" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "03_adamantane" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "03_adamantane" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "03_adamantane" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "03_adamantane" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -46,8 +58,12 @@ TEST_CASES = [
         "model_path": MACE_MODELS_DIR / "04_ammonia" / "MACE_model_swa.model",
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "04_ammonia" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "04_ammonia" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "04_ammonia" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "04_ammonia" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "04_ammonia" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "04_ammonia" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -57,8 +73,12 @@ TEST_CASES = [
         "model_path": MACE_MODELS_DIR / "05_anthracene" / "MACE_model_swa.model",
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "05_anthracene" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "05_anthracene" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "05_anthracene" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "05_anthracene" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "05_anthracene" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "05_anthracene" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -68,8 +88,12 @@ TEST_CASES = [
         "model_path": MACE_MODELS_DIR / "06_benzene" / "MACE_model_swa.model",
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "06_benzene" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "06_benzene" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "06_benzene" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "06_benzene" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "06_benzene" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "06_benzene" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -79,8 +103,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "07_CO2" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "07_CO2" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "07_CO2" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "07_CO2" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "07_CO2" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "07_CO2" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -90,8 +118,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "08_cyanamide" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "08_cyanamide" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "08_cyanamide" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "08_cyanamide" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "08_cyanamide" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "08_cyanamide" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -101,8 +133,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "09_cytosine" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "09_cytosine" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "09_cytosine" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "09_cytosine" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "09_cytosine" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "09_cytosine" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -112,8 +148,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "10_ethyl_carbamate" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "10_ethyl_carbamate" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "10_ethyl_carbamate" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "10_ethyl_carbamate" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "10_ethyl_carbamate" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "10_ethyl_carbamate" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -123,8 +163,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "11_formamide" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "11_formamide" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "11_formamide" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "11_formamide" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "11_formamide" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "11_formamide" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -134,8 +178,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "12_imidazole" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "12_imidazole" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "12_imidazole" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "12_imidazole" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "12_imidazole" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "12_imidazole" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -145,8 +193,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "13_naphthalene" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "13_naphthalene" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "13_naphthalene" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "13_naphthalene" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "13_naphthalene" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "13_naphthalene" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -156,8 +208,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "14_oxalic_acid_alpha" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "14_oxalic_acid_alpha" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "14_oxalic_acid_alpha" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "14_oxalic_acid_alpha" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "14_oxalic_acid_alpha" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "14_oxalic_acid_alpha" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -167,8 +223,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "15_oxalic_acid_beta" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "15_oxalic_acid_beta" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "15_oxalic_acid_beta" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "15_oxalic_acid_beta" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "15_oxalic_acid_beta" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "15_oxalic_acid_beta" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -178,8 +238,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "16_pyrazine" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "16_pyrazine" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "16_pyrazine" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "16_pyrazine" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "16_pyrazine" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "16_pyrazine" / "descriptors" / "trimers.npz",
         }
     },
 #    {
@@ -189,8 +253,8 @@ TEST_CASES = [
 #        "model_path": None,
 #        "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
 #        "symmetry_weights": {
-#            "dimers": REFERENCE_DATA_DIR / "X23" / "17_pyrazole" / "symmetry_weights" / "dimers.csv",
-#            "trimers": REFERENCE_DATA_DIR / "X23" / "17_pyrazole" / "symmetry_weights" / "trimers.csv",
+#            "dimers": REFERENCE_DATA_DIR / "X23" / "17_pyrazole" / "symmetry_weights" / "dimers_JCTC2025.csv",
+#            "trimers": REFERENCE_DATA_DIR / "X23" / "17_pyrazole" / "symmetry_weights" / "trimers_JCTC2025.csv",
 #        }
 #    },
     {
@@ -200,8 +264,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "18_triazine" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "18_triazine" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "18_triazine" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "18_triazine" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "18_triazine" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "18_triazine" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -211,8 +279,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "19_trioxane" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "19_trioxane" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "19_trioxane" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "19_trioxane" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "19_trioxane" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "19_trioxane" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -222,8 +294,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "20_uracil" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "20_uracil" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "20_uracil" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "20_uracil" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "20_uracil" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "20_uracil" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -233,8 +309,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "21_urea" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "21_urea" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "21_urea" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "21_urea" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "21_urea" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "21_urea" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -244,8 +324,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "22_hexamethylenetetramine" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "22_hexamethylenetetramine" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "22_hexamethylenetetramine" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "22_hexamethylenetetramine" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "22_hexamethylenetetramine" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "22_hexamethylenetetramine" / "descriptors" / "trimers.npz",
         }
     },
     {
@@ -255,8 +339,12 @@ TEST_CASES = [
         "model_path": None,
         "general_model_path": MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model",
         "symmetry_weights": {
-            "dimers": REFERENCE_DATA_DIR / "X23" / "23_succinic_acid" / "symmetry_weights" / "dimers.csv",
-            "trimers": REFERENCE_DATA_DIR / "X23" / "23_succinic_acid" / "symmetry_weights" / "trimers.csv",
+            "dimers": REFERENCE_DATA_DIR / "X23" / "23_succinic_acid" / "symmetry_weights" / "dimers_JCTC2025.csv",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "23_succinic_acid" / "symmetry_weights" / "trimers_JCTC2025.csv",
+        },
+        "descriptors": {
+            "dimers": REFERENCE_DATA_DIR / "X23" / "23_succinic_acid" / "descriptors" / "dimers.npz",
+            "trimers": REFERENCE_DATA_DIR / "X23" / "23_succinic_acid" / "descriptors" / "trimers.npz",
         }
     },
 ]
