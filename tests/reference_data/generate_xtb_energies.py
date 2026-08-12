@@ -11,6 +11,11 @@ except ImportError:
     print("Error: tblite is required to run this script. Please install it.", file=sys.stderr)
     sys.exit(1)
 
+# Ensure the project root is in sys.path for standalone execution
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 # Import TEST_CASES from the test_cases module
 from tests.reference_data.test_cases import TEST_CASES, REFERENCE_DATA_DIR
 
