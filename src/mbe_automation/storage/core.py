@@ -1680,6 +1680,92 @@ def read_finite_subsystem(dataset: str, key: str) -> FiniteSubsystem:
     )
 
 
+def save_unique_clusters(
+        dataset: str,
+        key: str,
+        clusters
+):
+    from mbe_automation.structure.clusters import unique_molecule_label
+
+    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
+    with dataset_file(dataset, "a") as f:
+        if key in f:
+            del f[key]
+        
+        group = f.create_group(key)
+        group.attrs["dataclass"] = "UniqueClusters"
+        group.attrs["n_clusters_unique"] = clusters.n_clusters_unique
+        group.attrs["n_clusters_reducible"] = clusters.n_clusters_reducible
+        group.attrs["composition"] = clusters.composition
+        
+        group.create_dataset(
+            name="weights", 
+            data=clusters.weights
+        )
+        group.create_dataset(
+            name="n_molecules_equivalent", 
+            data=clusters.n_molecules_equivalent
+        )
+        group.create_dataset(
+            name="sorted_min_rij (Å)", 
+            data=clusters.sorted_min_rij
+        )
+        group.create_dataset(
+            name="sorted_max_rij (Å)", 
+            data=clusters.sorted_max_rij
+        )
+        
+    save_structure(
+        dataset=dataset,
+        key=f"{key}/structures",
+        structure=clusters.structures
+    )
+    for i, ref_mol in enumerate(clusters.reference_molecules):
+        save_structure(
+            dataset=dataset,
+            key=f"{key}/reference_molecules/{unique_molecule_label(i)}",
+            structure=ref_mol
+        )
+
+
+def read_unique_clusters(
+        dataset: str,
+        key: str
+):
+    from mbe_automation.structure.clusters import UniqueClusters, unique_molecule_label
+
+    with dataset_file(dataset, "r") as f:
+        group = f[key]
+        n_clusters_unique = group.attrs["n_clusters_unique"]
+        n_clusters_reducible = group.attrs["n_clusters_reducible"]
+        composition = tuple(group.attrs["composition"])
+        
+        weights = group["weights"][...]
+        n_molecules_equivalent = group["n_molecules_equivalent"][...]
+        sorted_min_rij = group["sorted_min_rij (Å)"][...]
+        sorted_max_rij = group["sorted_max_rij (Å)"][...]
+        
+        n_ref_mols = len(group["reference_molecules"].keys())
+        
+    structures = read_structure(dataset, f"{key}/structures")
+    reference_molecules = tuple(
+        read_structure(dataset, f"{key}/reference_molecules/{unique_molecule_label(i)}")
+        for i in range(n_ref_mols)
+    )
+
+    return UniqueClusters(
+        n_clusters_unique=n_clusters_unique,
+        n_clusters_reducible=n_clusters_reducible,
+        composition=composition,
+        structures=structures,
+        reference_molecules=reference_molecules,
+        weights=weights,
+        n_molecules_equivalent=n_molecules_equivalent,
+        sorted_min_rij=sorted_min_rij,
+        sorted_max_rij=sorted_max_rij
+    )
+
+
 def save_attribute(
         dataset: str,
         key: str,

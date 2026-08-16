@@ -35,6 +35,7 @@ import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
 from mbe_automation.structure.clusters import (
     MolecularComposition as _MolecularComposition,
+    UniqueClusters as _UniqueClusters,
 )
 from mbe_automation.storage.core import (
     DATA_FOR_TRAINING,
@@ -1931,6 +1932,29 @@ def _to_cif_file(
             temperature_idx=0
         )
 
+@dataclass(kw_only=True)
+class UniqueClusters(_UniqueClusters):
+    def save(
+            self,
+            dataset: str,
+            key: str,
+    ) -> None:
+        mbe_automation.storage.core.save_unique_clusters(
+            dataset=dataset,
+            key=key,
+            clusters=self,
+        )
+
+    @classmethod
+    def read(
+            cls,
+            dataset: str,
+            key: str,
+    ) -> UniqueClusters:
+        return cls(**vars(
+            mbe_automation.storage.core.read_unique_clusters(dataset, key)
+        ))
+
 class AnySystem:
     """
     Helper class to read any supported system type from a dataset
@@ -1944,6 +1968,7 @@ class AnySystem:
         "MolecularCrystal": MolecularCrystal,
         "ForceConstants": ForceConstants,
         "AtomicReference": AtomicReference,
+        "UniqueClusters": UniqueClusters,
     }
 
     @staticmethod

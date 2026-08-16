@@ -283,7 +283,7 @@ class UniqueClusters:
                   (where X, Y are distinct molecules in the cluster, and i, j 
                   are their respective atoms; omitted for monomers).
         """
-        ref_mol_label = _unique_molecule_label(self.composition[0])
+        ref_mol_label = unique_molecule_label(self.composition[0])
         data = {
             "system": self.labels(),
             f"symmetry_weight (1∕{ref_mol_label})": self.weights,
@@ -293,7 +293,7 @@ class UniqueClusters:
         }
 
         for u in range(len(self.reference_molecules)):
-            mol_label = _unique_molecule_label(u)
+            mol_label = unique_molecule_label(u)
             data[f"n_molecules[{mol_label}] (1∕unit cell)"] = self.n_molecules_equivalent[u]
 
         if len(self.composition) == 2:
@@ -1107,6 +1107,7 @@ def _display_unique_molecules(
     mbe_automation.common.display.dotted_separator(len(header))
 
     for i, group_indices in enumerate(groups):
+        label = unique_molecule_label(i)
         mol = molecules_nonunique[group_indices[0]]
         pmg_mol = mol.to_pymatgen()
         comp = pmg_mol.composition.alphabetical_formula
@@ -1118,11 +1119,11 @@ def _display_unique_molecules(
                 energy_val = molecules_nonunique[idx].E_pot[0]
                 energy = f"{energy_val:.6f}"
                 if j == 0:
-                    print(f"{i:>8}   {n_atoms:>8}   {n_eq:>12}   {energy:>17}   {comp:<15}")
+                    print(f"{label:>8}   {n_atoms:>8}   {n_eq:>12}   {energy:>17}   {comp:<15}")
                 else:
                     print(f"{'':>8}   {'':>8}   {'':>12}   {energy:>17}")
         else:
-            print(f"{i:>8}   {n_atoms:>8}   {n_eq:>12}   {comp:<15}")
+            print(f"{label:>8}   {n_atoms:>8}   {n_eq:>12}   {comp:<15}")
 
     mbe_automation.common.display.dotted_separator(len(header))
 
@@ -1842,20 +1843,26 @@ def _filter_candidates_by_min_rij(
     )
 
 
-def _unique_molecule_label(molecule_type_index: int) -> str:
+def unique_molecule_label(molecule_type_index: int) -> str:
     """
     Map a unique molecule index to a letter label (0 -> A, 1 -> B, etc.).
     
     These labels represent the crystallographically unique molecules found in 
     the unit cell, and the resulting symbols are used to describe the unit 
     cell's composition.
+
+    Args:
+        molecule_type_index: Index of the unique molecule.
+
+    Returns:
+        String letter label for the molecule.
     """
     return chr(65 + molecule_type_index)
 
 
 def _composition_to_string(composition: Tuple[int, ...]) -> str:
     """Convert a composition tuple like (0, 0, 1) to a letter string like 'AAB'."""
-    return "".join(_unique_molecule_label(u) for u in composition)
+    return "".join(unique_molecule_label(u) for u in composition)
 
 
 def _cluster_label(

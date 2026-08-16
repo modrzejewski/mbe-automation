@@ -24,6 +24,7 @@ class DatasetKey:
         "BrillouinZonePath",
         "EOSCurves",
         "EOSMetadata",
+        "UniqueClusters",
     ]
 
 @dataclass
@@ -65,7 +66,12 @@ class DatasetKeys:
 
             if obj.parent and obj.parent.name != '/':
                 parent_dataclass = obj.parent.attrs.get("dataclass")
-                if parent_dataclass in ["FiniteSubsystem", "MolecularCrystal", "ForceConstants"]:
+                if parent_dataclass in [
+                    "FiniteSubsystem",
+                    "MolecularCrystal",
+                    "ForceConstants",
+                    "UniqueClusters",
+                ]:
                     return
             
             ground_truth_levels = None
@@ -104,6 +110,15 @@ class DatasetKeys:
                 contains_exactly_n_molecules = None
                 level_of_theory = None
                 
+            elif dataclass_attr == "UniqueClusters":
+                has_feature_vectors = "feature_vectors" in obj["structures"]
+                has_ground_truth = "ground_truth" in obj["structures"]
+                if has_ground_truth:
+                    ground_truth_levels = _get_levels(obj["structures"]["ground_truth"])
+                is_periodic = False
+                contains_exactly_n_molecules = len(obj.attrs.get("composition", []))
+                level_of_theory = obj["structures"].attrs.get("level_of_theory")
+
             else:
                 return
                 
@@ -186,6 +201,12 @@ class DatasetKeys:
 
     def force_constants(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "ForceConstants")
+
+    def unique_clusters(self, n: int | None = None) -> DatasetKeys:
+        return self._filter(lambda x: (
+            x.dataclass == "UniqueClusters" and
+            (n is None or x.contains_exactly_n_molecules == n)
+        ))
 
     def periodic(self) -> DatasetKeys:
         return self._filter(lambda x: x.is_periodic)

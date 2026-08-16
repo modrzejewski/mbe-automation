@@ -39,6 +39,12 @@ def run(config: mbe_automation.configs.many_body_expansion.MBE):
     )
 
     for cluster_type, clusters in unique_clusters.items():
+        mbe_automation.storage.save_unique_clusters(
+            dataset=config.dataset,
+            key=f"{config.root_key}/clusters/{cluster_type}",
+            clusters=clusters,
+        )
+
         if config.save_xyz:
             xyz_dir = Path(config.work_dir) / "xyz" / cluster_type
             clusters.to_xyz(dir=xyz_dir)
