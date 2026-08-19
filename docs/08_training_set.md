@@ -49,7 +49,7 @@ The first stage generates configurations by running a short molecular dynamics s
 
 ```python
 md_sampling_config = MDSampling(
-    crystal=Structure.from_xyz_file(xyz_solid),
+    crystal=Structure.from_file(xyz_solid),
     calculator=mace_calc,
     temperatures_K=np.array([temperature_K]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
@@ -77,7 +77,7 @@ A quasi-harmonic calculation is performed to obtain the force constants required
 ```python
 free_energy_config = FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file(xyz_solid),
+    crystal=Structure.from_file(xyz_solid),
     calculator=mace_calc,
     thermal_expansion=False,
     supercell_radius=20.0,
@@ -241,7 +241,7 @@ dataset = "training_set.hdf5"
 mace_calc = MACE(model_path=mlip_parameter_file)
 
 md_sampling_config = MDSampling(
-    crystal=Structure.from_xyz_file(xyz_solid),
+    crystal=Structure.from_file(xyz_solid),
     calculator=mace_calc,
     features_calculator=mace_calc,
     temperatures_K=np.array([temperature_K]),
@@ -264,7 +264,7 @@ mbe_automation.run(md_sampling_config)
 
 free_energy_config = FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file(xyz_solid),
+    crystal=Structure.from_file(xyz_solid),
     calculator=mace_calc,
     thermal_expansion=False,
     supercell_radius=20.0,

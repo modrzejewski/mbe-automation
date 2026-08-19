@@ -246,7 +246,7 @@ calc = DeltaMACE(
 )
 
 # Load a structure to test
-structure = Structure.from_xyz_file("some_test_structure.xyz")
+structure = Structure.from_file("some_test_structure.xyz")
 
 # Run calculation
 # The result will be at the target level of theory

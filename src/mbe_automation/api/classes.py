@@ -107,6 +107,7 @@ class MolecularComposition(_MolecularComposition):
             match_mode=match_mode,
         )
 
+    from_file = from_xyz_file
 
 class EOSMetadata(_EOSMetadata):
     @classmethod
@@ -699,6 +700,8 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             symprec=symprec,
         )
         return cls(**vars(mbe_automation.storage.from_ase_atoms(ase_atoms)))
+
+    from_file = from_xyz_file
 
     def subsample(
             self,

@@ -1,4 +1,4 @@
-# Quasi-Harmonic Calculation
+# Quasi-Harmonic Thermodynamics
 
 - [Setup](#setup)
 - [Phonon calculation](#phonon-calculation)
@@ -44,8 +44,8 @@ relaxation_config = Minimum(
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file(xyz_solid),
-    molecule=Structure.from_xyz_file(xyz_molecule),
+    crystal=Structure.from_file(xyz_solid),
+    molecule=Structure.from_file(xyz_molecule),
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
@@ -85,8 +85,8 @@ For crystals with more than one crystallographically distinct molecule in the as
 ```python
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file("polymorph_Zprime2.xyz"),
-    molecule=Structure.from_xyz_file("molecule.xyz"),  # ONE reference
+    crystal=Structure.from_file("polymorph_Zprime2.xyz"),
+    molecule=Structure.from_file("molecule.xyz"),  # ONE reference
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
     dataset="properties.hdf5",
@@ -110,15 +110,15 @@ from mbe_automation.configs.quasi_harmonic import MoleculeRef
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file("cocrystal.xyz"),
+    crystal=Structure.from_file("cocrystal.xyz"),
     molecule=[
         MoleculeRef(
-            system=Structure.from_xyz_file("species_A.xyz"),
+            system=Structure.from_file("species_A.xyz"),
             multiplicity=4,           # in the conventional cell
             multiplicity_cell="conventional",
         ),
         MoleculeRef(
-            system=Structure.from_xyz_file("species_B.xyz"),
+            system=Structure.from_file("species_B.xyz"),
             multiplicity=4,
             multiplicity_cell="conventional",
         ),
@@ -196,8 +196,8 @@ relaxation_config = Minimum(
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file(xyz_solid),
-    molecule=Structure.from_xyz_file(xyz_molecule),
+    crystal=Structure.from_file(xyz_solid),
+    molecule=Structure.from_file(xyz_molecule),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
@@ -264,8 +264,8 @@ DFT_B0_prime    = 6.2      # dimensionless
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file(xyz_solid),
-    molecule=Structure.from_xyz_file(xyz_molecule),
+    crystal=Structure.from_file(xyz_solid),
+    molecule=Structure.from_file(xyz_molecule),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
@@ -454,8 +454,8 @@ relaxation_config = Minimum(
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_xyz_file(xyz_solid),
-    molecule=Structure.from_xyz_file(xyz_molecule),
+    crystal=Structure.from_file(xyz_solid),
+    molecule=Structure.from_file(xyz_molecule),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
