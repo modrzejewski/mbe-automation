@@ -8,7 +8,11 @@ import mbe_automation.storage.core
 import mbe_automation.structure.clusters
 import importlib.resources
 
-_TEMPLATES_ROOT = importlib.resources.files("mbe_automation.templates").joinpath("inputs", "mrcc")
+_TEMPLATES_ROOT = (
+    importlib.resources.files("mbe_automation.templates")
+    / "inputs"
+    / "mrcc"
+)
 _SUBSYSTEM_TAG = "##SUBSYSTEM:"
 
 Method = Literal[

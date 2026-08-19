@@ -5,7 +5,11 @@ from pathlib import Path
 import mbe_automation.storage.core
 import importlib.resources
 
-_TEMPLATES_ROOT = importlib.resources.files("mbe_automation.templates").joinpath("inputs", "beyond-rpa")
+_TEMPLATES_ROOT = (
+    importlib.resources.files("mbe_automation.templates")
+    / "inputs"
+    / "beyond-rpa"
+)
 
 Method = Literal["rpa+ph_avqz", "rpa+ph_avtz"]
 
