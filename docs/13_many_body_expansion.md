@@ -5,7 +5,7 @@
 - [How to read the results](#how-to-read-the-results)
 - [Complete Input Files](#complete-input-files)
 
-This workflow automatically identifies crystallographically unique molecules
+This workflow identifies crystallographically unique molecules
 within a periodic crystal structure, expands the system to a supercell,
 extracts symmetry-unique $n$-body clusters (monomers, dimers, trimers) up to
 specified distance cutoffs, and generates the necessary inputs for high-level
@@ -77,10 +77,10 @@ The workflow offers several boolean flags to control the generated output:
 - `save_inputs`: Generates the actual quantum chemistry input files.
 
 If `save_inputs=True`, you must specify a list of `electronic_methods`.
-Currently supported methods include various MRCC and Beyond-RPA protocols. The
+Supported methods include MRCC and beyond-RPA protocols. The
 inputs will be exported to `work_dir/inputs/<method>/<cluster_type>/`.
 
-Execute the workflow by passing the configuration object to the `run` function:
+Execute the workflow by passing the configuration object to `run`:
 
 ```python
 mbe_automation.workflows.many_body_expansion.run(mbe_config)
@@ -93,11 +93,11 @@ metadata CSVs.
 
 ### HDF5 Datasets
 
-The HDF5 file (e.g. `properties.hdf5`) will store the structures and unique
+The HDF5 file (e.g. `dataset.hdf5`) will store the structures and unique
 clusters under the configured `root_key` (default is `many_body_expansion`):
 
 ```
-properties.hdf5
+dataset.hdf5
 └── many_body_expansion
     ├── clusters
     │   ├── dimers
@@ -166,7 +166,7 @@ H 3.26851588 3.96156632 2.03262046
 
 ### Python Script (`mbe_export.py`)
 
-This complete script demonstrates setting up the MBE export.
+This script demonstrates the MBE export setup.
 
 ```python
 import mbe_automation
