@@ -30,6 +30,7 @@ from mbe_automation.dynamics.harmonic.bands import DEFAULT_Q_SPACING, DEFAULT_DE
 import mbe_automation.ml.core
 import mbe_automation.ml.mace
 import mbe_automation.calculators
+import mbe_automation.calculators.electronic.core
 from mbe_automation.calculators import CALCULATORS
 import mbe_automation.structure.clusters
 from mbe_automation.ml.core import SUBSAMPLING_ALGOS, FEATURE_VECTOR_TYPES
@@ -45,7 +46,7 @@ from mbe_automation.storage.core import (
     CALCULATION_STATUS_FAILED,
     read_attribute,
 )
-from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_LOOSE
+from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_LOOSE
 import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.crystal_thermo
@@ -1943,6 +1944,22 @@ class UniqueClusters(_UniqueClusters):
             dataset=dataset,
             key=key,
             clusters=self,
+        )
+
+    def to_input_files(
+        self,
+        dir: str | Path,
+        method: mbe_automation.calculators.electronic.Method,
+        frame_index: int | None = None,
+    ) -> None:
+        """
+        Export input files for all symmetry-unique clusters.
+        """
+        mbe_automation.calculators.electronic.to_input_files(
+            unique_clusters=self,
+            dir=dir,
+            method=method,
+            frame_index=frame_index,
         )
 
     @classmethod

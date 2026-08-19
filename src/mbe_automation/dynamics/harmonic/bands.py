@@ -12,7 +12,7 @@ import numpy.typing as npt
 from typing import Any, List, Literal
 import phonopy
 from mbe_automation.storage import views
-from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT
+from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_STRICT
 from mbe_automation.dynamics.harmonic.modes import at_k_points
 
 DEFAULT_Q_SPACING = 0.05  # Å⁻¹

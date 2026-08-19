@@ -2,6 +2,7 @@ import contextlib
 import random
 import time
 from typing import Generator, Any
+from pathlib import Path
 
 import os
 if os.name != "posix":
@@ -19,11 +20,15 @@ class LockTimeoutError(TimeoutError):
     pass
 
 @contextlib.contextmanager
-def acquire_storage_lock(file_path: str, timeout: int = DEFAULT_LOCK_TIMEOUT) -> Generator[None, None, None]:
+def acquire_storage_lock(
+    file_path: str | Path,
+    timeout: int = DEFAULT_LOCK_TIMEOUT,
+) -> Generator[None, None, None]:
     """
     Acquire a blocking filesystem lock for the file using flock.
     """
-    lock_path = f"{file_path}.lock"
+    file_path = Path(file_path)
+    lock_path = file_path.with_name(file_path.name + ".lock")
     start_time = time.monotonic()
 
     with open(lock_path, "a") as lock_handle:
@@ -34,7 +39,7 @@ def acquire_storage_lock(file_path: str, timeout: int = DEFAULT_LOCK_TIMEOUT) ->
             except BlockingIOError:
                 if time.monotonic() - start_time >= timeout:
                     raise LockTimeoutError(f"Lock acquisition timed out after {timeout}s")
-                
+
                 time.sleep(random.uniform(POLL_INTERVAL_MIN, POLL_INTERVAL_MAX))
 
         try:
@@ -45,15 +50,15 @@ def acquire_storage_lock(file_path: str, timeout: int = DEFAULT_LOCK_TIMEOUT) ->
 
 @contextlib.contextmanager
 def dataset_file(
-    file_path: str, 
-    mode: str = "r", 
-    timeout: int = DEFAULT_LOCK_TIMEOUT, 
+    file_path: str | Path,
+    mode: str = "r",
+    timeout: int = DEFAULT_LOCK_TIMEOUT,
     **kwargs: Any
 ) -> Generator[h5py.File, None, None]:
     """
     Open storage with an exclusive lock.
     """
+    file_path = Path(file_path)
     with acquire_storage_lock(file_path, timeout):
         with h5py.File(file_path, mode, **kwargs) as handle:
             yield handle
-            

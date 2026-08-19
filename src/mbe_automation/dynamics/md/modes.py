@@ -12,7 +12,8 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pathlib import Path
 
 import mbe_automation.structure.relax
-from mbe_automation.configs.structure import Minimum, SYMMETRY_TOLERANCE_STRICT
+from mbe_automation.configs.structure import Minimum
+from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_STRICT
 
 @dataclass
 class MFDThermalDisplacements:

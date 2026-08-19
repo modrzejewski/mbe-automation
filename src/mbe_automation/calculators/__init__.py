@@ -10,4 +10,4 @@ from .core import run_model
 from .core import CALCULATORS
 from .isolated_atoms import atomic_energies
 from . import pyscf
-
+from . import electronic

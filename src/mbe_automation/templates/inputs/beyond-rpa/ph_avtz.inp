@@ -10,7 +10,7 @@ rpa
 end
 
 xyz
-{NATOMS_LIST}
+{NATOMS}{CHARGE}
 {COORDINATES}
 end
 

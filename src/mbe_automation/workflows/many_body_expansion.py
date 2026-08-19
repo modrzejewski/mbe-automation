@@ -8,6 +8,7 @@ import mbe_automation.common.resources
 import mbe_automation.storage
 import mbe_automation.structure.clusters
 import mbe_automation.configs.many_body_expansion
+import mbe_automation.calculators.electronic
 
 def run(config: mbe_automation.configs.many_body_expansion.MBE):
     datetime_start = mbe_automation.common.display.timestamp_start()
@@ -16,7 +17,7 @@ def run(config: mbe_automation.configs.many_body_expansion.MBE):
     mbe_automation.common.display.framed("Many-body expansion of the lattice energy")
 
     crystal_struct = config.crystal
-    
+
     mbe_automation.storage.save_structure(
         structure=crystal_struct,
         dataset=config.dataset,
@@ -26,12 +27,15 @@ def run(config: mbe_automation.configs.many_body_expansion.MBE):
     composition = mbe_automation.structure.clusters.identify_molecules(
         crystal=crystal_struct,
         calculator=config.calculator,
+        reference_frame_index=config.frame_index,
         energy_thresh=config.unique_molecules_energy_thresh,
         match_mode="energy_only",
     )
 
-    max_cutoff = max(config.filter.cutoffs.values())
-    supercell_molecules = composition.expand_to_supercell(cutoff=max_cutoff)
+    supercell_molecules = composition.expand_to_supercell(
+        cutoff=config.filter.max_cutoff,
+        frame_index=config.frame_index
+    )
 
     unique_clusters = supercell_molecules.symmetry_unique_clusters(
         unique_cluster_filter=config.filter,
@@ -46,14 +50,32 @@ def run(config: mbe_automation.configs.many_body_expansion.MBE):
         )
 
         if config.save_xyz:
-            xyz_dir = Path(config.work_dir) / "xyz" / cluster_type
+            xyz_dir = config.work_dir / "xyz" / cluster_type
             clusters.to_xyz(dir=xyz_dir)
-            
+
         if config.save_csv:
-            csv_dir = Path(config.work_dir) / "csv"
+            csv_dir = config.work_dir / "csv"
             csv_dir.mkdir(parents=True, exist_ok=True)
             csv_file = csv_dir / f"{cluster_type}.csv"
             clusters.to_csv(file_path=csv_file)
+
+        if config.save_inputs:
+            for method in config.electronic_methods: # type: ignore
+                input_dir = config.work_dir / "inputs" / method / cluster_type
+                #
+                # MBE workflow assumes neutral, closed-shell species.
+                #
+                mbe_automation.calculators.electronic.to_input_files(
+                    unique_clusters=clusters,
+                    dir=input_dir,
+                    method=method, # type: ignore
+                )
+
+    if config.save_plots:
+        mbe_automation.structure.display.plot_cumulative_cluster_count(
+            unique_clusters=unique_clusters,
+            save_path=config.work_dir / "cumulative_cluster_count.png"
+        )
 
     print("MBE clustering workflow completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)

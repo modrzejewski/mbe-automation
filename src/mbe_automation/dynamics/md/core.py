@@ -18,8 +18,10 @@ from  mbe_automation.configs.md import ClassicalMD
 import mbe_automation.storage
 import mbe_automation.structure.molecule
 import mbe_automation.dynamics.md.csvr
-import mbe_automation.calculators
-from mbe_automation.calculators import CALCULATORS, MACE
+from mbe_automation.calculators.mace import MACE
+import typing
+if typing.TYPE_CHECKING:
+    from mbe_automation.calculators import CALCULATORS
 
 def get_velocities(
     system: ase.Atoms,
@@ -87,7 +89,7 @@ def get_velocities(
 def run(
         system: ase.Atoms,
         supercell_matrix: npt.NDArray[np.integer] | None,
-        calculator: CALCULATORS,
+        calculator: "CALCULATORS",
         target_temperature_K: float,
         target_pressure_GPa: float | None,
         md: ClassicalMD,

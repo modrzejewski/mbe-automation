@@ -4,18 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 
 from mbe_automation.configs.recommended import SEMIEMPIRICAL_DFTB, KNOWN_MODELS
-#
-# Tolerances for symmetry detection and refinement
-#
-# (1) Strict tolerance: recommended for phonon calculations.
-#     1.0E-05 is the default value used in phonopy.
-# (2) Loose tolerance: recommended for symmetry refinement
-#     of a structure after coordinate relaxation.
-#     1.0E-2 is the default value in pymatgen for
-#     symmetry refinement.
-#
-SYMMETRY_TOLERANCE_STRICT = 1.0E-5
-SYMMETRY_TOLERANCE_LOOSE = 1.0E-2
+from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 
 CELL_RELAXATION_MODES = ("full", "constant_volume", "only_atoms")
 

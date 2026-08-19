@@ -25,7 +25,8 @@ import mbe_automation.common
 import mbe_automation.storage
 from mbe_automation.storage.core import ForceConstants
 import mbe_automation.structure
-from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, Minimum
+from mbe_automation.configs.structure import Minimum
+from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_STRICT
 import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
 from mbe_automation.dynamics.harmonic.symmetry import symmetrized_dynamical_matrix

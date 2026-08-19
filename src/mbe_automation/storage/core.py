@@ -74,17 +74,17 @@ class BrillouinZonePath:
     --------
     Consider a path G-X-M-G with 3 segments: G-X, X-M, M-G.
     All segments are connected.
-    
+
     n_segments = 3
     path_connections = [True, True, False]
     labels = ["G", "X", "M", "G"] (4 labels)
 
     Consider a disconnected path G-X (segment 0) and M-G (segment 1).
-    
+
     n_segments = 2
     path_connections = [False, False]
     labels = ["G", "X", "M", "G"] (4 labels)
-    
+
     """
     kpoints: List[npt.NDArray[np.float64]]
     frequencies: List[npt.NDArray[np.float64]]
@@ -115,10 +115,10 @@ class AtomicReference:
     Thanks to this, the training process focuses on learning
     interactions, not the absolute energies which include
     the inert core.
-    
+
     """
     energies: dict[str, dict[np.int64, np.float64]] = field(default_factory=dict)
-    
+
     def __getitem__(self, level_of_theory: str) -> dict[np.int64, np.float64]:
         return self.energies[level_of_theory]
 
@@ -134,7 +134,7 @@ class AtomicReference:
             return NotImplemented
 
         merged_energies = {k: v.copy() for k, v in self.energies.items()}
-        
+
         for level_of_theory, atom_energies in other.energies.items():
             if level_of_theory in merged_energies:
                 merged_energies[level_of_theory].update(atom_energies)
@@ -142,11 +142,11 @@ class AtomicReference:
                 merged_energies[level_of_theory] = atom_energies.copy()
 
         return AtomicReference(energies=merged_energies)
-    
+
     @property
     def levels_of_theory(self) -> list[str]:
         return list(self.energies.keys())
-    
+
 @dataclass
 class GroundTruth:
     energies: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
@@ -166,7 +166,7 @@ class GroundTruth:
             forces={k: v[indices] for k, v in self.forces.items()},
             calculation_status={k: v[indices] for k, v in self.calculation_status.items()},
         )
-        
+
 @dataclass
 class Structure:
     """
@@ -175,7 +175,7 @@ class Structure:
 
     Data generated with the theoretical model applied
     at the structure generation stage:
-    
+
     Structure.positions
     Structure.E_pot
     Structure.forces
@@ -202,8 +202,9 @@ class Structure:
     feature_vectors: npt.NDArray[np.floating] | None = None
     feature_vectors_type: str = "none"
     level_of_theory: str | None = None
-    
+
     def __post_init__(self):
+        assert self.n_atoms > 0, "Structure must contain at least one atom."
         self.periodic = (self.cell_vectors is not None)
 
     def __len__(self) -> int:
@@ -222,13 +223,13 @@ class Structure:
             forces=(self.forces.copy() if self.forces is not None else None),
             ground_truth=(self.ground_truth.copy() if self.ground_truth is not None else None),
             feature_vectors=(
-                self.feature_vectors.copy() 
+                self.feature_vectors.copy()
                 if self.feature_vectors_type != "none" else None
             ),
             feature_vectors_type=self.feature_vectors_type,
             level_of_theory=self.level_of_theory,
         )
-    
+
     def save(
             self,
             dataset: str,
@@ -314,40 +315,40 @@ class Structure:
     def to_xyz_string(self, frame_index: int = 0, n_digits: int = 6) -> str:
         """
         Generate a raw XYZ-formatted coordinate block for a specific frame.
-        
-        The output is formatted deterministically (fixed precision, no negative 
+
+        The output is formatted deterministically (fixed precision, no negative
         zeros) for hashing.
-        
+
         Args:
             frame_index: The index of the frame/cluster to export.
             n_digits: Number of decimal digits for the atomic coordinates.
-            
+
         Returns:
-            A string containing `{element} {x} {y} {z}` for each atom, 
+            A string containing `{element} {x} {y} {z}` for each atom,
             without header lines, stripped of leading/trailing whitespace.
         """
         n_atoms = self.n_atoms
-        
+
         if self.multi_frame:
             positions = self.positions[frame_index]
         else:
             positions = self.positions
-            
+
         # Vectorized rounding and negative zero elimination
         # Adding 0.0 forces IEEE 754 to convert any -0.0 into a positive 0.0
         positions = np.round(positions, n_digits) + 0.0
-            
+
         if self.permuted_between_frames:
             atomic_numbers = self.atomic_numbers[frame_index]
         else:
             atomic_numbers = self.atomic_numbers
-            
+
         lines = []
         for i in range(n_atoms):
             element_symbol = pymatgen.core.periodic_table.Element.from_Z(atomic_numbers[i]).symbol
             x, y, z = positions[i]
             lines.append(f"{element_symbol:<2} {x:14.{n_digits}f} {y:14.{n_digits}f} {z:14.{n_digits}f}")
-            
+
         return "\n".join(lines).strip()
 
     def lattice(self, frame_index: int = 0) -> pymatgen.core.Lattice:
@@ -415,7 +416,7 @@ class Trajectory(Structure):
     ):
         if ensemble == "NPT" and target_pressure is None:
             raise ValueError("Target pressure must be specified for the NPT ensemble")
-        
+
         return cls(
             time_equilibration=time_equilibration,
             ensemble=ensemble,
@@ -485,14 +486,14 @@ class Trajectory(Structure):
                 traj=self,
                 update_mode=update_mode,
             )
-            
+
         else:
             _save_only(
                 dataset=dataset,
                 key=key,
                 structure=self,
                 quantities=only,
-            )            
+            )
 
 @dataclass
 class MolecularCrystal:
@@ -511,9 +512,9 @@ class MolecularCrystal:
     index_map : List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
         Mapping of molecule index to the corresponding atomic indices within the `supercell`.
     centers_of_mass : npt.NDArray[np.floating]
-        Centers of mass for molecules in the reference frame which was used in a call 
-        to `structure.clusters.identify_molecules`. Note that the reference frame may no 
-        longer be present as one of the frames in a `MolecularCrystal` object returned 
+        Centers of mass for molecules in the reference frame which was used in a call
+        to `structure.clusters.identify_molecules`. Note that the reference frame may no
+        longer be present as one of the frames in a `MolecularCrystal` object returned
         by `MolecularCrystal.subsample`.
     identical_composition : bool
         Indicates whether all identified molecules share identical atomic composition.
@@ -528,7 +529,7 @@ class MolecularCrystal:
     """
     supercell: Structure
     index_map: List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
-    centers_of_mass: npt.NDArray[np.floating] 
+    centers_of_mass: npt.NDArray[np.floating]
     identical_composition: bool
     n_molecules: int
     central_molecule_index: int
@@ -539,7 +540,7 @@ class MolecularCrystal:
             self,
             molecule_indices: npt.NDArray[np.integer]
     ) -> npt.NDArray[np.integer]:
-        
+
         atom_indices = np.concatenate([self.index_map[i] for i in molecule_indices])
         return self.supercell.atomic_numbers[atom_indices]
 
@@ -552,13 +553,13 @@ class MolecularCrystal:
             molecule_indices: npt.NDArray[np.integer],
             frame_index: int = 0
     ) -> npt.NDArray[np.floating]:
-        
+
         atom_indices = np.concatenate([self.index_map[i] for i in molecule_indices])
         if self.supercell.positions.ndim == 3:
             selected_positions = self.supercell.positions[frame_index, atom_indices, :]
         else:
             selected_positions = self.supercell.positions[atom_indices, :]
-            
+
         return selected_positions
 
 
@@ -571,7 +572,7 @@ class FiniteSubsystem:
     @property
     def unique_elements(self) -> npt.NDArray[np.int64]:
         return self.cluster_of_molecules.unique_elements
-    
+
 def save_data_frame(
         dataset: str,
         key: str,
@@ -581,13 +582,13 @@ def save_data_frame(
     with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
-        
+
         group = f.create_group(key)
 
         if df.attrs:
             for attr_key, attr_value in df.attrs.items():
                 group.attrs[attr_key] = attr_value
-        
+
         for column_label in df.columns:
             column = df[column_label]
 
@@ -609,24 +610,24 @@ def read_data_frame(
         key: str,
         columns: List[str] | Literal["all"] = "all"
 ) -> pd.DataFrame:
-    
+
     with dataset_file(dataset, "r") as f:
         group = f[key]
-        
+
         if columns == "all":
             candidate_labels = list(group.keys())
         else:
             candidate_labels = columns
-            
+
         data = {
-            label: group[label][:] 
-            for label in candidate_labels 
-            if (label in group and 
-                isinstance(group[label], h5py.Dataset) and 
+            label: group[label][:]
+            for label in candidate_labels
+            if (label in group and
+                isinstance(group[label], h5py.Dataset) and
                 group[label].ndim == 1)
         }
         metadata = dict(group.attrs)
-        
+
     df = pd.DataFrame(data)
     df.attrs = metadata
     return df
@@ -638,15 +639,15 @@ def save_brillouin_zone_path(
         key: str,
 ):
 
-    band_structure = phonons.band_structure    
+    band_structure = phonons.band_structure
     n_segments = len(band_structure.frequencies)
     _, n_bands = band_structure.frequencies[0].shape
-    
+
     Path(dataset).parent.mkdir(parents=True, exist_ok=True)
     with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
-            
+
         group = f.create_group(key)
         group.attrs["dataclass"] = "BrillouinZonePath"
         group.attrs["n_segments"] = n_segments
@@ -664,7 +665,7 @@ def save_brillouin_zone_path(
         for i in range(n_segments):
             group.create_dataset(
                 name=f"frequencies_segment_{i} (THz)",
-                data=band_structure.frequencies[i]                
+                data=band_structure.frequencies[i]
             )
             group.create_dataset(
                 name=f"distances_segment_{i}",
@@ -675,7 +676,7 @@ def save_brillouin_zone_path(
                 data=band_structure.qpoints[i]
             )
 
-            
+
 def read_brillouin_zone_path(
         dataset: str,
         key: str
@@ -684,7 +685,7 @@ def read_brillouin_zone_path(
     with dataset_file(dataset, "r") as f:
         group = f[key]
         n_segments = group.attrs["n_segments"]
-        
+
         path_connections = group["path_connections"][...]
         labels = group["labels"][...].astype(str)
 
@@ -720,7 +721,7 @@ def save_eos_curves(
 
     V_sampled = np.zeros((n_temperatures, n_volumes))
     G_sampled = np.zeros((n_temperatures, n_volumes))
-    V_min = np.zeros(n_temperatures) 
+    V_min = np.zeros(n_temperatures)
     G_min = np.zeros(n_temperatures)
     for i, fit in enumerate(G_tot_curves):
         V_sampled[i, :] = fit.V_sampled[:]
@@ -742,7 +743,7 @@ def save_eos_curves(
     with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
-            
+
         group = f.create_group(key)
         group.attrs["dataclass"] = "EOSCurves"
         group.attrs["n_temperatures"] = n_temperatures
@@ -903,14 +904,14 @@ def _read_eec(group: h5py.Group):
 
 
 def _save_debye_model(
-        group: h5py.Group, 
+        group: h5py.Group,
         debye_model: "mbe_automation.dynamics.harmonic.eec.DebyeModel"
 ) -> None:
     """Save a DebyeModel instance into the provided group."""
     group.attrs["dataclass"] = "DebyeModel"
     group.attrs["initialized"] = debye_model.initialized
     group.attrs["max_fit_temperature (K)"] = debye_model.max_fit_temperature_K
-    
+
     if debye_model.initialized:
         group.attrs["V0"] = debye_model._V0
         group.attrs["ThetaD (K)"] = debye_model._ThetaD
@@ -977,8 +978,8 @@ def save_eos_metadata(
             debye_subgroup = group.create_group("debye_model")
             _save_debye_model(debye_subgroup, eos_metadata.debye_model)
 
-    # Save DataFrames outside the main dataset_file block to prevent 
-    # deadlocks if save_data_frame also acquires a lock 
+    # Save DataFrames outside the main dataset_file block to prevent
+    # deadlocks if save_data_frame also acquires a lock
     # (though save_data_frame also uses dataset_file internally).
     save_data_frame(
         dataset=dataset,
@@ -1000,22 +1001,22 @@ def read_eos_metadata(
     Read an EOSMetadata object from an HDF5 dataset.
     """
     from mbe_automation.dynamics.harmonic.core import EOSMetadata
-    
+
     with dataset_file(dataset, "r") as f:
         group = f[key]
-        
+
         temperatures_K = group["T (K)"][...]
         sampled_volumes = group["V_sampled (Å³∕unit cell)"][...]
         force_constants_keys = group["force_constants_keys"][...].astype(str).tolist()
         equation_of_state = group.attrs["equation_of_state"]
-        
+
         eos_curves_key = group.attrs["eos_curves_key"]
-        
+
         select_T_stacked = group["select_T"][...]
         select_T = [row for row in select_T_stacked]
 
         eec = _read_eec(group["eec"])
-        
+
         if "debye_model" in group:
             debye_model = _read_debye_model(group["debye_model"])
         else:
@@ -1046,7 +1047,7 @@ def read_eos_metadata(
     )
 
 def _save_structure(
-        dataset: str,
+        dataset: str | Path,
         key: str,
         positions: npt.NDArray[np.floating],
         atomic_numbers: npt.NDArray[np.integer],
@@ -1080,6 +1081,8 @@ def _save_structure(
        the OLD geometry but NEW energies/forces. This corrupts the dataset integrity.
        Use ``update_mode="replace"`` if the geometry has changed.
     """
+    dataset = Path(dataset)
+
     if positions.ndim == 2:
         n_frames = 1
         n_atoms = positions.shape[0]
@@ -1091,16 +1094,16 @@ def _save_structure(
             f"positions array must have rank 2 or 3, but has rank {positions.ndim}"
         )
 
-    Path(dataset).parent.mkdir(parents=True, exist_ok=True)    
+    dataset.parent.mkdir(parents=True, exist_ok=True)
     with dataset_file(dataset, "a") as f:
         if key in f and update_mode == "replace":
             del f[key]
-        
+
         # Check if we need to initialize the structure data
-        # If the key is present, we assume the structure data is already there 
+        # If the key is present, we assume the structure data is already there
         # (based on the assumption "either all of them are in hdf5, or none of them")
         save_basics = (key not in f)
-        
+
         group = f.require_group(key)
 
         if save_basics:
@@ -1137,7 +1140,7 @@ def _save_structure(
                     name="forces (eV∕Å)",
                     data=forces
                 )
-                
+
             group.attrs["dataclass"] = "Structure"
             group.attrs["n_frames"] = n_frames
             group.attrs["n_atoms"] = n_atoms
@@ -1164,12 +1167,12 @@ def _save_structure(
             _save_ground_truth(f, f"{key}/ground_truth", ground_truth, update_mode=update_mode)
 
 @overload
-def save_structure(*, dataset: str, key: str, structure: Structure, update_mode: Literal["update_properties", "replace"] = "update_properties") -> None: ...
+def save_structure(*, dataset: str | Path, key: str, structure: Structure, update_mode: Literal["update_properties", "replace"] = "update_properties") -> None: ...
 
 @overload
 def save_structure(
     *,
-    dataset: str,
+    dataset: str | Path,
     key: str,
     positions: npt.NDArray[np.floating],
     atomic_numbers: npt.NDArray[np.integer],
@@ -1184,7 +1187,7 @@ def save_structure(
     update_mode: Literal["update_properties", "replace"] = "update_properties",
 ) -> None: ...
 
-def save_structure(*, dataset: str, key: str, **kwargs):
+def save_structure(*, dataset: str | Path, key: str, **kwargs):
     """
     Save a structure to a dataset.
 
@@ -1241,7 +1244,7 @@ def save_structure(*, dataset: str, key: str, **kwargs):
             "Either a 'structure' object or 'positions' and other arrays "
             "must be provided as keyword arguments."
         )
-        
+
 
 def read_structure(dataset, key):
     with dataset_file(dataset, "r") as f:
@@ -1320,7 +1323,7 @@ def save_trajectory(
         save_basics = (key not in f)
 
         group = f.require_group(key)
-        
+
         if save_basics:
             group.attrs["dataclass"] = "Trajectory"
             group.attrs["ensemble"] = traj.ensemble
@@ -1370,7 +1373,7 @@ def save_trajectory(
             group.create_dataset(
                 name="E_pot (eV∕atom)",
                 data=traj.E_pot
-            )   
+            )
             group.create_dataset(
                 name="E_trans_drift (eV∕atom)",
                 data=traj.E_trans_drift
@@ -1402,7 +1405,7 @@ def save_trajectory(
                 name="feature_vectors",
                 data=traj.feature_vectors
             )
-            
+
         elif update_mode == "update_properties":
             #
             # If we are in update_properties mode and the trajectory already exists,
@@ -1422,7 +1425,7 @@ def save_trajectory(
 
 
 def read_trajectory(dataset: str, key: str) -> Trajectory:
-    
+
     with dataset_file(dataset, "r") as f:
         group = f[key]
         is_periodic = group.attrs["periodic"]
@@ -1461,7 +1464,7 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             ground_truth=_read_ground_truth(f, key=f"{key}/ground_truth"),
             level_of_theory=level_of_theory,
         )
-        
+
     return traj
 
 
@@ -1503,7 +1506,7 @@ def save_force_constants(
         masses=primitive.masses,
         cell_vectors=primitive.cell
     )
-    
+
     supercell = phonons.supercell
     save_structure(
         dataset=dataset,
@@ -1514,7 +1517,7 @@ def save_force_constants(
         cell_vectors=supercell.cell
     )
 
-        
+
 def read_force_constants(dataset: str, key: str) -> ForceConstants:
     """Read force constants and their associated structures."""
 
@@ -1548,7 +1551,7 @@ def save_molecular_crystal(
     with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
-        
+
         group = f.create_group(key)
         group.attrs["dataclass"] = "MolecularCrystal"
         group.attrs["n_molecules"] = system.n_molecules
@@ -1562,8 +1565,8 @@ def save_molecular_crystal(
         if not system.identical_composition:
             max_len = max(len(indices) for indices in system.index_map)
             padded_array = np.full(
-                (system.n_molecules, max_len), 
-                fill_value=-1, 
+                (system.n_molecules, max_len),
+                fill_value=-1,
                 dtype=system.index_map[0].dtype
             )
             for i, indices in enumerate(system.index_map):
@@ -1582,7 +1585,7 @@ def save_molecular_crystal(
             name="max_distances_to_central_molecule (Å)",
             data=system.max_distances_to_central_molecule
         )
-        
+
     save_structure(
         dataset=dataset,
         key=f"{key}/supercell",
@@ -1593,11 +1596,11 @@ def save_molecular_crystal(
 def read_molecular_crystal(dataset: str, key: str) -> MolecularCrystal:
     """
     Read a MolecularCrystal object from a dataset.
-    
+
     """
     with dataset_file(dataset, "r") as f:
         group = f[key]
-        
+
         n_molecules = group.attrs["n_molecules"]
         identical_composition = group.attrs["identical_composition"]
         central_molecule_index = group.attrs["central_molecule_index"]
@@ -1639,12 +1642,12 @@ def save_finite_subsystem(
         Path(dataset).parent.mkdir(parents=True, exist_ok=True)
         with dataset_file(dataset, "a") as f:
             if key in f:
-                del f[key]  
+                del f[key]
             group = f.create_group(key)
             group.attrs["dataclass"] = "FiniteSubsystem"
             group.attrs["n_molecules"] = subsystem.n_molecules
             group.create_dataset("molecule_indices", data=subsystem.molecule_indices)
-            
+
         save_structure(
             structure=subsystem.cluster_of_molecules,
             dataset=dataset,
@@ -1658,7 +1661,7 @@ def save_finite_subsystem(
             structure=subsystem.cluster_of_molecules,
             quantities=only,
         )
-        
+
     return
 
 
@@ -1681,40 +1684,41 @@ def read_finite_subsystem(dataset: str, key: str) -> FiniteSubsystem:
 
 
 def save_unique_clusters(
-        dataset: str,
+        dataset: str | Path,
         key: str,
         clusters
 ):
+    dataset = Path(dataset)
     from mbe_automation.structure.clusters import unique_molecule_label
 
-    Path(dataset).parent.mkdir(parents=True, exist_ok=True)
+    dataset.parent.mkdir(parents=True, exist_ok=True)
     with dataset_file(dataset, "a") as f:
         if key in f:
             del f[key]
-        
+
         group = f.create_group(key)
         group.attrs["dataclass"] = "UniqueClusters"
         group.attrs["n_clusters_unique"] = clusters.n_clusters_unique
         group.attrs["n_clusters_reducible"] = clusters.n_clusters_reducible
         group.attrs["composition"] = clusters.composition
-        
+
         group.create_dataset(
-            name="weights", 
+            name="weights",
             data=clusters.weights
         )
         group.create_dataset(
-            name="n_molecules_equivalent", 
+            name="n_molecules_equivalent",
             data=clusters.n_molecules_equivalent
         )
         group.create_dataset(
-            name="sorted_min_rij (Å)", 
+            name="sorted_min_rij (Å)",
             data=clusters.sorted_min_rij
         )
         group.create_dataset(
-            name="sorted_max_rij (Å)", 
+            name="sorted_max_rij (Å)",
             data=clusters.sorted_max_rij
         )
-        
+
     save_structure(
         dataset=dataset,
         key=f"{key}/structures",
@@ -1739,14 +1743,14 @@ def read_unique_clusters(
         n_clusters_unique = group.attrs["n_clusters_unique"]
         n_clusters_reducible = group.attrs["n_clusters_reducible"]
         composition = tuple(group.attrs["composition"])
-        
+
         weights = group["weights"][...]
         n_molecules_equivalent = group["n_molecules_equivalent"][...]
         sorted_min_rij = group["sorted_min_rij (Å)"][...]
         sorted_max_rij = group["sorted_max_rij (Å)"][...]
-        
+
         n_ref_mols = len(group["reference_molecules"].keys())
-        
+
     structures = read_structure(dataset, f"{key}/structures")
     reference_molecules = tuple(
         read_structure(dataset, f"{key}/reference_molecules/{unique_molecule_label(i)}")
@@ -1805,11 +1809,11 @@ def _save_only(
     Save selected physical quantities from
     a Structure object into a permanent storage
     dataset.
-    
+
     This function is designed to update the dataset
     with data needed for training machine learning
     interatomic potentials.
-    
+
     Keeps the rest of the saved Structure object unaltered.
     """
 
@@ -1822,9 +1826,9 @@ def _save_only(
                 f"Existing dataset has {group.attrs['n_frames']} frames, "
                 f"but the object being saved has {structure.n_frames} frames."
             )
-        
+
         if "feature_vectors" in quantities:
-            
+
             if structure.feature_vectors is None:
                 raise RuntimeError(
                     "Feature vectors not present, cannot save requested data."
@@ -1838,7 +1842,7 @@ def _save_only(
                     name="feature_vectors",
                     data=structure.feature_vectors
                 )
-                
+
             group.attrs["feature_vectors_type"] = structure.feature_vectors_type
 
         if "ground_truth" in quantities:
@@ -1849,7 +1853,7 @@ def _save_only(
                 )
 
             _save_ground_truth(f, f"{key}/ground_truth", structure.ground_truth, update_mode="update_properties")
-            
+
     return
 
 def _update_dataset(
@@ -1862,8 +1866,8 @@ def _update_dataset(
         energies_and_forces_data: bool,
 ) -> None:
     sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
-    
-    # 
+
+    #
     # If update_mode is not "update_properties" or the dataset does not exist,
     # we proceed with the standard overwrite (delete and create).
     #
@@ -1877,7 +1881,7 @@ def _update_dataset(
     # Partial Update Logic
     #
     dset = group[dataset_name]
-    
+
     if dset.shape != new_data.shape:
         raise ValueError(
             f"Shape mismatch when updating dataset '{dataset_name}': "
@@ -1900,10 +1904,10 @@ def _update_dataset(
                 old_status = np.full(dset.shape[0], CALCULATION_STATUS_COMPLETED)
 
             mask = (
-                (new_status != CALCULATION_STATUS_UNDEFINED) & 
+                (new_status != CALCULATION_STATUS_UNDEFINED) &
                 (old_status != CALCULATION_STATUS_COMPLETED)
             )
-            
+
     # Perform the update
     if mask is not None:
         # Only write to the indices where mask is True to save I/O and memory
@@ -1929,7 +1933,7 @@ def _save_ground_truth(
     for name, energy in ground_truth.energies.items():
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         sanitized_quantity_name = f"E_{sanitized_method_name} (eV∕atom)"
-        
+
         _update_dataset(
             group=group,
             dataset_name=sanitized_quantity_name,
@@ -1944,7 +1948,7 @@ def _save_ground_truth(
     for name, forces in ground_truth.forces.items():
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         ds_name = f"forces_{sanitized_method_name} (eV∕Å)"
-        
+
         _update_dataset(
             group=group,
             dataset_name=ds_name,
@@ -1959,7 +1963,7 @@ def _save_ground_truth(
     for name, status in ground_truth.calculation_status.items():
         sanitized_method_name = name.replace("/", UNICODE_DIVISION_SLASH)
         ds_name = f"status_{sanitized_method_name}"
-        
+
         _update_dataset(
             group=group,
             dataset_name=ds_name,
@@ -1994,7 +1998,7 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
                 energies[name] = group[f"E_{sanitized_name} (eV∕atom)"][...]
             if f"forces_{sanitized_name} (eV∕Å)" in group:
                 forces[name] = group[f"forces_{sanitized_name} (eV∕Å)"][...]
-            
+
             if f"status_{sanitized_name}" in group:
                 calculation_status[name] = group[f"status_{sanitized_name}"][...]
             else:
@@ -2006,11 +2010,11 @@ def _read_ground_truth(f: h5py.File, key: str) -> GroundTruth | None:
                     n_frames = len(energies[name])
                 elif name in forces:
                     n_frames = len(forces[name])
-                
+
                 if n_frames > 0:
                     calculation_status[name] = np.full(
-                        n_frames, 
-                        CALCULATION_STATUS_COMPLETED, 
+                        n_frames,
+                        CALCULATION_STATUS_COMPLETED,
                         dtype=np.int64
                     )
 
@@ -2034,7 +2038,7 @@ def _available_energies(
     """
     if restrict_to is None:
         restrict_to = ["ground_truth", "structure_generation"]
-    
+
     methods = []
     if (
             "structure_generation" in restrict_to and
@@ -2061,8 +2065,8 @@ def _available_forces(
     """
     if restrict_to is None:
         restrict_to = ["ground_truth", "structure_generation"]
-    
-    methods = []    
+
+    methods = []
     if (
             "structure_generation" in restrict_to and
             structure.level_of_theory is not None and
@@ -2072,7 +2076,7 @@ def _available_forces(
         # Level of theory used to generate the geometry
         # via relaxation or molecular dynamics
         #
-        methods.append(structure.level_of_theory) 
+        methods.append(structure.level_of_theory)
 
     if (
             "ground_truth" in restrict_to and
@@ -2085,7 +2089,7 @@ def _available_forces(
         methods.extend([x for x in structure.ground_truth.forces])
 
     return methods
-        
+
 def _energies_at_level_of_theory(
         structure: Structure,
         level_of_theory: str,
@@ -2100,20 +2104,20 @@ def _energies_at_level_of_theory(
         structure.ground_truth is not None and
         level_of_theory in structure.ground_truth.energies
     )
-    
+
     from_structure = (
         structure.level_of_theory is not None and
         structure.level_of_theory == level_of_theory and
         structure.E_pot is not None
     )
-    
+
     if from_ground_truth:
         energies = structure.ground_truth.energies[level_of_theory]
     elif from_structure:
         energies = structure.E_pot
     else:
         energies = None
-    
+
     return energies
 
 def _forces_at_level_of_theory(
@@ -2126,12 +2130,12 @@ def _forces_at_level_of_theory(
     be either a ground truth method or the method used
     to obtain the geometry.
     """
-    
+
     from_ground_truth = (
         structure.ground_truth is not None and
         level_of_theory in structure.ground_truth.forces
     )
-    
+
     from_structure = (
         structure.level_of_theory is not None and
         structure.level_of_theory == level_of_theory and
@@ -2144,7 +2148,7 @@ def _forces_at_level_of_theory(
         forces = structure.forces
     else:
         forces = None
-    
+
     return forces
 
 def save_atomic_reference(
@@ -2159,7 +2163,7 @@ def save_atomic_reference(
 
     key_E = "E (eV∕atom)"
     key_Z = "atomic_numbers"
-    
+
     with dataset_file(dataset, "a") as f:
         if key in f:
             if overwrite:
@@ -2170,7 +2174,7 @@ def save_atomic_reference(
                     f"Set overwrite=True to replace it."
                 )
         group = f.create_group(key)
-        
+
         for method_name in atomic_reference.levels_of_theory:
             d = atomic_reference.energies[method_name]
             atomic_numbers = np.sort(np.fromiter(d.keys(), dtype=np.int64))
@@ -2180,7 +2184,7 @@ def save_atomic_reference(
             subgroup = group.require_group(sanitized_method_name)
             subgroup.create_dataset(key_Z, data=atomic_numbers)
             subgroup.create_dataset(key_E, data=energies)
-        
+
         group.attrs["levels_of_theory"] = sorted(atomic_reference.levels_of_theory)
         group.attrs["dataclass"] = "AtomicReference"
 
@@ -2189,19 +2193,19 @@ def read_atomic_reference(dataset: str | Path, key: str) -> AtomicReference:
     key_E = "E (eV∕atom)"
     key_Z = "atomic_numbers"
     energies = {}
-    
+
     with dataset_file(dataset, "r") as f:
         atomic_reference_group = f[key]
         levels_of_theory = atomic_reference_group.attrs.get("levels_of_theory", [])
-        
+
         for method_name in levels_of_theory:
-            sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)            
+            sanitized_method_name = method_name.replace("/", UNICODE_DIVISION_SLASH)
             subgroup = atomic_reference_group[sanitized_method_name]
             energies[method_name] = dict(zip(
                 subgroup[key_Z][...],  # atomic numbers
                 subgroup[key_E][...]   # corresponding isolated atom energies for each Z (eV/atom)
             ))
-            
+
     return AtomicReference(
         energies=energies
     )

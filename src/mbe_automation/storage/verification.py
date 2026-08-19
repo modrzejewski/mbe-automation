@@ -6,7 +6,7 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 import mbe_automation.dynamics.harmonic.modes
-from mbe_automation.storage.xyz_formats import SYMMETRY_TOLERANCE_STRICT
+from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_STRICT
 
 def verify_adps_roundtrip(
     cif_path: str,

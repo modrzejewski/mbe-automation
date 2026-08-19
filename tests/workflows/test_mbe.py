@@ -145,7 +145,7 @@ def _assert_cumulative_weights_comparison(
         this_subset = df_this[df_this[distance_column] <= safe_t]
         
         ref1_phys = int(ref1_subset['Weight'].sum())
-        this_phys = int(this_subset['symmetry_weight (1∕A)'].sum())
+        this_phys = int(this_subset['cluster_count'].sum())
         
         ref1_uniq = len(ref1_subset)
         this_uniq = len(this_subset)
