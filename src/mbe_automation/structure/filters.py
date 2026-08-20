@@ -3,14 +3,18 @@ from typing import List, Literal, Dict
 import numpy as np
 import numpy.typing as npt
 
+from mbe_automation.storage.mbe import _UniqueClustersFilter
+
+
 NUMBER_SELECTION = [
     "closest_to_center_of_mass",
-    "closest_to_central_molecule"
+    "closest_to_central_molecule",
 ]
 DISTANCE_SELECTION = [
     "max_min_distance_to_central_molecule",
-    "max_max_distance_to_central_molecule"
+    "max_max_distance_to_central_molecule",
 ]
+
 
 @dataclass(kw_only=True)
 class FiniteSubsystemFilter:
@@ -48,10 +52,10 @@ class FiniteSubsystemFilter:
     def __post_init__(self):
         if self.selection_rule in NUMBER_SELECTION:
             if self.distances is not None:
-                 raise ValueError(
-                     f"Selection rule '{self.selection_rule}' requires 'distances' to be None. "
-                     "But 'distances' was provided."
-                 )
+                raise ValueError(
+                    f"Selection rule '{self.selection_rule}' requires 'distances' to be None. "
+                    "But 'distances' was provided."
+                )
             if self.n_molecules is None:
                 raise ValueError(
                     f"Selection rule '{self.selection_rule}' requires 'n_molecules' to be set."
@@ -70,20 +74,13 @@ class FiniteSubsystemFilter:
         else:
             raise ValueError(f"Invalid selection_rule: {self.selection_rule}")
 
+
 @dataclass(kw_only=True)
-class UniqueClustersFilter:
+class UniqueClustersFilter(_UniqueClustersFilter):
     """
     Filtering settings for finding symmetry-unique molecular clusters in
     a MolecularCrystal.
     """
-    cluster_types: List[str] = field(
-        default_factory=lambda: ["monomers", "dimers", "trimers"]
-    )
-    cutoffs: Dict[str, float | None] = field(
-        default_factory=lambda: {"monomers": None, "dimers": 15.0, "trimers": 10.0}
-    )
-    alignment_thresh: float = 1.0e-4 # Å
-    algorithm: Literal["ase", "pymatgen", "irmsd"] | None = None
 
     def __post_init__(self):
         missing_keys = [

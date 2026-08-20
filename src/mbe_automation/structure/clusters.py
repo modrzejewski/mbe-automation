@@ -39,8 +39,12 @@ import mbe_automation.structure.molecule
 import mbe_automation.common.display
 import mbe_automation.calculators.core
 from mbe_automation.storage.core import MolecularCrystal
-from mbe_automation.configs.clusters import NUMBER_SELECTION, DISTANCE_SELECTION
-from mbe_automation.configs.clusters import FiniteSubsystemFilter, UniqueClustersFilter
+from mbe_automation.structure.filters import (
+    NUMBER_SELECTION,
+    DISTANCE_SELECTION,
+    FiniteSubsystemFilter,
+    UniqueClustersFilter,
+)
 from mbe_automation.configs.structure import Minimum
 from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_LOOSE
 
@@ -318,7 +322,7 @@ class UniqueClusters:
         m_A = self.composition.count(self.composition[0])
         
         data = {
-            "system": self.labels,
+            "system": self.labels(),
             "cluster_count": self.weights,
         }
 
@@ -340,26 +344,37 @@ class UniqueClusters:
 
         return pd.DataFrame(data)
 
-    def labels(self, frame_index: int | None = None) -> List[str]:
-        """Generate a list of formatted string labels for unique clusters."""
+    def labels(
+        self,
+        frame_index: int | None = None,
+    ) -> npt.NDArray[np.str_]:
+        """
+        Generate array of formatted string labels for unique clusters.
+        """
         if frame_index is not None:
-            return [
+            return np.array(
+                [
+                    _cluster_label(
+                        composition=self.composition,
+                        unique_cluster_index=frame_index,
+                        n_clusters_unique=self.n_clusters_unique,
+                        cluster=self.structures,
+                    )
+                ],
+                dtype=np.str_,
+            )
+        return np.array(
+            [
                 _cluster_label(
                     composition=self.composition,
-                    unique_cluster_index=frame_index,
+                    unique_cluster_index=i,
                     n_clusters_unique=self.n_clusters_unique,
                     cluster=self.structures,
                 )
-            ]
-        return [
-            _cluster_label(
-                composition=self.composition,
-                unique_cluster_index=i,
-                n_clusters_unique=self.n_clusters_unique,
-                cluster=self.structures,
-            )
-            for i in range(self.n_clusters_unique)
-        ]
+                for i in range(self.n_clusters_unique)
+            ],
+            dtype=np.str_,
+        )
 
     def to_xyz(self, dir: Path | str) -> None:
         """
@@ -389,15 +404,33 @@ class UniqueClusters:
             file_path = out_dir / f"{label}.xyz"
             file_path.write_text(xyz_content, encoding="utf-8")
 
-    def to_csv(self, file_path: Path | str) -> None:
+    def to_csv(
+        self,
+        file_path: Path | str,
+        decimal_digits: int | None = 4,
+    ) -> None:
         """
         Export cluster properties to a CSV file. The output contains all symmetry
         weights required to assemble the lattice energy via the many-body expansion.
 
         Args:
             file_path: The destination path for the .csv file.
+            decimal_digits: Number of decimal digits for floating-point formatting.
+                If None, full precision is exported.
         """
-        self.to_data_frame().to_csv(file_path, index=False, float_format="%.3f")
+        path = Path(file_path)
+        path.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+        float_format = (
+            f"%.{decimal_digits}f" if decimal_digits is not None else None
+        )
+        self.to_data_frame().to_csv(
+            path,
+            index=False,
+            float_format=float_format,
+        )
 
 
 @dataclass

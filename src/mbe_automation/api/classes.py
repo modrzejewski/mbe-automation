@@ -14,7 +14,10 @@ import mbe_automation.storage
 import mbe_automation.common
 import mbe_automation.dynamics.md.display
 from mbe_automation.configs.execution import Resources
-from mbe_automation.configs.clusters import FiniteSubsystemFilter
+from mbe_automation.structure.filters import (
+    FiniteSubsystemFilter,
+    UniqueClustersFilter,
+)
 from mbe_automation.configs.structure import Minimum
 from mbe_automation.storage import ForceConstants as _ForceConstants
 from mbe_automation.storage import Structure as _Structure
@@ -23,6 +26,7 @@ from mbe_automation.storage import MolecularCrystal as _MolecularCrystal
 from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 from mbe_automation.storage import AtomicReference as _AtomicReference
 from mbe_automation.storage import BrillouinZonePath as _BrillouinZonePath
+from mbe_automation.mbe import MBEMetadata as _MBEMetadata
 from mbe_automation.dynamics.harmonic.core import EOSMetadata as _EOSMetadata
 import mbe_automation.dynamics.harmonic.modes
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, ThermalDisplacements
@@ -156,6 +160,9 @@ class EOSMetadata(_EOSMetadata):
             external_freqs_THz=external_freqs_THz,
             symmetry_tolerance=symmetry_tolerance,
         )
+
+
+MBEMetadata = _MBEMetadata
 
 @dataclass(kw_only=True)
 class BrillouinZonePath(_BrillouinZonePath):
@@ -1989,10 +1996,23 @@ class AnySystem:
         "ForceConstants": ForceConstants,
         "AtomicReference": AtomicReference,
         "UniqueClusters": UniqueClusters,
+        "MBEMetadata": MBEMetadata,
     }
 
     @staticmethod
-    def read(dataset: str, key: str) -> Structure | Trajectory | FiniteSubsystem | MolecularCrystal | ForceConstants | AtomicReference:
+    def read(
+        dataset: str | Path,
+        key: str,
+    ) -> (
+        Structure
+        | Trajectory
+        | FiniteSubsystem
+        | MolecularCrystal
+        | ForceConstants
+        | AtomicReference
+        | UniqueClusters
+        | MBEMetadata
+    ):
         """
         Reads the object at the given key, automatically determining its type.
         """
