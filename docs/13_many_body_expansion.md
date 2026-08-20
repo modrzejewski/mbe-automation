@@ -13,7 +13,7 @@ electronic structure calculations.
 
 ## Workflow Configuration
 
-The workflow is configured using the `MBE` and `UniqueClustersFilter` classes
+The workflow is configured using the `Clusters` and `UniqueClustersFilter` classes
 from `mbe_automation`. It requires defining the crystal structure
 and configuring an MLIP calculator to distinguish crystallographically unique
 molecules.
@@ -33,7 +33,7 @@ mace_calc = MACE(
     head="omol"
 )
 
-mbe_config = mbe_automation.configs.many_body_expansion.MBE(
+mbe_config = mbe_automation.configs.many_body_expansion.Clusters(
     crystal=Structure.from_file(xyz_solid),
     calculator=mace_calc,
     filter=UniqueClustersFilter(
@@ -182,7 +182,7 @@ mace_calc = MACE(
     head="omol"
 )
 
-mbe_config = mbe_automation.configs.many_body_expansion.MBE(
+mbe_config = mbe_automation.configs.many_body_expansion.Clusters(
     crystal=Structure.from_file(xyz_solid),
     calculator=mace_calc,
     filter=UniqueClustersFilter(

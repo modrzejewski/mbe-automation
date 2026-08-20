@@ -20,7 +20,7 @@ from mbe_automation import (
     Structure,
     UniqueClustersFilter,
 )
-from mbe_automation.configs.many_body_expansion import MBE
+from mbe_automation.configs.many_body_expansion import Clusters
 from mbe_automation.common.display import dotted_separator
 
 DIMER_CUTOFF = 30.0
@@ -226,7 +226,7 @@ def _run_cluster_extraction(case: dict, work_dir: Path) -> None:
         cutoffs={"dimers": DIMER_CUTOFF, "trimers": TRIMER_CUTOFF},
     )
 
-    config = MBE(
+    config = Clusters(
         crystal=crystal,
         calculator=calc,
         filter=unique_cluster_filter,

@@ -11,7 +11,7 @@ import mbe_automation.configs.many_body_expansion
 import mbe_automation.calculators.electronic
 
 def run(
-    config: mbe_automation.configs.many_body_expansion.MBE,
+    config: mbe_automation.configs.many_body_expansion.Clusters,
 ) -> None:
     datetime_start = mbe_automation.common.display.timestamp_start()
 
