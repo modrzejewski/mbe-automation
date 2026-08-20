@@ -29,7 +29,7 @@ from mbe_automation.calculators import MACE
 
 import mbe_automation
 from mbe_automation.configs.md import ClassicalMD
-from mbe_automation.structure.clusters import FiniteSubsystemFilter
+from mbe_automation import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter
 from mbe_automation.configs.training import MDSampling, PhononSampling
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
@@ -227,7 +227,7 @@ from mbe_automation.calculators import MACE
 
 import mbe_automation
 from mbe_automation.configs.md import ClassicalMD
-from mbe_automation.structure.clusters import FiniteSubsystemFilter
+from mbe_automation import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter
 from mbe_automation.configs.training import MDSampling, PhononSampling
 from mbe_automation.configs.quasi_harmonic import FreeEnergy

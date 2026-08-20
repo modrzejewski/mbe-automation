@@ -162,7 +162,12 @@ class EOSMetadata(_EOSMetadata):
         )
 
 
-MBEMetadata = _MBEMetadata
+class MBEMetadata(_MBEMetadata):
+    @classmethod
+    def read(cls, dataset: str | Path, key: str) -> MBEMetadata:
+        return cls(**vars(
+            _MBEMetadata.read(dataset=dataset, key=key)
+        ))
 
 @dataclass(kw_only=True)
 class BrillouinZonePath(_BrillouinZonePath):

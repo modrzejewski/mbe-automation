@@ -77,16 +77,17 @@ class MBEMetadata(_MBEMetadata):
         """
         if cluster_type is None:
             return {
-                cluster_type: self.read_clusters(
-                    cluster_type=cluster_type,
+                ct: self.read_clusters(
+                    cluster_type=ct,
                 )
-                for cluster_type in self.cluster_types
+                for ct in self.cluster_types
             }
 
-        assert cluster_type in self.unique_clusters_keys, (
-            f"Invalid cluster type: '{cluster_type}'. "
-            f"Available cluster types: {self.cluster_types}"
-        )
+        if cluster_type not in self.unique_clusters_keys:
+            raise ValueError(
+                f"Invalid cluster type: '{cluster_type}'. "
+                f"Available cluster types: {self.cluster_types}"
+            )
 
         return mbe_automation.storage.core.read_unique_clusters(
             dataset=self.dataset,

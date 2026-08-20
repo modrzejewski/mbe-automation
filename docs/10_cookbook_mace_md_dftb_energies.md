@@ -156,7 +156,7 @@ Read the periodic MD trajectory, extract finite clusters (n ≥ 2), and compute 
 import mbe_automation
 import numpy as np
 from mbe_automation import Structure, DatasetKeys
-from mbe_automation.configs.clusters import FiniteSubsystemFilter
+from mbe_automation import FiniteSubsystemFilter
 from mbe_automation.calculators import MACE
 
 dataset = "md_structures.hdf5"

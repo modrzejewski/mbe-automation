@@ -264,7 +264,7 @@ def test_mbe_metadata_methods(tmp_path: Path):
     single_cluster = mbe_obj.read_clusters(cluster_type="dimers[AA]")
     assert isinstance(single_cluster, UniqueClusters)
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         mbe_obj.read_clusters(cluster_type="invalid_type")
 
     with pytest.raises(ValueError):

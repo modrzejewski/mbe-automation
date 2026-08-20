@@ -128,7 +128,6 @@ def save_mbe_metadata(
         group.attrs["root_key"] = mbe_metadata.root_key
         group.attrs["crystal_key"] = mbe_metadata.crystal_key
         group.attrs["cluster_types"] = mbe_metadata.cluster_types
-        group.attrs["dataset"] = str(mbe_metadata.dataset)
 
         keys_group = group.create_group("unique_clusters_keys")
         for k, v in mbe_metadata.unique_clusters_keys.items():
@@ -164,8 +163,6 @@ def read_mbe_metadata(
         root_key = str(group.attrs["root_key"])
         crystal_key = str(group.attrs["crystal_key"])
         cluster_types = [str(x) for x in group.attrs["cluster_types"]]
-        dataset_attr = group.attrs.get("dataset", None)
-        dataset_path = Path(str(dataset_attr)) if dataset_attr is not None else Path(dataset)
 
         keys_group = group["unique_clusters_keys"]
         unique_clusters_keys = {
@@ -191,7 +188,7 @@ def read_mbe_metadata(
         cluster_types=cluster_types,
         unique_clusters_keys=unique_clusters_keys,
         crystal_key=crystal_key,
-        dataset=dataset_path,
+        dataset=Path(dataset),
         root_key=root_key,
         filter=filter_obj,
         geometric_parameters=geometric_parameters,
