@@ -10,7 +10,7 @@ from mbe_automation.structure.filters import UniqueClustersFilter
 import mbe_automation.calculators.electronic
 
 @dataclass(kw_only=True)
-class MBE:
+class Clusters:
                                    #
                                    # Structure of the crystal from which clusters
                                    # are cleaved. The atomic coordinates remain

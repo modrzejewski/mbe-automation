@@ -19,7 +19,7 @@ from mbe_automation.api import MBEMetadata as APIMBEMetadata
 from mbe_automation.mbe import MBEMetadata
 from mbe_automation.storage import Structure, from_xyz_file
 from mbe_automation.structure.clusters import UniqueClusters
-from mbe_automation.configs.many_body_expansion import MBE
+from mbe_automation.configs.many_body_expansion import Clusters
 from mbe_automation.storage import (
     save_structure,
     save_unique_clusters,
@@ -299,7 +299,7 @@ def test_mbe_workflow(tmp_path: Path):
     )
 
     dataset_path = tmp_path / "workflow_run" / "properties.hdf5"
-    config = MBE(
+    config = Clusters(
         crystal=crystal,
         calculator=calc,
         filter=unique_cluster_filter,

@@ -41,5 +41,5 @@ def _(config: mbe_automation.configs.refinement.NormalModeRefinement):
     return mbe_automation.workflows.refinement.run(config)
 
 @_dispatch.register
-def _(config: mbe_automation.configs.many_body_expansion.MBE):
+def _(config: mbe_automation.configs.many_body_expansion.Clusters):
     return mbe_automation.workflows.many_body_expansion.run(config)
