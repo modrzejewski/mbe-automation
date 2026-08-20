@@ -2,22 +2,17 @@
 
 This file defines the best practices for running validation and testing scripts in this project.
 
-## Environment Management
-
-*   **Pixi:** Always run tests within an environment created by `pixi`.
-*   **Rationale:** Standard Python environments may cause segmentation faults due to library version incompatibilities specific to `mbe-automation`.
-
 ## Execution
 
-*   **Commands:** Prefix all testing or validation commands with `pixi run`.
-*   **Interactive Shell:** For interactive tasks, open a shell within the environment using `pixi shell`.
+*   **Commands:** Run tests directly in the current environment using `pytest` or `python`.
 
 ### Examples
 
 ```bash
-pixi run python path/to/validation_script.py
+python tests/workflows/test_mbe.py
 ```
 
 ```bash
-pixi run pytest
+pytest tests/workflows/test_mbe.py
 ```
+
