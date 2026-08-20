@@ -15,9 +15,12 @@ import numpy.testing as npt
 import pytest
 
 import mbe_automation
-from mbe_automation import MACE, Structure
+from mbe_automation import (
+    MACE,
+    Structure,
+    UniqueClustersFilter,
+)
 from mbe_automation.configs.many_body_expansion import MBE
-from mbe_automation.configs.clusters import UniqueClustersFilter
 from mbe_automation.common.display import dotted_separator
 
 DIMER_CUTOFF = 30.0

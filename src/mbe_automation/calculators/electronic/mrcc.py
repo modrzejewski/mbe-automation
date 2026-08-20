@@ -130,9 +130,14 @@ def to_input_files(
             frame_index=i,
         )
         with open(dir / f"{cluster_label}.inp", "w") as f:
-            for sub_label, inp_str in inputs.items():
-                f.write(f"{_SUBSYSTEM_TAG}{sub_label}\n")
-                f.write(inp_str)
+            # Skip subsystem tags for monomers; tags are only needed to delimit
+            # subsystems when ghost atoms might be present.
+            if len(unique_clusters.composition) == 1:
+                f.write(list(inputs.values())[0])
+            else:
+                for sub_label, inp_str in inputs.items():
+                    f.write(f"{_SUBSYSTEM_TAG}{sub_label}\n")
+                    f.write(inp_str)
 
 def setup_workdir(combined_input_file: Path, workdir: Path) -> List[Path]:
     """

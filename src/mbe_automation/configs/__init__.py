@@ -4,6 +4,5 @@ from . import training
 from . import execution
 from . import structure
 from . import recommended
-from . import clusters
 from . import refinement
 from . import many_body_expansion

@@ -75,7 +75,7 @@ This example demonstrates how to iterate over periodic trajectories, convert the
 ```python
 from mbe_automation import Structure, DatasetKeys
 import numpy as np
-from mbe_automation.configs.clusters import FiniteSubsystemFilter
+from mbe_automation import FiniteSubsystemFilter
 
 dataset = "urea.hdf5"
 

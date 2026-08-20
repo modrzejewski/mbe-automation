@@ -6,6 +6,8 @@ from . import configs
 from . import workflows
 from . import ml
 from . import calculators
+from . import mbe
+from . import mbe_legacy
 
 from .calculators import (
     HF,
@@ -35,6 +37,10 @@ from .api import (
     AnySystem,
     BrillouinZonePath,
     EOSMetadata,
+    MBEMetadata,
+    UniqueClusters,
+    FiniteSubsystemFilter,
+    UniqueClustersFilter,
     run,
 )
 

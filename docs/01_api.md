@@ -395,7 +395,7 @@ Configuration for generating distorted structures by sampling along normal mode 
 
 ### FiniteSubsystemFilter
 
-🔗 [`mbe_automation.structure.clusters.FiniteSubsystemFilter`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/clusters.py#L16)
+🔗 [`mbe_automation.FiniteSubsystemFilter`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/structure/filters.py)
 
 Specifies how finite molecular clusters are extracted from periodic frames.
 

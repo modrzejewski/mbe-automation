@@ -7,7 +7,7 @@ import sys
 import mbe_automation.common
 import mbe_automation.queue_scripts as queue_scripts
 import mbe_automation.directory_structure as directory_structure
-import mbe_automation.mbe
+import mbe_automation.mbe_legacy
 import mbe_automation.inputs.rpa
 import mbe_automation.inputs.orca
 import mbe_automation.inputs.mrcc
@@ -49,7 +49,7 @@ def prepare_inputs(ProjectDirectory, mlip_parameters, UnitCellFile, SystemTypes,
     sys.stdout = mbe_automation.common.display.ReplicatedOutput(SummaryFile)
 
     if not UseExistingXYZ:
-        mbe_automation.mbe.Make(UnitCellFile,
+        mbe_automation.mbe_legacy.Make(UnitCellFile,
                                 Cutoffs,
                                 ClusterTypes,
                                 MonomerRelaxation,

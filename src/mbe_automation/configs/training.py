@@ -8,7 +8,7 @@ import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 
 from .md import ClassicalMD
-from .clusters import FiniteSubsystemFilter
+from mbe_automation.structure.filters import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, AMPLITUDE_SCAN_MODES
 from mbe_automation.ml.core import FEATURE_VECTOR_TYPES
 import mbe_automation.storage

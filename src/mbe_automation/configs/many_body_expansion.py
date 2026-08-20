@@ -6,7 +6,7 @@ import ase
 from ase.calculators.calculator import Calculator as ASECalculator
 
 import mbe_automation.storage
-from mbe_automation.configs.clusters import UniqueClustersFilter
+from mbe_automation.structure.filters import UniqueClustersFilter
 import mbe_automation.calculators.electronic
 
 @dataclass(kw_only=True)
