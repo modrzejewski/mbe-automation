@@ -38,7 +38,7 @@ mbe_config = mbe_automation.configs.many_body_expansion.MBE(
     calculator=mace_calc,
     filter=UniqueClustersFilter(
         cluster_types=["monomers", "dimers", "trimers"],
-        cutoffs={"dimers": 30.0, "trimers": 15.0}
+        cutoffs={"dimers": 30.0, "trimers": 10.0}
     ),
     work_dir="./mbe_output",
     dataset="./dataset.hdf5",
@@ -187,7 +187,7 @@ mbe_config = mbe_automation.configs.many_body_expansion.MBE(
     calculator=mace_calc,
     filter=UniqueClustersFilter(
         cluster_types=["monomers", "dimers", "trimers"],
-        cutoffs={"dimers": 30.0, "trimers": 15.0}
+        cutoffs={"dimers": 30.0, "trimers": 10.0}
     ),
     work_dir="./mbe_output",
     dataset="./dataset.hdf5",

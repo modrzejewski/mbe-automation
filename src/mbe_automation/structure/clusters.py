@@ -306,7 +306,7 @@ class UniqueClusters:
                   X in the unit cell.
                 - multiplicity_[Ref]: The number of molecules of the reference
                   type [Ref] present within a single cluster.
-                - energy_weight (1∕unit cell): The weight of the cluster's energy
+                - lattice_energy_weight (1∕unit cell): The weight of the cluster's energy
                   contribution to the total lattice energy.
                 - min_r (Å): min(i∈X, j∈Y) r_ij (dimers only)
                 - max_r (Å): max(i∈X, j∈Y) r_ij (dimers only)
@@ -331,7 +331,7 @@ class UniqueClusters:
             data[f"n_molecules[{mol_label}] (1∕unit cell)"] = self.n_molecules_equivalent[u]
 
         data[f"multiplicity_{ref_mol_label}"] = m_A
-        data["energy_weight (1∕unit cell)"] = (self.weights * n_A) / m_A
+        data["lattice_energy_weight (1∕unit cell)"] = (self.weights * n_A) / m_A
 
         if len(self.composition) == 2:
             data["min_r (Å)"] = self.sorted_min_rij[:, 0]
