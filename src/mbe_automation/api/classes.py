@@ -1,8 +1,9 @@
 from __future__ import annotations
+import collections.abc
 import phonopy
 from dataclasses import dataclass, field
 import typing
-from typing import Tuple, Literal, Sequence, List, TYPE_CHECKING
+from typing import Literal, TYPE_CHECKING
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -2023,6 +2024,6 @@ class AnySystem:
             return cls_to_read.read(dataset, key)
         else:
             raise ValueError(
-                f"Unknown or missing 'dataclass' attribute '{dataclass_name}' "
+                f"Invalid or missing 'dataclass' attribute '{dataclass_name}' "
                 f"at key '{key}' in dataset '{dataset}'."
             )

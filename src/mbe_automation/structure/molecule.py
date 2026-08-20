@@ -220,7 +220,7 @@ def match(
         selected_algo = _match_algorithms[algorithm]
     except KeyError:
         raise ValueError(
-            f"Unknown algorithm '{algorithm}'. "
+            f"Invalid algorithm '{algorithm}'. "
             f"Must be one of {list(_match_algorithms.keys())}"
         )
 

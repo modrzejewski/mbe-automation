@@ -332,7 +332,7 @@ def from_xyz_file(
                     )
                 )
             else:
-                raise ValueError(f"Unknown transformation: {transform}")
+                raise ValueError(f"Invalid transformation: {transform}")
                 
             system = ase.Atoms(
                 numbers=atomic_numbers,

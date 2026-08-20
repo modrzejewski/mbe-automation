@@ -1,7 +1,7 @@
 from __future__ import annotations
 import itertools
 import re
-from typing import List, Dict, Literal, get_args
+from typing import Literal, get_args
 from pathlib import Path
 
 import mbe_automation.storage.core
@@ -34,10 +34,10 @@ _METHOD_TO_TEMPLATE = {
 def to_input_string(
     method: Method,
     structure: mbe_automation.storage.core.Structure,
-    subsystem_sizes: List[int] | None = None,
-    charges: List[int] | None = None,
+    subsystem_sizes: list[int] | None = None,
+    charges: list[int] | None = None,
     frame_index: int = 0
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Generate MRCC input strings for a cluster and its subsystems, e.g., for a
     trimer, ABC, A, B, C, AB, ...
@@ -45,7 +45,7 @@ def to_input_string(
     Args:
         method: Quantum-chemical model.
         structure: Structure object containing coordinates.
-        subsystem_sizes: List of atom counts for each molecule in the
+        subsystem_sizes: list of atom counts for each molecule in the
             molecular cluster.
         frame_index: Index of the frame in the Structure object.
 
@@ -134,7 +134,7 @@ def to_input_files(
                 f.write(f"{_SUBSYSTEM_TAG}{sub_label}\n")
                 f.write(inp_str)
 
-def setup_workdir(combined_input_file: Path, workdir: Path) -> List[Path]:
+def setup_workdir(combined_input_file: Path, workdir: Path) -> list[Path]:
     """
     Extract aggregated MRCC inputs into a computational workspace.
     Each subsystem gets a subdirectory with a `MINP` file. Undelimited files
@@ -157,7 +157,7 @@ def setup_workdir(combined_input_file: Path, workdir: Path) -> List[Path]:
         (workdir / "MINP").write_text(content.lstrip(), encoding="utf-8")
         return [workdir]
 
-    subdirs: List[Path] = []
+    subdirs: list[Path] = []
     for i in range(1, len(parts), 2):
         sub_label = parts[i].strip()
         input_text = parts[i+1].lstrip()

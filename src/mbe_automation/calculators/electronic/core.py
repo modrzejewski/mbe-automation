@@ -1,7 +1,7 @@
 from __future__ import annotations
+import collections.abc
 import typing
 from pathlib import Path
-from typing import Callable
 
 if typing.TYPE_CHECKING:
     import mbe_automation.structure.clusters
@@ -18,7 +18,7 @@ METHODS = (
     + beyond_rpa.METHODS
 )
 
-_DISPATCH_MAP: dict[str, Callable] = {
+_DISPATCH_MAP: dict[str, collections.abc.Callable] = {
     m: mrcc.to_input_files 
     for m in mrcc.METHODS
 } | {

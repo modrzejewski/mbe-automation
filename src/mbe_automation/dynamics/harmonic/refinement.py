@@ -308,7 +308,7 @@ def _validate_atomic_numbers(
     try:
          target_numbers = np.array([symbol_map[s] for s in target_symbols])
     except KeyError as e:
-         raise ValueError(f"Unknown element symbol '{e.args[0]}' in target structure cannot be validated against atomic numbers.") from e
+         raise ValueError(f"Invalid element symbol '{e.args[0]}' in target structure cannot be validated against atomic numbers.") from e
 
     permuted_source_numbers = _permute_atoms(source_numbers, source_to_target_indices, axis=0)
     

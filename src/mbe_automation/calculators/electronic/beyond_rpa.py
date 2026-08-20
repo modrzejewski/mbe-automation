@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Literal, get_args
+from typing import Literal, get_args
 from pathlib import Path
 
 import mbe_automation.storage.core
@@ -23,8 +23,8 @@ _METHOD_TO_TEMPLATE = {
 def to_input_string(
     method: Method,
     structure: mbe_automation.storage.core.Structure,
-    subsystem_sizes: List[int] | None = None,
-    charges: List[int] | None = None,
+    subsystem_sizes: list[int] | None = None,
+    charges: list[int] | None = None,
     frame_index: int = 0
 ) -> str:
     """
@@ -33,9 +33,9 @@ def to_input_string(
     Args:
         method: Quantum-chemical model.
         structure: Structure object containing coordinates.
-        subsystem_sizes: List of atom counts for each molecule in the
+        subsystem_sizes: list of atom counts for each molecule in the
             molecular cluster.
-        charges: List of charges for each molecule in the molecular cluster.
+        charges: list of charges for each molecule in the molecular cluster.
         frame_index: Index of the frame in the Structure object.
 
     Returns:

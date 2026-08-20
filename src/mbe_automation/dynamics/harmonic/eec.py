@@ -304,14 +304,14 @@ class EECConfig:
 
     def __post_init__(self):
         if self.reference_state_forcing not in ELECTRONIC_ENERGY_CORRECTION:
-            raise ValueError(f"Unknown EECConfig reference_state_forcing: {self.reference_state_forcing}")
+            raise ValueError(f"Invalid EECConfig reference_state_forcing: {self.reference_state_forcing}")
         if self.reference_state_forcing != "none" and (self.T_ref is None or self.V_ref is None):
             raise ValueError(f"T_ref and V_ref must be specified for reference_state_forcing '{self.reference_state_forcing}'.")
         has_baseline = [self.baseline_V0, self.baseline_B0_GPa, self.baseline_B0_prime]
         if any(v is not None for v in has_baseline) and not all(v is not None for v in has_baseline):
             raise ValueError("All three baseline curve parameters (baseline_V0, baseline_B0_GPa, baseline_B0_prime) must be specified.")
         if self.baseline_curve_type not in ("polynomial", "birch_murnaghan"):
-            raise ValueError(f"Unknown baseline_curve_type: '{self.baseline_curve_type}'. Must be 'polynomial' or 'birch_murnaghan'.")
+            raise ValueError(f"Invalid baseline_curve_type: '{self.baseline_curve_type}'. Must be 'polynomial' or 'birch_murnaghan'.")
         if self.reference_state_forcing == "rebase_to_reference" and self.override_baseline_curve:
             raise ValueError(
                 "reference_state_forcing='rebase_to_reference' cannot be combined "
@@ -545,7 +545,7 @@ def _eec_value(
     elif correction_type == "none":
         E_corr = np.zeros_like(V) if isinstance(V, (np.ndarray, list)) else 0.0
     else:
-        raise ValueError(f"Unknown correction type: {correction_type}")
+        raise ValueError(f"Invalid correction type: {correction_type}")
 
     E_final = E_base + E_corr
     E_spline = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"](V)
@@ -610,7 +610,7 @@ def _eec_pressure(
         else:
             dE_corr_dV = 0.0
     else:
-        raise ValueError(f"Unknown correction type: {correction_type}")
+        raise ValueError(f"Invalid correction type: {correction_type}")
 
     dE_final_dV = dE_base_dV + dE_corr_dV
     dE_spline_dV = cold_curve["E_el_crystal_spline (kJ∕mol∕unit cell)"].derivative(1)(V)
@@ -688,7 +688,7 @@ def _eec_param(
             cold_curve=base_cold_curve,
         )
     else:
-        raise ValueError(f"Unknown reference_state_forcing: {config.reference_state_forcing}")
+        raise ValueError(f"Invalid reference_state_forcing: {config.reference_state_forcing}")
 
     p_eec_GPa = _eec_pressure(
         V=config.V_ref,

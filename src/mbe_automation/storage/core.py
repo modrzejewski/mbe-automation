@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Tuple, Literal, overload, Dict
+from typing import Literal, overload
 import pymatgen
 import pymatgen.core.periodic_table
 import pandas as pd
@@ -40,12 +40,12 @@ class BrillouinZonePath:
 
     Parameters
     ----------
-    kpoints : List[npt.NDArray[np.float64]]
-        List of k-points for each segment.
+    kpoints : list[npt.NDArray[np.float64]]
+        list of k-points for each segment.
         Length: n_segments
         Shape of each element: (n_kpoints_in_segment, 3)
-    frequencies : List[npt.NDArray[np.float64]]
-        List of phonon frequencies for each segment.
+    frequencies : list[npt.NDArray[np.float64]]
+        list of phonon frequencies for each segment.
         Length: n_segments
         Shape of each element: (n_kpoints_in_segment, n_bands)
         Units: THz
@@ -61,7 +61,7 @@ class BrillouinZonePath:
         It depends on the connectivity of the path.
         If all segments are connected, n_labels = n_segments + 1.
         If no segments are connected, n_labels = 2 * n_segments.
-    distances : List[npt.NDArray[np.float64]]
+    distances : list[npt.NDArray[np.float64]]
         Distances along the path in reciprocal space, used for plotting.
         Length: n_segments
         Shape of each element: (n_kpoints_in_segment,)
@@ -86,11 +86,11 @@ class BrillouinZonePath:
     labels = ["G", "X", "M", "G"] (4 labels)
 
     """
-    kpoints: List[npt.NDArray[np.float64]]
-    frequencies: List[npt.NDArray[np.float64]]
+    kpoints: list[npt.NDArray[np.float64]]
+    frequencies: list[npt.NDArray[np.float64]]
     path_connections: npt.NDArray[np.bool_]
     labels: npt.NDArray[np.str_]
-    distances: List[npt.NDArray[np.float64]]
+    distances: list[npt.NDArray[np.float64]]
 
 @dataclass
 class EOSCurves:
@@ -149,9 +149,9 @@ class AtomicReference:
 
 @dataclass
 class GroundTruth:
-    energies: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
-    forces: Dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
-    calculation_status: Dict[str, npt.NDArray[np.int64]] = field(default_factory=dict)
+    energies: dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
+    forces: dict[str, npt.NDArray[np.float64]] = field(default_factory=dict)
+    calculation_status: dict[str, npt.NDArray[np.int64]] = field(default_factory=dict)
 
     def copy(self) -> GroundTruth:
         return GroundTruth(
@@ -234,7 +234,7 @@ class Structure:
             self,
             dataset: str,
             key: str,
-            only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
+            only: list[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
             update_mode: Literal["update_properties", "replace"] = "update_properties",
     ) -> None:
         """
@@ -448,7 +448,7 @@ class Trajectory(Structure):
             self,
             dataset: str,
             key: str,
-            only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
+            only: list[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
             update_mode: Literal["update_properties", "replace"] = "update_properties",
     ) -> None:
         """
@@ -509,7 +509,7 @@ class MolecularCrystal:
     ----------
     supercell : Structure
         The underlying periodic atomic structure encompassing all molecules.
-    index_map : List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
+    index_map : list[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
         Mapping of molecule index to the corresponding atomic indices within the `supercell`.
     centers_of_mass : npt.NDArray[np.floating]
         Centers of mass for molecules in the reference frame which was used in a call
@@ -528,7 +528,7 @@ class MolecularCrystal:
         Longest interatomic distance between each molecule and the central reference molecule.
     """
     supercell: Structure
-    index_map: List[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
+    index_map: list[npt.NDArray[np.integer]] | npt.NDArray[np.integer]
     centers_of_mass: npt.NDArray[np.floating]
     identical_composition: bool
     n_molecules: int
@@ -608,7 +608,7 @@ def save_data_frame(
 def read_data_frame(
         dataset: str,
         key: str,
-        columns: List[str] | Literal["all"] = "all"
+        columns: list[str] | Literal["all"] = "all"
 ) -> pd.DataFrame:
 
     with dataset_file(dataset, "r") as f:
@@ -1631,7 +1631,7 @@ def save_finite_subsystem(
         dataset: str,
         key: str,
         subsystem: FiniteSubsystem,
-        only: List[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
+        only: list[Literal[*DATA_FOR_TRAINING]] | Literal[*DATA_FOR_TRAINING] | None = None,
 ) -> None:
     """Save a FiniteSubsystem object to a dataset."""
 
@@ -1803,7 +1803,7 @@ def _save_only(
         dataset: str,
         key: str,
         structure: Structure,
-        quantities: List[Literal[*DATA_FOR_TRAINING]],
+        quantities: list[Literal[*DATA_FOR_TRAINING]],
 ) -> None:
     """
     Save selected physical quantities from

@@ -224,7 +224,7 @@ def fit(
         equation_of_state not in nonlinear_fit and
         equation_of_state not in interpolation):
         
-        raise ValueError(f"Unknown EOS: {equation_of_state}")
+        raise ValueError(f"Invalid EOS: {equation_of_state}")
 
     if equation_of_state in interpolation:
         spline_fit = spline_interpolation(V, G)
@@ -296,7 +296,7 @@ def get_minimum_points_for_eos(equation_of_state: str) -> int:
     elif equation_of_state in ["spline", "vinet", "birch_murnaghan"]:
         return 4
     else:
-        raise ValueError(f"Unknown EOS: {equation_of_state}")
+        raise ValueError(f"Invalid EOS: {equation_of_state}")
 
 def cold_curve(
     V: npt.NDArray[np.float64],

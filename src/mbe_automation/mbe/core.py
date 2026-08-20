@@ -1,7 +1,8 @@
 from __future__ import annotations
+import collections.abc
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -124,7 +125,7 @@ class MBEMetadata(_MBEMetadata):
         self,
         dir: str | Path,
         method: mbe_automation.calculators.electronic.Method,
-        cluster_types: Sequence[str] | None = None,
+        cluster_types: collections.abc.Sequence[str] | None = None,
     ) -> None:
         """
         Batch generate quantum chemistry input files for clusters.
@@ -143,7 +144,7 @@ class MBEMetadata(_MBEMetadata):
     def to_xyz(
         self,
         dir: str | Path,
-        cluster_types: Sequence[str] | None = None,
+        cluster_types: collections.abc.Sequence[str] | None = None,
     ) -> None:
         """
         Batch export .xyz cluster geometries.
@@ -160,7 +161,7 @@ class MBEMetadata(_MBEMetadata):
     def to_csv(
         self,
         dir: str | Path,
-        cluster_types: Sequence[str] | None = None,
+        cluster_types: collections.abc.Sequence[str] | None = None,
         decimal_digits: int | None = 4,
     ) -> None:
         """

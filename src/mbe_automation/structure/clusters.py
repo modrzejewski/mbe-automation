@@ -1,7 +1,8 @@
 from __future__ import annotations
+import collections.abc
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Literal, Dict, Tuple, Iterator
+from typing import Literal
 import math
 import itertools
 from functools import cached_property
@@ -62,15 +63,15 @@ class SupercellMolecules:
         n_equivalent: Array where `n_equivalent[k]` specifies the number
             of occurences of the k-th unique molecule in the supercell.
         n_unit_cells: Number of unit cells used to construct this supercell.
-        positions: List of atomic coordinates. `positions[k]` has shape
+        positions: list of atomic coordinates. `positions[k]` has shape
             `(n_equivalent[k], n_atoms, 3)`.
-        atomic_numbers: List of atomic numbers. `atomic_numbers[k]` has shape
+        atomic_numbers: list of atomic numbers. `atomic_numbers[k]` has shape
             `(n_equivalent[k], n_atoms)`.
-        masses: List of atomic masses. `masses[k]` has shape
+        masses: list of atomic masses. `masses[k]` has shape
             `(n_equivalent[k], n_atoms)`.
-        centers_of_mass: List of centers of mass. `centers_of_mass[k]` has shape
+        centers_of_mass: list of centers of mass. `centers_of_mass[k]` has shape
             `(n_equivalent[k], 3)`.
-        min_distance_to_ref_molecule: List of arrays where the k-th array has shape
+        min_distance_to_ref_molecule: list of arrays where the k-th array has shape
             `(n_molecules_unique, n_equivalent[k])` representing the minimum
             atom-atom distance to each reference molecule.
     """
@@ -78,17 +79,17 @@ class SupercellMolecules:
     n_molecules_unique: int
     n_equivalent: npt.NDArray[np.int64]
     n_unit_cells: int
-    positions: List[npt.NDArray[np.float64]]
-    atomic_numbers: List[npt.NDArray[np.int64]]
-    masses: List[npt.NDArray[np.float64]]
-    centers_of_mass: List[npt.NDArray[np.float64]]
-    min_distance_to_ref_molecule: List[npt.NDArray[np.float64]]
+    positions: list[npt.NDArray[np.float64]]
+    atomic_numbers: list[npt.NDArray[np.int64]]
+    masses: list[npt.NDArray[np.float64]]
+    centers_of_mass: list[npt.NDArray[np.float64]]
+    min_distance_to_ref_molecule: list[npt.NDArray[np.float64]]
 
     def symmetry_unique_clusters(
         self,
         unique_cluster_filter: UniqueClustersFilter,
         key: str | None = None,
-    ) -> Dict[str, UniqueClusters]:
+    ) -> dict[str, UniqueClusters]:
         """
         Extract symmetry-unique molecular clusters from the supercell.
         """
@@ -103,7 +104,7 @@ class SupercellMolecules:
         )
         return results
 
-    def reference_molecules(self) -> Tuple[mbe_automation.storage.core.Structure, ...]:
+    def reference_molecules(self) -> tuple[mbe_automation.storage.core.Structure, ...]:
         """
         Return the central reference molecules (index 0) for each unique type in the unit cell.
         """
@@ -145,7 +146,7 @@ class ReducibleClusters:
             is given by `composition[k]`. For example, if `composition` is `(0, 0, 1)`,
             a row `[0, 5, 2]` represents a cluster formed by the 0th candidate of type 0,
             the 5th candidate of type 0, and the 2nd candidate of type 1.
-        candidate_to_supercell: List of arrays mapping candidate indices `c_idx` to supercell
+        candidate_to_supercell: list of arrays mapping candidate indices `c_idx` to supercell
             molecule indices `eq_i` for each unique molecule type.
         sorted_min_rij: Array of minimum intermolecular distances (in Å) for each cluster,
             used to quickly assess potential symmetry equivalence.
@@ -155,9 +156,9 @@ class ReducibleClusters:
             their `sorted_min_rij` arrays is strictly less than this threshold.
     """
     n_clusters: int
-    composition: Tuple[int, ...]
+    composition: tuple[int, ...]
     clusters: npt.NDArray[np.int64]
-    candidate_to_supercell: List[npt.NDArray[np.int64]]
+    candidate_to_supercell: list[npt.NDArray[np.int64]]
     sorted_min_rij: npt.NDArray[np.float64]
     sorted_max_rij: npt.NDArray[np.float64]
     alignment_thresh: float
@@ -165,7 +166,7 @@ class ReducibleClusters:
     def __len__(self) -> int:
         return self.n_clusters
 
-    def __getitem__(self, cluster_idx: int) -> Tuple[int, ...]:
+    def __getitem__(self, cluster_idx: int) -> tuple[int, ...]:
         """
         Returns the mapped supercell molecule indices `eq_i` for the requested cluster.
 
@@ -174,7 +175,7 @@ class ReducibleClusters:
         """
         return self.to_supercell_indices(cluster_idx)
 
-    def to_supercell_indices(self, cluster_idx: int) -> Tuple[int, ...]:
+    def to_supercell_indices(self, cluster_idx: int) -> tuple[int, ...]:
         """
         Returns the tuple of supercell molecule indices `eq_i` for a specific cluster.
         """
@@ -239,11 +240,11 @@ class UniqueClusters:
     Attributes:
         n_clusters_unique: Number of symmetry-unique clusters.
         n_clusters_reducible: Number of candidate reducible clusters prior to symmetry reduction.
-        composition: Tuple of molecule types defining the cluster composition.
+        composition: tuple of molecule types defining the cluster composition.
         structures: A single `Structure` object where `n_frames` corresponds
             to the number of symmetry-unique clusters. Contains the Cartesian
             coordinates (`positions`) of all clusters.
-        reference_molecules: Tuple of `Structure` objects representing all
+        reference_molecules: tuple of `Structure` objects representing all
             unique molecules of the unit cell. Its length matches the total
             number of unique molecules, allowing it to be indexed by the
             integers in `composition`. Note that this tuple includes all unit
@@ -259,9 +260,9 @@ class UniqueClusters:
     """
     n_clusters_unique: int
     n_clusters_reducible: int
-    composition: Tuple[int, ...]
+    composition: tuple[int, ...]
     structures: mbe_automation.storage.core.Structure
-    reference_molecules: Tuple[mbe_automation.storage.core.Structure, ...]
+    reference_molecules: tuple[mbe_automation.storage.core.Structure, ...]
     weights: npt.NDArray[np.int64]
     n_molecules_equivalent: npt.NDArray[np.int64]
     sorted_min_rij: npt.NDArray[np.float64]
@@ -449,12 +450,12 @@ class _ClusterAccumulator:
         atomic_numbers: Concatenated atomic numbers of each cluster.
         masses: Concatenated atomic masses of each cluster.
     """
-    supercell_molecule_indices: List[Tuple[int, ...]]
-    weights: List[int]
-    reducible_cluster_indices: List[int]
-    positions: List[npt.NDArray[np.float64]]
-    atomic_numbers: List[npt.NDArray[np.int64]]
-    masses: List[npt.NDArray[np.float64]]
+    supercell_molecule_indices: list[tuple[int, ...]]
+    weights: list[int]
+    reducible_cluster_indices: list[int]
+    positions: list[npt.NDArray[np.float64]]
+    atomic_numbers: list[npt.NDArray[np.int64]]
+    masses: list[npt.NDArray[np.float64]]
 
     @staticmethod
     def empty() -> "_ClusterAccumulator":
@@ -494,10 +495,10 @@ class MolecularComposition:
 
     Attributes:
         molecular_crystal: Full periodic molecular crystal graph representation.
-        molecules_nonunique: List containing all individual
+        molecules_nonunique: list containing all individual
             molecules found within the periodic cell.
         n_molecules_nonunique: Total count of all molecules in the cell.
-        molecules_unique: List of the representative unique molecules.
+        molecules_unique: list of the representative unique molecules.
         n_molecules_unique: Count of unique molecules.
         n_equivalent: n_equivalent[k] specifies how many equivalent molecules
             correspond to k-th unique molecule.
@@ -505,9 +506,9 @@ class MolecularComposition:
             pointing to the equivalent molecules in `molecules_nonunique`.
     """
     molecular_crystal: mbe_automation.storage.core.MolecularCrystal
-    molecules_nonunique: List[mbe_automation.storage.Structure]
+    molecules_nonunique: list[mbe_automation.storage.Structure]
     n_molecules_nonunique: int
-    molecules_unique: List[mbe_automation.storage.Structure]
+    molecules_unique: list[mbe_automation.storage.Structure]
     n_molecules_unique: int
     n_equivalent: npt.NDArray[np.int64]
     groups: list[npt.NDArray[np.int64]]
@@ -520,7 +521,7 @@ class MolecularComposition:
         self,
         unique_molecule_index: int,
         frame_index: int = 0
-    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64], npt.NDArray[np.float64]]:
         """
         Extract the positions, atomic numbers, and masses for all molecules of a given unique type.
         """
@@ -736,7 +737,7 @@ def GetSupercellDimensions(UnitCell, SupercellRadius):
 
 def _test_identical_composition(
     system: mbe_automation.storage.Structure,
-    index_map: List[npt.NDArray[np.integer]]
+    index_map: list[npt.NDArray[np.integer]]
 ) -> bool:
     """
     Tests if all molecules have the same elemental composition using np.bincount.
@@ -1034,7 +1035,7 @@ def _extract_finite_subsystem(
 
 
 def _group_molecules_by_energy(
-        molecules: List[mbe_automation.storage.Structure],
+        molecules: list[mbe_automation.storage.Structure],
         thresh: float = 1.0E-5, # eV/atom
 ) -> list[npt.NDArray[np.int64]]:
     """
@@ -1077,7 +1078,7 @@ def _extract_nonunique_molecules(
         molecular_crystal: mbe_automation.storage.MolecularCrystal,
         reference_frame_index: int = 0,
         calculator: ASECalculator | None = None,
-) -> List[mbe_automation.storage.Structure]:
+) -> list[mbe_automation.storage.Structure]:
     """
     Extract all molecules present in a unit cell as a list of separate
     Structures.
@@ -1116,7 +1117,7 @@ def _extract_nonunique_molecules(
 
 
 def _group_molecules_by_rmsd(
-        molecules: List[mbe_automation.storage.Structure],
+        molecules: list[mbe_automation.storage.Structure],
         thresh: float = SYMMETRY_TOLERANCE_LOOSE,
 ) -> list[npt.NDArray[np.int64]]:
     n_mols = len(molecules)
@@ -1148,7 +1149,7 @@ def _group_molecules_by_rmsd(
     return grouped_indices
 
 def _split_groups_by_rmsd(
-        molecules_nonunique: List[mbe_automation.storage.Structure],
+        molecules_nonunique: list[mbe_automation.storage.Structure],
         energy_groups: list[npt.NDArray[np.int64]],
         rmsd_thresh: float = SYMMETRY_TOLERANCE_LOOSE,
 ) -> list[npt.NDArray[np.int64]]:
@@ -1167,7 +1168,7 @@ def _split_groups_by_rmsd(
 
 
 def _display_unique_molecules(
-        molecules_nonunique: List[mbe_automation.storage.Structure],
+        molecules_nonunique: list[mbe_automation.storage.Structure],
         groups: list[npt.NDArray[np.int64]],
         energies_available: bool,
 ):
@@ -1356,7 +1357,7 @@ def _shortest_atom_atom_distance(
 
 
 def _cartesian_supercell_shifts(
-    supercell_size: List[int] | Tuple[int, int, int] | npt.NDArray[np.int64],
+    supercell_size: list[int] | tuple[int, int, int] | npt.NDArray[np.int64],
     cell_vectors: npt.NDArray[np.float64],
     boundary_axis: int | None = None
 ) -> npt.NDArray[np.float64]:
@@ -1621,7 +1622,7 @@ def _extract_relaxed_unique_molecules(
 def extract_finite_subsystem(
         system: mbe_automation.storage.MolecularCrystal,
         filter: FiniteSubsystemFilter | None = None,
-) -> List[mbe_automation.storage.FiniteSubsystem]:
+) -> list[mbe_automation.storage.FiniteSubsystem]:
     """
     Extract symmetry-unique clusters from a MolecularCrystal.
     """
@@ -1683,7 +1684,7 @@ def extract_finite_subsystem(
 def _candidates_within_sphere(
     supercell_molecules: SupercellMolecules,
     unique_cluster_filter: UniqueClustersFilter,
-) -> Tuple[List[npt.NDArray[np.int64]], List[npt.NDArray[np.float64]]]:
+) -> tuple[list[npt.NDArray[np.int64]], list[npt.NDArray[np.float64]]]:
     """
     Filter supercell molecules to those within the distance cutoff from any central reference molecule.
 
@@ -1700,9 +1701,9 @@ def _candidates_within_sphere(
         unique_cluster_filter: The filter containing cutoffs for inclusion in the candidate pool.
 
     Returns:
-        candidate_to_supercell: List of arrays (length n_unique) containing the supercell
+        candidate_to_supercell: list of arrays (length n_unique) containing the supercell
                                 molecule indices of the valid candidates.
-        candidate_positions: List of arrays (length n_unique) containing the coordinates
+        candidate_positions: list of arrays (length n_unique) containing the coordinates
                              of the valid candidates.
     """
     max_cutoff = max([v for v in unique_cluster_filter.cutoffs.values() if v is not None], default=0.0)
@@ -1729,7 +1730,7 @@ def _candidates_within_sphere(
 def _intermolecular_distances(
     positions_a: npt.NDArray[np.float64],
     positions_b: npt.NDArray[np.float64]
-) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
     Computes the shortest and longest atom-atom distances between two sets of molecules.
 
@@ -1761,14 +1762,14 @@ def _intermolecular_distances(
 
 
 def _candidate_distances(
-    candidate_positions: List[npt.NDArray[np.float64]],
-) -> Tuple[List[List[npt.NDArray[np.float64]]], List[List[npt.NDArray[np.float64]]]]:
+    candidate_positions: list[npt.NDArray[np.float64]],
+) -> tuple[list[list[npt.NDArray[np.float64]]], list[list[npt.NDArray[np.float64]]]]:
     """
     Calculate the minimum and maximum distance matrices between candidates
     resolved into groups corresponding to unique molecules (u, v).
 
     Args:
-        candidate_positions: List of arrays containing the coordinates of valid
+        candidate_positions: list of arrays containing the coordinates of valid
             candidates, grouped by unique molecule type. `candidate_positions[u]`
             is a numpy array of shape `(N_u, N_atoms, 3)` representing all
             candidate molecules of type `u`.
@@ -1803,7 +1804,7 @@ def _candidate_distances(
     return min_rij, max_rij
 
 
-def _canonical_cluster_types(n_unique: int, cluster_size: int) -> Iterator[Tuple[int, ...]]:
+def _canonical_cluster_types(n_unique: int, cluster_size: int) -> collections.abc.Iterator[tuple[int, ...]]:
     """
     Generate all possible canonical cluster compositions.
 
@@ -1818,11 +1819,11 @@ def _canonical_cluster_types(n_unique: int, cluster_size: int) -> Iterator[Tuple
 
 
 def _filter_candidates_by_min_rij(
-    composition: Tuple[int, ...],
+    composition: tuple[int, ...],
     max_min_rij: float | None,
-    min_rij: List[List[npt.NDArray[np.float64]]],
-    max_rij: List[List[npt.NDArray[np.float64]]],
-    candidate_to_supercell: List[npt.NDArray[np.int64]],
+    min_rij: list[list[npt.NDArray[np.float64]]],
+    max_rij: list[list[npt.NDArray[np.float64]]],
+    candidate_to_supercell: list[npt.NDArray[np.int64]],
     alignment_thresh: float,
 ) -> ReducibleClusters:
     """
@@ -1940,7 +1941,7 @@ def subsystem_label(indices: tuple[int, ...], n_molecules: int) -> str:
     Generate a binary bitmask string label for a subsystem of a given cluster.
 
     Args:
-        indices: Tuple of zero-based indices of molecules included in the subsystem.
+        indices: tuple of zero-based indices of molecules included in the subsystem.
         n_molecules: Total number of molecules in the cluster.
 
     Returns:
@@ -1953,13 +1954,13 @@ def subsystem_label(indices: tuple[int, ...], n_molecules: int) -> str:
     return "".join(mask)
 
 
-def _composition_to_string(composition: Tuple[int, ...]) -> str:
+def _composition_to_string(composition: tuple[int, ...]) -> str:
     """Convert a composition tuple like (0, 0, 1) to a letter string like 'AAB'."""
     return "".join(unique_molecule_label(u) for u in composition)
 
 
 def _cluster_label(
-    composition: Tuple[int, ...],
+    composition: tuple[int, ...],
     unique_cluster_index: int,
     n_clusters_unique: int,
     cluster: mbe_automation.storage.core.Structure,
@@ -2021,7 +2022,7 @@ def _cluster_size(cluster_type: str) -> int:
     sizes = {"monomers": 1, "dimers": 2, "trimers": 3, "tetramers": 4}
     if cluster_type not in sizes:
         raise ValueError(
-            f"Unknown cluster type '{cluster_type}'. "
+            f"Invalid cluster type '{cluster_type}'. "
             f"Supported types: {list(sizes.keys())}"
         )
     return sizes[cluster_type]
@@ -2029,7 +2030,7 @@ def _cluster_size(cluster_type: str) -> int:
 
 def _print_cluster_summary(
     unique_cluster_filter: UniqueClustersFilter,
-    results: Dict[str, UniqueClusters],
+    results: dict[str, UniqueClusters],
 ) -> None:
     """Print a lightweight summary table of the extracted clusters."""
     col_w = 22
@@ -2061,7 +2062,7 @@ def _symmetry_unique_clusters(
     supercell_molecules: SupercellMolecules,
     unique_cluster_filter: UniqueClustersFilter,
     key: str | None = None, # dataset key (only to display a message)
-) -> Dict[str, UniqueClusters]:
+) -> dict[str, UniqueClusters]:
 
 
     if key is not None:
