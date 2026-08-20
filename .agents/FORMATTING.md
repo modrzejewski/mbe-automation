@@ -3,7 +3,7 @@
 ## Function Definitions
 
 *   **Line Breaks:** Always place a line break after every argument definition, including the last one.
-*   **Type Hints:** All arguments must have type hints.
+*   **Type Hints:** All arguments must have type hints. Prefer Python native types (e.g., `dict`, `list`, `tuple`) over their capitalized equivalents from the `typing` module. Use the pipe operator `|` for unions and optional types (e.g., `list | None`) instead of importing `Union` or `Optional` from the `typing` module.
 *   **Numpy Arrays:** Type hints for numpy arrays must specify both the array type and the numerical type (e.g., `npt.NDArray[np.float64]`).
 
 ### Example
@@ -52,3 +52,20 @@ mbe_automation.dynamics.harmonic.bands.reorder(
     *   **Scope:** This rule applies to unit labels inside keys/column names/metadata. In free-form prose, docstrings, or arithmetic expressions, keep the ordinary `/`.
 
 
+## Line Lengths and Long Statements
+
+*   **Line Length Limit**: Aim for a maximum line length of 88 characters to improve readability.
+*   **Long Assertions and Strings**: When writing assertions with long error messages or long string literals, use parentheses to implicitly concatenate strings and break them across multiple lines, rather than extending the line or using the `\` continuation character.
+
+### Example
+
+```python
+assert method in _METHODS, (
+    f"Method '{method}' is not supported. "
+    f"Supported methods are: {', '.join(_METHODS)}"
+)
+```
+
+## Error Messages
+
+*   **Invalid vs Unknown**: Prefer the word "Invalid" instead of "Unknown" when writing error messages for invalid parameters or arguments. (e.g., `ValueError("Invalid electronic method...")`).

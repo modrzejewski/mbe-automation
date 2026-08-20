@@ -85,7 +85,7 @@ Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single
 #### Methods
 *   **`read`**: Load the object from a dataset file.
 *   **`save`**: Saves the object to a dataset file. Supports `update_properties` mode to update energies, forces, and feature vectors (if missing), without overwriting geometry.
-*   **`from_xyz_file`**: Creates a structure object from an XYZ file. Takes `read_path`, `transform` (symmetry transformation, default `"to_symmetrized_primitive_cell"`), and `symprec` (symmetry tolerance).
+*   **`from_file`**: Creates a structure object from XYZ, CIF, POSCAR, and other file formats (recognized by extension). Takes `read_path`, `transform` (symmetry transformation, default `"to_symmetrized_primitive_cell"`), and `symprec` (symmetry tolerance).
 *   **`subsample`**: Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). Requires feature vectors.
 *   **`select`**: Returns a new object containing only the specified frames (by index).
 *   **`run`**: Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. Can distribute work via `chunk`.
@@ -139,7 +139,7 @@ Periodic crystal structure with additional topological information about its con
 Decomposition of the periodic unit cell into unique and non-unique molecules.
 
 #### Methods
-*   **`from_xyz_file`**: Loads a composition and performs molecular identification.
+*   **`from_file`**: Loads a composition and performs molecular identification.
 
 ### FiniteSubsystem
 
@@ -395,7 +395,7 @@ Configuration for generating distorted structures by sampling along normal mode 
 
 ### FiniteSubsystemFilter
 
-🔗 [`mbe_automation.structure.clusters.FiniteSubsystemFilter`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/clusters.py#L16)
+🔗 [`mbe_automation.FiniteSubsystemFilter`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/structure/filters.py)
 
 Specifies how finite molecular clusters are extracted from periodic frames.
 

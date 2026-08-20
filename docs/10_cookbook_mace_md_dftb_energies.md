@@ -60,7 +60,7 @@ import mbe_automation
 from mbe_automation.configs.md import Enthalpy, ClassicalMD
 from mbe_automation import Structure
 
-crystal = Structure.from_xyz_file("urea_x23_geometry.xyz")
+crystal = Structure.from_file("urea_x23_geometry.xyz")
 molecule = crystal.extract_all_molecules()[0]
 
 calculator = MACE(
@@ -156,7 +156,7 @@ Read the periodic MD trajectory, extract finite clusters (n ≥ 2), and compute 
 import mbe_automation
 import numpy as np
 from mbe_automation import Structure, DatasetKeys
-from mbe_automation.configs.clusters import FiniteSubsystemFilter
+from mbe_automation import FiniteSubsystemFilter
 from mbe_automation.calculators import MACE
 
 dataset = "md_structures.hdf5"

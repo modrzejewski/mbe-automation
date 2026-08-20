@@ -20,7 +20,7 @@ import mbe_automation.structure
 import mbe_automation.storage.core
 import mbe_automation.storage.views
 import mbe_automation.common.display
-from mbe_automation.configs.structure import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
+from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 from mbe_automation.dynamics.harmonic.modes import symmetrize_adps
 
 def _read_cif_pymatgen(filepath: str | Path) -> pymatgen.core.Structure:

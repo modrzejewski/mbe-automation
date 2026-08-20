@@ -62,3 +62,6 @@ gpu-cuda12 = [
   "cutensor-cu12",
   "ray",
 ]
+
+[tool.setuptools.package-data]
+mbe_automation = ["templates/**/*"]

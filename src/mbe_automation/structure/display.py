@@ -1,7 +1,10 @@
 from __future__ import annotations
 import chemiscope
-import pymatviz
+import matplotlib.pyplot as plt
 import numpy as np
+import os
+import pymatviz
+from pathlib import Path
 
 import mbe_automation.storage
 
@@ -70,3 +73,83 @@ def to_chemiscope(
         properties=properties
     )
 
+def plot_cumulative_cluster_count(
+    unique_clusters: dict[str, "mbe_automation.structure.clusters.UniqueClusters"],
+    save_path: str | Path | None = None
+) -> plt.Figure | None:
+    """
+    Generate and save a multi-panel cumulative cluster count plot vs distance.
+    Groups clusters elegantly by len(composition) and plots on a shared Y-axis.
+    """
+    # Find all unique cluster sizes (excluding monomers and empty clusters)
+    sizes = sorted(
+        set(
+            c.n_molecules
+            for c in unique_clusters.values()
+            if c.n_molecules > 1 and c.n_clusters_unique > 0
+        )
+    )
+    n_panels = len(sizes)
+    
+    if n_panels == 0:
+        return
+        
+    fig, axes = plt.subplots(1, n_panels, figsize=(5 * n_panels, 6), sharey=True)
+    if n_panels == 1:
+        axes = [axes]
+        
+    color_idx = 0
+    for ax, size in zip(axes, sizes):
+        clusters_of_size = [
+            c
+            for c in unique_clusters.values()
+            if c.n_molecules == size and c.n_clusters_unique > 0
+        ]
+        base_type_name = clusters_of_size[0].type_string
+        
+        for clusters in clusters_of_size:
+            distances = clusters.characteristic_distances
+            
+            if size == 2:
+                xlabel_dist = r"$\min\; r_{ij}$ (Å)"
+            else:
+                xlabel_dist = r"$\max\; \min\; r_{ij}$ (Å)"
+                
+            counts = np.arange(1, len(distances) + 1)
+            
+            # For a single-component crystal, label the line as 'Dimers' (or base_type).
+            # For multi-component, use 'AA', 'AB' etc.
+            is_single_component = clusters.n_molecules_unique == 1
+            line_label = base_type_name.capitalize() if is_single_component else clusters.composition_string
+            
+            ax.plot(
+                distances,
+                counts,
+                label=line_label,
+                drawstyle="steps-post",
+                linewidth=2,
+                color=plt.cm.tab10(color_idx % 10)
+            )
+            color_idx += 1
+
+        ax.set_xlabel(xlabel_dist)
+        
+        if not (clusters_of_size[0].n_molecules_unique == 1):
+            ax.legend(title=base_type_name.capitalize())
+        else:
+            ax.legend()
+            
+        ax.grid(True, linestyle="--", alpha=0.7)
+        
+    axes[0].set_ylabel("Symmetry-unique clusters")
+    plt.tight_layout()
+    
+    if save_path is not None:
+        save_dir = Path(save_path).parent
+        if str(save_dir) != ".":
+            save_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path, dpi=300)
+        plt.close(fig)
+        return None
+    else:
+        return fig

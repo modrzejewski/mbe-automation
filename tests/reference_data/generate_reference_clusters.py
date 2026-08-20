@@ -9,7 +9,7 @@ sys.path.insert(0, str(project_root))
 
 from test_cases import TEST_CASES
 import mbe_automation.directory_structure as directory_structure
-import mbe_automation.mbe as mbe
+import mbe_automation.mbe_legacy as mbe
 
 DIMERS_CUTOFF = 30.0
 TRIMERS_CUTOFF = 10.0

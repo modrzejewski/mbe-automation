@@ -22,7 +22,8 @@ Library for high-level automation of thermodynamics modeling with machine-learni
 
 ## Workflows
 
-*   [Quasi-Harmonic Calculation](./06_quasi_harmonic.md)
+*   [Many-Body Expansion of the Lattice Energy](./13_many_body_expansion.md)
+*   [Quasi-Harmonic Thermodynamics](./06_quasi_harmonic.md)
 *   [Molecular Dynamics](./07_molecular_dynamics.md)
 *   [MD sampling and phonon sampling](./08_training_set.md)
 

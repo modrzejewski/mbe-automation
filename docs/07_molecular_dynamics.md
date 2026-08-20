@@ -31,8 +31,8 @@ The MD workflow is configured using the `Enthalpy` and `ClassicalMD` classes fro
 
 ```python
 md_config = mbe_automation.configs.md.Enthalpy(
-    molecule=Structure.from_xyz_file(xyz_molecule),
-    crystal=Structure.from_xyz_file(xyz_solid),
+    molecule=Structure.from_file(xyz_molecule),
+    crystal=Structure.from_file(xyz_solid),
     calculator=mace_calc,
     temperatures_K=np.array([298.15]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
@@ -125,8 +125,8 @@ xyz_molecule = "path/to/your/molecule.xyz"
 mace_calc = MACE(model_path="path/to/your/model.model")
 
 md_config = mbe_automation.configs.md.Enthalpy(
-    molecule=Structure.from_xyz_file(xyz_molecule),
-    crystal=Structure.from_xyz_file(xyz_solid),
+    molecule=Structure.from_file(xyz_molecule),
+    crystal=Structure.from_file(xyz_solid),
     calculator=mace_calc,
     temperatures_K=np.array([298.15]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
