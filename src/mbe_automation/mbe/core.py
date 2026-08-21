@@ -12,13 +12,14 @@ import mbe_automation.storage.core
 import mbe_automation.storage.mbe
 from mbe_automation.structure.clusters import UniqueClusters
 from mbe_automation.storage.mbe import _MBEMetadata
+from mbe_automation.mbe.tasks import ClusterSelection
 
 if TYPE_CHECKING:
     from mbe_automation.storage.core import Structure
 
 
 @dataclass(kw_only=True)
-class MBEMetadata(_MBEMetadata):
+class Decomposition(_MBEMetadata):
     """
     Store metadata and geometric parameters of Many-Body Expansion (MBE) calculations.
 
@@ -41,9 +42,9 @@ class MBEMetadata(_MBEMetadata):
         cls,
         dataset: str | Path,
         key: str,
-    ) -> MBEMetadata:
+    ) -> Decomposition:
         """
-        Read MBEMetadata from a dataset file.
+        Read Decomposition from a dataset file.
         """
         raw = mbe_automation.storage.mbe.read_mbe_metadata(
             dataset=dataset,
@@ -58,6 +59,32 @@ class MBEMetadata(_MBEMetadata):
         return mbe_automation.storage.core.read_structure(
             dataset=self.dataset,
             key=self.crystal_key,
+        )
+
+    def select(self, cluster_type: str) -> ClusterSelection:
+        """
+        Start a fluent selection of clusters for task scheduling.
+
+        Args:
+            cluster_type: Cluster type identifier (e.g. "dimers",
+                "trimers"). Must match at least one entry in
+                ``self.cluster_types`` via prefix matching.
+
+        Returns:
+            A ``ClusterSelection`` builder.
+        """
+        matching = [
+            ct for ct in self.cluster_types
+            if ct.startswith(cluster_type)
+        ]
+        if not matching:
+            raise ValueError(
+                f"No cluster types matching '{cluster_type}'. "
+                f"Available types: {self.cluster_types}"
+            )
+        return ClusterSelection(
+            _mbe=self,
+            _cluster_type=cluster_type,
         )
 
     def read_clusters(
@@ -121,25 +148,6 @@ class MBEMetadata(_MBEMetadata):
                 f"Supported properties are: ['cumulative_cluster_count']"
             )
 
-    def to_input_files(
-        self,
-        dir: str | Path,
-        method: mbe_automation.calculators.electronic.Method,
-        cluster_types: Sequence[str] | None = None,
-    ) -> None:
-        """
-        Batch generate quantum chemistry input files for clusters.
-        """
-        selected_types = cluster_types or self.cluster_types
-        dir_path = Path(dir)
-        for cluster_type in selected_types:
-            mbe_automation.calculators.electronic.to_input_files(
-                unique_clusters=self.read_clusters(
-                    cluster_type=cluster_type,
-                ),
-                dir=dir_path / cluster_type,
-                method=method,
-            )
 
     def to_xyz(
         self,

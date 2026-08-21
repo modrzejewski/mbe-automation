@@ -15,11 +15,11 @@ from mbe_automation import (
     MACE,
     UniqueClustersFilter,
 )
-from mbe_automation.api import MBEMetadata as APIMBEMetadata
-from mbe_automation.mbe import MBEMetadata
+from mbe_automation.api import Decomposition as APIDecomposition
+from mbe_automation.mbe import Decomposition
 from mbe_automation.storage import Structure, from_xyz_file
 from mbe_automation.structure.clusters import UniqueClusters
-from mbe_automation.configs.many_body_expansion import MBE
+from mbe_automation.configs.many_body_expansion import Clusters
 from mbe_automation.storage import (
     save_structure,
     save_unique_clusters,
@@ -103,7 +103,7 @@ def test_mbe_metadata_serialization_roundtrip(tmp_path: Path):
     clusters = _create_mock_unique_clusters()
     save_unique_clusters(
         dataset=dataset_path,
-        key=f"{root_key}/unique_clusters/dimers[AA]",
+        key=f"{root_key}/cleaved/dimers[AA]",
         clusters=clusters,
     )
 
@@ -114,9 +114,9 @@ def test_mbe_metadata_serialization_roundtrip(tmp_path: Path):
 
     df_dimers = clusters.to_data_frame()
     geometric_parameters = {"dimers[AA]": df_dimers}
-    unique_clusters_keys = {"dimers[AA]": f"{root_key}/unique_clusters/dimers[AA]"}
+    unique_clusters_keys = {"dimers[AA]": f"{root_key}/cleaved/dimers[AA]"}
 
-    mbe_obj = MBEMetadata(
+    mbe_obj = Decomposition(
         cluster_types=["dimers[AA]"],
         unique_clusters_keys=unique_clusters_keys,
         crystal_key=f"{root_key}/structures/crystal[input]",
@@ -166,7 +166,7 @@ def test_mbe_metadata_inspection_and_api(tmp_path: Path):
     clusters = _create_mock_unique_clusters()
     save_unique_clusters(
         dataset=dataset_path,
-        key=f"{root_key}/unique_clusters/dimers[AA]",
+        key=f"{root_key}/cleaved/dimers[AA]",
         clusters=clusters,
     )
 
@@ -175,9 +175,9 @@ def test_mbe_metadata_inspection_and_api(tmp_path: Path):
         cutoffs={"dimers": 15.0},
     )
 
-    mbe_obj = MBEMetadata(
+    mbe_obj = Decomposition(
         cluster_types=["dimers[AA]"],
-        unique_clusters_keys={"dimers[AA]": f"{root_key}/unique_clusters/dimers[AA]"},
+        unique_clusters_keys={"dimers[AA]": f"{root_key}/cleaved/dimers[AA]"},
         crystal_key=f"{root_key}/structures/crystal[input]",
         dataset=dataset_path,
         root_key=root_key,
@@ -193,13 +193,13 @@ def test_mbe_metadata_inspection_and_api(tmp_path: Path):
 
     keys = DatasetKeys(dataset_path)
     assert f"{root_key}/mbe_metadata" in keys.mbe_metadata()
-    assert f"{root_key}/unique_clusters/dimers[AA]" in keys.unique_clusters()
+    assert f"{root_key}/cleaved/dimers[AA]" in keys.unique_clusters()
 
-    api_loaded = APIMBEMetadata.read(
+    api_loaded = APIDecomposition.read(
         dataset=str(dataset_path),
         key=f"{root_key}/mbe_metadata",
     )
-    assert isinstance(api_loaded, APIMBEMetadata)
+    assert isinstance(api_loaded, APIDecomposition)
     assert isinstance(api_loaded.dataset, Path)
     assert api_loaded.dataset == dataset_path
     assert api_loaded.cluster_types == ["dimers[AA]"]
@@ -208,7 +208,7 @@ def test_mbe_metadata_inspection_and_api(tmp_path: Path):
         dataset=str(dataset_path),
         key=f"{root_key}/mbe_metadata",
     )
-    assert isinstance(any_loaded, APIMBEMetadata)
+    assert isinstance(any_loaded, APIDecomposition)
     assert isinstance(any_loaded.dataset, Path)
     assert any_loaded.dataset == dataset_path
 
@@ -227,7 +227,7 @@ def test_mbe_metadata_methods(tmp_path: Path):
     clusters = _create_mock_unique_clusters()
     save_unique_clusters(
         dataset=dataset_path,
-        key=f"{root_key}/unique_clusters/dimers[AA]",
+        key=f"{root_key}/cleaved/dimers[AA]",
         clusters=clusters,
     )
 
@@ -236,9 +236,9 @@ def test_mbe_metadata_methods(tmp_path: Path):
         cutoffs={"dimers": 15.0},
     )
 
-    mbe_obj = MBEMetadata(
+    mbe_obj = Decomposition(
         cluster_types=["dimers[AA]"],
-        unique_clusters_keys={"dimers[AA]": f"{root_key}/unique_clusters/dimers[AA]"},
+        unique_clusters_keys={"dimers[AA]": f"{root_key}/cleaved/dimers[AA]"},
         crystal_key=f"{root_key}/structures/crystal[input]",
         dataset=dataset_path,
         root_key=root_key,
@@ -299,7 +299,7 @@ def test_mbe_workflow(tmp_path: Path):
     )
 
     dataset_path = tmp_path / "workflow_run" / "properties.hdf5"
-    config = MBE(
+    config = Clusters(
         crystal=crystal,
         calculator=calc,
         filter=unique_cluster_filter,
@@ -311,12 +311,12 @@ def test_mbe_workflow(tmp_path: Path):
 
     mbe_automation.run(config)
 
-    mbe_metadata = MBEMetadata.read(
+    mbe_metadata = Decomposition.read(
         dataset=dataset_path,
         key="many_body_expansion/mbe_metadata",
     )
 
-    assert isinstance(mbe_metadata, MBEMetadata)
+    assert isinstance(mbe_metadata, Decomposition)
     assert isinstance(mbe_metadata.dataset, Path)
     assert mbe_metadata.dataset == dataset_path
     assert len(mbe_metadata.cluster_types) > 0

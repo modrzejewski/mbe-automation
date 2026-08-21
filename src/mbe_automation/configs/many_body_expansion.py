@@ -10,7 +10,7 @@ from mbe_automation.structure.filters import UniqueClustersFilter
 import mbe_automation.calculators.electronic
 
 @dataclass(kw_only=True)
-class MBE:
+class Clusters:
                                    #
                                    # Structure of the crystal from which clusters
                                    # are cleaved. The atomic coordinates remain
@@ -74,18 +74,9 @@ class MBE:
                                    #
     save_csv: bool = True
                                    #
-                                   # Whether to export quantum chemistry input files for the clusters.
-                                   #
-    save_inputs: bool = False
-                                   #
                                    # Whether to save diagnostic plots (e.g. cumulative cluster counts vs distance).
                                    #
     save_plots: bool = True
-                                   #
-                                   # The specific quantum chemistry methods (e.g., 'lno-ccsd(t)_tight_avqz').
-                                   # Accepts a single method string or a list of methods to export multiple.
-                                   #
-    electronic_methods: Sequence[str] | str | None = None
 
     def __post_init__(self):
         if isinstance(self.crystal, ase.Atoms):
@@ -96,19 +87,3 @@ class MBE:
             
         self.work_dir = Path(self.work_dir).expanduser()
         self.dataset = Path(self.dataset).expanduser()
-
-        if self.save_inputs:
-            if not self.electronic_methods:
-                raise ValueError("electronic_methods must be specified when save_inputs is True.")
-
-            if isinstance(self.electronic_methods, str):
-                self.electronic_methods = [self.electronic_methods]
-            else:
-                self.electronic_methods = list(self.electronic_methods)
-
-            for m in self.electronic_methods:
-                if m not in mbe_automation.calculators.electronic.METHODS:
-                    raise ValueError(
-                        f"Invalid electronic method: '{m}'. "
-                        f"Supported methods are: {', '.join(mbe_automation.calculators.electronic.METHODS)}"
-                    )

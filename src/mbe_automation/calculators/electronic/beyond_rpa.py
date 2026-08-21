@@ -72,25 +72,3 @@ def to_input_string(
     }
     return input_template.format(**job_params)
 
-def to_input_files(
-    unique_clusters: mbe_automation.structure.clusters.UniqueClusters,
-    dir: Path,
-    method: Method,
-    frame_index: int | None = None,
-) -> None:
-    """
-    Export input files for all symmetry-unique clusters into the given directory.
-    """
-    mol_sizes = [unique_clusters.reference_molecules[u].n_atoms for u in unique_clusters.composition]
-    indices = range(unique_clusters.n_clusters_unique) if frame_index is None else [frame_index]
-
-    for i in indices:
-        cluster_label = unique_clusters.labels(frame_index=i)[0]
-        inp_str = to_input_string(
-            method=method,
-            structure=unique_clusters.structures,
-            subsystem_sizes=mol_sizes,
-            frame_index=i,
-        )
-        with open(dir / f"{cluster_label}.inp", "w") as f:
-            f.write(inp_str)

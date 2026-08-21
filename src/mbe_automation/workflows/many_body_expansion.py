@@ -11,8 +11,8 @@ import mbe_automation.configs.many_body_expansion
 import mbe_automation.calculators.electronic
 
 def run(
-    config: mbe_automation.configs.many_body_expansion.MBE,
-) -> None:
+    config: mbe_automation.configs.many_body_expansion.Clusters,
+) -> mbe_automation.mbe.Decomposition:
     datetime_start = mbe_automation.common.display.timestamp_start()
 
     mbe_automation.common.resources.print_computational_resources()
@@ -48,7 +48,7 @@ def run(
     geometric_parameters = {}
 
     for cluster_type, clusters in unique_clusters.items():
-        key = f"{config.root_key}/unique_clusters/{cluster_type}"
+        key = f"{config.root_key}/cleaved/{cluster_type}"
         unique_clusters_keys[cluster_type] = key
         geometric_parameters[cluster_type] = clusters.to_data_frame()
 
@@ -68,24 +68,13 @@ def run(
                 file_path=config.work_dir / "csv" / f"{cluster_type}.csv",
             )
 
-        if config.save_inputs:
-            for method in config.electronic_methods:  # type: ignore
-                #
-                # MBE workflow assumes neutral, closed-shell species.
-                #
-                mbe_automation.calculators.electronic.to_input_files(
-                    unique_clusters=clusters,
-                    dir=config.work_dir / "inputs" / method / cluster_type,
-                    method=method,  # type: ignore
-                )
-
     if config.save_plots:
         mbe_automation.structure.display.plot_cumulative_cluster_count(
             unique_clusters=unique_clusters,
             save_path=config.work_dir / "cumulative_cluster_count.png",
         )
 
-    mbe_obj = mbe_automation.mbe.MBEMetadata(
+    mbe_obj = mbe_automation.mbe.Decomposition(
         cluster_types=list(unique_clusters.keys()),
         unique_clusters_keys=unique_clusters_keys,
         crystal_key=f"{config.root_key}/structures/crystal[input]",
@@ -103,3 +92,4 @@ def run(
 
     print("MBE clustering workflow completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)
+    return mbe_obj

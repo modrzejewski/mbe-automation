@@ -26,7 +26,7 @@ from mbe_automation.storage import MolecularCrystal as _MolecularCrystal
 from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 from mbe_automation.storage import AtomicReference as _AtomicReference
 from mbe_automation.storage import BrillouinZonePath as _BrillouinZonePath
-from mbe_automation.mbe import MBEMetadata as _MBEMetadata
+from mbe_automation.mbe import Decomposition as _Decomposition
 from mbe_automation.dynamics.harmonic.core import EOSMetadata as _EOSMetadata
 import mbe_automation.dynamics.harmonic.modes
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, ThermalDisplacements
@@ -162,11 +162,11 @@ class EOSMetadata(_EOSMetadata):
         )
 
 
-class MBEMetadata(_MBEMetadata):
+class Decomposition(_Decomposition):
     @classmethod
-    def read(cls, dataset: str | Path, key: str) -> MBEMetadata:
+    def read(cls, dataset: str | Path, key: str) -> Decomposition:
         return cls(**vars(
-            _MBEMetadata.read(dataset=dataset, key=key)
+            _Decomposition.read(dataset=dataset, key=key)
         ))
 
 @dataclass(kw_only=True)
@@ -1961,22 +1961,6 @@ class UniqueClusters(_UniqueClusters):
             clusters=self,
         )
 
-    def to_input_files(
-        self,
-        dir: str | Path,
-        method: mbe_automation.calculators.electronic.Method,
-        frame_index: int | None = None,
-    ) -> None:
-        """
-        Export input files for all symmetry-unique clusters.
-        """
-        mbe_automation.calculators.electronic.to_input_files(
-            unique_clusters=self,
-            dir=dir,
-            method=method,
-            frame_index=frame_index,
-        )
-
     @classmethod
     def read(
             cls,
@@ -2001,7 +1985,7 @@ class AnySystem:
         "ForceConstants": ForceConstants,
         "AtomicReference": AtomicReference,
         "UniqueClusters": UniqueClusters,
-        "MBEMetadata": MBEMetadata,
+        "Decomposition": Decomposition,
     }
 
     @staticmethod
@@ -2016,7 +2000,7 @@ class AnySystem:
         | ForceConstants
         | AtomicReference
         | UniqueClusters
-        | MBEMetadata
+        | Decomposition
     ):
         """
         Reads the object at the given key, automatically determining its type.

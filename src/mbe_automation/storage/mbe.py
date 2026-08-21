@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, get_args
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -8,13 +8,16 @@ import h5py
 from .file_lock import dataset_file
 from . import core
 
+ClusterType = Literal["monomers", "dimers", "trimers"]
+CLUSTER_TYPES = get_args(ClusterType)
+
 
 @dataclass(kw_only=True)
 class _UniqueClustersFilter:
     """
     Storage schema for unique clusters filtering configuration.
     """
-    cluster_types: list[str] = field(
+    cluster_types: list[ClusterType] = field(
         default_factory=lambda: ["monomers", "dimers", "trimers"]
     )
     cutoffs: dict[str, float | None] = field(
@@ -124,7 +127,7 @@ def save_mbe_metadata(
         if key in f:
             del f[key]
         group = f.create_group(key)
-        group.attrs["dataclass"] = "MBEMetadata"
+        group.attrs["dataclass"] = "Decomposition"
         group.attrs["root_key"] = mbe_metadata.root_key
         group.attrs["crystal_key"] = mbe_metadata.crystal_key
         group.attrs["cluster_types"] = mbe_metadata.cluster_types
