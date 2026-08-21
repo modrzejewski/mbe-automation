@@ -112,20 +112,20 @@ The `work_dir` will contain the exported files:
 mbe_output/
 ├── cumulative_cluster_count.png
 ├── csv/
-│   ├── monomers.csv
-│   ├── dimers.csv
-│   └── trimers.csv
+│   ├── monomers[A].csv
+│   ├── dimers[AA].csv
+│   └── trimers[AAA].csv
 ├── xyz/
-│   ├── monomers/
-│   ├── dimers/
-│   └── trimers/
+│   ├── monomers[A]/
+│   ├── dimers[AA]/
+│   └── trimers[AAA]/
 └── tasks/
     ├── lno-ccsd(t)_vtight_avqz/
     │   ├── monomers[A]/
-    │   │   └── 01-monomer[A]-8a9b2c/
+    │   │   └── 01-monomer[A]-8a9b2c3d4e5f6a7b/
     │   │       └── MINP
     │   ├── dimers[AA]/
-    │   │   └── 02-dimer[AA]-8a9b2c/
+    │   │   └── 02-dimer[AA]-8a9b2c3d4e5f6a7b/
     │   │       ├── 11/
     │   │       │   └── MINP
     │   │       ├── 10/
@@ -143,11 +143,11 @@ mbe_output/
     │   └── ...
     └── rpa+ph_avtz/
         ├── monomers[A]/
-        │   └── 01-monomer[A]-8a9b2c.inp
+        │   └── 01-monomer[A]-8a9b2c3d4e5f6a7b.inp
         └── dimers[AA]/
-            ├── 000-dimer[AA]-8a9b2c.inp
-            ├── 001-dimer[AA]-3f7e1d.inp
-            ├── 002-dimer[AA]-c4a6b9.inp
+            ├── 000-dimer[AA]-8a9b2c3d4e5f6a7b.inp
+            ├── 001-dimer[AA]-3f7e1d2c4b5a6e8f.inp
+            ├── 002-dimer[AA]-c4a6b9d8e7f1a2b3.inp
             └── ...
 ```
 
