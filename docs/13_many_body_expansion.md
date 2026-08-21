@@ -1,7 +1,7 @@
 # Many-Body Expansion of the Lattice Energy
 
-- [Workflow Configuration](#workflow-configuration)
-- [Saving Options & Input Generation](#saving-options--input-generation)
+- [Symmetry-Unique Clusters](#symmetry-unique-clusters)
+- [Inputs for Quantum-Chemical Calculations](#inputs-for-quantum-chemical-calculations)
 - [How to read the results](#how-to-read-the-results)
 - [Complete Input Files](#complete-input-files)
 
@@ -11,97 +11,95 @@ extracts symmetry-unique $n$-body clusters (monomers, dimers, trimers) up to
 specified distance cutoffs, and generates the necessary inputs for high-level
 electronic structure calculations.
 
-## Workflow Configuration
+## Symmetry-Unique Clusters
 
 The workflow is configured using the `Clusters` and `UniqueClustersFilter` classes
 from `mbe_automation`. It requires defining the crystal structure
-and configuring an MLIP calculator to distinguish crystallographically unique
-molecules.
-
-```python
-import mbe_automation
-from mbe_automation.calculators import MACE
-from mbe_automation import Structure
-import mbe_automation.configs
-from mbe_automation import UniqueClustersFilter
-
-xyz_solid = "ammonia.xyz"
-
-# Used to distinguish unique molecules based on their energy
-mace_calc = MACE(
-    model_path="~/models/mace/mace-mh-1.model", 
-    head="omol"
-)
-
-mbe_config = mbe_automation.configs.many_body_expansion.Clusters(
-    crystal=Structure.from_file(xyz_solid),
-    calculator=mace_calc,
-    filter=UniqueClustersFilter(
-        cluster_types=["monomers", "dimers", "trimers"],
-        cutoffs={"dimers": 30.0, "trimers": 10.0}
-    ),
-    work_dir="./mbe_output",
-    dataset="./dataset.hdf5",
-    save_xyz=True,
-    save_csv=True,
-    save_plots=True,
-    save_inputs=True,
-    electronic_methods=[
-        "lno-ccsd(t)_vtight_avqz",
-        "lno-ccsd(t)_tight_avqz",
-        "lno-ccsd(t)_vtight_avtz",
-        "lno-ccsd(t)_tight_avtz",
-        "rpa+ph_avqz",
-        "rpa+ph_avtz"
-    ]
-)
-```
-
-### UniqueClustersFilter
+and configuring an MLIP calculator. This calculator is used exclusively to distinguish
+crystallographically unique molecules and is not involved in subsequent electronic structure calculations.
 
 The `UniqueClustersFilter` defines which $n$-body clusters to extract and the
 distance cutoffs (in Å) used for filtering. The distance between two molecules
 is evaluated as the minimum distance between any of their respective atoms.
 
-## Saving Options & Input Generation
+```python
+import mbe_automation
+from mbe_automation import MACE, Structure, UniqueClustersFilter
+import mbe_automation.configs
 
-The workflow offers several boolean flags to control the generated output:
+xyz_solid = "ammonia.xyz"
 
-- `save_xyz`: Saves the symmetry-unique clusters to `.xyz` files in
-  `work_dir/xyz/<cluster_type>/`.
-- `save_csv`: Saves metadata (such as symmetry numbers and characteristic
-  distances) to `.csv` files in `work_dir/csv/`.
-- `save_plots`: Generates diagnostic plots, such as cumulative cluster counts
-  vs. distance, in `work_dir/`.
-- `save_inputs`: Generates the actual quantum chemistry input files.
+mace_calc = MACE(
+    model_path="~/models/mace/mace-mh-1.model", 
+    head="omol"
+)
 
-If `save_inputs=True`, you must specify a list of `electronic_methods`.
-Supported methods include MRCC and beyond-RPA protocols. The
-inputs will be exported to `work_dir/inputs/<method>/<cluster_type>/`.
+cluster_filter = UniqueClustersFilter(
+    cluster_types=["monomers", "dimers", "trimers"],
+    cutoffs={"dimers": 30.0, "trimers": 10.0}
+)
 
-Execute the workflow by passing the configuration object to `run`:
+config = mbe_automation.configs.many_body_expansion.Clusters(
+    crystal=Structure.from_file(xyz_solid),
+    calculator=mace_calc,
+    filter=cluster_filter,
+    work_dir="./mbe_output",
+    dataset="./dataset.hdf5",
+)
+
+decomposition = mbe_automation.run(config)
+```
+
+## Inputs for Quantum-Chemical Calculations
+
+Select clusters by type and distance, schedule quantum-chemical computations,
+and export the input files:
 
 ```python
-mbe_automation.workflows.many_body_expansion.run(mbe_config)
+tasks = decomposition.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks += decomposition.select("dimers").below(7.0).schedule("rpa+ph_avtz")
+
+tasks.to_input_files("./mbe_output")
 ```
+
+The `schedule` method returns a `Tasks` collection. Multiple collections
+can be combined with `+=` and exported in a single call to `to_input_files`.
+
+| Method | Description |
+|---|---|
+| `select(cluster_type)` | Select a cluster type (e.g., `"monomers"`, `"dimers"`). |
+| `below(distance)` | Restrict to clusters with characteristic distance below the cutoff (Å). |
+| `schedule(method)` | Generate tasks for the specified quantum-chemical model. |
+| `to_input_files(work_dir)` | Write scheduled tasks as input files to disk. |
+
+The following quantum-chemical models are available:
+
+| Identifier | Program | Description |
+|---|---|---|
+| 🔗 [`lno-ccsd(t)_vtight_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_vtight_avqz.inp) | MRCC | LNO-CCSD(T), vTight thresholds, aug-cc-pVQZ |
+| 🔗 [`lno-ccsd(t)_vtight_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_vtight_avtz.inp) | MRCC | LNO-CCSD(T), vTight thresholds, aug-cc-pVTZ |
+| 🔗 [`lno-ccsd(t)_tight_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_tight_avqz.inp) | MRCC | LNO-CCSD(T), Tight thresholds, aug-cc-pVQZ |
+| 🔗 [`lno-ccsd(t)_tight_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_tight_avtz.inp) | MRCC | LNO-CCSD(T), Tight thresholds, aug-cc-pVTZ |
+| 🔗 [`rpa+ph_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/beyond-rpa/ph_avqz.inp) | beyond-RPA | RPA+ph, aug-cc-pVQZ |
+| 🔗 [`rpa+ph_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/beyond-rpa/ph_avtz.inp) | beyond-RPA | RPA+ph, aug-cc-pVTZ |
 
 ## How to read the results
 
-The workflow produces a hierarchical HDF5 dataset, directory structure, and
+The workflow produces a hierarchical dataset file, directory structure, and
 metadata CSVs.
 
-### HDF5 Datasets
+### Dataset Structure
 
-The HDF5 file (e.g. `dataset.hdf5`) will store the structures and unique
+The dataset file (e.g. `dataset.hdf5`) stores the structures and unique
 clusters under the configured `root_key` (default is `many_body_expansion`):
 
 ```
 dataset.hdf5
 └── many_body_expansion
-    ├── clusters
-    │   ├── dimers
-    │   ├── monomers
-    │   └── trimers
+    ├── cleaved
+    │   ├── monomers[A]
+    │   ├── dimers[AA]
+    │   └── trimers[AAA]
     └── structures
         └── crystal[input]
 ```
@@ -121,11 +119,20 @@ mbe_output/
 │   ├── monomers/
 │   ├── dimers/
 │   └── trimers/
-└── inputs/
+└── tasks/
     ├── lno-ccsd(t)_vtight_avqz/
-    │   ├── monomers/
-    │   ├── dimers/
-    │   └── trimers/
+    │   ├── monomers[A]/
+    │   │   └── 01-monomer[A]-8a9b2c/
+    │   │       └── MINP
+    │   ├── dimers[AA]/
+    │   │   └── 02-dimer[AA]-8a9b2c/
+    │   │       ├── 11/
+    │   │       │   └── MINP
+    │   │       ├── 10/
+    │   │       │   └── MINP
+    │   │       └── 01/
+    │   │           └── MINP
+    │   └── trimers[AAA]/
     ├── lno-ccsd(t)_tight_avqz/
     │   └── ...
     ├── lno-ccsd(t)_vtight_avtz/
@@ -135,7 +142,13 @@ mbe_output/
     ├── rpa+ph_avqz/
     │   └── ...
     └── rpa+ph_avtz/
-        └── ...
+        ├── monomers[A]/
+        │   └── 01-monomer[A]-8a9b2c.inp
+        └── dimers[AA]/
+            ├── 000-dimer[AA]-8a9b2c.inp
+            ├── 001-dimer[AA]-3f7e1d.inp
+            ├── 002-dimer[AA]-c4a6b9.inp
+            └── ...
 ```
 
 ## Complete Input Files
@@ -169,42 +182,37 @@ This script demonstrates the MBE export setup.
 
 ```python
 import mbe_automation
-from mbe_automation.calculators import MACE
-from mbe_automation import Structure
+from mbe_automation import MACE, Structure, UniqueClustersFilter
 import mbe_automation.configs
-from mbe_automation import UniqueClustersFilter
 
 xyz_solid = "ammonia.xyz"
 
-# Initialize MLIP calculator for unique molecule detection
 mace_calc = MACE(
     model_path="~/models/mace/mace-mh-1.model", 
     head="omol"
 )
 
-mbe_config = mbe_automation.configs.many_body_expansion.Clusters(
-    crystal=Structure.from_file(xyz_solid),
-    calculator=mace_calc,
-    filter=UniqueClustersFilter(
-        cluster_types=["monomers", "dimers", "trimers"],
-        cutoffs={"dimers": 30.0, "trimers": 10.0}
-    ),
-    work_dir="./mbe_output",
-    dataset="./dataset.hdf5",
-    save_xyz=True,
-    save_csv=True,
-    save_plots=True,
-    save_inputs=True,
-    electronic_methods=[
-        "lno-ccsd(t)_vtight_avqz",
-        "lno-ccsd(t)_tight_avqz",
-        "lno-ccsd(t)_vtight_avtz",
-        "lno-ccsd(t)_tight_avtz",
-        "rpa+ph_avqz",
-        "rpa+ph_avtz"
-    ]
+cluster_filter = UniqueClustersFilter(
+    cluster_types=["monomers", "dimers", "trimers"],
+    cutoffs={"dimers": 30.0, "trimers": 10.0}
 )
 
-# Run the workflow
-mbe_automation.workflows.many_body_expansion.run(mbe_config)
+config = mbe_automation.configs.many_body_expansion.Clusters(
+    crystal=Structure.from_file(xyz_solid),
+    calculator=mace_calc,
+    filter=cluster_filter,
+    work_dir="./mbe_output",
+    dataset="./dataset.hdf5",
+)
+
+decomposition = mbe_automation.run(config)
+
+tasks = decomposition.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks += decomposition.select("dimers").below(7.0).schedule("lno-ccsd(t)_vtight_avqz")
+
+tasks += decomposition.select("monomers").schedule("rpa+ph_avtz")
+tasks += decomposition.select("dimers").schedule("rpa+ph_avtz")
+tasks += decomposition.select("trimers").schedule("rpa+ph_avtz")
+
+tasks.to_input_files(config.work_dir)
 ```

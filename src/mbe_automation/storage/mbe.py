@@ -127,7 +127,7 @@ def save_mbe_metadata(
         if key in f:
             del f[key]
         group = f.create_group(key)
-        group.attrs["dataclass"] = "MBEMetadata"
+        group.attrs["dataclass"] = "Decomposition"
         group.attrs["root_key"] = mbe_metadata.root_key
         group.attrs["crystal_key"] = mbe_metadata.crystal_key
         group.attrs["cluster_types"] = mbe_metadata.cluster_types

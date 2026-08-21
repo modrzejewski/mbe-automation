@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(kw_only=True)
-class MBEMetadata(_MBEMetadata):
+class Decomposition(_MBEMetadata):
     """
     Store metadata and geometric parameters of Many-Body Expansion (MBE) calculations.
 
@@ -42,9 +42,9 @@ class MBEMetadata(_MBEMetadata):
         cls,
         dataset: str | Path,
         key: str,
-    ) -> MBEMetadata:
+    ) -> Decomposition:
         """
-        Read MBEMetadata from a dataset file.
+        Read Decomposition from a dataset file.
         """
         raw = mbe_automation.storage.mbe.read_mbe_metadata(
             dataset=dataset,

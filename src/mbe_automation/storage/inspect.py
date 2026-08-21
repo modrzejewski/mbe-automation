@@ -24,7 +24,7 @@ class DatasetKey:
         "BrillouinZonePath",
         "EOSCurves",
         "EOSMetadata",
-        "MBEMetadata",
+        "Decomposition",
         "UniqueClusters",
     ]
 
@@ -109,7 +109,7 @@ class DatasetKeys:
                 "BrillouinZonePath",
                 "EOSCurves",
                 "EOSMetadata",
-                "MBEMetadata",
+                "Decomposition",
             ]:
                 has_feature_vectors = None
                 has_ground_truth = None
@@ -207,7 +207,7 @@ class DatasetKeys:
         return self._filter(lambda x: x.dataclass == "EOSMetadata")
 
     def mbe_metadata(self) -> DatasetKeys:
-        return self._filter(lambda x: x.dataclass == "MBEMetadata")
+        return self._filter(lambda x: x.dataclass == "Decomposition")
 
     def force_constants(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "ForceConstants")

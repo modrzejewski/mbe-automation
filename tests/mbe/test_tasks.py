@@ -15,13 +15,13 @@ from mbe_automation import (
 )
 from mbe_automation.storage import from_xyz_file
 from mbe_automation.configs.many_body_expansion import Clusters
-from mbe_automation.mbe import MBEMetadata
+from mbe_automation.mbe import Decomposition
 from mbe_automation.mbe.tasks import ClusterSelection, ScheduledTask
 from tests.reference_data.test_cases import TEST_CASES
 
 
 @pytest.fixture(scope="module")
-def mbe_metadata(tmp_path_factory) -> MBEMetadata:
+def mbe_metadata(tmp_path_factory) -> Decomposition:
     test_cases_with_models = [
         c for c in TEST_CASES
         if c.get("general_model_path", Path()).exists()
@@ -53,14 +53,14 @@ def mbe_metadata(tmp_path_factory) -> MBEMetadata:
 
     mbe_automation.run(config)
 
-    mbe_metadata = MBEMetadata.read(
+    mbe_metadata = Decomposition.read(
         dataset=dataset_path,
         key="many_body_expansion/mbe_metadata",
     )
     return mbe_metadata
 
 
-def test_cluster_selection_fluent_api(mbe_metadata: MBEMetadata):
+def test_cluster_selection_fluent_api(mbe_metadata: Decomposition):
     selection = mbe_metadata.select("dimers")
     assert isinstance(selection, ClusterSelection)
     assert selection._cluster_type == "dimers"
@@ -76,18 +76,18 @@ def test_cluster_selection_fluent_api(mbe_metadata: MBEMetadata):
     assert selection._max_distance is None
 
 
-def test_schedule_invalid_method(mbe_metadata: MBEMetadata):
+def test_schedule_invalid_method(mbe_metadata: Decomposition):
     selection = mbe_metadata.select("dimers")
     with pytest.raises(ValueError, match="Invalid electronic method"):
         selection.schedule("nonexistent_method")
 
 
-def test_select_invalid_type(mbe_metadata: MBEMetadata):
+def test_select_invalid_type(mbe_metadata: Decomposition):
     with pytest.raises(ValueError, match="No cluster types matching"):
         mbe_metadata.select("hexamers")
 
 
-def test_schedule_beyond_rpa(mbe_metadata: MBEMetadata):
+def test_schedule_beyond_rpa(mbe_metadata: Decomposition):
     tasks = mbe_metadata.select("dimers").below(7.0).schedule("rpa+ph_avtz")
     
     assert len(tasks) > 0
@@ -102,7 +102,7 @@ def test_schedule_beyond_rpa(mbe_metadata: MBEMetadata):
         assert task.characteristic_distance <= 7.0
 
 
-def test_schedule_mrcc(mbe_metadata: MBEMetadata):
+def test_schedule_mrcc(mbe_metadata: Decomposition):
     tasks = mbe_metadata.select("trimers").below(6.0).schedule("lno-ccsd(t)_tight_avtz")
     
     assert len(tasks) > 0
@@ -122,8 +122,52 @@ def test_schedule_mrcc(mbe_metadata: MBEMetadata):
         assert task.characteristic_distance <= 6.0
 
 
-def test_schedule_monomers(mbe_metadata: MBEMetadata):
+def test_schedule_monomers(mbe_metadata: Decomposition):
     tasks = mbe_metadata.select("monomers").schedule("lno-ccsd(t)_tight_avtz")
     assert len(tasks) > 0
     for task in tasks:
         assert np.isnan(task.characteristic_distance)
+
+
+def test_below_monomers_raises_error(mbe_metadata: Decomposition):
+    with pytest.raises(ValueError, match="Distance cutoff cannot be applied to monomers"):
+        mbe_metadata.select("monomers").below(5.0)
+
+
+def test_tasks_to_input_files(mbe_metadata: Decomposition, tmp_path: Path):
+    tasks_rpa = mbe_metadata.select("dimers").schedule("rpa+ph_avtz")
+    tasks_mrcc = mbe_metadata.select("dimers").schedule("lno-ccsd(t)_tight_avtz")
+    
+    tasks_rpa.to_input_files(tmp_path)
+    tasks_mrcc.to_input_files(tmp_path)
+    
+    tasks_dir = tmp_path / "tasks"
+    assert tasks_dir.exists()
+    
+    for task in tasks_rpa:
+        expected_path = tasks_dir / task.method / task.cluster_type / f"{task.cluster_label}.inp"
+        assert expected_path.exists()
+        assert expected_path.read_text(encoding="utf-8") == task.input_string
+
+    for task in tasks_mrcc:
+        expected_path = tasks_dir / task.method / task.cluster_type / task.cluster_label / task.subsystem_label / "MINP"
+        assert expected_path.exists()
+        assert expected_path.read_text(encoding="utf-8") == task.input_string
+
+
+def test_schedule_distance_exceeds_cutoff(mbe_metadata: Decomposition):
+    # Dimers generation cutoff is 8.0 Å
+    with pytest.raises(ValueError, match="larger than the generation cutoff"):
+        mbe_metadata.select("dimers").below(10.0).schedule("rpa+ph_avtz")
+
+    with pytest.raises(ValueError, match="larger than the generation cutoff"):
+        mbe_metadata.select("dimers").below(8.1).schedule("rpa+ph_avtz")
+
+    # Trimers generation cutoff is 6.0 Å
+    with pytest.raises(ValueError, match="larger than the generation cutoff"):
+        mbe_metadata.select("trimers").below(6.5).schedule("lno-ccsd(t)_tight_avtz")
+
+    # Exactly at or below cutoff should not raise
+    tasks = mbe_metadata.select("dimers").below(8.0).schedule("rpa+ph_avtz")
+    assert len(tasks) > 0
+
