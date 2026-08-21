@@ -68,17 +68,6 @@ def run(
                 file_path=config.work_dir / "csv" / f"{cluster_type}.csv",
             )
 
-        if config.save_inputs:
-            for method in config.electronic_methods:  # type: ignore
-                #
-                # MBE workflow assumes neutral, closed-shell species.
-                #
-                mbe_automation.calculators.electronic.to_input_files(
-                    unique_clusters=clusters,
-                    dir=config.work_dir / "inputs" / method / cluster_type,
-                    method=method,  # type: ignore
-                )
-
     if config.save_plots:
         mbe_automation.structure.display.plot_cumulative_cluster_count(
             unique_clusters=unique_clusters,

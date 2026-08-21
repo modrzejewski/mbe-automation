@@ -1961,22 +1961,6 @@ class UniqueClusters(_UniqueClusters):
             clusters=self,
         )
 
-    def to_input_files(
-        self,
-        dir: str | Path,
-        method: mbe_automation.calculators.electronic.Method,
-        frame_index: int | None = None,
-    ) -> None:
-        """
-        Export input files for all symmetry-unique clusters.
-        """
-        mbe_automation.calculators.electronic.to_input_files(
-            unique_clusters=self,
-            dir=dir,
-            method=method,
-            frame_index=frame_index,
-        )
-
     @classmethod
     def read(
             cls,
