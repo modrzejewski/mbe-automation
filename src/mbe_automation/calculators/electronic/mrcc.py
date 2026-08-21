@@ -106,38 +106,6 @@ def to_input_string(
 
     return results
 
-def to_input_files(
-    unique_clusters: mbe_automation.structure.clusters.UniqueClusters,
-    dir: Path,
-    method: Method,
-    frame_index: int | None = None,
-) -> None:
-    """
-    Export input files for all symmetry-unique clusters into the given directory.
-
-    Subsystems are delimited by `_SUBSYSTEM_TAG`. Preprocess with `setup_workdir`
-    prior to execution.
-    """
-    mol_sizes = [unique_clusters.reference_molecules[u].n_atoms for u in unique_clusters.composition]
-    indices = range(unique_clusters.n_clusters_unique) if frame_index is None else [frame_index]
-
-    for i in indices:
-        cluster_label = unique_clusters.labels(frame_index=i)[0]
-        inputs = to_input_string(
-            method=method,
-            structure=unique_clusters.structures,
-            subsystem_sizes=mol_sizes,
-            frame_index=i,
-        )
-        with open(dir / f"{cluster_label}.inp", "w") as f:
-            # Skip subsystem tags for monomers; tags are only needed to delimit
-            # subsystems when ghost atoms might be present.
-            if len(unique_clusters.composition) == 1:
-                f.write(list(inputs.values())[0])
-            else:
-                for sub_label, inp_str in inputs.items():
-                    f.write(f"{_SUBSYSTEM_TAG}{sub_label}\n")
-                    f.write(inp_str)
 
 def setup_workdir(combined_input_file: Path, workdir: Path) -> List[Path]:
     """

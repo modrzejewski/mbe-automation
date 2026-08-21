@@ -242,7 +242,10 @@ class UniqueClusters:
         composition: Tuple of molecule types defining the cluster composition.
         structures: A single `Structure` object where `n_frames` corresponds
             to the number of symmetry-unique clusters. Contains the Cartesian
-            coordinates (`positions`) of all clusters.
+            coordinates (`positions`) of all clusters. The atoms in each
+            frame are ordered according to the sequence of molecules defined
+            in the `composition` attribute. However, the atom ordering within
+            each molecule may be permuted between frames.
         reference_molecules: Tuple of `Structure` objects representing all
             unique molecules of the unit cell. Its length matches the total
             number of unique molecules, allowing it to be indexed by the
@@ -270,6 +273,11 @@ class UniqueClusters:
     @property
     def n_molecules(self) -> int:
         return len(self.composition)
+
+    @property
+    def molecule_sizes(self) -> list[int]:
+        """Number of atoms in each molecule forming the cluster."""
+        return [self.reference_molecules[u].n_atoms for u in self.composition]
 
     @property
     def type_string(self) -> str:
@@ -390,7 +398,7 @@ class UniqueClusters:
         labels = self.labels()
         n_atoms_total = self.structures.n_atoms
 
-        mol_sizes = [str(self.reference_molecules[u].n_atoms) for u in self.composition]
+        mol_sizes = [str(s) for s in self.molecule_sizes]
         # The XYZ comment line (second line) stores space-separated atomic counts for each
         # constituent molecule (e.g., "15 15" for a dimer of two 15-atom molecules).
         # This is used by external tools to reconstruct molecular boundaries.
