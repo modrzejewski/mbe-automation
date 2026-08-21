@@ -34,6 +34,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
     * [PhononSampling](#phononsampling)
     * [FiniteSubsystemFilter](#finitesubsystemfilter)
     * [PhononFilter](#phononfilter)
+    * [Clusters](#clusters)
 * [4. Interatomic Potentials & Calculators](#4-interatomic-potentials--calculators)
     * [MACE](#mace)
     * [DeltaMACE](#deltamace)
@@ -418,6 +419,26 @@ Specifies which phonon modes to include in the `PhononSampling` workflow.
 | `selected_modes` | Array of 1-based indices to include. Ignores freq bounds if specified. | `None` |
 | `freq_min_THz` | Minimum phonon frequency (THz). | `0.1` |
 | `freq_max_THz` | Maximum phonon frequency (THz). | `8.0` |
+
+### Clusters
+
+🔗 [`mbe_automation.configs.many_body_expansion.Clusters`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/many_body_expansion.py#L13)
+
+Configuration object for the Many-Body Expansion (MBE) workflow.
+
+| Parameter | Description | Default Value |
+| --- | --- | --- |
+| `crystal` | Structure of the crystal from which clusters are cleaved. The atomic coordinates remain unmodified. | - |
+| `frame_index` | Frame index used if crystal is a Structure with multiple frames. | `0` |
+| `calculator` | Energy calculator used to distinguish crystallographically inequivalent molecules. Molecules are cleaved from the crystal lattice and their individual potential energies are computed. They are considered unique if their energies differ by more than the specified energy threshold. | `None` |
+| `filter` | Cluster filtering settings. The cutoffs correspond to the max(X,Y) min(i∈X, j∈Y) r_ij characteristic distance of the cluster, where X, Y are molecules and i, j are their respective atoms. Cutoffs are given in Å. | `UniqueClustersFilter(cluster_types=["monomers", "dimers", "trimers"], cutoffs={"dimers": 30.0, "trimers": 15.0})` |
+| `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell. | `1.0E-5` |
+| `work_dir` | Directory where files are stored at runtime. | `"./"` |
+| `dataset` | The main dataset file with all data. | `"./properties.hdf5"` |
+| `root_key` | Root path in the dataset file. | `"many_body_expansion"` |
+| `save_xyz` | Whether to save the symmetry-unique clusters to .xyz files. The .xyz files for individual clusters are saved in a dedicated subdirectory of work_dir. | `True` |
+| `save_csv` | Whether to save the symmetry-unique clusters metadata (such as symmetry numbers and characteristic distances) to .csv files. | `True` |
+| `save_plots` | Whether to save diagnostic plots (e.g. cumulative cluster counts vs distance). | `True` |
 
 ---
 

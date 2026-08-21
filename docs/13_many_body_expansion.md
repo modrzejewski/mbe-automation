@@ -13,7 +13,7 @@ electronic structure calculations.
 
 ## Symmetry-Unique Clusters
 
-The workflow is configured using the `Clusters` and `UniqueClustersFilter` classes
+The workflow is configured using the [`Clusters`](01_api.md#clusters) and [`UniqueClustersFilter`](01_api.md#uniqueclustersfilter) classes
 from `mbe_automation`. It requires defining the crystal structure
 and configuring an MLIP calculator. This calculator is used exclusively to distinguish
 crystallographically unique molecules and is not involved in subsequent electronic structure calculations.
