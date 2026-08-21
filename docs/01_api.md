@@ -428,8 +428,8 @@ Configuration object for the Many-Body Expansion (MBE) workflow.
 
 | Parameter | Description | Default Value |
 | --- | --- | --- |
-| `crystal` | Structure of the crystal from which clusters are cleaved. The atomic coordinates remain unmodified. | - |
-| `frame_index` | Frame index used if crystal is a Structure with multiple frames. | `0` |
+| `crystal` | Structure of the crystal from which clusters are cleaved. | - |
+| `frame_index` | Frame index used if crystal is a Structure with multiple frames. Only relevant for multi-frame input structures. | `0` |
 | `calculator` | Energy calculator used to distinguish crystallographically inequivalent molecules. Molecules are cleaved from the crystal lattice and their individual potential energies are computed. They are considered unique if their energies differ by more than the specified energy threshold. | `None` |
 | `filter` | Cluster filtering settings. The cutoffs correspond to the max(X,Y) min(i∈X, j∈Y) r_ij characteristic distance of the cluster, where X, Y are molecules and i, j are their respective atoms. Cutoffs are given in Å. | `UniqueClustersFilter(cluster_types=["monomers", "dimers", "trimers"], cutoffs={"dimers": 30.0, "trimers": 15.0})` |
 | `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell. | `1.0E-5` |
