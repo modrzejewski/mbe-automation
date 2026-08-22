@@ -19,6 +19,14 @@ METHODS = (
     + beyond_rpa.METHODS
 )
 
+SOFTWARE_MAP: dict[str, str] = {
+    m: "mrcc"
+    for m in mrcc.METHODS
+} | {
+    m: "beyond-rpa"
+    for m in beyond_rpa.METHODS
+}
+
 _DISPATCH_MAP: dict[str, Callable] = {
     m: mrcc.to_input_string
     for m in mrcc.METHODS
