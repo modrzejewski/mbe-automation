@@ -6,7 +6,6 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=48
 #SBATCH --time=72:00:00
-#SBATCH --array=1-{n_tasks}
 
 module load mrcc
 

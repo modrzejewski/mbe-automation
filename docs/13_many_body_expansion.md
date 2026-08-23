@@ -19,7 +19,7 @@ and configuring an MLIP calculator. This calculator is used exclusively to disti
 crystallographically unique molecules and is not involved in subsequent electronic structure calculations.
 
 The `UniqueClustersFilter` defines which $n$-body clusters to extract and the
-distance cutoffs (in Å) used for filtering. The distance between two molecules
+distance cutoffs (in Å) used for filtering. The distance between two molecules
 is evaluated as the minimum distance between any of their respective atoms.
 
 ```python
@@ -68,7 +68,7 @@ can be combined with `+=` and exported in a single call to `to_input_files`.
 | Method | Description |
 |---|---|
 | `select(cluster_type)` | Select a cluster type (e.g., `"monomers"`, `"dimers"`). |
-| `below(distance)` | Restrict to clusters with characteristic distance below the cutoff (Å). |
+| `below(distance)` | Restrict to clusters with characteristic distance below the cutoff (Å). |
 | `schedule(method)` | Generate tasks for the specified quantum-chemical model. |
 | `to_input_files(work_dir)` | Write scheduled tasks as input files to disk. |
 

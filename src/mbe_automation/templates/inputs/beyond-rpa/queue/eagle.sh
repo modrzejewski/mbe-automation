@@ -7,12 +7,17 @@
 #SBATCH --cpus-per-task=48
 #SBATCH --time=08:00:00
 #SBATCH --mem=180gb
-#SBATCH --array=1-{n_tasks}
 
 module load python
 module load ifort
 module load impi
 module load mkl
+
+if [ -n "$I_MPI_PMI_LIBRARY" ]; then
+    unset I_MPI_PMI_LIBRARY
+fi
+export I_MPI_HYDRA_BOOTSTRAP="ssh"
+export I_MPI_OFI_PROVIDER="tcp"
 
 TARGET=$(sed -n "${{SLURM_ARRAY_TASK_ID}}p" tasks.txt)
 TARGET_BASE="${{TARGET%.*}}"

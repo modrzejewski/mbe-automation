@@ -35,7 +35,7 @@ class ScheduledTask:
         cluster_type: Cluster type identifier,
             e.g. "dimers[AA]".
         characteristic_distance: Characteristic intermolecular distance
-            in Å. NaN for monomers.
+            in Å. NaN for monomers.
         subsystem_label: Bitmask label for the subsystem,
             e.g. "11", "10", "01". None when the calculator
             produces a single input per cluster.
@@ -103,18 +103,103 @@ class Tasks(UserList[ScheduledTask]):
         self,
         method: str | None = None,
         cluster_type: str | None = None,
+        min_distance: float | None = None,
+        max_distance: float | None = None,
     ) -> Tasks:
         """
-        Return a sub-collection of Tasks filtered by method and/or cluster_type.
+        Return a sub-collection of Tasks filtered by the specified criteria.
+
+        Args:
+            method: Quantum-chemical model (e.g., 'lno-ccsd(t)_tight_avqz').
+            cluster_type: Cluster identifier (e.g., 'monomers[A]', 'dimers[AA]').
+            min_distance: Minimum characteristic distance in Å. Excludes monomers if provided.
+            max_distance: Maximum characteristic distance in Å. Excludes monomers if provided.
+
+        Returns:
+            Tasks: Filtered collection.
         """
         filtered = self.data
         if method is not None:
-            filtered = [task for task in filtered if task.method == method]
+            filtered = [t for t in filtered if t.method == method]
         if cluster_type is not None:
-            filtered = [task for task in filtered if task.cluster_type == cluster_type]
+            filtered = [t for t in filtered if t.cluster_type == cluster_type]
+            
+        if min_distance is not None:
+            filtered = [
+                t for t in filtered 
+                if not np.isnan(t.characteristic_distance) and t.characteristic_distance >= min_distance
+            ]
+        if max_distance is not None:
+            filtered = [
+                t for t in filtered 
+                if not np.isnan(t.characteristic_distance) and t.characteristic_distance < max_distance
+            ]
             
         return Tasks(filtered)
     
+    def _split_by_distance(self, distance_threshold: float) -> tuple[Tasks, Tasks]:
+        """
+        Split tasks into two collections based on a characteristic distance threshold.
+        Monomers (NaN distance) are included in the first collection.
+
+        Args:
+            distance_threshold: Distance in Å. Tasks strictly below this value go 
+                to the first collection, others go to the second.
+                
+        Returns:
+            tuple[Tasks, Tasks]: (Tasks below threshold, Tasks at or above threshold)
+        """
+        below = []
+        above = []
+        for t in self.data:
+            if np.isnan(t.characteristic_distance) or t.characteristic_distance < distance_threshold:
+                below.append(t)
+            else:
+                above.append(t)
+                
+        return Tasks(below), Tasks(above)
+
+
+    def _distance_bins(
+        self,
+        cluster_type: str,
+        distance_increment: float = 2.0,
+        initial_distance: float = 4.0,
+    ) -> dict[tuple[float, float], Tasks]:
+        """
+        Group tasks of a specific cluster type by characteristic distance.
+        
+        Args:
+            cluster_type: Exact cluster topology identifier (e.g., 'dimers[AA]').
+            distance_increment: The size of the distance bins for characteristic distances
+                greater than the initial_distance.
+            initial_distance: The upper bound for the first distance bin. 
+
+        Returns: 
+            dict[tuple[float, float], Tasks]: Mapping of bin boundaries to task subsets.
+                The upper bound of the last bin is represented as np.inf.
+        """
+        if cluster_type.startswith("monomers"):
+            raise ValueError("Distance binning cannot be applied to monomers.")
+            
+        grouped_tasks = {}
+        
+        remaining = self.filter_by(cluster_type=cluster_type)
+        
+        lower = 0.0
+        upper = initial_distance
+        while len(remaining) > 0:
+            bin, remaining = remaining._split_by_distance(upper)
+            
+            if len(bin) > 0:
+                upper_bound = np.inf if len(remaining) == 0 else upper
+                grouped_tasks[(lower, upper_bound)] = bin
+            
+            lower = upper
+            upper = lower + distance_increment
+            
+        return grouped_tasks
+
     def to_input_files(
         self,
         work_dir: str | Path,
@@ -154,15 +239,33 @@ class Tasks(UserList[ScheduledTask]):
         """
         for method in self.methods:
             method_dir = work_dir / _TASKS_DIR / method
+            method_tasks = self.filter_by(method=method)
             
-            task_lines = [
-                str(task.input_file.relative_to(_TASKS_DIR / method))
-                for task in self.filter_by(method=method)
-            ]
+            grouped_paths = {}
+            for cluster_type in method_tasks.cluster_types:
+                if cluster_type.startswith("monomers"):
+                    subset = method_tasks.filter_by(cluster_type=cluster_type)
+                    grouped_paths[cluster_type] = [
+                        str(task.input_file.relative_to(_TASKS_DIR / method))
+                        for task in subset
+                    ]
+                else:
+                    bins = method_tasks._distance_bins(
+                        cluster_type=cluster_type,
+                        distance_increment=2.0,
+                        initial_distance=4.0,
+                    )
+                    for (lower, upper), subset in bins.items():
+                        upper_str = "∞" if np.isinf(upper) else f"{upper:.2f}"
+                        group_name = f"{cluster_type} ({lower:.2f} ≤ r < {upper_str} Å)"
+                        grouped_paths[group_name] = [
+                            str(task.input_file.relative_to(_TASKS_DIR / method))
+                            for task in subset
+                        ]
             
             files = mbe_automation.calculators.electronic.slurm.to_input_string(
                 method=method,
-                task_lines=task_lines,
+                grouped_tasks=grouped_paths,
                 queue=queue,
             )
             
@@ -199,12 +302,14 @@ class ClusterSelection:
         self,
         clusters: UniqueClusters,
     ) -> None:
-        if self._max_distance is None or clusters.type_string == "monomers":
+        max_dist = self._max_distance
+        if max_dist is None or clusters.type_string == "monomers":
             return
-        if self._max_distance > self._mbe.filter.cutoffs[clusters.type_string]:
+        cutoff = self._mbe.filter.cutoffs[clusters.type_string]
+        if cutoff is not None and max_dist > cutoff:
             raise ValueError(
-                f"Requested distance cutoff {self._max_distance} Å is larger "
-                f"than the generation cutoff ({self._mbe.filter.cutoffs[clusters.type_string]} Å) for \"{clusters.type_string}\"."
+                f"Requested distance cutoff {self._max_distance} Å is larger "
+                f"than the generation cutoff ({self._mbe.filter.cutoffs[clusters.type_string]} Å) for \"{clusters.type_string}\"."
             )
 
     def schedule(self, method: str) -> Tasks:
@@ -238,6 +343,7 @@ class ClusterSelection:
         tasks = Tasks()
         for cluster_type in matching_types:
             clusters = self._mbe.read_clusters(cluster_type=cluster_type)
+            assert not isinstance(clusters, dict) # Mypy narrowing for specific cluster_type
             self._assert_distance_below_cutoff(clusters)
             mol_sizes = clusters.molecule_sizes
             char_distances = clusters.characteristic_distances
@@ -245,7 +351,7 @@ class ClusterSelection:
 
             for i in range(clusters.n_clusters_unique):
                 if is_monomer:
-                    distance = np.nan
+                    distance = np.float64(np.nan)
                 else:
                     distance = np.float64(char_distances[i])
                     if (self._max_distance is not None
@@ -254,7 +360,7 @@ class ClusterSelection:
 
                 cluster_label = clusters.labels(frame_index=i)[0]
                 inputs = mbe_automation.calculators.electronic.core.to_input_string(
-                    method=method,
+                    method=method, # type: ignore[arg-type]
                     structure=clusters.structures,
                     subsystem_sizes=mol_sizes,
                     frame_index=i,

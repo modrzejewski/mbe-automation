@@ -1733,7 +1733,7 @@ def save_unique_clusters(
 
 
 def read_unique_clusters(
-        dataset: str,
+        dataset: str | Path,
         key: str
 ):
     from mbe_automation.structure.clusters import UniqueClusters, unique_molecule_label

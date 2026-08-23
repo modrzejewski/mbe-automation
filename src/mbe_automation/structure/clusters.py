@@ -309,10 +309,10 @@ class UniqueClusters:
         Returns:
             A pandas DataFrame with the following columns:
                 - system: The string label of the cluster.
-                - cluster_count: The integer number of symmetry-equivalent clusters.
+                - symmetry_weight: The integer number of symmetry-equivalent clusters.
                 - n_molecules[X] (1∕unit cell): The number of molecules of type
                   X in the unit cell.
-                - multiplicity_[Ref]: The number of molecules of the reference
+                - n_molecules[Ref] (1∕cluster): The number of molecules of the reference
                   type [Ref] present within a single cluster.
                 - lattice_energy_weight (1∕unit cell): The weight of the cluster's energy
                   contribution to the total lattice energy.
@@ -331,14 +331,14 @@ class UniqueClusters:
         
         data = {
             "system": self.labels(),
-            "cluster_count": self.weights,
+            "symmetry_weight": self.weights,
         }
 
         for u in range(len(self.reference_molecules)):
             mol_label = unique_molecule_label(u)
             data[f"n_molecules[{mol_label}] (1∕unit cell)"] = self.n_molecules_equivalent[u]
 
-        data[f"multiplicity_{ref_mol_label}"] = m_A
+        data[f"n_molecules[{ref_mol_label}] (1∕cluster)"] = m_A
         data["lattice_energy_weight (1∕unit cell)"] = (self.weights * n_A) / m_A
 
         if len(self.composition) == 2:

@@ -147,7 +147,7 @@ def test_mbe_metadata_serialization_roundtrip(tmp_path: Path):
     loaded_df = loaded.geometric_parameters["dimers[AA]"]
     assert set(loaded_df.columns) == set(df_dimers.columns)
     assert np.all(loaded_df["system"].astype(str) == df_dimers["system"].astype(str))
-    assert np.all(loaded_df["cluster_count"] == df_dimers["cluster_count"])
+    assert np.all(loaded_df["symmetry_weight"] == df_dimers["symmetry_weight"])
     assert np.allclose(loaded_df["min_r (Å)"], df_dimers["min_r (Å)"])
     assert np.allclose(loaded_df["max_r (Å)"], df_dimers["max_r (Å)"])
 

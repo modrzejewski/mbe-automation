@@ -6,7 +6,6 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=48
 #SBATCH --time=12:00:00
-#SBATCH --array=1-{n_tasks}
 
 unset I_MPI_PMI_LIBRARY
 export I_MPI_HYDRA_BOOTSTRAP=ssh

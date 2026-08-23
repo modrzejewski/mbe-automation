@@ -7,7 +7,6 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --time=72:00:00
 #SBATCH --mem=180gb
-#SBATCH --array=1-{n_tasks}
 
 module load python
 module load ifort

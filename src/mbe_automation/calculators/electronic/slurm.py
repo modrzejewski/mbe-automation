@@ -7,6 +7,13 @@ from . import beyond_rpa
 
 _TEMPLATES_ROOT = importlib.resources.files("mbe_automation.templates") / "inputs"
 
+_SUBMIT_TEMPLATE = """#!/bin/bash
+# Master submission script for {job_name}
+# Comment or uncomment the lines below to control which jobs are submitted.
+
+{sbatch_commands}
+"""
+
 _TEMPLATE_MAP = {
     m: _TEMPLATES_ROOT / "mrcc" / "queue"
     for m in mrcc.METHODS
@@ -32,35 +39,78 @@ def _path_to_template(method: str, queue: str | None = None) -> Path:
     
     return queue_dir / f"{queue}.sh"
 
+def _task_array(method: str, template_path: Path) -> str:
+    """
+    Generate the SLURM task array script from a template.
+    """
+    template = template_path.read_text(encoding="utf-8")
+    return template.format(job_name=method)
+
+def _submit(method: str, grouped_tasks: dict[str, list[str]]) -> str:
+    """
+    Generate the master submit script.
+    """
+    sbatch_lines = []
+    
+    current_line = 1
+    for group_key, task_lines in grouped_tasks.items():
+        n_tasks = len(task_lines)
+        if n_tasks == 0:
+            continue
+            
+        start = current_line
+        end = current_line + n_tasks - 1
+        
+        sbatch_lines.append(f"# {group_key} ({n_tasks} tasks)")
+        sbatch_lines.append(f"sbatch --array={start}-{end} task_array.sh")
+        sbatch_lines.append("")
+        
+        current_line += n_tasks
+        
+    return _SUBMIT_TEMPLATE.format(
+        job_name=method,
+        sbatch_commands="\n".join(sbatch_lines).strip()
+    )
+
+def _task_list(grouped_tasks: dict[str, list[str]]) -> str:
+    """
+    Generate the contents of a single master task list file.
+    """
+    all_tasks = []
+    for tasks in grouped_tasks.values():
+        all_tasks.extend(tasks)
+    return "\n".join(all_tasks) + "\n"
+
 def to_input_string(
     method: str,
-    task_lines: list[str],
+    grouped_tasks: dict[str, list[str]],
     queue: str | None = None,
 ) -> dict[str, str]:
     """
-    Generate SLURM batch array script and tasks list for a given method and queue.
+    Generate SLURM batch array script and tasks lists for a given quantum chemical model.
     
     Args:
         method: Quantum-chemical model identifier.
-        task_lines: List of target directories/files for the tasks array.
+        grouped_tasks: Dictionary mapping group names to their list of task lines.
         queue: Name of the queue (e.g. "Poznań").
             If None, the default queue for the software is used.
         
     Returns:
         Dictionary mapping filenames to their string content:
         {
-            "submit.sh": Formatted SLURM bash script content,
-            "tasks.txt": Newline-separated list of tasks,
+            "submit.sh": Master submission script content,
+            "task_array.sh": Template array script content,
+            "tasks.txt": Newline-separated master list of tasks,
         }
     """
     template_path = _path_to_template(method, queue)
-        
     if not template_path.exists():
         raise ValueError(f"Queue template not found: {template_path}")
         
-    template = template_path.read_text(encoding="utf-8")
-    
-    return {
-        "submit.sh": template.format(job_name=method, n_tasks=len(task_lines)),
-        "tasks.txt": "\n".join(task_lines) + "\n",
+    output_files = {
+        "task_array.sh": _task_array(method, template_path),
+        "submit.sh": _submit(method, grouped_tasks),
+        "tasks.txt": _task_list(grouped_tasks),
     }
+            
+    return output_files
