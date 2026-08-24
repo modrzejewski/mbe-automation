@@ -14,7 +14,7 @@ except ImportError:
 from tqdm import tqdm
 
 # Ensure the project root is in sys.path for standalone execution
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -22,7 +22,7 @@ from tests.reference_data.test_cases import TEST_CASES, REFERENCE_DATA_DIR
 
 def process_clusters(case: dict, cluster_type: str):
     sym_weights_csv = case["symmetry_weights"][cluster_type]
-    case_dir = Path(sym_weights_csv).parent.parent
+    case_dir = Path(sym_weights_csv).parents[1]
     zip_path = case_dir / f"{cluster_type}.zip"
     
     if not zip_path.exists():

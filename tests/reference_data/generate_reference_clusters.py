@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 
 # Add project root to sys.path so we can import modules
-project_root = Path(__file__).resolve().parent.parent.parent
+project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
 from test_cases import TEST_CASES
@@ -76,7 +76,7 @@ def main():
                 
                 # Archive the XYZ geometries
                 src_xyz_dir = directory_structure.XYZ_DIRS[cluster_type]
-                dest_zip_base = dest_file.parent.parent / cluster_type
+                dest_zip_base = dest_file.parents[1] / cluster_type
                 
                 if Path(src_xyz_dir).exists() and any(Path(src_xyz_dir).iterdir()):
                     shutil.make_archive(str(dest_zip_base), 'zip', src_xyz_dir)

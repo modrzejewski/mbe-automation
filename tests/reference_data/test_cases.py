@@ -1,6 +1,6 @@
 from pathlib import Path
 
-TESTS_DIR = Path(__file__).resolve().parent.parent
+TESTS_DIR = Path(__file__).resolve().parents[1]
 REFERENCE_DATA_DIR = Path(__file__).resolve().parent
 X23_DIR = REFERENCE_DATA_DIR / "xyz" / "X23"
 MACE_MODELS_DIR = REFERENCE_DATA_DIR / "mace_models" / "Pia_et_al_Chem_Sci_2025"
