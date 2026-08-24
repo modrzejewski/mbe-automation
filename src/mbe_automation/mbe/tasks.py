@@ -11,7 +11,7 @@ import mbe_automation.calculators.electronic.mrcc
 import mbe_automation.calculators.electronic.slurm
 
 if TYPE_CHECKING:
-    from mbe_automation.mbe.core import Decomposition
+    from mbe_automation.mbe.core import MBE
     from mbe_automation.structure.clusters import UniqueClusters
 
 #
@@ -279,10 +279,10 @@ class ClusterSelection:
     """
     Fluent builder for selecting clusters and generating scheduled tasks.
 
-    Created by ``Decomposition.select()``. Use ``.below()`` to apply
+    Created by ``MBE.select()``. Use ``.below()`` to apply
     an optional distance cutoff, then ``.schedule()`` to generate tasks.
     """
-    _mbe: Decomposition
+    _mbe: MBE
     _cluster_type: str
     _max_distance: float | None = field(default=None, repr=False)
 
@@ -302,11 +302,9 @@ class ClusterSelection:
         self,
         clusters: UniqueClusters,
     ) -> None:
-        max_dist = self._max_distance
-        if max_dist is None or clusters.type_string == "monomers":
+        if self._max_distance is None or clusters.type_string == "monomers":
             return
-        cutoff = self._mbe.filter.cutoffs[clusters.type_string]
-        if cutoff is not None and max_dist > cutoff:
+        if self._max_distance > self._mbe.filter.cutoffs[clusters.type_string]:
             raise ValueError(
                 f"Requested distance cutoff {self._max_distance} Å is larger "
                 f"than the generation cutoff ({self._mbe.filter.cutoffs[clusters.type_string]} Å) for \"{clusters.type_string}\"."
@@ -343,7 +341,6 @@ class ClusterSelection:
         tasks = Tasks()
         for cluster_type in matching_types:
             clusters = self._mbe.read_clusters(cluster_type=cluster_type)
-            assert not isinstance(clusters, dict) # Mypy narrowing for specific cluster_type
             self._assert_distance_below_cutoff(clusters)
             mol_sizes = clusters.molecule_sizes
             char_distances = clusters.characteristic_distances
@@ -351,7 +348,7 @@ class ClusterSelection:
 
             for i in range(clusters.n_clusters_unique):
                 if is_monomer:
-                    distance = np.float64(np.nan)
+                    distance = np.nan
                 else:
                     distance = np.float64(char_distances[i])
                     if (self._max_distance is not None
@@ -360,7 +357,7 @@ class ClusterSelection:
 
                 cluster_label = clusters.labels(frame_index=i)[0]
                 inputs = mbe_automation.calculators.electronic.core.to_input_string(
-                    method=method, # type: ignore[arg-type]
+                    method=method,
                     structure=clusters.structures,
                     subsystem_sizes=mol_sizes,
                     frame_index=i,

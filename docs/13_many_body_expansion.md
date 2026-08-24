@@ -47,7 +47,7 @@ config = mbe_automation.configs.many_body_expansion.Clusters(
     dataset="./dataset.hdf5",
 )
 
-decomposition = mbe_automation.run(config)
+mbe = mbe_automation.run(config)
 ```
 
 ## Inputs for Quantum-Chemical Calculations
@@ -56,8 +56,8 @@ Select clusters by type and distance, schedule quantum-chemical computations,
 and export the input files:
 
 ```python
-tasks = decomposition.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
-tasks += decomposition.select("dimers").below(7.0).schedule("rpa+ph_avtz")
+tasks = mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks += mbe.select("dimers").below(7.0).schedule("rpa+ph_avtz")
 
 tasks.to_input_files("./mbe_output")
 ```
@@ -96,6 +96,7 @@ clusters under the configured `root_key` (default is `many_body_expansion`):
 ```
 dataset.hdf5
 └── many_body_expansion
+    ├── summary
     ├── cleaved
     │   ├── monomers[A]
     │   ├── dimers[AA]
@@ -103,6 +104,8 @@ dataset.hdf5
     └── structures
         └── crystal[input]
 ```
+
+The `summary` node stores workflow metadata and can accommodate future computation outputs.
 
 ### Directory Structure
 
@@ -205,14 +208,14 @@ config = mbe_automation.configs.many_body_expansion.Clusters(
     dataset="./dataset.hdf5",
 )
 
-decomposition = mbe_automation.run(config)
+mbe = mbe_automation.run(config)
 
-tasks = decomposition.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
-tasks += decomposition.select("dimers").below(7.0).schedule("lno-ccsd(t)_vtight_avqz")
+tasks = mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks += mbe.select("dimers").below(7.0).schedule("lno-ccsd(t)_vtight_avqz")
 
-tasks += decomposition.select("monomers").schedule("rpa+ph_avtz")
-tasks += decomposition.select("dimers").schedule("rpa+ph_avtz")
-tasks += decomposition.select("trimers").schedule("rpa+ph_avtz")
+tasks += mbe.select("monomers").schedule("rpa+ph_avtz")
+tasks += mbe.select("dimers").schedule("rpa+ph_avtz")
+tasks += mbe.select("trimers").schedule("rpa+ph_avtz")
 
 tasks.to_input_files(config.work_dir)
 ```

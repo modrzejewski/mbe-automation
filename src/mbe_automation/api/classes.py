@@ -26,7 +26,7 @@ from mbe_automation.storage import MolecularCrystal as _MolecularCrystal
 from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 from mbe_automation.storage import AtomicReference as _AtomicReference
 from mbe_automation.storage import BrillouinZonePath as _BrillouinZonePath
-from mbe_automation.mbe import Decomposition as _Decomposition
+from mbe_automation.mbe import MBE as _MBE
 from mbe_automation.dynamics.harmonic.core import EOSMetadata as _EOSMetadata
 import mbe_automation.dynamics.harmonic.modes
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, ThermalDisplacements
@@ -162,11 +162,11 @@ class EOSMetadata(_EOSMetadata):
         )
 
 
-class Decomposition(_Decomposition):
+class MBE(_MBE):
     @classmethod
-    def read(cls, dataset: str | Path, key: str) -> Decomposition:
+    def read(cls, dataset: str | Path, key: str) -> MBE:
         return cls(**vars(
-            _Decomposition.read(dataset=dataset, key=key)
+            _MBE.read(dataset=dataset, key=key)
         ))
 
 @dataclass(kw_only=True)
@@ -1985,7 +1985,7 @@ class AnySystem:
         "ForceConstants": ForceConstants,
         "AtomicReference": AtomicReference,
         "UniqueClusters": UniqueClusters,
-        "Decomposition": Decomposition,
+        "MBE": MBE,
     }
 
     @staticmethod
@@ -2000,7 +2000,7 @@ class AnySystem:
         | ForceConstants
         | AtomicReference
         | UniqueClusters
-        | Decomposition
+        | MBE
     ):
         """
         Reads the object at the given key, automatically determining its type.

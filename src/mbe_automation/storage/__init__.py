@@ -36,7 +36,7 @@ from mbe_automation.storage.core import (
 )
 
 from mbe_automation.storage.mbe import (
-    _MBEMetadata,
+    _MBE,
     _UniqueClustersFilter,
     save_mbe_metadata,
     read_mbe_metadata,

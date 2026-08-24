@@ -12,7 +12,7 @@ import mbe_automation.calculators.electronic
 
 def run(
     config: mbe_automation.configs.many_body_expansion.Clusters,
-) -> mbe_automation.mbe.Decomposition:
+) -> mbe_automation.mbe.MBE:
     datetime_start = mbe_automation.common.display.timestamp_start()
 
     mbe_automation.common.resources.print_computational_resources()
@@ -74,7 +74,7 @@ def run(
             save_path=config.work_dir / "cumulative_cluster_count.png",
         )
 
-    mbe_obj = mbe_automation.mbe.Decomposition(
+    mbe_obj = mbe_automation.mbe.MBE(
         cluster_types=list(unique_clusters.keys()),
         unique_clusters_keys=unique_clusters_keys,
         crystal_key=f"{config.root_key}/structures/crystal[input]",
@@ -86,7 +86,7 @@ def run(
 
     mbe_automation.storage.save_mbe_metadata(
         dataset=config.dataset,
-        key=f"{config.root_key}/mbe_metadata",
+        key=f"{config.root_key}/summary",
         mbe_metadata=mbe_obj,
     )
 

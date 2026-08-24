@@ -37,7 +37,7 @@ from .api import (
     AnySystem,
     BrillouinZonePath,
     EOSMetadata,
-    Decomposition,
+    MBE,
     UniqueClusters,
     FiniteSubsystemFilter,
     UniqueClustersFilter,

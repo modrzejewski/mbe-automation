@@ -11,7 +11,7 @@ import mbe_automation.calculators.electronic
 import mbe_automation.storage.core
 import mbe_automation.storage.mbe
 from mbe_automation.structure.clusters import UniqueClusters
-from mbe_automation.storage.mbe import _MBEMetadata
+from mbe_automation.storage.mbe import _MBE
 from mbe_automation.mbe.tasks import ClusterSelection
 
 if TYPE_CHECKING:
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(kw_only=True)
-class Decomposition(_MBEMetadata):
+class MBE(_MBE):
     """
     Store metadata and geometric parameters of Many-Body Expansion (MBE) calculations.
 
@@ -42,9 +42,9 @@ class Decomposition(_MBEMetadata):
         cls,
         dataset: str | Path,
         key: str,
-    ) -> Decomposition:
+    ) -> MBE:
         """
-        Read Decomposition from a dataset file.
+        Read MBE summary from a dataset file.
         """
         raw = mbe_automation.storage.mbe.read_mbe_metadata(
             dataset=dataset,
