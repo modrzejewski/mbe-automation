@@ -84,3 +84,64 @@ Both completeness risks outlined by the reviewer are fundamentally correct and r
 2. **Risk B (Skew Lattices):** The face-by-face iterative grid expansion relies on a monotonic distance condition that only holds for sufficiently orthogonal lattices, and fails silently for unreduced bases by missing diagonal near-neighbors.
 
 Resolving these issues will require redesigning the `_supercell_size` bounding logic to either utilize bounding spheres that account for maximum intramolecular offsets (for Risk A) and implementing a proper shortest-vector/Niggli reduction or a bounding-box approach using reciprocal lattice vectors (for Risk B).
+
+## 4. Proposed Solutions
+
+To fully eliminate both completeness risks simultaneously, the supercell bounds generator should abandon the iterative, face-by-face distance sampling in favor of an **analytical bounding-box generation using reciprocal space**.
+
+### 4.1 Solution for Risk B (Skew Lattices)
+By calculating the perpendicular distances between lattice planes using the inverse transpose of the cell matrix, we can geometrically guarantee that any vector within the spherical cutoff is enclosed by the generated supercell, regardless of how skewed the basis vectors are.
+
+### 4.2 Solution for Risk A (Anchor Mismatch)
+By introducing a `padding` parameter to the analytical bound calculation, we can safely inflate the geometric cutoff radius before calculating the bounding box. This padding should be large enough to encapsulate the maximum possible shift in center-of-mass and the maximum intramolecular extent.
+
+### 4.3 Proposed Implementation
+
+The following function replaces the iterative logic in `_supercell_size` and returns the required grid dimensions:
+
+```python
+import numpy as np
+
+def compute_supercell_dimensions_analytical(
+    cell_vectors: np.ndarray,
+    target_cutoff: float,
+    padding: float = 0.0
+) -> np.ndarray:
+    """
+    Computes the minimum supercell dimensions required to strictly encompass
+    a given spatial cutoff radius, resolving skew-lattice issues.
+
+    Args:
+        cell_vectors: (3, 3) array of lattice vectors as rows.
+        target_cutoff: The desired interaction distance.
+        padding: Extra radius padding to account for anchor mismatch
+                 (e.g., max intramolecular extent + max COM shift).
+
+    Returns:
+        np.ndarray of shape (3,) with required expansions [Na, Nb, Nc].
+    """
+    effective_cutoff = target_cutoff + padding
+
+    # Calculate cell volume
+    vol = np.abs(np.linalg.det(cell_vectors))
+    if vol < 1e-8:
+        raise ValueError("Lattice volume is too small or singular.")
+
+    # Reciprocal lattice vectors (without 2pi factor)
+    # The length of the reciprocal vector b_i is related to the
+    # perpendicular distance d_i between lattice planes: |b_i| = 1 / d_i
+    # Note: np.linalg.inv(A).T computes the reciprocal basis (rows are b1, b2, b3)
+    reciprocal_basis = np.linalg.inv(cell_vectors).T
+
+    # Perpendicular distances between faces
+    plane_spacings = 1.0 / np.linalg.norm(reciprocal_basis, axis=1)
+
+    # The required number of units along axis i is effective_cutoff / plane_spacings[i]
+    # We take the ceiling to ensure the bounding box strictly covers the sphere
+    dimensions = np.ceil(effective_cutoff / plane_spacings).astype(np.int64)
+
+    return dimensions
+```
+
+**Testing the proposed fix against Risk B:**
+If we provide the exact skewed unit cell parameters from the Risk B counter-example (`a=(10,0,0)`, `b=(8.66, 5, 0)`, `c=(0,0,10)`, `cutoff=6.0`), the analytical function returns `[2, 2, 1]`, correctly demanding a much larger grid expansion to cover the highly interacting diagonal `a - b` vector, completely avoiding the early-convergence trap of the previous algorithm.
