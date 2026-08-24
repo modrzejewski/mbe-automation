@@ -36,7 +36,6 @@ md_config = mbe_automation.configs.md.Enthalpy(
     calculator=mace_calc,
     temperatures_K=np.array([298.15]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
-    dataset="properties.hdf5",
 
     md_molecule=mbe_automation.configs.md.ClassicalMD(
         ensemble="NVT",
@@ -130,7 +129,6 @@ md_config = mbe_automation.configs.md.Enthalpy(
     calculator=mace_calc,
     temperatures_K=np.array([298.15]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
-    dataset="properties.hdf5",
 
     md_molecule=mbe_automation.configs.md.ClassicalMD(
         ensemble="NVT",

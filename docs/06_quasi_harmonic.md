@@ -49,7 +49,6 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
-    dataset="properties.hdf5",
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 )
@@ -89,7 +88,6 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     molecule=Structure.from_file("molecule.xyz"),  # ONE reference
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
-    dataset="properties.hdf5",
 )
 ```
 
@@ -125,7 +123,6 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     ],
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
-    dataset="properties.hdf5",
 )
 ```
 
@@ -201,7 +198,6 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
-    dataset="properties.hdf5",
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 
@@ -269,7 +265,6 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
-    dataset="properties.hdf5",
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 
@@ -459,7 +454,6 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
-    dataset="properties.hdf5",
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
 

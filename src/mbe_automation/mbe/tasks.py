@@ -256,7 +256,7 @@ class Tasks(UserList[ScheduledTask]):
                         initial_distance=4.0,
                     )
                     for (lower, upper), subset in bins.items():
-                        upper_str = "∞" if np.isinf(upper) else f"{upper:.2f}"
+                        upper_str = "max cutoff" if np.isinf(upper) else f"{upper:.2f}"
                         group_name = f"{cluster_type} ({lower:.2f} ≤ r < {upper_str} Å)"
                         grouped_paths[group_name] = [
                             str(task.input_file.relative_to(_TASKS_DIR / method))

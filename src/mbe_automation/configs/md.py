@@ -214,7 +214,7 @@ class Enthalpy:
                                    # a single HDF5 file with all data computed
                                    # for the physical system
                                    #
-    dataset: str | Path = "./properties.hdf5"
+    dataset: str | Path | None = None
     root_key: str = "md"
                                    #
                                    # Verbosity of the program's output.
@@ -230,8 +230,12 @@ class Enthalpy:
         if isinstance(self.molecule, mbe_automation.storage.Structure):
             self.molecule = mbe_automation.storage.to_ase(self.molecule)
         
-        self.dataset  = Path(self.dataset).expanduser()
         self.work_dir = Path(self.work_dir).expanduser()
+        
+        if self.dataset is None:
+            self.dataset = self.work_dir / "dataset.hdf5"
+        else:
+            self.dataset = Path(self.dataset).expanduser()
 
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
         self.pressures_GPa = np.atleast_1d(self.pressures_GPa)
