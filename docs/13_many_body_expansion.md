@@ -44,7 +44,6 @@ config = mbe_automation.configs.many_body_expansion.Clusters(
     calculator=mace_calc,
     filter=cluster_filter,
     work_dir="./mbe_output",
-    dataset="./dataset.hdf5",
 )
 
 mbe = mbe_automation.run(config)
@@ -205,7 +204,6 @@ config = mbe_automation.configs.many_body_expansion.Clusters(
     calculator=mace_calc,
     filter=cluster_filter,
     work_dir="./mbe_output",
-    dataset="./dataset.hdf5",
 )
 
 mbe = mbe_automation.run(config)

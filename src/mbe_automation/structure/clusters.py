@@ -2084,11 +2084,7 @@ def _symmetry_unique_clusters(
 
     print(f"cluster_types        {unique_cluster_filter.cluster_types}")
     print(f"alignment_thresh     {unique_cluster_filter.alignment_thresh} Å")
-    algo_display = (
-        unique_cluster_filter.algorithm
-        or f"{mbe_automation.structure.molecule.DEFAULT_MATCH_ALGO} (default)"
-    )
-    print(f"algorithm            {algo_display}")
+    print(f"algorithm            {unique_cluster_filter.algorithm}")
 
     candidate_to_supercell, candidate_positions = _candidates_within_sphere(
         supercell_molecules=supercell_molecules,

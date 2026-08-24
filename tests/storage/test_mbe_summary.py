@@ -114,11 +114,11 @@ def test_mbe_summary_serialization_roundtrip(tmp_path: Path):
 
     df_dimers = clusters.to_data_frame()
     geometric_parameters = {"dimers[AA]": df_dimers}
-    unique_clusters_keys = {"dimers[AA]": f"{root_key}/cleaved/dimers[AA]"}
+    keys = {"dimers[AA]": f"{root_key}/cleaved/dimers[AA]"}
 
     mbe = MBE(
         cluster_types=["dimers[AA]"],
-        unique_clusters_keys=unique_clusters_keys,
+        keys=keys,
         crystal_key=f"{root_key}/structures/crystal[input]",
         dataset=dataset_path,
         root_key=root_key,
@@ -138,7 +138,7 @@ def test_mbe_summary_serialization_roundtrip(tmp_path: Path):
     )
 
     assert loaded.cluster_types == ["dimers[AA]"]
-    assert loaded.unique_clusters_keys == unique_clusters_keys
+    assert loaded.keys == keys
     assert loaded.crystal_key == f"{root_key}/structures/crystal[input]"
     assert loaded.root_key == root_key
     assert isinstance(loaded.dataset, Path)
@@ -177,7 +177,7 @@ def test_mbe_summary_inspection_and_api(tmp_path: Path):
 
     mbe = MBE(
         cluster_types=["dimers[AA]"],
-        unique_clusters_keys={"dimers[AA]": f"{root_key}/cleaved/dimers[AA]"},
+        keys={"dimers[AA]": f"{root_key}/cleaved/dimers[AA]"},
         crystal_key=f"{root_key}/structures/crystal[input]",
         dataset=dataset_path,
         root_key=root_key,
@@ -238,7 +238,7 @@ def test_mbe_summary_methods(tmp_path: Path):
 
     mbe = MBE(
         cluster_types=["dimers[AA]"],
-        unique_clusters_keys={"dimers[AA]": f"{root_key}/cleaved/dimers[AA]"},
+        keys={"dimers[AA]": f"{root_key}/cleaved/dimers[AA]"},
         crystal_key=f"{root_key}/structures/crystal[input]",
         dataset=dataset_path,
         root_key=root_key,

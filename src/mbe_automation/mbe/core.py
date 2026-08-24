@@ -26,7 +26,7 @@ class MBE(_MBE):
     Attributes:
         cluster_types: List of available cluster type identifiers
             (e.g., ["monomers[A]", "dimers[AA]", "dimers[AB]", "trimers[AAA]"]).
-        unique_clusters_keys: Mapping of cluster type strings to full dataset keys
+        keys: Mapping of cluster type strings to full dataset keys
             pointing to stored `UniqueClusters` objects in the dataset file.
         crystal_key: Full dataset key for the input crystal structure.
         dataset: Path to the dataset file.
@@ -110,7 +110,7 @@ class MBE(_MBE):
                 for ct in self.cluster_types
             }
 
-        if cluster_type not in self.unique_clusters_keys:
+        if cluster_type not in self.cluster_types:
             raise ValueError(
                 f"Invalid cluster type: '{cluster_type}'. "
                 f"Available cluster types: {self.cluster_types}"
@@ -118,7 +118,7 @@ class MBE(_MBE):
 
         return mbe_automation.storage.core.read_unique_clusters(
             dataset=self.dataset,
-            key=self.unique_clusters_keys[cluster_type],
+            key=self.keys[cluster_type],
         )
 
     def plot(

@@ -44,12 +44,12 @@ def run(
         key=config.root_key,
     )
 
-    unique_clusters_keys = {}
+    keys = {}
     geometric_parameters = {}
 
     for cluster_type, clusters in unique_clusters.items():
         key = f"{config.root_key}/cleaved/{cluster_type}"
-        unique_clusters_keys[cluster_type] = key
+        keys[cluster_type] = key
         geometric_parameters[cluster_type] = clusters.to_data_frame()
 
         mbe_automation.storage.save_unique_clusters(
@@ -76,7 +76,7 @@ def run(
 
     mbe_obj = mbe_automation.mbe.MBE(
         cluster_types=list(unique_clusters.keys()),
-        unique_clusters_keys=unique_clusters_keys,
+        keys=keys,
         crystal_key=f"{config.root_key}/structures/crystal[input]",
         dataset=Path(config.dataset),
         root_key=config.root_key,

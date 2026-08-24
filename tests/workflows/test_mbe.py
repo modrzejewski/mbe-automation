@@ -231,7 +231,6 @@ def _run_cluster_extraction(case: dict, work_dir: Path) -> None:
         calculator=calc,
         filter=unique_cluster_filter,
         work_dir=work_dir,
-        dataset=work_dir / "properties.hdf5",
         save_xyz=True,
         save_csv=True,
     )

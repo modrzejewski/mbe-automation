@@ -60,7 +60,7 @@ class Clusters:
                                    # a single dataset file with all data computed
                                    # for the physical system
                                    #
-    dataset: str | Path = "./properties.hdf5"
+    dataset: str | Path | None = None
     root_key: str = "many_body_expansion"
                                    #
                                    # Whether to save the symmetry-unique clusters to .xyz files.
@@ -86,4 +86,7 @@ class Clusters:
             raise ValueError("The input crystal structure must be periodic.")
             
         self.work_dir = Path(self.work_dir).expanduser()
-        self.dataset = Path(self.dataset).expanduser()
+        if self.dataset is None:
+            self.dataset = self.work_dir / "dataset.hdf5"
+        else:
+            self.dataset = Path(self.dataset).expanduser()
