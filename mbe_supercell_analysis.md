@@ -170,3 +170,30 @@ Running the same synthetic test case (Type A at `x=0` mass 1, Type B at `x=9` ma
 ### 5.3 Conclusion on Risk A
 
 The patch correctly decouples the geometric center (from which the symmetric grid is expanded) from the center of mass. By anchoring the reference molecule to the central lattice cell `[0, 0, 0]` before sorting, the generated supercell bounding box remains perfectly symmetric around the reference, guaranteeing that no molecules within the cutoff sphere are omitted. Risk A has been successfully eliminated. The change in the internal ordering of the supercell structure is entirely safe because downstream clustering logic is completely agnostic to the absolute index order, depending only on the relative distance constraints which are now mathematically sound.
+
+## 6. Verification of the Patch for Risk B
+
+A recent patch introduced to the `mbe_automation` codebase alters the algorithm in `_supercell_size` to explicitly address Risk B (the failure to identify proper bounds for skew or non-reduced lattices).
+
+### 6.1 Analysis of the Code Changes
+
+The previous implementation used a brittle "face-by-face" iterative expansion. It checked whether explicit shifted coordinates along the `+a` and `-a` boundaries were within the cutoff. If they were not, the algorithm assumed convergence for that axis, missing the fact that diagonal combinations like `a - b` could swing back into the cutoff sphere in highly skewed lattices.
+
+The updated logic abandons this iterative check entirely in favor of a mathematically rigorous, direct geometric calculation:
+1. For each crystallographic direction $i$, it computes the normal vector of the plane formed by the other two lattice vectors using the cross product: `normal = np.cross(other_vectors[0], other_vectors[1])`.
+2. It then calculates the perpendicular height of the unit cell along direction $i$ by projecting the lattice vector $a_i$ onto this unit normal: `h = abs(np.dot(a_i, unit_normal))`.
+3. The required number of layers to safely encapsulate the cutoff is then determined directly by dividing the geometric cutoff by the perpendicular height: `layers = math.ceil(cutoff / h) + delta`.
+
+This approach ensures that regardless of the skew angles between the basis vectors, the generated parallelpiped bounding box strictly encloses the bounding sphere of radius `cutoff`.
+
+### 6.2 Verification via Counter-example
+
+Running the same synthetic test case (`a=(10.0, 0.0, 0.0)`, `b=(8.660254, 5.0, 0.0)`, `c=(0.0, 0.0, 10.0)`, cutoff 6.0 Å) against the patched codebase yields the following results:
+
+- **Previous supercell size:** `[1 1 1]` (failed to capture diagonal images).
+- **Patched supercell size:** `[7 7 5]`
+- **Captured Interacting Images:** The test script verifies that the previously omitted diagonal shifts (specifically indices representing the vectors `a - b` and `b - a`, which have a magnitude of 5.176381 Å) are now successfully generated within this bounding box.
+
+### 6.3 Conclusion on Risk B
+
+The patch fundamentally changes the bounding box algorithm from an empirical test to a rigorous geometric projection. By relying on perpendicular lattice heights rather than the absolute lengths of the highly skewed basis vectors, the code guarantees the complete inclusion of all atom-atom interactions. Risk B has been definitively resolved.
