@@ -1470,7 +1470,7 @@ def _expand_to_supercell(
     else:
         unit_cell_vectors = unit_cell.cell_vectors
 
-    supercell_size = _supercell_size_v2(composition, cutoff, frame_index)
+    supercell_size = _supercell_size(composition, cutoff, frame_index)
 
     nx, ny, nz = supercell_size
     n_cells = nx * ny * nz
