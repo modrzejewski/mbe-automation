@@ -188,6 +188,11 @@ class Structure:
     It is expected that the ground truth object is populated by
     data points from expensive models which cannot be used
     for structure generation.
+    
+    Attributes:
+        cell_vectors: Lattice vectors of the periodic structure. 
+            Stored as an array of shape (3, 3) or (n_frames, 3, 3), where the 
+            last two dimensions hold the lattice vectors (a, b, c) as rows.
     """
     positions: npt.NDArray[np.floating]
     atomic_numbers: npt.NDArray[np.integer]

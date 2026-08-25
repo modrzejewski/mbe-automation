@@ -1414,54 +1414,36 @@ def _supercell_size(
     frame_index: int = 0
 ) -> npt.NDArray[np.int64]:
     """
-    Iteratively determine the minimal supercell dimensions required to encompass
-    a given cutoff distance by checking explicit intermolecular distances
-    between central unit cell molecules and newly added boundary molecules.
+    Determine conservative supercell dimensions using geometric perpendicular heights.
+    
+    The calculated size guarantees the inclusion of all atom-atom interactions 
+    between any molecule in the central unit cell and molecules in the neighboring 
+    cells within the given cutoff distance.
+    
+    Returns:
+        npt.NDArray[np.int64]: An array of three odd integers representing the 
+        total number of unit cells in each crystallographic direction.
     """
+    delta = 1
+    
     unit_cell = composition.molecular_crystal.supercell
     if unit_cell.variable_cell:
         unit_cell_vectors = unit_cell.cell_vectors[frame_index]
     else:
         unit_cell_vectors = unit_cell.cell_vectors
 
-    # Extract base positions for molecules naturally grouped by their unique type
-    central_batches = [
-        composition.atomic_properties(u, frame_index)[0]
-        for u in range(composition.n_molecules_unique)
-    ]
+    n = []
+    for i in range(3):
+        a_i = unit_cell_vectors[i]
+        other_vectors = [unit_cell_vectors[j] for j in range(3) if j != i]
+        normal = np.cross(other_vectors[0], other_vectors[1])
+        unit_normal = normal / np.linalg.norm(normal)
+        h = abs(np.dot(a_i, unit_normal))  # perpendicular height along direction i
+        layers = math.ceil(cutoff / h) + delta
+        n_i = 2 * layers + 1
+        n.append(n_i)
 
-    supercell_size = np.array([1, 1, 1], dtype=np.int64)
-
-    expanded = True
-    while expanded:
-        expanded = False
-        # Iterate over each crystallographic direction (a, b, c)
-        for i in range(3):
-            while True:
-                # Generate the Cartesian shifts for the boundary cells added in this step
-                shifts = _cartesian_supercell_shifts(supercell_size, unit_cell_vectors, boundary_axis=i)
-
-                min_dist = np.inf
-
-                # Check distances between all central molecule batches and explicitly shifted target batches
-                for batch_ref in central_batches:
-                    for batch_target in central_batches:
-                        # Shift the target batch explicitly across all boundary shifts using the helper
-                        shifted_targets = _batch_shift(batch_target, shifts)
-
-                        # Compute minimum distances matrix between all references and shifted targets
-                        dists, _ = _intermolecular_distances(batch_ref, shifted_targets)
-                        min_dist = min(min_dist, np.min(dists))
-
-                # If the boundary molecules interact with the central cell, accept the expanded size
-                if min_dist < cutoff:
-                    supercell_size[i] += 2
-                    expanded = True
-                else:
-                    # We have reached convergence for this specific direction in the current pass
-                    break
-
-    return supercell_size
+    return np.array(n, dtype=np.int64)
 
 
 def _expand_to_supercell(
@@ -1488,7 +1470,7 @@ def _expand_to_supercell(
     else:
         unit_cell_vectors = unit_cell.cell_vectors
 
-    supercell_size = _supercell_size(composition, cutoff, frame_index)
+    supercell_size = _supercell_size_v2(composition, cutoff, frame_index)
 
     nx, ny, nz = supercell_size
     n_cells = nx * ny * nz
