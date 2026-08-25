@@ -85,6 +85,13 @@ class Clusters:
         if not self.crystal.periodic:
             raise ValueError("The input crystal structure must be periodic.")
             
+        if not isinstance(self.calculator, ASECalculator):
+            raise TypeError(
+                "An ASE calculator is required to determine the number of "
+                "crystallographically unique molecules in the unit cell. "
+                f"Got: {type(self.calculator).__name__}"
+            )
+
         self.work_dir = Path(self.work_dir).expanduser()
         if self.dataset is None:
             self.dataset = self.work_dir / "dataset.hdf5"

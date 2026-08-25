@@ -1517,34 +1517,45 @@ def _expand_to_supercell(
         total_mass_r += np.sum(p * m[:, :, np.newaxis], axis=(0, 1))
 
     total_com = total_mass_r / total_mass
+    #
+    # The central cell is the cell with shift vector [0, 0, 0]
+    #
+    central_cell_idx = np.argmin(np.linalg.norm(shifts_cart, axis=1))
 
     for u in range(composition.n_molecules_unique):
         positions_list[u] -= total_com
-        p = positions_list[u]
-        m = masses_list[u]
-        coms = np.sum(p * m[:, :, np.newaxis], axis=1) / np.sum(m, axis=1)[:, np.newaxis]
-
-        distances_to_origin = np.linalg.norm(coms, axis=1)
-        sort_indices = np.argsort(distances_to_origin)
-
-        positions_list[u] = positions_list[u][sort_indices]
-        atomic_numbers_list[u] = atomic_numbers_list[u][sort_indices]
-        masses_list[u] = masses_list[u][sort_indices]
-        coms = coms[sort_indices]
-
-        centers_of_mass_list.append(coms)
 
     min_distance_to_ref_molecule = []
     for u in range(composition.n_molecules_unique):
         dist_matrix = np.zeros((composition.n_molecules_unique, composition.n_equivalent[u] * n_cells))
 
         for v in range(composition.n_molecules_unique):
+            ref_idx_v = central_cell_idx * composition.n_equivalent[v]
+            #
+            # Compute shortest atom-atom distance for every molecule of kind u
+            # to the reference molecule of kind v
+            #
             dist_matrix[v, :] = _shortest_atom_atom_distance(
-                positions_list[v][0],
+                positions_list[v][ref_idx_v],
                 positions_list[u]
             )
 
         min_distance_to_ref_molecule.append(dist_matrix)
+
+    for u in range(composition.n_molecules_unique):
+        distances_to_ref = min_distance_to_ref_molecule[u][u, :]
+        sort_indices = np.argsort(distances_to_ref)
+
+        positions_list[u] = positions_list[u][sort_indices]
+        atomic_numbers_list[u] = atomic_numbers_list[u][sort_indices]
+        masses_list[u] = masses_list[u][sort_indices]
+
+        min_distance_to_ref_molecule[u] = min_distance_to_ref_molecule[u][:, sort_indices]
+
+        p = positions_list[u]
+        m = masses_list[u]
+        coms = np.sum(p * m[:, :, np.newaxis], axis=1) / np.sum(m, axis=1)[:, np.newaxis]
+        centers_of_mass_list.append(coms)
 
     return SupercellMolecules(
         n_molecules_nonunique=composition.n_molecules_nonunique * n_cells,
