@@ -202,13 +202,19 @@ The patch fundamentally changes the bounding box algorithm from an empirical tes
 
 The `mbe_automation` supercell creation code was further refined in the latest commit to combine the mitigations for both Risk A and Risk B into a single, highly robust geometric algorithm.
 
-### 7.1 Unified Supercell Bounding Logic
-The most recent patch replaces the `delta = 1` heuristic padding previously used in the perpendicular height bounds calculation with a rigorous calculation of **fractional spans**:
-1. The code computes `max_span`, which measures the maximum peak-to-peak fractional coordinate difference for all molecules in the crystal along each crystallographic axis.
-2. The number of required boundary layers is evaluated using:
+### 7.1 Mathematical Correctness of Fractional Spans
+The most recent patch replaces the arbitrary `delta = 1` heuristic padding previously used in the bounds calculation with a mathematically exact calculation utilizing **fractional spans**. This directly targets a fundamental nuance of lattice distance geometry: the cutoff is requested as an absolute spherical radius (in Ångströms), but molecules themselves are extended objects, not point masses.
+
+1. The code computes `max_span`, which is the maximum peak-to-peak fractional coordinate difference (the "width") of any molecule in the crystal along each crystallographic axis.
+2. The required boundary layers are evaluated using:
    `layers = math.ceil(cutoff / h + max_span[i] + eps)`
 
-This is a mathematically complete solution because `cutoff / h` guarantees that the base cutoff sphere is enclosed (solving the Skew Lattice issue, Risk B), and the addition of `max_span[i]` expands the bounding box perfectly by the maximum intramolecular extent along that axis. This explicit geometric padding means that even if the molecules are extremely large or elongated, their boundaries cannot "spill" out of the generated search grid, fully neutralizing any sensitivity to Anchor Mismatches (Risk A).
+**Why this algorithm is mathematically correct:**
+- **The Spherical Cutoff (`cutoff / h`):** The perpendicular height $h$ represents the absolute distance between lattice planes. Dividing the spherical cutoff radius by $h$ accurately determines the exact number of fractional lattice shifts required to encapsulate a perfect sphere. This alone completely solves **Risk B (Skew Lattices)**, as it relies on invariant plane-to-plane spacing rather than raw vector lengths.
+- **The Molecular Extent (`max_span[i]`):** Because the cutoff represents an *atom-to-atom* interaction threshold, calculating grid sizes based strictly on molecular centers-of-mass is insufficient; a long molecule centered just inside the grid edge might have atoms stretching far outside it. By adding `max_span[i]` directly to the fractional boundary, the algorithm guarantees that the grid is expanded by exactly the maximum intramolecular dimension.
+- **The Mitigation of Risk A:** This fractional padding is the final nail in the coffin for **Risk A (Anchor Mismatch)**. Because the grid is inflated explicitly by the physical dimensions of the molecules, it is impossible for any valid atom-to-atom interaction originating from the central cell to cross the generated boundary, regardless of where the anchor molecule resides or how the atoms are distributed within the molecule.
+
+This constitutes a formally correct, deterministic $\mathcal{O}(1)$ bounding algorithm that completely eliminates both completeness risks without relying on arbitrary buffers.
 
 ### 7.2 Empirical Re-verification
 
