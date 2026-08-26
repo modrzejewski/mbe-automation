@@ -1,2 +1,2 @@
-from .core import Decomposition
+from .core import MBE
 from .tasks import ScheduledTask, ClusterSelection

@@ -11,7 +11,7 @@ import mbe_automation.calculators.electronic
 import mbe_automation.storage.core
 import mbe_automation.storage.mbe
 from mbe_automation.structure.clusters import UniqueClusters
-from mbe_automation.storage.mbe import _MBEMetadata
+from mbe_automation.storage.mbe import _MBE
 from mbe_automation.mbe.tasks import ClusterSelection
 
 if TYPE_CHECKING:
@@ -19,14 +19,14 @@ if TYPE_CHECKING:
 
 
 @dataclass(kw_only=True)
-class Decomposition(_MBEMetadata):
+class MBE(_MBE):
     """
     Store metadata and geometric parameters of Many-Body Expansion (MBE) calculations.
 
     Attributes:
         cluster_types: List of available cluster type identifiers
             (e.g., ["monomers[A]", "dimers[AA]", "dimers[AB]", "trimers[AAA]"]).
-        unique_clusters_keys: Mapping of cluster type strings to full dataset keys
+        keys: Mapping of cluster type strings to full dataset keys
             pointing to stored `UniqueClusters` objects in the dataset file.
         crystal_key: Full dataset key for the input crystal structure.
         dataset: Path to the dataset file.
@@ -42,9 +42,9 @@ class Decomposition(_MBEMetadata):
         cls,
         dataset: str | Path,
         key: str,
-    ) -> Decomposition:
+    ) -> MBE:
         """
-        Read Decomposition from a dataset file.
+        Read MBE summary from a dataset file.
         """
         raw = mbe_automation.storage.mbe.read_mbe_metadata(
             dataset=dataset,
@@ -110,7 +110,7 @@ class Decomposition(_MBEMetadata):
                 for ct in self.cluster_types
             }
 
-        if cluster_type not in self.unique_clusters_keys:
+        if cluster_type not in self.cluster_types:
             raise ValueError(
                 f"Invalid cluster type: '{cluster_type}'. "
                 f"Available cluster types: {self.cluster_types}"
@@ -118,7 +118,7 @@ class Decomposition(_MBEMetadata):
 
         return mbe_automation.storage.core.read_unique_clusters(
             dataset=self.dataset,
-            key=self.unique_clusters_keys[cluster_type],
+            key=self.keys[cluster_type],
         )
 
     def plot(

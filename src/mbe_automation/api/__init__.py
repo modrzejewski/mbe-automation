@@ -2,7 +2,7 @@ from .classes import (
     ForceConstants, Structure, Trajectory,
     MolecularCrystal, FiniteSubsystem, MolecularComposition,
     Dataset, AtomicReference, AnySystem, BrillouinZonePath,
-    EOSMetadata, Decomposition, UniqueClusters,
+    EOSMetadata, MBE, UniqueClusters,
     FiniteSubsystemFilter, UniqueClustersFilter,
 )
 from .workflow_entrypoint import run

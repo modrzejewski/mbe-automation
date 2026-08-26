@@ -167,7 +167,7 @@ class FreeEnergy:
                                    # a single dataset file with all data computed
                                    # for the physical system
                                    #
-    dataset: str | Path = "./properties.hdf5"
+    dataset: str | Path | None = None
                                    #
                                    # Root location in the dataset hierarchical
                                    # structure.
@@ -362,8 +362,12 @@ class FreeEnergy:
         if isinstance(self.molecule, mbe_automation.storage.Structure):
             self.molecule = mbe_automation.storage.to_ase(self.molecule)
 
-        self.dataset = Path(self.dataset).expanduser()
         self.work_dir = Path(self.work_dir).expanduser()
+
+        if self.dataset is None:
+            self.dataset = self.work_dir / "dataset.hdf5"
+        else:
+            self.dataset = Path(self.dataset).expanduser()
 
         self.temperatures_K = np.sort(
             np.atleast_1d(self.temperatures_K).astype(np.float64, copy=False)

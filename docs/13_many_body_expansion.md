@@ -19,7 +19,7 @@ and configuring an MLIP calculator. This calculator is used exclusively to disti
 crystallographically unique molecules and is not involved in subsequent electronic structure calculations.
 
 The `UniqueClustersFilter` defines which $n$-body clusters to extract and the
-distance cutoffs (in Å) used for filtering. The distance between two molecules
+distance cutoffs (in Å) used for filtering. The distance between two molecules
 is evaluated as the minimum distance between any of their respective atoms.
 
 ```python
@@ -44,10 +44,9 @@ config = mbe_automation.configs.many_body_expansion.Clusters(
     calculator=mace_calc,
     filter=cluster_filter,
     work_dir="./mbe_output",
-    dataset="./dataset.hdf5",
 )
 
-decomposition = mbe_automation.run(config)
+mbe = mbe_automation.run(config)
 ```
 
 ## Inputs for Quantum-Chemical Calculations
@@ -56,8 +55,8 @@ Select clusters by type and distance, schedule quantum-chemical computations,
 and export the input files:
 
 ```python
-tasks = decomposition.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
-tasks += decomposition.select("dimers").below(7.0).schedule("rpa+ph_avtz")
+tasks = mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks += mbe.select("dimers").below(7.0).schedule("rpa+ph_avtz")
 
 tasks.to_input_files("./mbe_output")
 ```
@@ -68,7 +67,7 @@ can be combined with `+=` and exported in a single call to `to_input_files`.
 | Method | Description |
 |---|---|
 | `select(cluster_type)` | Select a cluster type (e.g., `"monomers"`, `"dimers"`). |
-| `below(distance)` | Restrict to clusters with characteristic distance below the cutoff (Å). |
+| `below(distance)` | Restrict to clusters with characteristic distance below the cutoff (Å). |
 | `schedule(method)` | Generate tasks for the specified quantum-chemical model. |
 | `to_input_files(work_dir)` | Write scheduled tasks as input files to disk. |
 
@@ -96,6 +95,7 @@ clusters under the configured `root_key` (default is `many_body_expansion`):
 ```
 dataset.hdf5
 └── many_body_expansion
+    ├── summary
     ├── cleaved
     │   ├── monomers[A]
     │   ├── dimers[AA]
@@ -103,6 +103,8 @@ dataset.hdf5
     └── structures
         └── crystal[input]
 ```
+
+The `summary` node stores workflow metadata and can accommodate future computation outputs.
 
 ### Directory Structure
 
@@ -202,17 +204,16 @@ config = mbe_automation.configs.many_body_expansion.Clusters(
     calculator=mace_calc,
     filter=cluster_filter,
     work_dir="./mbe_output",
-    dataset="./dataset.hdf5",
 )
 
-decomposition = mbe_automation.run(config)
+mbe = mbe_automation.run(config)
 
-tasks = decomposition.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
-tasks += decomposition.select("dimers").below(7.0).schedule("lno-ccsd(t)_vtight_avqz")
+tasks = mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks += mbe.select("dimers").below(7.0).schedule("lno-ccsd(t)_vtight_avqz")
 
-tasks += decomposition.select("monomers").schedule("rpa+ph_avtz")
-tasks += decomposition.select("dimers").schedule("rpa+ph_avtz")
-tasks += decomposition.select("trimers").schedule("rpa+ph_avtz")
+tasks += mbe.select("monomers").schedule("rpa+ph_avtz")
+tasks += mbe.select("dimers").schedule("rpa+ph_avtz")
+tasks += mbe.select("trimers").schedule("rpa+ph_avtz")
 
 tasks.to_input_files(config.work_dir)
 ```

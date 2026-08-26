@@ -309,10 +309,10 @@ class UniqueClusters:
         Returns:
             A pandas DataFrame with the following columns:
                 - system: The string label of the cluster.
-                - cluster_count: The integer number of symmetry-equivalent clusters.
+                - symmetry_weight: The integer number of symmetry-equivalent clusters.
                 - n_molecules[X] (1∕unit cell): The number of molecules of type
                   X in the unit cell.
-                - multiplicity_[Ref]: The number of molecules of the reference
+                - n_molecules[Ref] (1∕cluster): The number of molecules of the reference
                   type [Ref] present within a single cluster.
                 - lattice_energy_weight (1∕unit cell): The weight of the cluster's energy
                   contribution to the total lattice energy.
@@ -331,14 +331,14 @@ class UniqueClusters:
         
         data = {
             "system": self.labels(),
-            "cluster_count": self.weights,
+            "symmetry_weight": self.weights,
         }
 
         for u in range(len(self.reference_molecules)):
             mol_label = unique_molecule_label(u)
             data[f"n_molecules[{mol_label}] (1∕unit cell)"] = self.n_molecules_equivalent[u]
 
-        data[f"multiplicity_{ref_mol_label}"] = m_A
+        data[f"n_molecules[{ref_mol_label}] (1∕cluster)"] = m_A
         data["lattice_energy_weight (1∕unit cell)"] = (self.weights * n_A) / m_A
 
         if len(self.composition) == 2:
@@ -1414,54 +1414,45 @@ def _supercell_size(
     frame_index: int = 0
 ) -> npt.NDArray[np.int64]:
     """
-    Iteratively determine the minimal supercell dimensions required to encompass
-    a given cutoff distance by checking explicit intermolecular distances
-    between central unit cell molecules and newly added boundary molecules.
+    Determine supercell dimensions using geometric perpendicular heights
+    and the fractional spans of the molecules.
+    
+    The calculated size guarantees the inclusion of all atom-atom interactions 
+    between any molecule in the central unit cell and molecules in the neighboring 
+    cells within the given cutoff distance.
+    
+    Assumption: Every reference molecule in `composition` must have at least one 
+    atom within the primary unit cell (fractional coordinates in [0, 1]). Unwrapped 
+    molecules that have diffused entirely outside this cell will not have their 
+    interactions properly captured.
+    
+    Returns:
+        npt.NDArray[np.int64]: An array of three odd integers representing the 
+        total number of unit cells in each crystallographic direction.
     """
+    eps = 1.0e-2
+    
     unit_cell = composition.molecular_crystal.supercell
     if unit_cell.variable_cell:
         unit_cell_vectors = unit_cell.cell_vectors[frame_index]
     else:
         unit_cell_vectors = unit_cell.cell_vectors
 
-    # Extract base positions for molecules naturally grouped by their unique type
-    central_batches = [
-        composition.atomic_properties(u, frame_index)[0]
-        for u in range(composition.n_molecules_unique)
-    ]
+    spans = composition.molecular_crystal.fractional_spans(frame_index=frame_index)
+    max_span = np.max(spans, axis=0)
 
-    supercell_size = np.array([1, 1, 1], dtype=np.int64)
+    n = []
+    for i in range(3):
+        a_i = unit_cell_vectors[i]
+        other_vectors = [unit_cell_vectors[j] for j in range(3) if j != i]
+        normal = np.cross(other_vectors[0], other_vectors[1])
+        unit_normal = normal / np.linalg.norm(normal)
+        h = abs(np.dot(a_i, unit_normal))
+        layers = math.ceil(cutoff / h + 2 * max_span[i] + eps)
+        n_i = 2 * layers + 1
+        n.append(n_i)
 
-    expanded = True
-    while expanded:
-        expanded = False
-        # Iterate over each crystallographic direction (a, b, c)
-        for i in range(3):
-            while True:
-                # Generate the Cartesian shifts for the boundary cells added in this step
-                shifts = _cartesian_supercell_shifts(supercell_size, unit_cell_vectors, boundary_axis=i)
-
-                min_dist = np.inf
-
-                # Check distances between all central molecule batches and explicitly shifted target batches
-                for batch_ref in central_batches:
-                    for batch_target in central_batches:
-                        # Shift the target batch explicitly across all boundary shifts using the helper
-                        shifted_targets = _batch_shift(batch_target, shifts)
-
-                        # Compute minimum distances matrix between all references and shifted targets
-                        dists, _ = _intermolecular_distances(batch_ref, shifted_targets)
-                        min_dist = min(min_dist, np.min(dists))
-
-                # If the boundary molecules interact with the central cell, accept the expanded size
-                if min_dist < cutoff:
-                    supercell_size[i] += 2
-                    expanded = True
-                else:
-                    # We have reached convergence for this specific direction in the current pass
-                    break
-
-    return supercell_size
+    return np.array(n, dtype=np.int64)
 
 
 def _expand_to_supercell(
@@ -1517,34 +1508,45 @@ def _expand_to_supercell(
         total_mass_r += np.sum(p * m[:, :, np.newaxis], axis=(0, 1))
 
     total_com = total_mass_r / total_mass
+    #
+    # The central cell is the cell with shift vector [0, 0, 0]
+    #
+    central_cell_idx = np.argmin(np.linalg.norm(shifts_cart, axis=1))
 
     for u in range(composition.n_molecules_unique):
         positions_list[u] -= total_com
-        p = positions_list[u]
-        m = masses_list[u]
-        coms = np.sum(p * m[:, :, np.newaxis], axis=1) / np.sum(m, axis=1)[:, np.newaxis]
-
-        distances_to_origin = np.linalg.norm(coms, axis=1)
-        sort_indices = np.argsort(distances_to_origin)
-
-        positions_list[u] = positions_list[u][sort_indices]
-        atomic_numbers_list[u] = atomic_numbers_list[u][sort_indices]
-        masses_list[u] = masses_list[u][sort_indices]
-        coms = coms[sort_indices]
-
-        centers_of_mass_list.append(coms)
 
     min_distance_to_ref_molecule = []
     for u in range(composition.n_molecules_unique):
         dist_matrix = np.zeros((composition.n_molecules_unique, composition.n_equivalent[u] * n_cells))
 
         for v in range(composition.n_molecules_unique):
+            ref_idx_v = central_cell_idx * composition.n_equivalent[v]
+            #
+            # Compute shortest atom-atom distance for every molecule of kind u
+            # to the reference molecule of kind v
+            #
             dist_matrix[v, :] = _shortest_atom_atom_distance(
-                positions_list[v][0],
+                positions_list[v][ref_idx_v],
                 positions_list[u]
             )
 
         min_distance_to_ref_molecule.append(dist_matrix)
+
+    for u in range(composition.n_molecules_unique):
+        distances_to_ref = min_distance_to_ref_molecule[u][u, :]
+        sort_indices = np.argsort(distances_to_ref)
+
+        positions_list[u] = positions_list[u][sort_indices]
+        atomic_numbers_list[u] = atomic_numbers_list[u][sort_indices]
+        masses_list[u] = masses_list[u][sort_indices]
+
+        min_distance_to_ref_molecule[u] = min_distance_to_ref_molecule[u][:, sort_indices]
+
+        p = positions_list[u]
+        m = masses_list[u]
+        coms = np.sum(p * m[:, :, np.newaxis], axis=1) / np.sum(m, axis=1)[:, np.newaxis]
+        centers_of_mass_list.append(coms)
 
     return SupercellMolecules(
         n_molecules_nonunique=composition.n_molecules_nonunique * n_cells,
@@ -2084,11 +2086,7 @@ def _symmetry_unique_clusters(
 
     print(f"cluster_types        {unique_cluster_filter.cluster_types}")
     print(f"alignment_thresh     {unique_cluster_filter.alignment_thresh} Å")
-    algo_display = (
-        unique_cluster_filter.algorithm
-        or f"{mbe_automation.structure.molecule.DEFAULT_MATCH_ALGO} (default)"
-    )
-    print(f"algorithm            {algo_display}")
+    print(f"algorithm            {unique_cluster_filter.algorithm}")
 
     candidate_to_supercell, candidate_positions = _candidates_within_sphere(
         supercell_molecules=supercell_molecules,

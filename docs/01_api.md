@@ -256,7 +256,7 @@ Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 | `filter_out_broken_symmetry` | Filter out data points where space group differs from reference. | `True` |
 | `filter_out_extrapolated_minimum` | Filter out EOS fits where minimum is outside sampling interval. | `True` |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
-| `dataset` | The main dataset file with all data. | `"./properties.hdf5"` |
+| `dataset` | The main dataset file with all data. | `None` (defaults to `work_dir / "dataset.hdf5"`) |
 | `root_key` | Root path in the dataset file. | `"quasi_harmonic"` |
 | `verbose` | Verbosity of the program's output. `0` suppresses warnings. | `0` |
 | `save_plots` | If `True`, save plots of the simulation results. | `True` |
@@ -324,7 +324,7 @@ Configuration object for NVT/NPT thermodynamic averages from molecular dynamics.
 | unique_molecules_match_mode | Match mode to detect nonequivalent molecules ("energy_only", "rmsd_only", or "combined"). | "energy_only" |
 | relaxation | Geometry relaxation parameters. | Minimum() |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
-| `dataset` | The main dataset file with all data. | `"./properties.hdf5"` |
+| `dataset` | The main dataset file with all data. | `None` (defaults to `work_dir / "dataset.hdf5"`) |
 | `root_key` | Root path in the dataset file. | `"md"` |
 | `verbose` | Verbosity of the program's output. | `0` |
 | `save_plots` | If `True`, save plots of the simulation results. | `False` |
@@ -434,7 +434,7 @@ Configuration object for the Many-Body Expansion (MBE) workflow.
 | `filter` | Cluster filtering settings. The cutoffs correspond to the max(X,Y) min(i∈X, j∈Y) r_ij characteristic distance of the cluster, where X, Y are molecules and i, j are their respective atoms. Cutoffs are given in Å. | `UniqueClustersFilter(cluster_types=["monomers", "dimers", "trimers"], cutoffs={"dimers": 30.0, "trimers": 15.0})` |
 | `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell. | `1.0E-5` |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
-| `dataset` | The main dataset file with all data. | `"./properties.hdf5"` |
+| `dataset` | The main dataset file with all data. | `None` (defaults to `work_dir / "dataset.hdf5"`) |
 | `root_key` | Root path in the dataset file. | `"many_body_expansion"` |
 | `save_xyz` | Whether to save the symmetry-unique clusters to .xyz files. The .xyz files for individual clusters are saved in a dedicated subdirectory of work_dir. | `True` |
 | `save_csv` | Whether to save the symmetry-unique clusters metadata (such as symmetry numbers and characteristic distances) to .csv files. | `True` |

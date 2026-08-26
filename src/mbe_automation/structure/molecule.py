@@ -15,7 +15,6 @@ except (ImportError, OSError):
     irmsd = None  # type: ignore[assignment]
     _IRMSD_AVAILABLE = False
 
-DEFAULT_MATCH_ALGO = "irmsd"
 
 def to_pyscf(atoms: ase.Atoms, charge: int = 0, spin: int = 0) -> pyscf.gto.Mole:
     """
@@ -184,7 +183,7 @@ def match(
         positions_b: npt.NDArray[np.floating],
         atomic_numbers_b: npt.NDArray[np.integer],
         align_mirror_images: bool = False,
-        algorithm: Literal["ase", "pymatgen", "irmsd"] | None = None,
+        algorithm: Literal["ase", "pymatgen", "irmsd"] = "irmsd",
 ):
     """
     Compute root-mean square difference between atomic positions
@@ -207,8 +206,6 @@ def match(
     if not np.array_equal(comp_a, comp_b):
         return np.nan
 
-    if algorithm is None:
-        algorithm = DEFAULT_MATCH_ALGO
 
     _match_algorithms = {
         "ase": _match_ase,

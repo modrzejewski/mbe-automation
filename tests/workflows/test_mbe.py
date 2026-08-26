@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 # Ensure the project root is in sys.path for standalone execution
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -148,7 +148,7 @@ def _assert_cumulative_weights_comparison(
         this_subset = df_this[df_this[distance_column] <= safe_t]
         
         ref1_phys = int(ref1_subset['Weight'].sum())
-        this_phys = int(this_subset['cluster_count'].sum())
+        this_phys = int(this_subset['symmetry_weight'].sum())
         
         ref1_uniq = len(ref1_subset)
         this_uniq = len(this_subset)
@@ -231,7 +231,6 @@ def _run_cluster_extraction(case: dict, work_dir: Path) -> None:
         calculator=calc,
         filter=unique_cluster_filter,
         work_dir=work_dir,
-        dataset=work_dir / "properties.hdf5",
         save_xyz=True,
         save_csv=True,
     )
