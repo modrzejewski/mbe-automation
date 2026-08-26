@@ -18,4 +18,11 @@ export PATH=$PATH:~/mrcc
 TARGET=$(sed -n "${{SLURM_ARRAY_TASK_ID}}p" tasks.txt)
 cd $(dirname $TARGET)
 
-dmrcc > dmrcc.log
+if [ -f dmrcc.log ]; then
+    echo "dmrcc.log already exists in $(pwd), skipping."
+    exit 0
+fi
+
+dmrcc >& dmrcc.log
+find . -maxdepth 1 -type f ! -name 'MINP' ! -name 'dmrcc.log' -delete
+

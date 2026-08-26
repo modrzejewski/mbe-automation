@@ -163,7 +163,7 @@ class Tasks(UserList[ScheduledTask]):
     def _distance_bins(
         self,
         cluster_type: str,
-        distance_increment: float = 2.0,
+        distance_increment: float = 1.0,
         initial_distance: float = 4.0,
     ) -> dict[tuple[float, float], Tasks]:
         """
@@ -252,7 +252,6 @@ class Tasks(UserList[ScheduledTask]):
                 else:
                     bins = method_tasks._distance_bins(
                         cluster_type=cluster_type,
-                        distance_increment=2.0,
                         initial_distance=4.0,
                     )
                     for (lower, upper), subset in bins.items():

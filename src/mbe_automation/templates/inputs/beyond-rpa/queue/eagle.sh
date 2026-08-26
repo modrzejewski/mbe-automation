@@ -5,7 +5,7 @@
 #SBATCH --nodes 1      
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=48
-#SBATCH --time=08:00:00
+#SBATCH --time=32:00:00
 #SBATCH --mem=180gb
 
 module load python
@@ -22,4 +22,11 @@ export I_MPI_OFI_PROVIDER="tcp"
 TARGET=$(sed -n "${{SLURM_ARRAY_TASK_ID}}p" tasks.txt)
 TARGET_BASE="${{TARGET%.*}}"
 
-~/beyond-rpa/bin/run -np 1 -nt 48 "$TARGET" > "${{TARGET_BASE}}.log"
+if [ -f "${{TARGET_BASE}}.log" ]; then
+    echo "${{TARGET_BASE}}.log already exists, skipping."
+    exit 0
+fi
+
+~/beyond-rpa/bin/run -np 1 -nt 48 "$TARGET" >& "${{TARGET_BASE}}.log"
+
+
