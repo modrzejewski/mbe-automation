@@ -1443,7 +1443,7 @@ def _supercell_size(
         normal = np.cross(other_vectors[0], other_vectors[1])
         unit_normal = normal / np.linalg.norm(normal)
         h = abs(np.dot(a_i, unit_normal))
-        layers = math.ceil(cutoff / h + max_span[i] + eps)
+        layers = math.ceil(cutoff / h + 2 * max_span[i] + eps)
         n_i = 2 * layers + 1
         n.append(n_i)
 
