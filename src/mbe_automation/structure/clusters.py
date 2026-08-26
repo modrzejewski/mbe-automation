@@ -1421,6 +1421,11 @@ def _supercell_size(
     between any molecule in the central unit cell and molecules in the neighboring 
     cells within the given cutoff distance.
     
+    Assumption: Every reference molecule in `composition` must have at least one 
+    atom within the primary unit cell (fractional coordinates in [0, 1]). Unwrapped 
+    molecules that have diffused entirely outside this cell will not have their 
+    interactions properly captured.
+    
     Returns:
         npt.NDArray[np.int64]: An array of three odd integers representing the 
         total number of unit cells in each crystallographic direction.
