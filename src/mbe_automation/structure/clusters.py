@@ -1414,7 +1414,8 @@ def _supercell_size(
     frame_index: int = 0
 ) -> npt.NDArray[np.int64]:
     """
-    Determine conservative supercell dimensions using geometric perpendicular heights.
+    Determine supercell dimensions using geometric perpendicular heights
+    and the fractional spans of the molecules.
     
     The calculated size guarantees the inclusion of all atom-atom interactions 
     between any molecule in the central unit cell and molecules in the neighboring 
@@ -1424,7 +1425,7 @@ def _supercell_size(
         npt.NDArray[np.int64]: An array of three odd integers representing the 
         total number of unit cells in each crystallographic direction.
     """
-    delta = 1
+    eps = 1.0e-2
     
     unit_cell = composition.molecular_crystal.supercell
     if unit_cell.variable_cell:
@@ -1432,14 +1433,17 @@ def _supercell_size(
     else:
         unit_cell_vectors = unit_cell.cell_vectors
 
+    spans = composition.molecular_crystal.fractional_spans(frame_index=frame_index)
+    max_span = np.max(spans, axis=0)
+
     n = []
     for i in range(3):
         a_i = unit_cell_vectors[i]
         other_vectors = [unit_cell_vectors[j] for j in range(3) if j != i]
         normal = np.cross(other_vectors[0], other_vectors[1])
         unit_normal = normal / np.linalg.norm(normal)
-        h = abs(np.dot(a_i, unit_normal))  # perpendicular height along direction i
-        layers = math.ceil(cutoff / h) + delta
+        h = abs(np.dot(a_i, unit_normal))
+        layers = math.ceil(cutoff / h + max_span[i] + eps)
         n_i = 2 * layers + 1
         n.append(n_i)
 
