@@ -567,6 +567,37 @@ class MolecularCrystal:
 
         return selected_positions
 
+    def fractional_spans(self, frame_index: int = 0) -> npt.NDArray[np.float64]:
+        """
+        Compute the fractional span for all individual molecules.
+
+        The fractional span for a single molecule is defined as the maximum difference
+        in fractional coordinates (max - min) along the three crystallographic axes.
+        This method computes this span for every molecule in the crystal.
+
+        Args:
+            frame_index: The frame index to use if the structure contains multiple frames.
+
+        Returns:
+            An array of shape (n_molecules, 3) containing the fractional spans.
+        """
+        unit_cell = self.supercell
+
+        if unit_cell.variable_cell:
+            cell_vectors = unit_cell.cell_vectors[frame_index]
+        else:
+            cell_vectors = unit_cell.cell_vectors
+
+        inv_cell = np.linalg.inv(cell_vectors)
+        spans = np.zeros((self.n_molecules, 3), dtype=np.float64)
+
+        for i in range(self.n_molecules):
+            positions = self.positions(np.array([i]), frame_index=frame_index)
+            fractional_coords = positions @ inv_cell
+            spans[i] = np.ptp(fractional_coords, axis=0)
+
+        return spans
+
 
 @dataclass
 class FiniteSubsystem:
