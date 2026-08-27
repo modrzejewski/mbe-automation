@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Literal, get_args
 from pathlib import Path
+from collections import UserList
 import pandas as pd
 import numpy as np
 import h5py
@@ -10,6 +11,22 @@ from . import core
 
 ClusterType = Literal["monomers", "dimers", "trimers"]
 CLUSTER_TYPES = get_args(ClusterType)
+
+
+@dataclass(kw_only=True)
+class _ScheduledTask:
+    """Storage schema for a scheduled quantum chemistry computation."""
+    cluster_label: str
+    method: str
+    input_string: str
+    cluster_type: str
+    characteristic_distance: np.float64
+    subsystem_label: str | None
+
+
+class _ScheduledTasks(UserList[_ScheduledTask]):
+    """Storage schema for a collection of ScheduledTask objects."""
+    pass
 
 
 @dataclass(kw_only=True)
@@ -192,3 +209,105 @@ def read_mbe_metadata(
         filter=filter_obj,
         geometric_parameters=geometric_parameters,
     )
+
+
+def save_scheduled_tasks(
+    dataset: str | Path,
+    key: str,
+    tasks: _ScheduledTasks,
+) -> None:
+    with dataset_file(
+        dataset,
+        mode="a",
+    ) as f:
+        if key in f:
+            del f[key]
+        group = f.create_group(key)
+        group.attrs["dataclass"] = "ScheduledTasks"
+        group.attrs["n_scheduled_tasks"] = len(tasks)
+        
+        if len(tasks) == 0:
+            return
+            
+        compression_opts = {"compression": "gzip", "compression_opts": 4}
+        
+        group.create_dataset(
+            name="cluster_label",
+            data=np.array(
+                [t.cluster_label.encode("utf-8") for t in tasks]
+            ).astype("S"),
+        )
+        group.create_dataset(
+            name="method",
+            data=np.array(
+                [t.method.encode("utf-8") for t in tasks]
+            ).astype("S"),
+        )
+        group.create_dataset(
+            name="input_string",
+            data=np.array(
+                [t.input_string.encode("utf-8") for t in tasks]
+            ).astype("S"),
+            **compression_opts,
+        )
+        group.create_dataset(
+            name="cluster_type",
+            data=np.array(
+                [t.cluster_type.encode("utf-8") for t in tasks]
+            ).astype("S"),
+        )
+        group.create_dataset(
+            name="characteristic_distance",
+            data=np.array(
+                [t.characteristic_distance for t in tasks], dtype=np.float64
+            ),
+        )
+        group.create_dataset(
+            name="subsystem_label",
+            data=np.array(
+                [(t.subsystem_label or "").encode("utf-8") for t in tasks]
+            ).astype("S"),
+        )
+
+
+def read_scheduled_tasks(
+    dataset: str | Path,
+    key: str,
+) -> _ScheduledTasks:
+    with dataset_file(
+        dataset,
+        mode="r",
+    ) as f:
+        if key not in f:
+            raise KeyError(
+                f"Invalid key: '{key}' not found in dataset '{dataset}'."
+            )
+        group = f[key]
+        n_tasks = group.attrs["n_scheduled_tasks"]
+        
+        if n_tasks == 0:
+            return _ScheduledTasks([])
+            
+        labels = np.char.decode(group["cluster_label"][:], "utf-8")
+        methods = np.char.decode(group["method"][:], "utf-8")
+        inputs = np.char.decode(group["input_string"][:], "utf-8")
+        types = np.char.decode(group["cluster_type"][:], "utf-8")
+        dists = group["characteristic_distance"][:]
+        subsystems_raw = np.char.decode(group["subsystem_label"][:], "utf-8")
+        
+    task_list = []
+    for i in range(n_tasks):
+        sub_label = subsystems_raw[i] if subsystems_raw[i] != "" else None
+        task_list.append(_ScheduledTask(
+            cluster_label=labels[i],
+            method=methods[i],
+            input_string=inputs[i],
+            cluster_type=types[i],
+            characteristic_distance=dists[i],
+            subsystem_label=sub_label,
+        ))
+        
+    return _ScheduledTasks(task_list)
+
+
+

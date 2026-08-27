@@ -26,6 +26,7 @@ class DatasetKey:
         "EOSMetadata",
         "MBE",
         "UniqueClusters",
+        "ScheduledTasks",
     ]
 
 @dataclass
@@ -110,6 +111,7 @@ class DatasetKeys:
                 "EOSCurves",
                 "EOSMetadata",
                 "MBE",
+                "ScheduledTasks",
             ]:
                 has_feature_vectors = None
                 has_ground_truth = None
@@ -206,8 +208,11 @@ class DatasetKeys:
     def eos_metadata(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "EOSMetadata")
 
-    def mbe_metadata(self) -> DatasetKeys:
+    def mbe(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "MBE")
+
+    def scheduled_tasks(self) -> DatasetKeys:
+        return self._filter(lambda x: x.dataclass == "ScheduledTasks")
 
     def force_constants(self) -> DatasetKeys:
         return self._filter(lambda x: x.dataclass == "ForceConstants")

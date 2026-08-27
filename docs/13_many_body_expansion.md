@@ -55,13 +55,14 @@ Select clusters by type and distance, schedule quantum-chemical computations,
 and export the input files:
 
 ```python
-tasks = mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks = ScheduledTasks([])
+tasks += mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
 tasks += mbe.select("dimers").below(7.0).schedule("rpa+ph_avtz")
 
 tasks.to_input_files("./mbe_output")
 ```
 
-The `schedule` method returns a `Tasks` collection. Multiple collections
+The `schedule` method returns a `ScheduledTasks` collection. Multiple collections
 can be combined with `+=` and exported in a single call to `to_input_files`.
 
 | Method | Description |
@@ -184,7 +185,7 @@ This script demonstrates the MBE export setup.
 
 ```python
 import mbe_automation
-from mbe_automation import MACE, Structure, UniqueClustersFilter
+from mbe_automation import MACE, Structure, UniqueClustersFilter, ScheduledTasks
 import mbe_automation.configs
 
 xyz_solid = "ammonia.xyz"
@@ -208,7 +209,8 @@ config = mbe_automation.configs.many_body_expansion.Clusters(
 
 mbe = mbe_automation.run(config)
 
-tasks = mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks = ScheduledTasks([])
+tasks += mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
 tasks += mbe.select("dimers").below(7.0).schedule("lno-ccsd(t)_vtight_avqz")
 
 tasks += mbe.select("monomers").schedule("rpa+ph_avtz")

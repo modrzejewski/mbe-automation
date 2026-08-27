@@ -1986,6 +1986,7 @@ class AnySystem:
         "AtomicReference": AtomicReference,
         "UniqueClusters": UniqueClusters,
         "MBE": MBE,
+        "ScheduledTasks": ScheduledTasks,
     }
 
     @staticmethod
@@ -2001,6 +2002,7 @@ class AnySystem:
         | AtomicReference
         | UniqueClusters
         | MBE
+        | ScheduledTasks
     ):
         """
         Reads the object at the given key, automatically determining its type.
