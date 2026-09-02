@@ -42,6 +42,8 @@ from .api import (
     FiniteSubsystemFilter,
     UniqueClustersFilter,
     ScheduledTasks,
+    Clusters,
+    MultiLevel,
     run,
 )
 

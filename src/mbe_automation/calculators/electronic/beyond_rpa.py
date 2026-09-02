@@ -11,6 +11,10 @@ _TEMPLATES_ROOT = (
     / "beyond-rpa"
 )
 
+TheoryLevel = Literal["rpa+ph"]
+
+THEORY_LEVELS = get_args(TheoryLevel)
+
 Method = Literal["rpa+ph_avqz", "rpa+ph_avtz"]
 
 METHODS = get_args(Method)

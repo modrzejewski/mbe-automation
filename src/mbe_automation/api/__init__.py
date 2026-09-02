@@ -7,3 +7,4 @@ from .classes import (
 )
 from .workflow_entrypoint import run
 from ..mbe.tasks import ScheduledTasks
+from ..configs.many_body_expansion import Clusters, MultiLevel

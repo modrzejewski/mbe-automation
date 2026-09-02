@@ -97,3 +97,136 @@ class Clusters:
             self.dataset = self.work_dir / "dataset.hdf5"
         else:
             self.dataset = Path(self.dataset).expanduser()
+
+
+@dataclass(kw_only=True)
+class MultiLevel(Clusters):
+                                   #
+                                   # Electronic structure theories to schedule
+                                   #
+    theory: Sequence[str] = (
+        "rpa+ph",
+        "lno-ccsd(t)",
+    )
+                                   #
+                                   # Cutoff distances (Å) below which higher-level
+                                   # LNO-CCSD(T) calculations are scheduled for each
+                                   # cluster type. Setting a cutoff to None disables
+                                   # higher-level calculations for that cluster type.
+                                   # Monomers are always computed at both lower and
+                                   # higher levels and must not be included.
+                                   #
+    switchover_distances: dict[str, float | None] = field(
+        default_factory=lambda: {
+            "dimers": 7.0,
+            "trimers": None,
+        }
+    )
+                                   #
+                                   # Basis sets to use in electronic structure calculations
+                                   #
+    basis_sets: Sequence[str] = (
+        "avtz",
+        "avqz",
+    )
+                                   #
+                                   # Accuracy tiers for LNO-CCSD(T). Multiple
+                                   # settings allow extrapolation to the
+                                   # local-approximation-free limit.
+                                   #
+    lno_accuracy: Sequence[str] = (
+        "tight",
+        "vtight",
+    )
+                                   #
+                                   # Whether to export quantum-chemical input files and SLURM
+                                   # scripts to disk under work_dir/tasks
+                                   #
+    save_inputs: bool = True
+                                   #
+                                   # SLURM queue configuration name
+                                   #
+    queue: str | None = None
+
+    @property
+    def methods(self) -> list[str]:
+        """
+        Generate all configured electronic structure method names.
+
+        Returns:
+            List of electronic structure method strings.
+        """
+        methods = []
+        for t in self.theory:
+            if (
+                t
+                in mbe_automation.calculators.electronic.beyond_rpa.THEORY_LEVELS
+            ):
+                methods.extend([f"{t}_{b}" for b in self.basis_sets])
+            elif (
+                t in mbe_automation.calculators.electronic.mrcc.THEORY_LEVELS
+            ):
+                for acc in self.lno_accuracy:
+                    methods.extend([f"{t}_{acc}_{b}" for b in self.basis_sets])
+            else:
+                methods.append(t)
+        return methods
+
+    @property
+    def low_level_methods(self) -> list[str]:
+        """
+        Return all configured low-level electronic structure methods.
+        """
+        return [
+            m
+            for m in self.methods
+            if m in mbe_automation.calculators.electronic.LOW_LEVEL_METHODS
+        ]
+
+    @property
+    def high_level_methods(self) -> list[str]:
+        """
+        Return all configured high-level electronic structure methods.
+        """
+        return [
+            m
+            for m in self.methods
+            if m in mbe_automation.calculators.electronic.HIGH_LEVEL_METHODS
+        ]
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        for attr in ("theory", "basis_sets", "lno_accuracy"):
+            val = getattr(self, attr)
+            if isinstance(val, str) or not isinstance(val, Sequence):
+                raise TypeError(f"{attr} must be a sequence of strings.")
+            setattr(self, attr, tuple(val))
+
+        for method in self.methods:
+            if method not in mbe_automation.calculators.electronic.METHODS:
+                raise ValueError(
+                    f"Unsupported electronic structure method: \"{method}\". "
+                    f"Supported methods are: {mbe_automation.calculators.electronic.METHODS}"
+                )
+
+        for cluster_type, cutoff in self.switchover_distances.items():
+            if cluster_type.startswith("monomers"):
+                raise ValueError(
+                    "Switchover distance cannot be applied to monomers. "
+                    "Monomers are always computed at both lower and higher levels."
+                )
+            if cutoff is None:
+                continue
+            if cutoff <= 0.0:
+                raise ValueError(
+                    f"Switchover distance for \"{cluster_type}\" must be positive, got {cutoff}."
+                )
+            if cluster_type in self.filter.cutoffs:
+                max_cutoff = self.filter.cutoffs[cluster_type]
+                if cutoff > max_cutoff:
+                    raise ValueError(
+                        f"Requested switchover distance {cutoff} Å exceeds generation "
+                        f"cutoff ({max_cutoff} Å) for \"{cluster_type}\"."
+                    )
+
