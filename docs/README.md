@@ -1,14 +1,6 @@
-```
-+------------------------------------------------------------+
-| This is experimental code with lots of bugs intended for   |
-| internal use only. Will be ready as soon as we publish the |
-| methodology.                                               |
-+------------------------------------------------------------+
-```
-
 # `mbe-automation`
 
-Library for high-level automation of thermodynamics modeling with machine-learning interatomic potentials (MLIPs), specialized for organic molecular crystals.
+Toolkit for modeling the thermodynamics of molecular crystals with machine-learning interatomic potentials and electronic-structure methods.
 
 ## Setup
 
@@ -34,6 +26,6 @@ Library for high-level automation of thermodynamics modeling with machine-learni
 *   [Delta Learning Dataset Creation](./11_cookbook_delta_learning_dataset.md)
 *   [Adding Atomic Reference Energies to Existing MACE Training Data](./12_cookbook_export_with_atomic_energies.md)
 
-## Reference
+## Literature
 
-*   [Literature](./14_literature.md)
+*   [References for Theory and Algorithms](./14_literature.md)
