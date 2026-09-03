@@ -158,27 +158,80 @@ The workflow automatically extracts symmetry-unique clusters, schedules low- and
 
 ## How to read the results
 
-The workflow produces a hierarchical dataset file, directory structure, and
-metadata CSVs.
+The workflow simultaneously produces two types of outputs:
+*   A full data dump in a single HDF5 dataset file, which is perfect for archiving all technical details of your results.
+*   Files on disk with a predefined directory structure that organizes your workflow on the compute cluster.
 
 ### Dataset Structure
 
-The dataset file (e.g. `dataset.hdf5`) stores the structures and unique
-clusters under the configured `root_key` (default is `many_body_expansion`):
+The dataset file (e.g. `mbe_output/dataset.hdf5`) stores the structures, unique clusters, scheduled tasks, and metadata under the configured `root_key` (default is `many_body_expansion`).
+
+You can inspect the dataset hierarchy using `mbe_automation.tree`:
+
+```python
+import mbe_automation
+
+mbe_automation.tree("mbe_output/dataset.hdf5")
+```
 
 ```
 dataset.hdf5
 └── many_body_expansion
-    ├── summary
     ├── cleaved
-    │   ├── monomers[A]
     │   ├── dimers[AA]
+    │   │   ├── n_molecules_equivalent [shape=(1,), dtype=int64]
+    │   │   ├── reference_molecules
+    │   │   │   └── A
+    │   │   │       ├── atomic_numbers [shape=(4,), dtype=int64]
+    │   │   │       ├── masses (u) [shape=(4,), dtype=float64]
+    │   │   │       └── positions (Å) [shape=(4, 3), dtype=float64]
+    │   │   ├── sorted_max_rij (Å) [shape=(374, 1), dtype=float64]
+    │   │   ├── sorted_min_rij (Å) [shape=(374, 1), dtype=float64]
+    │   │   ├── structures
+    │   │   │   ├── atomic_numbers [shape=(374, 8), dtype=int64]
+    │   │   │   ├── masses (u) [shape=(374, 8), dtype=float64]
+    │   │   │   └── positions (Å) [shape=(374, 8, 3), dtype=float64]
+    │   │   └── weights [shape=(374,), dtype=int64]
+    │   ├── monomers[A]
+    │   │   └── ...
     │   └── trimers[AAA]
-    └── structures
-        └── crystal[input]
+    │       └── ...
+    ├── scheduled
+    │   ├── characteristic_distance [shape=(2584,), dtype=float64]
+    │   ├── cluster_label [shape=(2584,), dtype=|S32]
+    │   ├── cluster_type [shape=(2584,), dtype=|S12]
+    │   ├── input_string [shape=(2584,), dtype=|S677]
+    │   ├── method [shape=(2584,), dtype=|S23]
+    │   └── subsystem_label [shape=(2584,), dtype=|S2]
+    ├── structures
+    │   └── crystal[input]
+    │       ├── atomic_numbers [shape=(16,), dtype=int64]
+    │       ├── cell_vectors (Å) [shape=(3, 3), dtype=float64]
+    │       ├── masses (u) [shape=(16,), dtype=float64]
+    │       └── positions (Å) [shape=(16, 3), dtype=float64]
+    └── summary
+        ├── filter
+        ├── geometric_parameters
+        │   ├── dimers[AA]
+        │   │   ├── lattice_energy_weight (1∕unit cell) [shape=(374,), dtype=float64]
+        │   │   ├── max_r (Å) [shape=(374,), dtype=float64]
+        │   │   ├── min_r (Å) [shape=(374,), dtype=float64]
+        │   │   ├── n_molecules[A] (1∕cluster) [shape=(374,), dtype=int64]
+        │   │   ├── n_molecules[A] (1∕unit cell) [shape=(374,), dtype=int64]
+        │   │   ├── symmetry_weight [shape=(374,), dtype=int64]
+        │   │   └── system [shape=(374,), dtype=object]
+        │   ├── monomers[A]
+        │   │   └── ...
+        │   └── trimers[AAA]
+        │       └── ...
+        └── keys
 ```
 
-The `summary` node stores workflow metadata and can accommodate future computation outputs.
+The dataset contains four main groups under `{root_key}`:
+- `cleaved`: Symmetry-unique clusters (`monomers`, `dimers`, `trimers`) with molecular coordinates and multiplicity weights (`monomers[A]` and `trimers[AAA]` share the layout shown for `dimers[AA]`).
+- `scheduled`: Scheduled quantum-chemical calculation tasks with cluster labels, subsystems, methods, and input strings.
+- `structures`: Initial periodic crystal structure.
+- `summary`: Workflow metadata, filter cutoffs, geometric parameters, and key mappings.
 
 ### Directory Structure
 
