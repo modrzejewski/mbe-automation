@@ -33,3 +33,7 @@ Library for high-level automation of thermodynamics modeling with machine-learni
 *   [Training Set from MACE MD + r2SCAN Energies & Forces](./10_cookbook_mace_md_dftb_energies.md)
 *   [Delta Learning Dataset Creation](./11_cookbook_delta_learning_dataset.md)
 *   [Adding Atomic Reference Energies to Existing MACE Training Data](./12_cookbook_export_with_atomic_energies.md)
+
+## Reference
+
+*   [Literature](./14_literature.md)

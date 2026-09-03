@@ -35,6 +35,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
     * [FiniteSubsystemFilter](#finitesubsystemfilter)
     * [PhononFilter](#phononfilter)
     * [Clusters](#clusters)
+    * [MultiLevel](#multilevel)
 * [4. Interatomic Potentials & Calculators](#4-interatomic-potentials--calculators)
     * [MACE](#mace)
     * [DeltaMACE](#deltamace)
@@ -424,14 +425,14 @@ Specifies which phonon modes to include in the `PhononSampling` workflow.
 
 🔗 [`mbe_automation.configs.many_body_expansion.Clusters`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/many_body_expansion.py#L13)
 
-Configuration object for the Many-Body Expansion (MBE) workflow.
+Configuration object for the many-body expansion workflow.
 
 | Parameter | Description | Default Value |
 | --- | --- | --- |
 | `crystal` | Structure of the crystal from which clusters are cleaved. | - |
 | `frame_index` | Frame index used if crystal is a Structure with multiple frames. Only relevant for multi-frame input structures. | `0` |
 | `calculator` | Energy calculator used to distinguish crystallographically inequivalent molecules. Molecules are cleaved from the crystal lattice and their individual potential energies are computed. They are considered unique if their energies differ by more than the specified energy threshold. | `None` |
-| `filter` | Cluster filtering settings. The cutoffs correspond to the max(X,Y) min(i∈X, j∈Y) r_ij characteristic distance of the cluster, where X, Y are molecules and i, j are their respective atoms. Cutoffs are given in Å. | `UniqueClustersFilter(cluster_types=["monomers", "dimers", "trimers"], cutoffs={"dimers": 30.0, "trimers": 15.0})` |
+| `filter` | Cluster filtering settings. The cutoffs correspond to the max(X,Y) min(i∈X, j∈Y) r_ij characteristic distance of the cluster, where X, Y are molecules and i, j are their respective atoms. Cutoffs are given in Å. | `UniqueClustersFilter(cluster_types=["monomers", "dimers", "trimers"], cutoffs={"dimers": 30.0, "trimers": 15.0})` |
 | `unique_molecules_energy_thresh` | Energy threshold (eV/atom) used to detect nonequivalent molecules in the input unit cell. | `1.0E-5` |
 | `work_dir` | Directory where files are stored at runtime. | `"./"` |
 | `dataset` | The main dataset file with all data. | `None` (defaults to `work_dir / "dataset.hdf5"`) |
@@ -439,6 +440,21 @@ Configuration object for the Many-Body Expansion (MBE) workflow.
 | `save_xyz` | Whether to save the symmetry-unique clusters to .xyz files. The .xyz files for individual clusters are saved in a dedicated subdirectory of work_dir. | `True` |
 | `save_csv` | Whether to save the symmetry-unique clusters metadata (such as symmetry numbers and characteristic distances) to .csv files. | `True` |
 | `save_plots` | Whether to save diagnostic plots (e.g. cumulative cluster counts vs distance). | `True` |
+
+### MultiLevel
+
+🔗 [`mbe_automation.configs.many_body_expansion.MultiLevel`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/many_body_expansion.py#L102)
+
+Configuration object for the multi-level many-body expansion workflow. Inherits all parameters from [`Clusters`](#clusters) with additional settings which control the electronic structure methods used in the lattice energy evaluation:
+
+| Parameter | Description | Default Value |
+| --- | --- | --- |
+| `theory` | Sequence of electronic structure theory levels. Allowed values: `"rpa+ph"`, `"lno-ccsd(t)"`. | `("rpa+ph", "lno-ccsd(t)")` |
+| `switchover_distances` | Mapping of cluster types (e.g. `"dimers"`, `"trimers"`) to cutoff distances (Å) below which higher-level calculations are scheduled. If `None`, higher-level calculations are disabled for that cluster type. Cannot be specified for `"monomers"`. | `{"dimers": 7.0, "trimers": None}` |
+| `basis_sets` | Basis set identifiers for electronic structure calculations. Supported values: `"avtz"`, `"avqz"`. | `("avtz", "avqz")` |
+| `lno_accuracy` | Accuracy settings for LNO-CCSD(T) calculations. Supported values: `"tight"`, `"vtight"`. | `("tight", "vtight")` |
+| `save_inputs` | Whether to export quantum-chemical input files and SLURM array scripts to `work_dir/tasks`. | `True` |
+| `queue` | SLURM queue configuration name. | `None` |
 
 ---
 
