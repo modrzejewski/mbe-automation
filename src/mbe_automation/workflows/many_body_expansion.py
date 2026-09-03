@@ -9,8 +9,11 @@ import mbe_automation.storage
 import mbe_automation.structure.clusters
 import mbe_automation.configs.many_body_expansion
 import mbe_automation.calculators.electronic
+import mbe_automation.mbe
+import mbe_automation.mbe.tasks
 
-def run(
+
+def _clusters(
     config: mbe_automation.configs.many_body_expansion.Clusters,
 ) -> mbe_automation.mbe.MBE:
     datetime_start = mbe_automation.common.display.timestamp_start()
@@ -93,3 +96,55 @@ def run(
     print("MBE clustering workflow completed")
     mbe_automation.common.display.timestamp_finish(datetime_start)
     return mbe_obj
+
+
+def _multi_level(
+    config: mbe_automation.configs.many_body_expansion.MultiLevel,
+) -> mbe_automation.mbe.tasks.ScheduledTasks:
+    datetime_start = mbe_automation.common.display.timestamp_start()
+
+    mbe_obj = _clusters(config)
+
+    all_tasks = mbe_automation.mbe.tasks.ScheduledTasks([])
+
+    for cluster_type in config.filter.cluster_types:
+        for method in config.low_level_methods:
+            all_tasks += mbe_obj.select(cluster_type).schedule(method)
+
+        for method in config.high_level_methods:
+            if cluster_type == "monomers":
+                all_tasks += mbe_obj.select(cluster_type).schedule(method)
+            else:
+                switch_dist = config.switchover_distances.get(cluster_type)
+                if switch_dist is not None:
+                    all_tasks += (
+                        mbe_obj.select(cluster_type)
+                        .below(switch_dist)
+                        .schedule(method)
+                    )
+
+    all_tasks.save(
+        dataset=config.dataset,
+        key=f"{config.root_key}/scheduled",
+    )
+
+    if config.save_inputs:
+        all_tasks.to_input_files(
+            work_dir=config.work_dir,
+            queue=config.queue,
+        )
+
+    print("Multi-level MBE workflow completed")
+    mbe_automation.common.display.timestamp_finish(datetime_start)
+    return all_tasks
+
+
+def run(
+    config: (
+        mbe_automation.configs.many_body_expansion.Clusters
+        | mbe_automation.configs.many_body_expansion.MultiLevel
+    ),
+) -> mbe_automation.mbe.MBE | mbe_automation.mbe.tasks.ScheduledTasks:
+    if isinstance(config, mbe_automation.configs.many_body_expansion.MultiLevel):
+        return _multi_level(config)
+    return _clusters(config)

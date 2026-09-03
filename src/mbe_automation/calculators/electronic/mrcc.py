@@ -1,6 +1,5 @@
 from __future__ import annotations
 import itertools
-import re
 from typing import List, Dict, Literal, get_args
 from pathlib import Path
 
@@ -13,7 +12,10 @@ _TEMPLATES_ROOT = (
     / "inputs"
     / "mrcc"
 )
-_SUBSYSTEM_TAG = "##SUBSYSTEM:"
+
+TheoryLevel = Literal["lno-ccsd(t)"]
+
+THEORY_LEVELS = get_args(TheoryLevel)
 
 Method = Literal[
     "lno-ccsd(t)_tight_avqz",
@@ -105,40 +107,3 @@ def to_input_string(
             results[label] = input_template.format(**job_params)
 
     return results
-
-
-def setup_workdir(combined_input_file: Path, workdir: Path) -> List[Path]:
-    """
-    Extract aggregated MRCC inputs into a computational workspace.
-    Each subsystem gets a subdirectory with a `MINP` file. Undelimited files
-    are written directly to `workdir`.
-
-    Args:
-        combined_input_file: The aggregated input file.
-        workdir: Target directory (must include cluster label).
-
-    Returns:
-        Created working directories.
-    """
-    content = combined_input_file.read_text(encoding="utf-8")
-
-    pattern = rf"^{re.escape(_SUBSYSTEM_TAG)}(.+)\s*$"
-    parts = re.split(pattern, content, flags=re.MULTILINE)
-
-    if len(parts) == 1:
-        workdir.mkdir(parents=True, exist_ok=True)
-        (workdir / "MINP").write_text(content.lstrip(), encoding="utf-8")
-        return [workdir]
-
-    subdirs: List[Path] = []
-    for i in range(1, len(parts), 2):
-        sub_label = parts[i].strip()
-        input_text = parts[i+1].lstrip()
-
-        sub_dir = workdir / sub_label
-        sub_dir.mkdir(parents=True, exist_ok=True)
-
-        (sub_dir / "MINP").write_text(input_text, encoding="utf-8")
-        subdirs.append(sub_dir)
-
-    return subdirs

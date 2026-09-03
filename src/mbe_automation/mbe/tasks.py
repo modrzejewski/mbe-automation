@@ -6,6 +6,8 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
+from mbe_automation.storage.mbe import _ScheduledTask, _ScheduledTasks, read_scheduled_tasks, save_scheduled_tasks
+
 import mbe_automation.calculators.electronic.core
 import mbe_automation.calculators.electronic.mrcc
 import mbe_automation.calculators.electronic.slurm
@@ -21,8 +23,8 @@ if TYPE_CHECKING:
 _TASKS_DIR = Path("tasks")
 
 
-@dataclass
-class ScheduledTask:
+@dataclass(kw_only=True)
+class ScheduledTask(_ScheduledTask):
     """
     A single quantum chemistry computation for one (sub)system of a cluster.
 
@@ -40,12 +42,6 @@ class ScheduledTask:
             e.g. "11", "10", "01". None when the calculator
             produces a single input per cluster.
     """
-    cluster_label: str
-    method: str
-    input_string: str
-    cluster_type: str
-    characteristic_distance: np.float64
-    subsystem_label: str | None
 
     @property
     def quantum_chemical_code(self) -> str:
@@ -84,11 +80,18 @@ class ScheduledTask:
             return self.directory / f"{self.cluster_label}.inp"
 
 
-class Tasks(UserList[ScheduledTask]):
+class ScheduledTasks(_ScheduledTasks):
     """
     Collection of ScheduledTask objects.
     """
     
+    @classmethod
+    def read(cls, dataset: str | Path, key: str) -> ScheduledTasks:
+        return cls(read_scheduled_tasks(dataset, key))
+        
+    def save(self, dataset: str | Path, key: str) -> None:
+        save_scheduled_tasks(dataset, key, self)
+        
     @property
     def methods(self) -> list[str]:
         """List of unique methods present in the tasks, preserving order."""
@@ -105,9 +108,9 @@ class Tasks(UserList[ScheduledTask]):
         cluster_type: str | None = None,
         min_distance: float | None = None,
         max_distance: float | None = None,
-    ) -> Tasks:
+    ) -> ScheduledTasks:
         """
-        Return a sub-collection of Tasks filtered by the specified criteria.
+        Return a sub-collection of ScheduledTasks filtered by the specified criteria.
 
         Args:
             method: Quantum-chemical model (e.g., 'lno-ccsd(t)_tight_avqz').
@@ -116,7 +119,7 @@ class Tasks(UserList[ScheduledTask]):
             max_distance: Maximum characteristic distance in Å. Excludes monomers if provided.
 
         Returns:
-            Tasks: Filtered collection.
+            ScheduledTasks: Filtered collection.
         """
         filtered = self.data
         if method is not None:
@@ -135,19 +138,19 @@ class Tasks(UserList[ScheduledTask]):
                 if not np.isnan(t.characteristic_distance) and t.characteristic_distance < max_distance
             ]
             
-        return Tasks(filtered)
+        return ScheduledTasks(filtered)
     
-    def _split_by_distance(self, distance_threshold: float) -> tuple[Tasks, Tasks]:
+    def _split_by_distance(self, distance_threshold: float) -> tuple[ScheduledTasks, ScheduledTasks]:
         """
         Split tasks into two collections based on a characteristic distance threshold.
         Monomers (NaN distance) are included in the first collection.
 
         Args:
-            distance_threshold: Distance in Å. Tasks strictly below this value go 
+            distance_threshold: Distance in Å. ScheduledTasks strictly below this value go 
                 to the first collection, others go to the second.
                 
         Returns:
-            tuple[Tasks, Tasks]: (Tasks below threshold, Tasks at or above threshold)
+            tuple[ScheduledTasks, ScheduledTasks]: (ScheduledTasks below threshold, ScheduledTasks at or above threshold)
         """
         below = []
         above = []
@@ -157,7 +160,7 @@ class Tasks(UserList[ScheduledTask]):
             else:
                 above.append(t)
                 
-        return Tasks(below), Tasks(above)
+        return ScheduledTasks(below), ScheduledTasks(above)
 
 
     def _distance_bins(
@@ -165,7 +168,7 @@ class Tasks(UserList[ScheduledTask]):
         cluster_type: str,
         distance_increment: float = 1.0,
         initial_distance: float = 4.0,
-    ) -> dict[tuple[float, float], Tasks]:
+    ) -> dict[tuple[float, float], ScheduledTasks]:
         """
         Group tasks of a specific cluster type by characteristic distance.
         
@@ -176,7 +179,7 @@ class Tasks(UserList[ScheduledTask]):
             initial_distance: The upper bound for the first distance bin. 
 
         Returns: 
-            dict[tuple[float, float], Tasks]: Mapping of bin boundaries to task subsets.
+            dict[tuple[float, float], ScheduledTasks]: Mapping of bin boundaries to task subsets.
                 The upper bound of the last bin is represented as np.inf.
         """
         if cluster_type.startswith("monomers"):
@@ -309,7 +312,7 @@ class ClusterSelection:
                 f"than the generation cutoff ({self._mbe.filter.cutoffs[clusters.type_string]} Å) for \"{clusters.type_string}\"."
             )
 
-    def schedule(self, method: str) -> Tasks:
+    def schedule(self, method: str) -> ScheduledTasks:
         """
         Generate scheduled tasks for the selected clusters.
 
@@ -337,7 +340,7 @@ class ClusterSelection:
                 f"Available types: {self._mbe.cluster_types}"
             )
 
-        tasks = Tasks()
+        scheduled_tasks = ScheduledTasks()
         for cluster_type in matching_types:
             clusters = self._mbe.read_clusters(cluster_type=cluster_type)
             self._assert_distance_below_cutoff(clusters)
@@ -362,7 +365,7 @@ class ClusterSelection:
                     frame_index=i,
                 )
                 for subsystem_label, input_string in inputs.items():
-                    tasks.append(ScheduledTask(
+                    scheduled_tasks.append(ScheduledTask(
                         cluster_label=cluster_label,
                         method=method,
                         input_string=input_string,
@@ -370,4 +373,4 @@ class ClusterSelection:
                         characteristic_distance=distance,
                         subsystem_label=subsystem_label,
                     ))
-        return tasks
+        return scheduled_tasks

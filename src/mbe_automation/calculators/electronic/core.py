@@ -19,6 +19,11 @@ METHODS = (
     + beyond_rpa.METHODS
 )
 
+LOW_LEVEL_METHODS = beyond_rpa.METHODS
+
+HIGH_LEVEL_METHODS = mrcc.METHODS
+
+
 SOFTWARE_MAP: dict[str, str] = {
     m: "mrcc"
     for m in mrcc.METHODS

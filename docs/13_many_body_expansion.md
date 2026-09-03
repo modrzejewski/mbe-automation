@@ -2,6 +2,7 @@
 
 - [Symmetry-Unique Clusters](#symmetry-unique-clusters)
 - [Inputs for Quantum-Chemical Calculations](#inputs-for-quantum-chemical-calculations)
+- [Multi-level coupled-cluster approach](#multi-level-coupled-cluster-approach)
 - [How to read the results](#how-to-read-the-results)
 - [Complete Input Files](#complete-input-files)
 
@@ -36,7 +37,7 @@ mace_calc = MACE(
 
 cluster_filter = UniqueClustersFilter(
     cluster_types=["monomers", "dimers", "trimers"],
-    cutoffs={"dimers": 30.0, "trimers": 10.0}
+    cutoffs={"dimers": 25.0, "trimers": 10.0}
 )
 
 config = mbe_automation.configs.many_body_expansion.Clusters(
@@ -51,17 +52,17 @@ mbe = mbe_automation.run(config)
 
 ## Inputs for Quantum-Chemical Calculations
 
-Select clusters by type and distance, schedule quantum-chemical computations,
-and export the input files:
+This manual method of selecting methods and cutoffs provides flexibility for custom workflows:
 
 ```python
-tasks = mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks = ScheduledTasks([])
+tasks += mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
 tasks += mbe.select("dimers").below(7.0).schedule("rpa+ph_avtz")
 
 tasks.to_input_files("./mbe_output")
 ```
 
-The `schedule` method returns a `Tasks` collection. Multiple collections
+The `schedule` method returns a `ScheduledTasks` collection. Multiple collections
 can be combined with `+=` and exported in a single call to `to_input_files`.
 
 | Method | Description |
@@ -73,38 +74,164 @@ can be combined with `+=` and exported in a single call to `to_input_files`.
 
 The following quantum-chemical models are available:
 
-| Identifier | Program | Description |
-|---|---|---|
-| 🔗 [`lno-ccsd(t)_vtight_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_vtight_avqz.inp) | MRCC | LNO-CCSD(T), vTight thresholds, aug-cc-pVQZ |
-| 🔗 [`lno-ccsd(t)_vtight_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_vtight_avtz.inp) | MRCC | LNO-CCSD(T), vTight thresholds, aug-cc-pVTZ |
-| 🔗 [`lno-ccsd(t)_tight_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_tight_avqz.inp) | MRCC | LNO-CCSD(T), Tight thresholds, aug-cc-pVQZ |
-| 🔗 [`lno-ccsd(t)_tight_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_tight_avtz.inp) | MRCC | LNO-CCSD(T), Tight thresholds, aug-cc-pVTZ |
-| 🔗 [`rpa+ph_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/beyond-rpa/ph_avqz.inp) | beyond-RPA | RPA+ph, aug-cc-pVQZ |
-| 🔗 [`rpa+ph_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/beyond-rpa/ph_avtz.inp) | beyond-RPA | RPA+ph, aug-cc-pVTZ |
+| Methods | Program |
+|---|---|
+| 🔗 [`lno-ccsd(t)_vtight_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_vtight_avqz.inp)<br>🔗 [`lno-ccsd(t)_vtight_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_vtight_avtz.inp)<br>🔗 [`lno-ccsd(t)_tight_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_tight_avqz.inp)<br>🔗 [`lno-ccsd(t)_tight_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_tight_avtz.inp) | MRCC [[Nagy2024](14_literature.md)] |
+| 🔗 [`rpa+ph_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/beyond-rpa/ph_avqz.inp)<br>🔗 [`rpa+ph_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/beyond-rpa/ph_avtz.inp) | beyond-RPA [[Syty2025](14_literature.md), [Cieśliński2023](14_literature.md)] |
+
+If your intent is to apply the multi-level coupled-cluster approach [[Syty2025](14_literature.md)], the calculations are more easily set up using the [`MultiLevel`](#multi-level-coupled-cluster-approach) configuration class (see the dedicated section below).
+
+## Multi-level coupled-cluster approach
+
+The multi-level approach is a protocol for computing benchmark coupled-cluster lattice energies of molecular solids [[Syty2025](14_literature.md)].
+
+For a crystal with a single symmetry-unique reference molecule ($\text{ref}$), the lattice energy is partitioned into monomer relaxation, pairwise interaction, and three-body nonadditive contributions [Eq. 1 in [Syty2025](14_literature.md)]:
+
+$$
+E_\text{latt} = \Delta E_{\text{ref}} + \frac{1}{2}\sum_{i} \Delta^2 E_{\text{ref},i} + \frac{1}{3}\sum_{i>j} \Delta^3 E_{\text{ref},i,j} + \dots
+$$
+
+where:
+- $\Delta E_{\text{ref}} = E_{\text{ref}}(\text{crystal}) - E_{\text{ref}}(\text{isolated molecule})$ is the monomer relaxation energy [Eq. 2 in [Syty2025](14_literature.md)],
+- $\Delta^2 E_{\text{ref},i} = E_{\text{ref},i} - E_\text{ref} - E_i$ is the pairwise interaction energy [Eq. 3 in [Syty2025](14_literature.md)],
+- $\Delta^3 E_{\text{ref},i,j} = E_{\text{ref},i,j} - \Delta^2 E_{\text{ref},i} - \Delta^2 E_{\text{ref},j} - \Delta^2 E_{i,j} - E_\text{ref} - E_i - E_j$ is the three-body nonadditive interaction [Eq. 4 in [Syty2025](14_literature.md)].
+
+To map a cluster onto an approximation level, its characteristic distance $R$ is defined as the shortest atom-atom separation for a dimer and as the largest of the three intermolecular distances for a trimer.
+
+The expansion is split into two levels of theory:
+
+- **High-level (LNO-CCSD(T))** [[Nagy2024](14_literature.md)]: Applied to monomer relaxation ($\Delta E_{\text{ref}}$) and short-range dimers below the switchover radius [Eq. 5 in [Syty2025](14_literature.md)]:
+
+  $`R < R^{\text{RPA}}_{\text{dimers}}`$
+
+  The switchover between high and low levels of theory is controlled by `switchover_distances`. Calculations are scheduled for multiple basis sets (`avtz`, `avqz`) and LNO threshold tiers (`tight`, `vtight`) to extrapolate to the complete basis set and local-approximation-free limits.
+
+- **Low-level (RPA+ph)** [[Syty2025](14_literature.md), [Cieśliński2023](14_literature.md)]: An efficient model that can handle long-range dimers [Eq. 6 in [Syty2025](14_literature.md)]:
+
+  $`R^{\text{RPA}}_{\text{dimers}} \le R < R^{\text{PBC}}_{\text{dimers}}`$
+
+  and all trimers within the cutoff radius [Eq. 7 in [Syty2025](14_literature.md)]:
+
+  $`R < R^{\text{PBC}}_{\text{trimers}}`$
+
+  Third-order particle-hole (ph) exchange corrections mitigate the underbinding of standard RPA. Due to rapid convergence of three-body interactions with level of theory, LNO-CCSD(T) is not applied to trimers (`"trimers": None`).
+
+### Multi-Level Workflow Configuration
+
+The multi-level workflow is configured with [`MultiLevel`](01_api.md#multilevel):
+
+```python
+import mbe_automation
+from mbe_automation import (
+    MACE,
+    Structure,
+    UniqueClustersFilter,
+    MultiLevel,
+)
+
+crystal = Structure.from_file("ammonia.xyz")
+calculator = MACE(model_path="~/models/mace/mace-mh-1.model", head="omol")
+
+cluster_filter = UniqueClustersFilter(
+    cluster_types=["monomers", "dimers", "trimers"],
+    cutoffs={"dimers": 25.0, "trimers": 10.0},
+)
+
+config = MultiLevel(
+    crystal=crystal,
+    calculator=calculator,
+    filter=cluster_filter,
+    switchover_distances={
+        "dimers": 7.0,
+        "trimers": None,  # Disable high-level theory for trimers
+    },
+    theory=["rpa+ph", "lno-ccsd(t)"],
+    basis_sets=["avtz", "avqz"],
+    lno_accuracy=["tight", "vtight"],
+    work_dir="./mbe_output",
+)
+
+mbe_automation.run(config)
+```
+
+The workflow automatically extracts symmetry-unique clusters, schedules low- and high-level tasks according to the configured cutoffs, writes quantum-chemical input files and SLURM array scripts to disk under `work_dir/tasks`, and saves scheduled tasks to the dataset file under `{root_key}/scheduled`.
 
 ## How to read the results
 
-The workflow produces a hierarchical dataset file, directory structure, and
-metadata CSVs.
+The workflow simultaneously produces two types of outputs:
+*   A full data dump in a single HDF5 dataset file, which is perfect for archiving all technical details of your results.
+*   Files on disk with a predefined directory structure that organizes your workflow on the compute cluster.
 
 ### Dataset Structure
 
-The dataset file (e.g. `dataset.hdf5`) stores the structures and unique
-clusters under the configured `root_key` (default is `many_body_expansion`):
+The dataset file (e.g. `mbe_output/dataset.hdf5`) stores the structures, unique clusters, scheduled tasks, and metadata under the configured `root_key` (default is `many_body_expansion`).
+
+You can inspect the dataset hierarchy using `mbe_automation.tree`:
+
+```python
+import mbe_automation
+
+mbe_automation.tree("mbe_output/dataset.hdf5")
+```
 
 ```
 dataset.hdf5
 └── many_body_expansion
-    ├── summary
     ├── cleaved
-    │   ├── monomers[A]
     │   ├── dimers[AA]
+    │   │   ├── n_molecules_equivalent [shape=(1,), dtype=int64]
+    │   │   ├── reference_molecules
+    │   │   │   └── A
+    │   │   │       ├── atomic_numbers [shape=(4,), dtype=int64]
+    │   │   │       ├── masses (u) [shape=(4,), dtype=float64]
+    │   │   │       └── positions (Å) [shape=(4, 3), dtype=float64]
+    │   │   ├── sorted_max_rij (Å) [shape=(374, 1), dtype=float64]
+    │   │   ├── sorted_min_rij (Å) [shape=(374, 1), dtype=float64]
+    │   │   ├── structures
+    │   │   │   ├── atomic_numbers [shape=(374, 8), dtype=int64]
+    │   │   │   ├── masses (u) [shape=(374, 8), dtype=float64]
+    │   │   │   └── positions (Å) [shape=(374, 8, 3), dtype=float64]
+    │   │   └── weights [shape=(374,), dtype=int64]
+    │   ├── monomers[A]
+    │   │   └── ...
     │   └── trimers[AAA]
-    └── structures
-        └── crystal[input]
+    │       └── ...
+    ├── scheduled
+    │   ├── characteristic_distance [shape=(2584,), dtype=float64]
+    │   ├── cluster_label [shape=(2584,), dtype=|S32]
+    │   ├── cluster_type [shape=(2584,), dtype=|S12]
+    │   ├── input_string [shape=(2584,), dtype=|S677]
+    │   ├── method [shape=(2584,), dtype=|S23]
+    │   └── subsystem_label [shape=(2584,), dtype=|S2]
+    ├── structures
+    │   └── crystal[input]
+    │       ├── atomic_numbers [shape=(16,), dtype=int64]
+    │       ├── cell_vectors (Å) [shape=(3, 3), dtype=float64]
+    │       ├── masses (u) [shape=(16,), dtype=float64]
+    │       └── positions (Å) [shape=(16, 3), dtype=float64]
+    └── summary
+        ├── filter
+        ├── geometric_parameters
+        │   ├── dimers[AA]
+        │   │   ├── lattice_energy_weight (1∕unit cell) [shape=(374,), dtype=float64]
+        │   │   ├── max_r (Å) [shape=(374,), dtype=float64]
+        │   │   ├── min_r (Å) [shape=(374,), dtype=float64]
+        │   │   ├── n_molecules[A] (1∕cluster) [shape=(374,), dtype=int64]
+        │   │   ├── n_molecules[A] (1∕unit cell) [shape=(374,), dtype=int64]
+        │   │   ├── symmetry_weight [shape=(374,), dtype=int64]
+        │   │   └── system [shape=(374,), dtype=object]
+        │   ├── monomers[A]
+        │   │   └── ...
+        │   └── trimers[AAA]
+        │       └── ...
+        └── keys
 ```
 
-The `summary` node stores workflow metadata and can accommodate future computation outputs.
+The dataset contains four main groups under `{root_key}`:
+- `cleaved`: Symmetry-unique clusters (`monomers`, `dimers`, `trimers`) with molecular coordinates and multiplicity weights (`monomers[A]` and `trimers[AAA]` share the layout shown for `dimers[AA]`).
+- `scheduled`: Scheduled quantum-chemical calculation tasks with cluster labels, subsystems, methods, and input strings.
+- `structures`: Initial periodic crystal structure.
+- `summary`: Workflow metadata, filter cutoffs, geometric parameters, and key mappings.
 
 ### Directory Structure
 
@@ -178,25 +305,72 @@ H 1.16887653 4.59789554 4.42732765
 H 3.26851588 3.96156632 2.03262046
 ```
 
-### Python Script (`mbe_export.py`)
+### Multi-Level Workflow (`mbe_multilevel.py`)
 
-This script demonstrates the MBE export setup.
+This script sets up and exports multi-level coupled-cluster calculations using [`MultiLevel`](01_api.md#multilevel):
 
 ```python
 import mbe_automation
-from mbe_automation import MACE, Structure, UniqueClustersFilter
+from mbe_automation import (
+    MACE,
+    Structure,
+    UniqueClustersFilter,
+    MultiLevel,
+)
+
+xyz_solid = "ammonia.xyz"
+
+mace_calc = MACE(
+    model_path="~/models/mace/mace-mh-1.model", 
+    head="omol",
+)
+
+cluster_filter = UniqueClustersFilter(
+    cluster_types=["monomers", "dimers", "trimers"],
+    cutoffs={"dimers": 25.0, "trimers": 10.0},
+)
+
+config = MultiLevel(
+    crystal=Structure.from_file(xyz_solid),
+    calculator=mace_calc,
+    filter=cluster_filter,
+    switchover_distances={
+        "dimers": 7.0,
+        "trimers": None,  # Disable high-level theory for trimers
+    },
+    theory=["rpa+ph", "lno-ccsd(t)"],
+    basis_sets=["avtz", "avqz"],
+    lno_accuracy=["tight", "vtight"],
+    work_dir="./mbe_output",
+)
+
+mbe_automation.run(config)
+```
+
+### Manual Selection of Electronic Structure Methods (`mbe_manual.py`)
+
+This script extracts clusters using [`Clusters`](01_api.md#clusters) and manually selects methods and distance cutoffs:
+
+```python
+import mbe_automation
+from mbe_automation import (
+    MACE,
+    Structure,
+    UniqueClustersFilter,
+    ScheduledTasks,
+)
 import mbe_automation.configs
 
 xyz_solid = "ammonia.xyz"
 
 mace_calc = MACE(
     model_path="~/models/mace/mace-mh-1.model", 
-    head="omol"
+    head="omol",
 )
 
 cluster_filter = UniqueClustersFilter(
     cluster_types=["monomers", "dimers", "trimers"],
-    cutoffs={"dimers": 30.0, "trimers": 10.0}
+    cutoffs={"dimers": 25.0, "trimers": 10.0},
 )
 
 config = mbe_automation.configs.many_body_expansion.Clusters(
@@ -208,7 +382,8 @@ config = mbe_automation.configs.many_body_expansion.Clusters(
 
 mbe = mbe_automation.run(config)
 
-tasks = mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks = ScheduledTasks([])
+tasks += mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
 tasks += mbe.select("dimers").below(7.0).schedule("lno-ccsd(t)_vtight_avqz")
 
 tasks += mbe.select("monomers").schedule("rpa+ph_avtz")

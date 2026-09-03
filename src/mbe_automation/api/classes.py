@@ -27,6 +27,7 @@ from mbe_automation.storage import FiniteSubsystem as _FiniteSubsystem
 from mbe_automation.storage import AtomicReference as _AtomicReference
 from mbe_automation.storage import BrillouinZonePath as _BrillouinZonePath
 from mbe_automation.mbe import MBE as _MBE
+from mbe_automation.mbe.tasks import ScheduledTasks
 from mbe_automation.dynamics.harmonic.core import EOSMetadata as _EOSMetadata
 import mbe_automation.dynamics.harmonic.modes
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, ThermalDisplacements
@@ -1986,6 +1987,7 @@ class AnySystem:
         "AtomicReference": AtomicReference,
         "UniqueClusters": UniqueClusters,
         "MBE": MBE,
+        "ScheduledTasks": ScheduledTasks,
     }
 
     @staticmethod
@@ -2001,6 +2003,7 @@ class AnySystem:
         | AtomicReference
         | UniqueClusters
         | MBE
+        | ScheduledTasks
     ):
         """
         Reads the object at the given key, automatically determining its type.
