@@ -86,7 +86,9 @@ The multi-level approach is a protocol for computing benchmark coupled-cluster l
 
 For a crystal with a single symmetry-unique reference molecule ($\text{ref}$), the lattice energy is partitioned into monomer relaxation, pairwise interaction, and three-body nonadditive contributions [Eq. 1 in [Syty2025](14_literature.md)]:
 
-$$E_\text{latt} = \Delta E_{\text{ref}} + \frac{1}{2}\sum_{i} \Delta^2 E_{\text{ref},i} + \frac{1}{3}\sum_{i>j} \Delta^3 E_{\text{ref},i,j} + \dots$$
+$$
+E_\text{latt} = \Delta E_{\text{ref}} + \frac{1}{2}\sum_{i} \Delta^2 E_{\text{ref},i} + \frac{1}{3}\sum_{i>j} \Delta^3 E_{\text{ref},i,j} + \dots
+$$
 
 where:
 - $\Delta E_{\text{ref}} = E_{\text{ref}}(\text{crystal}) - E_{\text{ref}}(\text{isolated molecule})$ is the monomer relaxation energy [Eq. 2 in [Syty2025](14_literature.md)],
@@ -99,14 +101,23 @@ The expansion is split into two levels of theory:
 
 - **High-level (LNO-CCSD(T))** [[Nagy2024](14_literature.md)]: Applied to monomer relaxation ($\Delta E_{\text{ref}}$) and short-range dimers below the switchover radius [Eq. 5 in [Syty2025](14_literature.md)]:
 
-  $$R < R^{\text{RPA}}_{\text{dimers}} = 7\text{ Å}$$
+  $$
+  R < R^{\text{RPA}}_{\text{dimers}}
+  $$
 
-  Calculations are scheduled for multiple basis sets (`avtz`, `avqz`) and LNO threshold tiers (`tight`, `vtight`) to extrapolate to the complete basis set (CBS) and local-approximation-free limits.
+  The switchover between high and low levels of theory is controlled by `switchover_distances`. Calculations are scheduled for multiple basis sets (`avtz`, `avqz`) and LNO threshold tiers (`tight`, `vtight`) to extrapolate to the complete basis set and local-approximation-free limits.
 
-- **Low-level (RPA+ph)** [[Syty2025](14_literature.md), [Cieśliński2023](14_literature.md)]: Evaluated for long-range dimers and all trimers within the cutoff radii [Eqs. 6 & 7 in [Syty2025](14_literature.md)]:
+- **Low-level (RPA+ph)** [[Syty2025](14_literature.md), [Cieśliński2023](14_literature.md)]: An efficient model that can handle long-range dimers [Eq. 6 in [Syty2025](14_literature.md)]:
 
-  $$R^{\text{RPA}}_{\text{dimers}} \le R < R^{\text{PBC}}_{\text{dimers}} = 30\text{ Å}$$
-  $$R < R^{\text{PBC}}_{\text{trimers}} = 15\text{ Å}$$
+  $$
+  R^{\text{RPA}}_{\text{dimers}} \le R < R^{\text{PBC}}_{\text{dimers}}
+  $$
+
+  and all trimers within the cutoff radius [Eq. 7 in [Syty2025](14_literature.md)]:
+
+  $$
+  R < R^{\text{PBC}}_{\text{trimers}}
+  $$
 
   Third-order particle-hole (ph) exchange corrections mitigate the underbinding of standard RPA. Due to rapid convergence of three-body interactions with level of theory, LNO-CCSD(T) is not applied to trimers (`"trimers": None`).
 
