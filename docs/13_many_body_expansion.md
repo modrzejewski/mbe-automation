@@ -52,8 +52,7 @@ mbe = mbe_automation.run(config)
 
 ## Inputs for Quantum-Chemical Calculations
 
-Select clusters by type and distance, schedule quantum-chemical computations,
-and export the input files:
+This manual method of selecting methods and cutoffs provides flexibility for custom workflows:
 
 ```python
 tasks = ScheduledTasks([])
@@ -80,6 +79,8 @@ The following quantum-chemical models are available:
 | 🔗 [`lno-ccsd(t)_vtight_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_vtight_avqz.inp)<br>🔗 [`lno-ccsd(t)_vtight_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_vtight_avtz.inp)<br>🔗 [`lno-ccsd(t)_tight_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_tight_avqz.inp)<br>🔗 [`lno-ccsd(t)_tight_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/mrcc/lno-ccsd(t)_tight_avtz.inp) | MRCC [[Nagy2024](14_literature.md)] |
 | 🔗 [`rpa+ph_avqz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/beyond-rpa/ph_avqz.inp)<br>🔗 [`rpa+ph_avtz`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/templates/inputs/beyond-rpa/ph_avtz.inp) | beyond-RPA [[Syty2025](14_literature.md), [Cieśliński2023](14_literature.md)] |
 
+If your intent is to apply the multi-level coupled-cluster approach, the calculations are more easily set up using the [`MultiLevel`](#multi-level-coupled-cluster-approach) configuration class (see the dedicated section below).
+
 ## Multi-level coupled-cluster approach
 
 The multi-level approach is a protocol for computing benchmark coupled-cluster lattice energies of molecular solids [[Syty2025](14_literature.md)].
@@ -101,17 +102,17 @@ The expansion is split into two levels of theory:
 
 - **High-level (LNO-CCSD(T))** [[Nagy2024](14_literature.md)]: Applied to monomer relaxation ($\Delta E_{\text{ref}}$) and short-range dimers below the switchover radius [Eq. 5 in [Syty2025](14_literature.md)]:
 
-  $R < R^{\text{RPA}}_{\text{dimers}}$
+  $`R < R^{\text{RPA}}_{\text{dimers}}`$
 
   The switchover between high and low levels of theory is controlled by `switchover_distances`. Calculations are scheduled for multiple basis sets (`avtz`, `avqz`) and LNO threshold tiers (`tight`, `vtight`) to extrapolate to the complete basis set and local-approximation-free limits.
 
 - **Low-level (RPA+ph)** [[Syty2025](14_literature.md), [Cieśliński2023](14_literature.md)]: An efficient model that can handle long-range dimers [Eq. 6 in [Syty2025](14_literature.md)]:
 
-  $R^{\text{RPA}}_{\text{dimers}} \le R < R^{\text{PBC}}_{\text{dimers}}$
+  $`R^{\text{RPA}}_{\text{dimers}} \le R < R^{\text{PBC}}_{\text{dimers}}`$
 
   and all trimers within the cutoff radius [Eq. 7 in [Syty2025](14_literature.md)]:
 
-  $R < R^{\text{PBC}}_{\text{trimers}}$
+  $`R < R^{\text{PBC}}_{\text{trimers}}`$
 
   Third-order particle-hole (ph) exchange corrections mitigate the underbinding of standard RPA. Due to rapid convergence of three-body interactions with level of theory, LNO-CCSD(T) is not applied to trimers (`"trimers": None`).
 
@@ -150,7 +151,7 @@ config = MultiLevel(
     work_dir="./mbe_output",
 )
 
-tasks = mbe_automation.run(config)
+mbe_automation.run(config)
 ```
 
 The workflow automatically extracts symmetry-unique clusters, schedules low- and high-level tasks according to the configured cutoffs, writes quantum-chemical input files and SLURM array scripts to disk under `work_dir/tasks`, and saves scheduled tasks to the dataset file under `{root_key}/scheduled`.
@@ -251,9 +252,9 @@ H 1.16887653 4.59789554 4.42732765
 H 3.26851588 3.96156632 2.03262046
 ```
 
-### Python Script (`mbe_export.py`)
+### Multi-Level Workflow (`mbe_multilevel.py`)
 
-This script demonstrates the MBE export setup.
+This script sets up and exports multi-level coupled-cluster calculations using [`MultiLevel`](01_api.md#multilevel):
 
 ```python
 import mbe_automation
@@ -290,5 +291,51 @@ config = MultiLevel(
     work_dir="./mbe_output",
 )
 
-tasks = mbe_automation.run(config)
+mbe_automation.run(config)
+```
+
+### Manual Selection of Electronic Structure Methods (`mbe_manual.py`)
+
+This script extracts clusters using [`Clusters`](01_api.md#clusters) and manually selects methods and distance cutoffs:
+
+```python
+import mbe_automation
+from mbe_automation import (
+    MACE,
+    Structure,
+    UniqueClustersFilter,
+    ScheduledTasks,
+)
+import mbe_automation.configs
+
+xyz_solid = "ammonia.xyz"
+
+mace_calc = MACE(
+    model_path="~/models/mace/mace-mh-1.model", 
+    head="omol",
+)
+
+cluster_filter = UniqueClustersFilter(
+    cluster_types=["monomers", "dimers", "trimers"],
+    cutoffs={"dimers": 25.0, "trimers": 10.0},
+)
+
+config = mbe_automation.configs.many_body_expansion.Clusters(
+    crystal=Structure.from_file(xyz_solid),
+    calculator=mace_calc,
+    filter=cluster_filter,
+    work_dir="./mbe_output",
+)
+
+mbe = mbe_automation.run(config)
+
+tasks = ScheduledTasks([])
+tasks += mbe.select("monomers").schedule("lno-ccsd(t)_vtight_avqz")
+tasks += mbe.select("dimers").below(7.0).schedule("lno-ccsd(t)_vtight_avqz")
+
+tasks += mbe.select("monomers").schedule("rpa+ph_avtz")
+tasks += mbe.select("dimers").schedule("rpa+ph_avtz")
+tasks += mbe.select("trimers").schedule("rpa+ph_avtz")
+
+tasks.to_input_files(config.work_dir)
 ```
