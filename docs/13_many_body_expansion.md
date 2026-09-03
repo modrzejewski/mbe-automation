@@ -101,23 +101,17 @@ The expansion is split into two levels of theory:
 
 - **High-level (LNO-CCSD(T))** [[Nagy2024](14_literature.md)]: Applied to monomer relaxation ($\Delta E_{\text{ref}}$) and short-range dimers below the switchover radius [Eq. 5 in [Syty2025](14_literature.md)]:
 
-  $$
-  R < R^{\text{RPA}}_{\text{dimers}}
-  $$
+  $R < R^{\text{RPA}}_{\text{dimers}}$
 
   The switchover between high and low levels of theory is controlled by `switchover_distances`. Calculations are scheduled for multiple basis sets (`avtz`, `avqz`) and LNO threshold tiers (`tight`, `vtight`) to extrapolate to the complete basis set and local-approximation-free limits.
 
 - **Low-level (RPA+ph)** [[Syty2025](14_literature.md), [Cieśliński2023](14_literature.md)]: An efficient model that can handle long-range dimers [Eq. 6 in [Syty2025](14_literature.md)]:
 
-  $$
-  R^{\text{RPA}}_{\text{dimers}} \le R < R^{\text{PBC}}_{\text{dimers}}
-  $$
+  $R^{\text{RPA}}_{\text{dimers}} \le R < R^{\text{PBC}}_{\text{dimers}}$
 
   and all trimers within the cutoff radius [Eq. 7 in [Syty2025](14_literature.md)]:
 
-  $$
-  R < R^{\text{PBC}}_{\text{trimers}}
-  $$
+  $R < R^{\text{PBC}}_{\text{trimers}}$
 
   Third-order particle-hole (ph) exchange corrections mitigate the underbinding of standard RPA. Due to rapid convergence of three-body interactions with level of theory, LNO-CCSD(T) is not applied to trimers (`"trimers": None`).
 
@@ -160,17 +154,6 @@ tasks = mbe_automation.run(config)
 ```
 
 The workflow automatically extracts symmetry-unique clusters, schedules low- and high-level tasks according to the configured cutoffs, writes quantum-chemical input files and SLURM array scripts to disk under `work_dir/tasks`, and saves scheduled tasks to the dataset file under `{root_key}/scheduled`.
-
-Scheduled tasks can be read from dataset storage:
-
-```python
-tasks = mbe_automation.read("./mbe_output/dataset.hdf5", "many_body_expansion/scheduled")
-```
-
-Configured methods are accessible through:
-- `config.methods`: All configured electronic structure method identifiers.
-- `config.low_level_methods`: Configured low-level methods (`rpa+ph`).
-- `config.high_level_methods`: Configured high-level methods (`lno-ccsd(t)`).
 
 ## How to read the results
 
