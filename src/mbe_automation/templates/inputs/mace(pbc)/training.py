@@ -9,7 +9,7 @@ from mbe_automation import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter
 from mbe_automation.configs.training import MDSampling, PhononSampling
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
-from mbe_automation.storage import from_xyz_file
+from mbe_automation import Structure
 
 xyz_solid = "{xyz_solid}"
 mlip_parameter_file = "{mlip_parameters}"
@@ -24,7 +24,7 @@ mace_calc = mace.calculators.MACECalculator(
 )
 
 md_sampling_config = MDSampling(
-    crystal=from_xyz_file(xyz_solid),
+    crystal=Structure.from_file(xyz_solid),
     calculator=mace_calc,
     features_calculator=mace_calc,
     temperature_K=temperature_K,
@@ -51,7 +51,7 @@ mbe_automation.run(md_sampling_config)
 
 free_energy_config = FreeEnergy.recommended(
     model_name="mace",
-    crystal=from_xyz_file(xyz_solid),
+    crystal=Structure.from_file(xyz_solid),
     calculator=mace_calc,
     thermal_expansion=False,
     relax_input_cell="constant_volume",

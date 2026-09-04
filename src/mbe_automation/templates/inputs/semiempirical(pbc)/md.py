@@ -5,7 +5,7 @@ import mbe_automation
 import mbe_automation.configs
 import mbe_automation.workflows
 from mbe_automation.configs.execution import Resources
-from mbe_automation.storage import from_xyz_file
+from mbe_automation import Structure
 
 xyz_solid = "{xyz_solid}"
 xyz_molecule = "{xyz_molecule}"
@@ -15,13 +15,13 @@ dataset = os.path.join(work_dir, "properties.hdf5")
 env_config = Resources.auto_detect(model_name="dftb3-d4")
 env_config.set()
 
-molecule = from_xyz_file(xyz_molecule)
-crystal = from_xyz_file(xyz_solid)
+molecule = Structure.from_file(xyz_molecule)
+crystal = Structure.from_file(xyz_solid)
 
 md_config = mbe_automation.configs.md.Enthalpy(
     molecule = molecule,
     crystal = crystal,
-    calculator = mbe_automation.calculators.DFTB3_D4(elements=crystal.symbols),
+    calculator = mbe_automation.calculators.DFTB3_D4(),
     temperature_K = 298.15,
     pressure_GPa = 1.0E-4,
     work_dir = work_dir,
