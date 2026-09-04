@@ -60,8 +60,10 @@ from mbe_automation.storage.views import to_phonopy
 from mbe_automation.storage.views import to_pymatgen
 from mbe_automation.storage.views import from_ase_atoms
 
+from mbe_automation.storage.xyz_formats import from_file
 from mbe_automation.storage.xyz_formats import from_xyz_file
 from mbe_automation.storage.xyz_formats import to_xyz_file
 from mbe_automation.storage.xyz_formats import to_cif_file
+from mbe_automation.storage.xyz_formats import to_file
 
 

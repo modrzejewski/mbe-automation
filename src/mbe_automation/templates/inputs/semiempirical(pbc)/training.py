@@ -8,16 +8,16 @@ from mbe_automation import FiniteSubsystemFilter
 from mbe_automation.dynamics.harmonic.modes import PhononFilter
 from mbe_automation.configs.training import MDSampling, PhononSampling
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
-from mbe_automation.storage import from_xyz_file
+from mbe_automation import Structure
 
 xyz_solid = "{xyz_solid}"
 temperature_K = 298.15
 work_dir = os.path.abspath(os.path.dirname(__file__))
 dataset = os.path.join(work_dir, "training_set.hdf5")
 
-crystal = from_xyz_file(xyz_solid)
+crystal = Structure.from_file(xyz_solid)
 
-calc = mbe_automation.calculators.DFTB3_D4(elements=crystal.symbols)
+calc = mbe_automation.calculators.DFTB3_D4()
 model_name = "dftb3_d4"
 
 md_sampling_config = MDSampling(
@@ -49,7 +49,7 @@ mbe_automation.run(md_sampling_config)
 
 free_energy_config = FreeEnergy.recommended(
     model_name=model_name,
-    crystal=from_xyz_file(xyz_solid),
+    crystal=Structure.from_file(xyz_solid),
     calculator=calc,
     thermal_expansion=False,
     relaxation=Minimum.recommended(

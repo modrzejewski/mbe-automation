@@ -87,7 +87,8 @@ Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single
 #### Methods
 *   **`read`**: Load the object from a dataset file.
 *   **`save`**: Saves the object to a dataset file. Supports `update_properties` mode to update energies, forces, and feature vectors (if missing), without overwriting geometry.
-*   **`from_file`**: Creates a structure object from XYZ, CIF, POSCAR, and other file formats (recognized by extension). Takes `read_path`, `transform` (symmetry transformation, default `"to_symmetrized_primitive_cell"`), and `symprec` (symmetry tolerance).
+*   **`from_file`**: Creates a `Structure` object from XYZ, CIF, POSCAR, and other file formats (recognized by extension or filename). Takes `read_path`, `transform` (symmetry transformation, default `"to_symmetrized_primitive_cell"`), and `symprec` (symmetry tolerance).
+*   **`to_file`**: Exports a `Structure` object to standard geometry file formats (e.g., CIF, POSCAR, XYZ, and any format supported by ASE). Takes `save_path`, optional `fmt` (inferred from extension/filename by default), and `symprec` (symmetry tolerance for space group detection in CIF exports).
 *   **`subsample`**: Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). Requires feature vectors.
 *   **`select`**: Returns a new object containing only the specified frames (by index).
 *   **`run`**: Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. Can distribute work via `chunk`.
@@ -595,3 +596,21 @@ from mbe_automation.storage import delete
 for key in DatasetKeys("properties.hdf5").molecular_crystals():
     delete(dataset="properties.hdf5", key=key)
 ```
+
+### Geometry File Import and Export
+
+Structures can be imported from and exported to standard crystallographic and molecular file formats (CIF, POSCAR, XYZ, and any format supported by ASE) via `Structure.from_file` and `Structure.to_file`.
+
+```python
+from mbe_automation import Structure
+
+# Load from file (format inferred automatically from extension or name)
+crystal = Structure.from_file("experiment.cif")
+molecule = Structure.from_file("isolated_molecule.xyz")
+
+# Export to different formats
+crystal.to_file("structure.cif")
+crystal.to_file("POSCAR")
+molecule.to_file("molecule.xyz")
+```
+

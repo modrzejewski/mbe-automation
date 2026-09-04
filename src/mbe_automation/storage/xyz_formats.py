@@ -16,9 +16,10 @@ from pathlib import Path
 if TYPE_CHECKING:
     import mbe_automation.dynamics.harmonic.modes
 
+import pymatgen.io.vasp
+from . import core
+from . import views
 import mbe_automation.structure
-import mbe_automation.storage.core
-import mbe_automation.storage.views
 import mbe_automation.common.display
 from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_STRICT, SYMMETRY_TOLERANCE_LOOSE
 from mbe_automation.dynamics.harmonic.modes import symmetrize_adps
@@ -90,12 +91,12 @@ def _read_cif(
     else:
         raise ValueError("Invalid backend requested in _read_cif.")        
 
-def _cif_with_adps(
+def _to_cif_with_adps(
         save_path: str | Path,
         struct: pymatgen.core.Structure,
         adps_cif: npt.NDArray[np.floating] | None = None,
         symprec: float = SYMMETRY_TOLERANCE_STRICT,
-        significant_figures: int = 8,
+        decimal_digits: int = 8,
     ) -> None:
     """
     Code from pymatgen.io.cif.CifWriter modified to handle anisotropic displacement
@@ -109,7 +110,7 @@ def _cif_with_adps(
     lattice = struct.lattice
     comp = struct.composition
     no_oxi_comp = comp.element_composition
-    format_str: str = f"{{:.{significant_figures}f}}"
+    format_str: str = f"{{:.{decimal_digits}f}}"
     blocks["_chemical_formula_sum"] = no_oxi_comp.formula
     if symprec is not None:
         spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(struct, symprec)
@@ -283,7 +284,7 @@ def _print_cell_summary(system: ase.Atoms, label: str) -> None:
     print(f"  Number of atoms   {len(system)}")
 
 
-def from_xyz_file(
+def from_file(
         read_path: str | Path,
         transform: Literal[
             "to_symmetrized_conventional_cell",
@@ -349,9 +350,13 @@ def from_xyz_file(
 
     return system
 
+
+from_xyz_file = from_file  # synonym
+
+
 def to_xyz_file(
         save_path: str | Path,
-        system: ase.Atoms | mbe_automation.storage.core.Structure,
+        system: ase.Atoms | core.Structure,
         frame_index: int = 0,
         thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None = None,
         temperature_idx: int = 0,
@@ -359,14 +364,14 @@ def to_xyz_file(
 ):
     save_path = Path(save_path).expanduser()
 
-    if isinstance(system, mbe_automation.storage.core.Structure):
-        system_ase = mbe_automation.storage.views.to_ase(system, frame_index=frame_index)
+    if isinstance(system, core.Structure):
+        system_ase = views.to_ase(system, frame_index=frame_index)
     else:
         system_ase = system
         
     if save_path.suffix.lower() == ".cif":
         pmg_structure = pymatgen.io.ase.AseAtomsAdaptor.get_structure(system_ase)
-        _cif_with_adps(
+        _to_cif_with_adps(
             save_path=save_path,
             struct=pmg_structure,
             adps_cif=(
@@ -381,7 +386,7 @@ def to_xyz_file(
 
 def to_cif_file(
         save_path: str | Path,
-        system: ase.Atoms | mbe_automation.storage.core.Structure,
+        system: ase.Atoms | core.Structure,
         frame_index: int = 0,
         thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None = None,
         temperature_idx: int = 0,
@@ -404,3 +409,130 @@ def to_cif_file(
         temperature_idx=temperature_idx,
         symprec=symprec
     )
+
+
+def _to_poscar_file(
+        save_path: Path,
+        structure: core.Structure,
+        frame_index: int = 0,
+        decimal_digits: int = 8,
+        fractional_coords: bool = True,
+) -> None:
+    """
+    Save a periodic structure to a POSCAR file using pymatgen.
+
+    Args:
+        save_path: Path object for destination file.
+        structure: Periodic Structure object to save.
+        frame_index: Frame index if structure contains multiple frames.
+        decimal_digits: Number of digits after the decimal point.
+        fractional_coords: Whether fractional (True) or Cartesian (False) coordinates are written.
+    """
+    if not structure.periodic:
+        raise ValueError("Cannot save a non-periodic Structure to POSCAR format.")
+
+    pymatgen.io.vasp.Poscar(
+        structure=views.to_pymatgen(structure, frame_index=frame_index),
+    ).write_file(
+        save_path,
+        significant_figures=decimal_digits,
+        direct=fractional_coords,
+    )
+
+
+def _to_other_file(
+        save_path: Path,
+        structure: core.Structure,
+        frame_index: int = 0,
+        fmt: str | None = None,
+) -> None:
+    """
+    Save a structure to an arbitrary geometry file using ASE.
+
+    Args:
+        save_path: Path object for destination file.
+        structure: Structure object to save.
+        frame_index: Frame index if structure contains multiple frames.
+        fmt: File format passed to ase.io.write. If None, format is inferred.
+    """
+    system_ase = views.to_ase(structure, frame_index=frame_index)
+    if fmt == "xyz" and structure.periodic:
+        fmt = "extxyz"
+    ase.io.write(save_path, system_ase, format=fmt)
+
+
+def to_file(
+        save_path: str | Path,
+        structure: core.Structure,
+        frame_index: int = 0,
+        fmt: str | None = None,
+        decimal_digits: int = 8,
+        fractional_coords: bool = True,
+        thermal_displacements: "mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None" = None,
+        temperature_idx: int = 0,
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
+) -> None:
+    """
+    Save an atomistic structure to a geometry file.
+
+    Automatically resolves file format from file extension or filename, or uses
+    the format specified explicitly. Delegates to _to_cif_with_adps for CIF files,
+    _to_poscar_file for POSCAR files, and to_xyz_file for XYZ and other formats.
+
+    Args:
+        save_path: Destination path for the geometry file.
+        structure: Structure object to write.
+        frame_index: Frame index if structure contains multiple frames.
+        fmt: Optional explicit format override ("cif", "poscar", "xyz", etc.).
+        decimal_digits: Number of digits after the decimal point for POSCAR/CIF output.
+        fractional_coords: Whether coordinates in POSCAR are fractional (True) or Cartesian (False).
+        thermal_displacements: Optional ADPs for CIF output.
+        temperature_idx: Temperature index for ADPs.
+        symprec: Symmetry tolerance for CIF space group detection.
+    """
+    save_path = Path(save_path).expanduser()
+
+    resolved_format = fmt.lower() if fmt is not None else None
+    if resolved_format is None:
+        name = save_path.name
+        suffix = save_path.suffix
+        if suffix.lower() == ".cif":
+            resolved_format = "cif"
+        elif (
+            name == "POSCAR"
+            or name.startswith("POSCAR_")
+            or suffix.upper() == ".POSCAR"
+        ):
+            resolved_format = "poscar"
+        elif suffix.lower() in (".xyz", ".extxyz"):
+            resolved_format = "xyz"
+
+    if resolved_format == "cif":
+        if not structure.periodic:
+            raise ValueError("Cannot save a non-periodic Structure to CIF format.")
+        _to_cif_with_adps(
+            save_path=save_path,
+            struct=views.to_pymatgen(structure, frame_index=frame_index),
+            adps_cif=(
+                thermal_displacements.mean_square_displacements_matrix_diagonal_cif[temperature_idx]
+                if thermal_displacements is not None else None
+            ),
+            symprec=symprec,
+            decimal_digits=decimal_digits,
+        )
+    elif resolved_format == "poscar":
+        _to_poscar_file(
+            save_path=save_path,
+            structure=structure,
+            frame_index=frame_index,
+            decimal_digits=decimal_digits,
+            fractional_coords=fractional_coords,
+        )
+    else:
+        _to_other_file(
+            save_path=save_path,
+            structure=structure,
+            frame_index=frame_index,
+            fmt=resolved_format,
+        )
+

@@ -14,7 +14,7 @@ This workflow performs a quasi-harmonic calculation of thermodynamic properties,
 
 ## Setup
 
-Setup involves importing necessary modules and defining the system's structures and the machine learning interatomic potential (MLIP) calculator.
+Setup involves importing necessary modules and defining the system's structures and the machine learning interatomic potential (MLIP) calculator. Geometries can be provided in CIF, POSCAR, XYZ, or other supported formats and loaded using `Structure.from_file`.
 
 ```python
 import numpy as np
@@ -25,8 +25,8 @@ import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
 from mbe_automation import Structure
 
-xyz_solid = "path/to/your/solid.xyz"
-xyz_molecule = "path/to/your/molecule.xyz"
+crystal_file = "path/to/your/crystal.cif"  # or .xyz, POSCAR, etc.
+molecule_file = "path/to/your/molecule.xyz"
 
 mace_calc = MACE(model_path="path/to/your/mace.model")
 ```
@@ -44,8 +44,8 @@ relaxation_config = Minimum(
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_file(xyz_solid),
-    molecule=Structure.from_file(xyz_molecule),
+    crystal=Structure.from_file(crystal_file),
+    molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
@@ -181,8 +181,8 @@ from mbe_automation import Structure
 # Import EEC
 from mbe_automation.configs.quasi_harmonic import EEC
 
-xyz_solid = "path/to/your/solid.xyz"
-xyz_molecule = "path/to/your/molecule.xyz"
+crystal_file = "path/to/your/crystal.cif"
+molecule_file = "path/to/your/molecule.xyz"
 
 mace_calc = MACE(model_path="path/to/your/mace.model")
 
@@ -193,8 +193,8 @@ relaxation_config = Minimum(
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_file(xyz_solid),
-    molecule=Structure.from_file(xyz_molecule),
+    crystal=Structure.from_file(crystal_file),
+    molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
@@ -242,8 +242,8 @@ from mbe_automation.configs.structure import Minimum
 from mbe_automation.configs.quasi_harmonic import EEC
 from mbe_automation import Structure
 
-xyz_solid = "path/to/your/solid.xyz"
-xyz_molecule = "path/to/your/molecule.xyz"
+crystal_file = "path/to/your/crystal.cif"
+molecule_file = "path/to/your/molecule.xyz"
 
 mace_calc = MACE(model_path="path/to/your/mace.model")
 
@@ -260,8 +260,8 @@ DFT_B0_prime    = 6.2      # dimensionless
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_file(xyz_solid),
-    molecule=Structure.from_file(xyz_molecule),
+    crystal=Structure.from_file(crystal_file),
+    molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,
@@ -436,8 +436,8 @@ from mbe_automation.configs.structure import Minimum
 from mbe_automation.configs.quasi_harmonic import EEC
 from mbe_automation import Structure
 
-xyz_solid = "path/to/your/solid.xyz"
-xyz_molecule = "path/to/your/molecule.xyz"
+crystal_file = "path/to/your/crystal.cif"
+molecule_file = "path/to/your/molecule.xyz"
 
 mace_calc = MACE(model_path="path/to/your/model.model")
 
@@ -449,8 +449,8 @@ relaxation_config = Minimum(
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
     model_name="mace",
-    crystal=Structure.from_file(xyz_solid),
-    molecule=Structure.from_file(xyz_molecule),
+    crystal=Structure.from_file(crystal_file),
+    molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
     calculator=mace_calc,
     supercell_radius=25.0,

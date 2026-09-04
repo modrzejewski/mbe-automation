@@ -14,9 +14,9 @@ from mbe_automation.dynamics.md.modes import calculate_adp_covariance_matrix, MF
 import torch  # Now safe to import torch
 from mace.calculators import MACECalculator
 try:
-    from mbe_automation.storage.xyz_formats import _cif_with_adps
+    from mbe_automation.storage.xyz_formats import _to_cif_with_adps
 except ImportError:
-    _cif_with_adps = None
+    _to_cif_with_adps = None
 
 # Restore original load (optional, but good practice if we want normal behavior later)
 # torch.load = _original_torch_load
@@ -74,13 +74,13 @@ def main(
         print(f"Saved ADPs (.npy) to: {out_npy}")
 
     if out_cif:
-        if _cif_with_adps is None:
-            print("CIF writer (_cif_with_adps) not available in mbe_automation.storage; skipping CIF save.")
+        if _to_cif_with_adps is None:
+            print("CIF writer (_to_cif_with_adps) not available in mbe_automation.storage; skipping CIF save.")
         elif md_td.structure is None:
             print("No reference structure available in MFDThermalDisplacements.structure; cannot write CIF with ADPs.")
         else:
-            # _cif_with_adps expects a pymatgen Structure and adps array
-            _cif_with_adps(out_cif, md_td.structure, md_td.mean_square_displacements_matrix_diagonal)
+            # _to_cif_with_adps expects a pymatgen Structure and adps array
+            _to_cif_with_adps(out_cif, md_td.structure, md_td.mean_square_displacements_matrix_diagonal)
             print(f"Saved CIF with anisotropic U parameters to: {out_cif}")
 
 

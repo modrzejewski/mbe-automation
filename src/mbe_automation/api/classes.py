@@ -51,7 +51,10 @@ from mbe_automation.storage.core import (
     CALCULATION_STATUS_FAILED,
     read_attribute,
 )
-from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_LOOSE
+from mbe_automation.structure.crystal import (
+    SYMMETRY_TOLERANCE_LOOSE,
+    SYMMETRY_TOLERANCE_STRICT,
+)
 import mbe_automation.structure.relax
 import mbe_automation.dynamics.harmonic.core
 import mbe_automation.dynamics.harmonic.crystal_thermo
@@ -89,7 +92,7 @@ class MolecularComposition(_MolecularComposition):
         super().__init__(**vars(result))
 
     @classmethod
-    def from_xyz_file(
+    def from_file(
             cls,
             file_path: str | Path,
             calculator: ASECalculator | None = None,
@@ -99,7 +102,7 @@ class MolecularComposition(_MolecularComposition):
             bonding_algo: NearNeighbors | None = None,
             match_mode: Literal["energy_only", "rmsd_only", "combined"] = "energy_only",
     ) -> MolecularComposition:
-        crystal = Structure.from_xyz_file(
+        crystal = Structure.from_file(
             read_path=file_path,
         )
         return cls(
@@ -112,7 +115,7 @@ class MolecularComposition(_MolecularComposition):
             match_mode=match_mode,
         )
 
-    from_file = from_xyz_file
+    from_xyz_file = from_file  # synonym
 
 class EOSMetadata(_EOSMetadata):
     @classmethod
@@ -686,7 +689,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
         ))
 
     @classmethod
-    def from_xyz_file(
+    def from_file(
             cls,
             read_path: str | Path,
             transform: Literal[
@@ -707,14 +710,52 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
         Returns:
             Structure object.
         """
-        ase_atoms = mbe_automation.storage.from_xyz_file(
+        ase_atoms = mbe_automation.storage.from_file(
             read_path=read_path,
             transform=transform,
             symprec=symprec,
         )
         return cls(**vars(mbe_automation.storage.from_ase_atoms(ase_atoms)))
 
-    from_file = from_xyz_file
+    from_xyz_file = from_file # synonym
+
+    def to_file(
+            self,
+            save_path: str | Path,
+            frame_index: int = 0,
+            fmt: str | None = None,
+            decimal_digits: int = 8,
+            fractional_coords: bool = True,
+            thermal_displacements: "mbe_automation.dynamics.harmonic.modes.ThermalDisplacements | None" = None,
+            temperature_idx: int = 0,
+            symprec: float = SYMMETRY_TOLERANCE_STRICT,
+    ) -> None:
+        """
+        Save the structure to a geometry file.
+
+        Args:
+            save_path: Destination file path.
+            frame_index: Index of the frame to save.
+            fmt: File format ("xyz", "cif", "poscar", etc.). If None, inferred from extension.
+            decimal_digits: Number of decimal places for coordinate/cell output.
+            fractional_coords: Whether to write fractional coordinates in POSCAR files.
+            thermal_displacements: Optional ThermalDisplacements object for CIF files.
+            temperature_idx: Temperature index from thermal_displacements to include in CIF.
+            symprec: Symmetry tolerance for spacegroup analysis (used when exporting to CIF).
+        """
+        mbe_automation.storage.to_file(
+            save_path=save_path,
+            structure=self,
+            frame_index=frame_index,
+            fmt=fmt,
+            decimal_digits=decimal_digits,
+            fractional_coords=fractional_coords,
+            thermal_displacements=thermal_displacements,
+            temperature_idx=temperature_idx,
+            symprec=symprec,
+        )
+
+    to_xyz_file = to_file # synonym
 
     def subsample(
             self,

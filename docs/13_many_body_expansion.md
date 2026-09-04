@@ -28,7 +28,7 @@ import mbe_automation
 from mbe_automation import MACE, Structure, UniqueClustersFilter
 import mbe_automation.configs
 
-xyz_solid = "ammonia.xyz"
+crystal_file = "ammonia.xyz"  # or .cif, POSCAR, etc.
 
 mace_calc = MACE(
     model_path="~/models/mace/mace-mh-1.model", 
@@ -41,7 +41,7 @@ cluster_filter = UniqueClustersFilter(
 )
 
 config = mbe_automation.configs.many_body_expansion.Clusters(
-    crystal=Structure.from_file(xyz_solid),
+    crystal=Structure.from_file(crystal_file),
     calculator=mace_calc,
     filter=cluster_filter,
     work_dir="./mbe_output",
@@ -318,7 +318,7 @@ from mbe_automation import (
     MultiLevel,
 )
 
-xyz_solid = "ammonia.xyz"
+crystal_file = "ammonia.xyz"  # or POSCAR, CIF, etc.
 
 mace_calc = MACE(
     model_path="~/models/mace/mace-mh-1.model", 
@@ -331,7 +331,7 @@ cluster_filter = UniqueClustersFilter(
 )
 
 config = MultiLevel(
-    crystal=Structure.from_file(xyz_solid),
+    crystal=Structure.from_file(crystal_file),
     calculator=mace_calc,
     filter=cluster_filter,
     switchover_distances={
@@ -361,7 +361,7 @@ from mbe_automation import (
 )
 import mbe_automation.configs
 
-xyz_solid = "ammonia.xyz"
+crystal_file = "ammonia.xyz"  # or POSCAR, CIF, etc.
 
 mace_calc = MACE(
     model_path="~/models/mace/mace-mh-1.model", 
@@ -374,7 +374,7 @@ cluster_filter = UniqueClustersFilter(
 )
 
 config = mbe_automation.configs.many_body_expansion.Clusters(
-    crystal=Structure.from_file(xyz_solid),
+    crystal=Structure.from_file(crystal_file),
     calculator=mace_calc,
     filter=cluster_filter,
     work_dir="./mbe_output",
