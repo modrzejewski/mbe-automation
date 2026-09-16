@@ -1,0 +1,43 @@
+name: dependencies-uma-gpu
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python>=3.11
+  - pytorch-cuda=12.*
+  - pytorch==2.9.1
+  - numpy==2.3.3
+  - scipy==1.16.2
+  - networkx
+  - ase>=3.26.0
+  - dscribe
+  - matplotlib
+  - pymatgen==2025.10.7
+  - pyscf>=2.12.0
+  - scikit-learn
+  - spglib==2.6.0
+  - seekpath==2.2.1
+  - euphonic
+  - phonopy==2.43.2
+  - symfc==1.6.1
+  - tqdm
+  - joblib
+  - h5py
+  - pandas
+  - doped==3.2.1
+  - dynasor
+  - nglview
+  - pymatviz
+  - chemiscope
+  - gemmi
+  - ray
+  - pip
+  - pip:
+      - irmsd==0.1.1
+      - pyscf-dispersion
+      - fairchem-core>=2.19.0
+      - cuequivariance
+      - cuequivariance-torch
+      - cuequivariance-ops-torch-cu12
+      - gpu4pyscf-cuda12x>=1.5.2
+      - cutensor-cu12
