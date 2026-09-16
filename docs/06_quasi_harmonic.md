@@ -21,6 +21,7 @@ import numpy as np
 from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
+from mbe_automation.configs.quasi_harmonic import FreeEnergy
 # Import Minimum if you need to customize relaxation parameters
 from mbe_automation.configs.structure import Minimum
 from mbe_automation import Structure
@@ -42,8 +43,7 @@ relaxation_config = Minimum(
     max_force_on_atom_eV_A=1.0E-4
 )
 
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
-    model_name="mace",
+properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 200.0, 300.0]),
@@ -82,8 +82,7 @@ For crystals with more than one crystallographically distinct molecule in the as
 ### Replicated single reference (conformational polymorphs)
 
 ```python
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
-    model_name="mace",
+properties_config = FreeEnergy(
     crystal=Structure.from_file("polymorph_Zprime2.xyz"),
     molecule=Structure.from_file("molecule.xyz"),  # ONE reference
     temperatures_K=np.array([5.0, 200.0, 300.0]),
@@ -106,8 +105,7 @@ and proceeds with two independent gas-phase relaxations and vibrational analyses
 ```python
 from mbe_automation.configs.quasi_harmonic import MoleculeRef
 
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
-    model_name="mace",
+properties_config = FreeEnergy(
     crystal=Structure.from_file("cocrystal.xyz"),
     molecule=[
         MoleculeRef(
@@ -178,8 +176,8 @@ import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
 from mbe_automation import Structure
 
-# Import EEC
-from mbe_automation.configs.quasi_harmonic import EEC
+# Import EEC and FreeEnergy
+from mbe_automation.configs.quasi_harmonic import EEC, FreeEnergy
 
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
@@ -191,8 +189,7 @@ relaxation_config = Minimum(
     max_force_on_atom_eV_A=1.0E-4
 )
 
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
-    model_name="mace",
+properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
@@ -208,7 +205,6 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
         V_ref=145.80,
         cell="conventional"
     ),
-    equation_of_state="spline" # Required for EEC
 )
 
 mbe_automation.run(properties_config)
@@ -239,7 +235,7 @@ from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
-from mbe_automation.configs.quasi_harmonic import EEC
+from mbe_automation.configs.quasi_harmonic import EEC, FreeEnergy
 from mbe_automation import Structure
 
 crystal_file = "path/to/your/crystal.cif"
@@ -258,8 +254,7 @@ DFT_V0_A3       = 143.50   # Å³/unit cell
 DFT_B0_GPa      = 12.4     # GPa
 DFT_B0_prime    = 6.2      # dimensionless
 
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
-    model_name="mace",
+properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
@@ -276,7 +271,6 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
         baseline_B0_prime=DFT_B0_prime,
         cell="conventional"
     ),
-    equation_of_state="spline"  # Required for EEC
 )
 
 mbe_automation.run(properties_config)
@@ -311,7 +305,7 @@ To use Debye model volumes in the QHA temperature loop, set `volume_curve="debye
 ```python
 from mbe_automation.configs.quasi_harmonic import DebyeModel
 
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
+properties_config = FreeEnergy(
     ...
     volume_curve="debye",
     debye_model=DebyeModel(max_fit_temperature_K=200.0),
@@ -433,7 +427,7 @@ from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
-from mbe_automation.configs.quasi_harmonic import EEC
+from mbe_automation.configs.quasi_harmonic import EEC, FreeEnergy
 from mbe_automation import Structure
 
 crystal_file = "path/to/your/crystal.cif"
@@ -447,8 +441,7 @@ relaxation_config = Minimum(
     max_force_on_atom_eV_A=1.0E-4
 )
 
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
-    model_name="mace",
+properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
@@ -464,7 +457,6 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
         V_ref=145.80,
         cell="conventional"
     ),
-    equation_of_state="spline" # Required for EEC
 )
 
 mbe_automation.run(properties_config)

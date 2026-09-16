@@ -13,6 +13,7 @@ from mbe_automation.calculators import MACE
 import mbe_automation
 from mbe_automation import Structure
 from mbe_automation.configs.structure import Minimum
+from mbe_automation.configs.quasi_harmonic import FreeEnergy
 
 cif_path = "experiment.cif"
 
@@ -25,8 +26,7 @@ relaxation_config = Minimum(
     transform="no_transformation"
 )
 
-properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(
-    model_name="mace",
+properties_config = FreeEnergy(
     crystal=Structure.from_file(
         cif_path, 
         transform="no_transformation"

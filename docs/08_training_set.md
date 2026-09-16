@@ -75,8 +75,7 @@ mbe_automation.run(md_sampling_config)
 A quasi-harmonic calculation is performed to obtain the force constants required for the phonon sampling stage.
 
 ```python
-free_energy_config = FreeEnergy.recommended(
-    model_name="mace",
+free_energy_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     calculator=mace_calc,
     thermal_expansion=False,
@@ -262,8 +261,7 @@ md_sampling_config = MDSampling(
 )
 mbe_automation.run(md_sampling_config)
 
-free_energy_config = FreeEnergy.recommended(
-    model_name="mace",
+free_energy_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     calculator=mace_calc,
     thermal_expansion=False,
