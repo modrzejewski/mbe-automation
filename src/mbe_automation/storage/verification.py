@@ -1,8 +1,8 @@
 from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
+import pymatgen.core
 import pymatgen.io.cif
-from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 import mbe_automation.dynamics.harmonic.modes
@@ -10,7 +10,7 @@ from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_STRICT
 
 def verify_adps_roundtrip(
     cif_path: str,
-    original_structure: Structure,
+    original_structure: pymatgen.core.Structure,
     thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements,
     temperature_idx: int = 0,
     symprec: float = SYMMETRY_TOLERANCE_STRICT,

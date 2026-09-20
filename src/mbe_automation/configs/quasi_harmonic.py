@@ -346,16 +346,18 @@ class FreeEnergy:
     verbose: int = 0
     save_plots: bool = True
     save_csv: bool = True
+    save_adps: bool = False
+    adps_k_point_mesh: npt.NDArray[np.integer] | Literal["gamma"] | float = 50.0
 
     def __post_init__(self):
         import mbe_automation.dynamics.harmonic.eos
 
         if self.relaxation.transform != "to_symmetrized_primitive_cell":
             raise ValueError(
-                f"Quasi-harmonic workflows require the Minimum configuration "
-                f"to set transform='to_symmetrized_primitive_cell'. "
-                f"Got: '{self.relaxation.transform}'"
-            )
+                 f"Quasi-harmonic workflows require the Minimum configuration "
+                 f"to set transform='to_symmetrized_primitive_cell'. "
+                 f"Got: '{self.relaxation.transform}'"
+             )
 
         if isinstance(self.crystal, mbe_automation.storage.Structure):
             self.crystal = mbe_automation.storage.to_ase(self.crystal)
@@ -376,6 +378,20 @@ class FreeEnergy:
             diffs = np.diff(self.temperatures_K)
             if np.any(diffs < 1.0E-5):
                  raise ValueError("Numerically close temperatures detected in temperatures_K.")
+
+        if self.save_adps:
+            if self.thermal_expansion:
+                raise ValueError("save_adps=True requires thermal_expansion=False.")
+            if self.relaxation.cell_relaxation != "only_atoms":
+                raise ValueError(
+                    f"save_adps=True requires relaxation.cell_relaxation='only_atoms', "
+                    f"got '{self.relaxation.cell_relaxation}'."
+                )
+            if len(self.temperatures_K) != 1:
+                raise ValueError(
+                    f"save_adps=True requires a single temperature in temperatures_K, "
+                    f"got {len(self.temperatures_K)} temperatures: {self.temperatures_K}."
+                )
         
         if self.electronic_energy_correction.enforce_reference_state:
             if not np.any(np.isclose(self.temperatures_K, self.electronic_energy_correction.T_ref, atol=1.0E-5)):

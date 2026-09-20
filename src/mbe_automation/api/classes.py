@@ -1985,9 +1985,9 @@ def _to_cif_file(
         from mbe_automation.storage.verification import verify_adps_roundtrip
         verify_adps_roundtrip(
             cif_path=save_path,
-            original_structure=force_constants.primitive,
+            original_structure=force_constants.primitive.to_pymatgen(),
             thermal_displacements=disp,
-            temperature_idx=0
+            temperature_idx=0,
         )
 
 @dataclass(kw_only=True)

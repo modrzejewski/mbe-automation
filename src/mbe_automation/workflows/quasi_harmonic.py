@@ -19,6 +19,8 @@ import mbe_automation.structure.relax
 import mbe_automation.structure.clusters
 
 from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
+from mbe_automation.dynamics.harmonic.modes import PhononFilter, thermal_displacements
+from mbe_automation.storage.verification import verify_adps_roundtrip
 
 
 def _centering_ratio(unit_cell_primitive):
@@ -362,6 +364,63 @@ def _compute_sublimation_df(df_crystal, df_molecules, n_equivalent_primitive):
     )
 
 
+def _store_cif_adps(
+    config: mbe_automation.configs.quasi_harmonic.FreeEnergy,
+    key: str,
+    crystal_label: str,
+) -> None:
+    """
+    Compute atomic displacement parameters and dump them to a CIF file.
+    """
+    force_constants = mbe_automation.storage.read_force_constants(
+        dataset=config.dataset,
+        key=key,
+    )
+
+    cif_path = config.work_dir / "adps" / f"{crystal_label}.cif"
+    cif_path.parent.mkdir(parents=True, exist_ok=True)
+    temperature_K = config.temperatures_K[0]
+
+    mbe_automation.common.display.framed([
+        "Anisotropic displacement parameters",
+        mbe_automation.common.display.shorten_path(cif_path),
+    ])
+    print(f"temperature       {temperature_K:.1f} K")
+    if isinstance(config.adps_k_point_mesh, np.ndarray):
+        k_mesh_str = "×".join(map(str, config.adps_k_point_mesh))
+    else:
+        k_mesh_str = str(config.adps_k_point_mesh)
+    print(f"k_point_mesh      {k_mesh_str}")
+
+    phonon_filter = PhononFilter(
+        freq_max_THz=None,
+        k_point_mesh=config.adps_k_point_mesh,
+    )
+
+    disp = thermal_displacements(
+        force_constants=force_constants,
+        temperatures_K=config.temperatures_K,
+        phonon_filter=phonon_filter,
+        cell_type="primitive",
+        symmetrize_Dq=True,
+        symprec=1e-5,
+    )
+
+    mbe_automation.storage.to_cif_file(
+        save_path=cif_path,
+        system=force_constants.primitive,
+        thermal_displacements=disp,
+        temperature_idx=0,
+    )
+
+    verify_adps_roundtrip(
+        cif_path=str(cif_path),
+        original_structure=force_constants.primitive.to_pymatgen(),
+        thermal_displacements=disp,
+        temperature_idx=0,
+    )
+
+
 def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
     assert config.relaxation.transform == "to_symmetrized_primitive_cell", (
@@ -547,6 +606,13 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         level_of_theory=config.calculator.level_of_theory,
         unit_cell_type="primitive",
     )
+
+    if config.save_adps:
+        _store_cif_adps(
+            config=config,
+            key=f"{config.root_key}/phonons/force_constants/{relaxed_crystal_label}",
+            crystal_label=relaxed_crystal_label,
+        )
     
     if df_molecules is not None:
         df_sublimation = _compute_sublimation_df(

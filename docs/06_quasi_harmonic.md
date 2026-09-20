@@ -7,6 +7,7 @@
 - [Debye Model Volumes](#debye-model-volumes)
 - [Adjustable parameters](#adjustable-parameters)
 - [Computational Bottlenecks](#computational-bottlenecks)
+- [Atomic Displacement Parameters (ADPs)](#atomic-displacement-parameters-adps)
 - [How to read the results](#how-to-read-the-results)
 - [Complete Input Files](#complete-input-files)
 
@@ -329,6 +330,37 @@ Detailed descriptions of the configuration classes can be found in the [API Refe
 ## Computational Bottlenecks
 
 For a detailed discussion of performance considerations, see the [Computational Bottlenecks](./05_bottlenecks.md) section.
+
+## Atomic Displacement Parameters (ADPs)
+
+The workflow can compute harmonic anisotropic displacement parameters (ADPs, $U^{ij}$) and export them directly to a CIF file formatted with `_atom_site_aniso_*` tags, saved under `adps/` in the working directory (e.g., `adps/crystal[opt:atoms].cif`).
+
+```python
+import numpy as np
+from mbe_automation import Structure
+from mbe_automation.calculators import MACE
+from mbe_automation.configs.quasi_harmonic import FreeEnergy
+from mbe_automation.configs.structure import Minimum
+import mbe_automation
+
+mace_calc = MACE(model_path="path/to/your/model.model")
+
+relaxation_config = Minimum(
+    cell_relaxation="only_atoms",
+    max_force_on_atom_eV_A=1.0E-4,
+)
+
+config = FreeEnergy(
+    crystal=Structure.from_file("crystal.cif"),
+    temperatures_K=np.array([100.0]),
+    calculator=mace_calc,
+    thermal_expansion=False,
+    relaxation=relaxation_config,
+    save_adps=True,
+)
+
+mbe_automation.run(config)
+```
 
 ## How to read the results
 
