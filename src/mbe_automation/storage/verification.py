@@ -1,8 +1,8 @@
 from __future__ import annotations
+import gemmi
 import numpy as np
 import numpy.typing as npt
 import pymatgen.core
-import pymatgen.io.cif
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 import mbe_automation.dynamics.harmonic.modes
@@ -33,54 +33,26 @@ def verify_adps_roundtrip(
     """
     print(f"Verifying CIF roundtrip: {cif_path}")
 
-    # 1. Load CIF Data
-    parser = pymatgen.io.cif.CifParser(cif_path)
-    cif_dict = parser.as_dict()
-    # CIF files can contain multiple blocks, usually we care about the first one
-    block_name = list(cif_dict.keys())[0]
-    data = cif_dict[block_name]
-
-    # Helper to clean value strings (remove parens like '0.0123(4)')
-    def clean_val(val_str: str) -> float:
-        if '(' in val_str:
-            val_str = val_str.split('(')[0]
-        return float(val_str)
-
-    # 2. Extract Representative Atom Data
-    # Identify labels and ADPs
+    # 1. Load CIF Data via gemmi
     try:
-        labels = data["_atom_site_aniso_label"]
-        U11 = [clean_val(x) for x in data["_atom_site_aniso_U_11"]]
-        U22 = [clean_val(x) for x in data["_atom_site_aniso_U_22"]]
-        U33 = [clean_val(x) for x in data["_atom_site_aniso_U_33"]]
-        U23 = [clean_val(x) for x in data["_atom_site_aniso_U_23"]]
-        U13 = [clean_val(x) for x in data["_atom_site_aniso_U_13"]]
-        U12 = [clean_val(x) for x in data["_atom_site_aniso_U_12"]]
-    except KeyError as e:
-        print(f"FAILED: Missing ADP data in CIF - {e}")
+        doc = gemmi.cif.read_file(cif_path)
+        block = doc.sole_block()
+        small_structure = gemmi.make_small_structure_from_block(block)
+    except Exception as e:
+        print(f"FAILED: Could not read CIF - {e}")
         return False
 
-    # Map label to U_cif tensor
-    # Note: CIF ADPs are typically given in the order: U11, U22, U33, U23, U13, U12
-    # The matrix is symmetric.
-    u_cif_map = {}
-    for i, label in enumerate(labels):
-        u_mat = np.array([
-            [U11[i], U12[i], U13[i]],
-            [U12[i], U22[i], U23[i]],
-            [U13[i], U23[i], U33[i]]
-        ])
-        u_cif_map[label] = u_mat
-
-    # Extract fractional coords of representative atoms to match with symmetry
-    site_labels = data["_atom_site_label"]
-    site_fract_x = [clean_val(x) for x in data["_atom_site_fract_x"]]
-    site_fract_y = [clean_val(x) for x in data["_atom_site_fract_y"]]
-    site_fract_z = [clean_val(x) for x in data["_atom_site_fract_z"]]
-    
+    # 2. Extract Representative Atom Data and ADPs
     rep_sites = {}
-    for i, label in enumerate(site_labels):
-        rep_sites[label] = np.array([site_fract_x[i], site_fract_y[i], site_fract_z[i]])
+    u_cif_map = {}
+    for site in small_structure.sites:
+        rep_sites[site.label] = np.array([site.fract.x, site.fract.y, site.fract.z])
+        if site.aniso.nonzero():
+            u_cif_map[site.label] = np.array(site.aniso.as_mat33().tolist())
+
+    if not u_cif_map:
+        print(f"FAILED: Missing ADP data in CIF - {cif_path}")
+        return False
 
     # 3. Construct Transformation Matrix (CIF to Cartesian)
     # Reconstruct lattice from original structure (assuming it matches CIF)
@@ -91,6 +63,7 @@ def verify_adps_roundtrip(
     
     lattice = original_structure.lattice
     A = lattice.matrix.T # Pymatgen lattice.matrix is row vectors, take transpose for columns
+    A_inv = np.linalg.inv(A)
     
     # Reciprocal lattice vectors (crystallographic definition without 2pi)
     # B = inv(A).T. For pymatgen, lattice.reciprocal_lattice.matrix is also row vectors.
@@ -153,7 +126,7 @@ def verify_adps_roundtrip(
                     
                     # 3. Rotate to current atom frame
                     # U_site = R @ U_rep @ R.T
-                    R = op.rotation_matrix
+                    R = A @ op.rotation_matrix @ A_inv
                     U_cart_site = R @ U_cart_rep @ R.T
                     
                     reconstructed_adps[i] = U_cart_site

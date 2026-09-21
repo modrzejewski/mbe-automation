@@ -922,7 +922,7 @@ def thermal_displacements(
 
 def symmetrize_adps(
         structure: pymatgen.core.Structure,
-        adps: npt.NDArray[np.float64],
+        adps_cart: npt.NDArray[np.float64],
         symprec: float = SYMMETRY_TOLERANCE_STRICT
 ):
     """
@@ -930,7 +930,7 @@ def symmetrize_adps(
     
     Args:
         structure: A pymatgen.core.Structure object
-        adps: Numpy array (N_atoms, 3, 3) containing raw ADPs
+        adps_cart: Numpy array (N_atoms, 3, 3) containing raw Cartesian ADPs
         symprec: Symmetry precision
         
     Returns:
@@ -939,7 +939,9 @@ def symmetrize_adps(
     sga = SpacegroupAnalyzer(structure, symprec=symprec)
     symmetrized_structure = sga.get_symmetrized_structure()
     
-    adps_final = np.zeros_like(adps)
+    adps_final = np.zeros_like(adps_cart)
+    basis_cart = structure.lattice.matrix.T
+    basis_cart_inv = np.linalg.inv(basis_cart)
     
     # Iterate over groups of equivalent atoms (Wyckoff positions)
     # equivalent_indices is a list of lists, e.g. [[0, 1], [2, 3, 4, 5]]
@@ -949,19 +951,18 @@ def symmetrize_adps(
         ref_index = group_indices[0]
         ref_site = structure[ref_index]
         
-        # Container for tensors transformed to the representative's frame
+        # Containers for rotation matrices and tensors transformed to the representative's frame
         rotated_tensors = []
+        rotation_matrices = {}
         
         # 2. Transform all tensors to the representative's reference frame
         for idx in group_indices:
             target_site = structure[idx]
-            original_tensor = adps[idx]
+            original_tensor = adps_cart[idx]
             
-            # Find the symmetry operation R that maps ref_site -> target_site
-            # Pymatgen does not provide this directly for a pair of atoms, so we search in the group operations:
+            # Find the symmetry operation that maps ref_site -> target_site
             op = None
             for symm_op in sga.get_symmetry_operations():
-                # Check if this operation maps the representative to the target
                 transformed_coords = symm_op.operate(ref_site.frac_coords)
                 if np.allclose(structure.lattice.get_distance_and_image(
                         transformed_coords,
@@ -973,38 +974,20 @@ def symmetrize_adps(
             if op is None:
                 raise ValueError(f"No symmetry operation found between atom {ref_index} and {idx}")
             
-            # R is the rotation matrix (Cartesian part of the operation)
-            R = op.rotation_matrix
+            # Convert rotation matrix to Cartesian basis
+            R = basis_cart @ op.rotation_matrix @ basis_cart_inv
+            rotation_matrices[idx] = R
             
-            # Rotate the tensor back: U_ref = R.T @ U_target @ R
-            # (R.T is the inverse for orthogonal matrices)
+            # Rotate tensor back: U_ref = R.T @ U_target @ R
             U_rotated_back = R.T @ original_tensor @ R
             rotated_tensors.append(U_rotated_back)
             
         # 3. Compute the average in the representative's frame
-        # np.mean is safe here because all are "oriented" the same way
         U_avg_ref = np.mean(rotated_tensors, axis=0)
         
         # 4. Propagate the average back to all atoms in the group
         for idx in group_indices:
-            # We need to find the same operation R again (could be optimized by caching R above)
-            op = None
-            target_site = structure[idx]
-            for symm_op in sga.get_symmetry_operations():
-                transformed_coords = symm_op.operate(ref_site.frac_coords)
-                if np.allclose(structure.lattice.get_distance_and_image(
-                        transformed_coords,
-                        target_site.frac_coords
-                )[0], 0, atol=symprec):
-                    op = symm_op
-                    break
-            
-            if op is None:
-                raise ValueError(f"No symmetry operation found between atom {ref_index} and {idx}")
-
-            R = op.rotation_matrix
-
-            # Rotate the average to the target position: U_target = R @ U_avg_ref @ R.T
+            R = rotation_matrices[idx]
             adps_final[idx] = R @ U_avg_ref @ R.T
             
     return adps_final

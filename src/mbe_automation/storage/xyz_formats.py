@@ -266,9 +266,16 @@ def _to_cif_with_adps(
     if adps_cif is not None:
         if symprec is not None:
             #
-            # Compute averaged ADPs for symmetry-equivalent atoms
-            #        
-            adps_to_use = symmetrize_adps(struct, adps_cif, symprec=symprec)
+            # Compute averaged ADPs for symmetry-equivalent atoms in Cartesian frame
+            #
+            A = struct.lattice.matrix.T
+            N_diag = [np.linalg.norm(vrec) for vrec in np.linalg.inv(A)]
+            AN = A @ np.diag(N_diag)
+            AN_inv = np.linalg.inv(AN)
+
+            adps_cart = np.array([AN @ u @ AN.T for u in adps_cif])
+            adps_cart_symm = symmetrize_adps(struct, adps_cart, symprec=symprec)
+            adps_to_use = np.array([AN_inv @ u @ AN_inv.T for u in adps_cart_symm])
         else:
             adps_to_use = adps_cif
 
