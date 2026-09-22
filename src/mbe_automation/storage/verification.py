@@ -31,15 +31,13 @@ def verify_adps_roundtrip(
     Returns:
         True if verification passes, False otherwise (prints details).
     """
-    print(f"Verifying CIF roundtrip: {cif_path}")
-
     # 1. Load CIF Data via gemmi
     try:
         doc = gemmi.cif.read_file(cif_path)
         block = doc.sole_block()
         small_structure = gemmi.make_small_structure_from_block(block)
     except Exception as e:
-        print(f"FAILED: Could not read CIF - {e}")
+        print(f"CIF roundtrip failed: could not read CIF - {e}")
         return False
 
     # 2. Extract Representative Atom Data and ADPs
@@ -51,7 +49,7 @@ def verify_adps_roundtrip(
             u_cif_map[site.label] = np.array(site.aniso.as_mat33().tolist())
 
     if not u_cif_map:
-        print(f"FAILED: Missing ADP data in CIF - {cif_path}")
+        print(f"CIF roundtrip failed: missing ADP data in CIF - {cif_path}")
         return False
 
     # 3. Construct Transformation Matrix (CIF to Cartesian)
@@ -136,7 +134,7 @@ def verify_adps_roundtrip(
                 break
         
         if not found:
-            print(f"FAILED: Could not find symmetry mapping for atom {i} ({site.species})")
+            print(f"CIF roundtrip failed: could not find symmetry mapping for atom {i} ({site.species})")
             return False
 
         diff = np.abs(reconstructed_adps[i] - expected_adps[i])
@@ -144,11 +142,10 @@ def verify_adps_roundtrip(
         errors.append(max_diff)
 
     max_error_total = np.max(errors)
-    print(f"Max ADP deviation: {max_error_total:.6e}")
 
     if max_error_total > atol_adp:
-        print("FAILED: ADP mismatch exceeds tolerance.")
+        print(f"CIF roundtrip failed (max deviation {max_error_total:.1e})")
         return False
 
-    print("SUCCESS: CIF roundtrip verification passed.")
+    print(f"CIF roundtrip passed (max deviation {max_error_total:.1e})")
     return True
