@@ -263,6 +263,8 @@ Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 | `verbose` | Verbosity of the program's output. `0` suppresses warnings. | `0` |
 | `save_plots` | If `True`, save plots of the simulation results. | `True` |
 | `save_csv` | If `True`, save CSV files of the simulation results. | `True` |
+| `save_adps` | If `True`, compute atomic displacement parameters and save them to a CIF file. | `False` |
+| `adps_k_point_mesh` | The k-points mesh used for sampling the Brillouin zone when computing atomic displacement parameters. | `50.0` |
 
 ### MoleculeRef
 

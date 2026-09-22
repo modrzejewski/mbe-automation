@@ -101,9 +101,11 @@ class MolecularComposition(_MolecularComposition):
             assert_identical_composition: bool = False,
             bonding_algo: NearNeighbors | None = None,
             match_mode: Literal["energy_only", "rmsd_only", "combined"] = "energy_only",
+            cif_block: str | None = None,
     ) -> MolecularComposition:
         crystal = Structure.from_file(
             read_path=file_path,
+            cif_block=cif_block,
         )
         return cls(
             crystal=crystal,
@@ -698,6 +700,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
                 "no_transformation"
             ] = "to_symmetrized_primitive_cell",
             symprec: float = SYMMETRY_TOLERANCE_LOOSE,
+            cif_block: str | None = None,
     ):
         """
         Read a structure from a coordinate file.
@@ -706,6 +709,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             read_path: Path to the coordinate file.
             transform: Symmetrization applied to the periodic structure.
             symprec: Tolerance used for symmetry detection (in Å).
+            cif_block: Optional name of the CIF data block to read.
 
         Returns:
             Structure object.
@@ -714,6 +718,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             read_path=read_path,
             transform=transform,
             symprec=symprec,
+            cif_block=cif_block,
         )
         return cls(**vars(mbe_automation.storage.from_ase_atoms(ase_atoms)))
 
@@ -1985,9 +1990,9 @@ def _to_cif_file(
         from mbe_automation.storage.verification import verify_adps_roundtrip
         verify_adps_roundtrip(
             cif_path=save_path,
-            original_structure=force_constants.primitive,
+            original_structure=force_constants.primitive.to_pymatgen(),
             thermal_displacements=disp,
-            temperature_idx=0
+            temperature_idx=0,
         )
 
 @dataclass(kw_only=True)

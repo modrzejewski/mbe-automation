@@ -35,19 +35,41 @@ def _read_cif_pymatgen(filepath: str | Path) -> pymatgen.core.Structure:
     return structures[0]
 
 def _read_cif_gemmi(
-        filepath: str | Path
-    ) -> pymatgen.core.Structure:
+        filepath: str | Path,
+        cif_block: str | None = None,
+) -> pymatgen.core.Structure:
     """
     Read periodic structure and expand asymmetric unit to P1 unit cell.
     
     Args:
         filepath: Path to the structure file.
+        cif_block: Optional name of the CIF data block to read. If None,
+            assumes the file contains a single data block.
         
     Returns:
         Periodic structure with expanded atomic positions.
     """
     document = gemmi.cif.read_file(str(filepath))
-    block = document.sole_block()
+
+    if cif_block is None:
+        try:
+            block = document.sole_block()
+        except RuntimeError:
+            available = [b.name for b in document]
+            raise ValueError(
+                f"CIF file \"{filepath}\" contains multiple data blocks: {available}. "
+                f"Please define 'cif_block' to select the desired block (e.g., cif_block=\"{available[0]}\")."
+            )
+    else:
+        try:
+            block = document[cif_block]
+        except KeyError:
+            available = [b.name for b in document]
+            raise KeyError(
+                f"Block \"{cif_block}\" not found in CIF file \"{filepath}\". "
+                f"Available blocks: {available}."
+            )
+
     asymmetric_unit = gemmi.make_small_structure_from_block(block)
     
     unit_cell_sites = asymmetric_unit.get_all_unit_cell_sites()
@@ -82,11 +104,17 @@ def _read_cif_gemmi(
 
 def _read_cif(
     filepath: str | Path,
-    backend: Literal["gemmi", "pymatgen"] = "gemmi"
+    backend: Literal["gemmi", "pymatgen"] = "gemmi",
+    cif_block: str | None = None,
 ):
     if backend == "gemmi":
-        return _read_cif_gemmi(filepath)
+        return _read_cif_gemmi(filepath, cif_block=cif_block)
     elif backend == "pymatgen":
+        if cif_block is not None:
+            raise NotImplementedError(
+                "Specifying 'cif_block' is not supported with the 'pymatgen' backend. "
+                "Use the default 'gemmi' backend instead."
+            )
         return _read_cif_pymatgen(filepath)
     else:
         raise ValueError("Invalid backend requested in _read_cif.")        
@@ -238,9 +266,16 @@ def _to_cif_with_adps(
     if adps_cif is not None:
         if symprec is not None:
             #
-            # Compute averaged ADPs for symmetry-equivalent atoms
-            #        
-            adps_to_use = symmetrize_adps(struct, adps_cif, symprec=symprec)
+            # Compute averaged ADPs for symmetry-equivalent atoms in Cartesian frame
+            #
+            A = struct.lattice.matrix.T
+            N_diag = [np.linalg.norm(vrec) for vrec in np.linalg.inv(A)]
+            AN = A @ np.diag(N_diag)
+            AN_inv = np.linalg.inv(AN)
+
+            adps_cart = np.array([AN @ u @ AN.T for u in adps_cif])
+            adps_cart_symm = symmetrize_adps(struct, adps_cart, symprec=symprec)
+            adps_to_use = np.array([AN_inv @ u @ AN_inv.T for u in adps_cart_symm])
         else:
             adps_to_use = adps_cif
 
@@ -292,7 +327,8 @@ def from_file(
             "no_transformation"
         ] = "to_symmetrized_primitive_cell",
         symprec: float = SYMMETRY_TOLERANCE_LOOSE,
-        cif_backend: Literal["gemmi", "pymatgen"] = "gemmi"
+        cif_backend: Literal["gemmi", "pymatgen"] = "gemmi",
+        cif_block: str | None = None,
 ) -> ase.Atoms:
 
     read_path = Path(read_path).expanduser()
@@ -303,7 +339,11 @@ def from_file(
     ])
 
     if read_path.suffix.lower() == ".cif":
-        structure = _read_cif(read_path, backend=cif_backend)
+        structure = _read_cif(
+            read_path,
+            backend=cif_backend,
+            cif_block=cif_block,
+        )
         system = pymatgen.io.ase.AseAtomsAdaptor.get_atoms(structure)
     else:
         system = ase.io.read(read_path)
