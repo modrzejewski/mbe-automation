@@ -335,6 +335,8 @@ For a detailed discussion of performance considerations, see the [Computational 
 
 The workflow can compute harmonic anisotropic displacement parameters (ADPs, $U^{ij}$) and export them directly to a CIF file formatted with `_atom_site_aniso_*` tags, saved under `adps/` in the working directory (e.g., `adps/crystal[opt:atoms].cif`).
 
+To enable ADP calculation, set `save_adps=True` in `FreeEnergy`. The Brillouin zone sampling is controlled by `adps_k_point_mesh`, which defines a supercell radius cutoff in Å (default: `50.0`).
+
 ```python
 import numpy as np
 from mbe_automation import Structure
@@ -357,6 +359,7 @@ config = FreeEnergy(
     thermal_expansion=False,
     relaxation=relaxation_config,
     save_adps=True,
+    adps_k_point_mesh=100.0,
 )
 
 mbe_automation.run(config)
