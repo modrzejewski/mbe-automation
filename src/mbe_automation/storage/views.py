@@ -1,15 +1,16 @@
 from __future__ import annotations
 import io
-import contextlib
 from typing import overload
 from functools import singledispatch
 import numpy as np
+import numpy.typing as npt
 import h5py
 import ase
 import ase.io.trajectory
 import dynasor
 import phonopy
 import pymatgen
+import scipy.spatial
 
 from phonopy.structure.atoms import PhonopyAtoms
 
@@ -344,6 +345,79 @@ def to_dynasor_mode_projector(
     return mp
 
 
+def _align_force_constants_to_supercell(
+    force_constants: npt.NDArray[np.float64],
+    source_positions: npt.NDArray[np.float64],
+    target_positions: npt.NDArray[np.float64],
+    cell: npt.NDArray[np.float64],
+    tolerance: float = 1e-4,
+) -> npt.NDArray[np.float64]:
+    """Permute a force constants tensor to match target supercell atom ordering.
+
+    Parameters
+    ----------
+    force_constants : ndarray of shape (N, N, 3, 3)
+        Force constants matrix corresponding to source_positions.
+    source_positions : ndarray of shape (N, 3)
+        Cartesian positions of atoms corresponding to force_constants.
+    target_positions : ndarray of shape (N, 3)
+        Cartesian positions of atoms in the target (Phonopy) supercell.
+    cell : ndarray of shape (3, 3)
+        Lattice vectors of the supercell for periodic boundary folding.
+    tolerance : float, default=1e-4
+        Maximum allowed distance (in Angstroms) between matched atom positions.
+
+    Returns
+    -------
+    ndarray of shape (N, N, 3, 3)
+        Force constants permuted so that row and column indices match target_positions.
+
+    Raises
+    ------
+    ValueError
+        If atom counts differ, if the position mapping is not bijective,
+        or if any matched atom distance exceeds tolerance.
+    """
+    if len(source_positions) != len(target_positions):
+        raise ValueError(
+            f"Atom count mismatch: source has {len(source_positions)} atoms, "
+            f"target has {len(target_positions)} atoms."
+        )
+
+    if np.allclose(target_positions, source_positions, atol=tolerance):
+        return force_constants
+
+    inv_cell = np.linalg.inv(cell)
+
+    def _fold(positions: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        scaled = positions @ inv_cell
+        scaled = scaled - np.floor(np.round(scaled, 8))
+        scaled[np.isclose(scaled, 1.0, atol=1e-6)] = 0.0
+        scaled[np.isclose(scaled, 0.0, atol=1e-6)] = 0.0
+        return scaled @ cell
+
+    source_search = _fold(source_positions)
+    target_search = _fold(target_positions)
+
+    tree = scipy.spatial.KDTree(source_search)
+    distances, permutation = tree.query(target_search)
+
+    max_distance = np.max(distances)
+    if max_distance > tolerance:
+        raise ValueError(
+            f"Target supercell positions do not match source supercell within tolerance "
+            f"(max distance = {max_distance:.6e} Å > tolerance = {tolerance:.6e} Å)."
+        )
+
+    if len(np.unique(permutation)) != len(permutation):
+        raise ValueError(
+            "Mapping between target and source supercell positions is not bijective. "
+            "Duplicate matches detected."
+        )
+
+    return force_constants[np.ix_(permutation, permutation)]
+
+
 @overload
 def to_phonopy(
     force_constants: core.ForceConstants
@@ -388,9 +462,16 @@ def to_phonopy(
     )
     ph = phonopy.Phonopy(
         unitcell=primitive_ph,
-        supercell_matrix=fc_data.supercell_matrix
+        supercell_matrix=fc_data.supercell_matrix,
+        primitive_matrix=np.eye(3),
     )
-    ph.force_constants = fc_data.force_constants
+
+    ph.force_constants = _align_force_constants_to_supercell(
+        force_constants=fc_data.force_constants,
+        source_positions=fc_data.supercell.positions,
+        target_positions=ph.supercell.positions,
+        cell=ph.supercell.cell,
+    )
 
     return ph
 
