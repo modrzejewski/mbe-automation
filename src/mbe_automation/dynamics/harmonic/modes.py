@@ -97,24 +97,67 @@ class ThermalDisplacements:
     mean_square_displacements_matrix_full: npt.NDArray[np.float64]
     instantaneous_displacements: npt.NDArray[np.float64] | None
 
+def _primitive_to_conventional(
+    phonopy_object: phonopy.Phonopy,
+    symprec: float = SYMMETRY_TOLERANCE_STRICT,
+) -> npt.NDArray[np.float64]:
+    """
+    Compute reciprocal space transformation matrix from conventional to primitive cell.
+
+    Args:
+        phonopy_object: Initialized Phonopy instance.
+        symprec: Symmetry tolerance for space group detection. Defaults to SYMMETRY_TOLERANCE_STRICT.
+
+    Returns:
+        trans_conv_to_prim: (3, 3) Transformation matrix mapping fractional
+            coordinates from conventional to primitive reciprocal basis:
+            q_prim = q_conv @ trans_conv_to_prim
+    """
+    primitive = phonopy_object.primitive
+    cell_conv, _, _ = mbe_automation.structure.crystal.to_symmetrized_conventional_cell(
+        cell_vectors=primitive.cell,
+        atomic_numbers=primitive.numbers,
+        scaled_positions=primitive.scaled_positions,
+        symprec=symprec,
+    )
+    B_conv = 2 * np.pi * np.linalg.inv(cell_conv).T
+    B_prim = 2 * np.pi * np.linalg.inv(primitive.cell).T
+    return B_conv @ np.linalg.inv(B_prim)
+
+
 def at_k_point(
     phonopy_object: phonopy.Phonopy,
     k_point: npt.NDArray[np.float64],
     symmetrize_Dq: bool = False,
-    symprec: float = 1e-5,
+    symprec: float = SYMMETRY_TOLERANCE_STRICT,
+    frac_coords_frame: Literal["primitive", "conventional"] = "primitive",
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
     """
     Compute phonon frequencies and eigenvectors at a specified k-point.
         
     Args:
-    phonopy_object: Phonopy object.
-    k_point: The k-point coordinates in reciprocal space (fractional coordinates).
+        phonopy_object: Phonopy object.
+        k_point: The k-point coordinates in reciprocal space (fractional coordinates).
+        symmetrize_Dq: Whether to symmetrize the dynamical matrix using crystal symmetry.
+        symprec: Symmetry tolerance. Defaults to SYMMETRY_TOLERANCE_STRICT.
+        frac_coords_frame: Reference reciprocal frame for k_point ("primitive" or "conventional").
+
     Returns:
-    A tuple containing:
-    - frequencies (in THz)
-    - eigenvectors (n_modes, n_modes) stored as columns. The column v[:, i] is the
-      normalized eigenvector corresponding to the eigenvalue w[i].
+        A tuple containing:
+        - frequencies (in THz)
+        - eigenvectors (n_modes, n_modes) stored as columns. The column v[:, i] is the
+          normalized eigenvector corresponding to the eigenvalue w[i].
     """
+    k_point = np.asarray(k_point, dtype=np.float64)
+    if frac_coords_frame == "conventional":
+        transf = _primitive_to_conventional(phonopy_object, symprec=symprec)
+        k_point = k_point @ transf
+    elif frac_coords_frame != "primitive":
+        raise ValueError(
+            f"Unknown frac_coords_frame: '{frac_coords_frame}'. "
+            f"Must be either 'primitive' or 'conventional'."
+        )
+
     if symmetrize_Dq:
         D = symmetrized_dynamical_matrix(phonopy_object, k_point, tolerance=symprec)
     else:
@@ -135,7 +178,8 @@ def at_k_points(
     freq_units: Literal["THz", "invcm"] = "THz",
     eigenvectors_storage: Literal["columns", "rows"] = "columns",
     symmetrize_Dq: bool = False,
-    symprec: float = 1e-5,
+    symprec: float = SYMMETRY_TOLERANCE_STRICT,
+    frac_coords_frame: Literal["primitive", "conventional"] = "primitive",
 ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128] | None]:
     """
     Compute phonon frequencies and optionally eigenvectors at specified k-points.
@@ -151,6 +195,9 @@ def at_k_points(
             - "rows": Eigenvectors are stored in rows (n_kpoints, n_bands, n_bands).
               v[k, i, :] is the eigenvector for the i-th band at k-point k.
             Default is "columns".
+        symmetrize_Dq: Whether to symmetrize dynamical matrix by space group.
+        symprec: Symmetry tolerance. Defaults to SYMMETRY_TOLERANCE_STRICT.
+        frac_coords_frame: Reference reciprocal frame for k_points ("primitive" or "conventional").
 
     Returns:
         A tuple containing:
@@ -158,6 +205,16 @@ def at_k_points(
         - eigenvectors: (n_kpoints, n_bands, n_bands) array of eigenvectors, or None 
           if compute_eigenvecs is False.
     """
+    k_points = np.asarray(k_points, dtype=np.float64)
+    if frac_coords_frame == "conventional":
+        transf = _primitive_to_conventional(phonopy_object, symprec=symprec)
+        k_points = k_points @ transf
+    elif frac_coords_frame != "primitive":
+        raise ValueError(
+            f"Unknown frac_coords_frame: '{frac_coords_frame}'. "
+            f"Must be either 'primitive' or 'conventional'."
+        )
+
     physical_units = phonopy.physical_units.get_physical_units()
     to_THz = physical_units.DefaultToTHz
     

@@ -283,12 +283,10 @@ class ForceConstants(_ForceConstants):
             self,
             k_points: npt.NDArray[np.float64] | list | None = None,
             eigenvectors_storage: Literal["columns", "rows"] = "columns",
-            track_bands: bool = False,
-            degenerate_freqs_tol_cm1: float = DEFAULT_DEGENERATE_FREQS_TOL,
-            delta_q: float = 0.05,
             symmetrize_Dq: bool = False,
-            symprec: float = 1e-5,
+            symprec: float = SYMMETRY_TOLERANCE_STRICT,
             freq_units: Literal["THz", "cm-1"] = "THz",
+            frac_coords_frame: Literal["primitive", "conventional"] = "primitive",
     ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.complex128]]:
         """
         Compute phonon frequencies and eigenvectors at specified k-points.
@@ -304,18 +302,13 @@ class ForceConstants(_ForceConstants):
                 - "rows": v[i, :] is the i-th eigenvector (for a single k-point)
                    or v[k, i, :] (for multiple k-points).
                 Default is "columns".
-            track_bands: Whether to track bands using non-adiabatic overlap.
-                If True, reorders frequencies and eigenvectors to follow band continuity.
-                Requires k_points to include Gamma [0, 0, 0].
-            degenerate_freqs_tol_cm1: Tolerance for detecting degenerate frequencies in cm⁻¹.
-                Used only when track_bands=True. This threshold is needed because the
-                band tracking algorithm needs to apply degenerate perturbation theory
-                when some of the frequencies form a degenerate subset.
-            delta_q: Displacement distance for perturbation theory in Å⁻¹
-                Used only when track_bands=True.
             symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
                 using crystal symmetry operations.
+            symprec: Symmetry tolerance for space group detection. Defaults to SYMMETRY_TOLERANCE_STRICT.
             freq_units: Units of output frequencies, "THz" or "cm-1".
+            frac_coords_frame: Reference reciprocal frame for fractional k-point coordinates:
+                - "primitive": Coordinates relative to primitive reciprocal vectors (default).
+                - "conventional": Coordinates relative to conventional reciprocal vectors.
  
         Returns:
             A tuple containing:
@@ -333,6 +326,7 @@ class ForceConstants(_ForceConstants):
                 k_point=k_points,
                 symmetrize_Dq=symmetrize_Dq,
                 symprec=symprec,
+                frac_coords_frame=frac_coords_frame,
             )
             if eigenvectors_storage == "rows":
                 evecs = evecs.T
@@ -345,30 +339,7 @@ class ForceConstants(_ForceConstants):
                 eigenvectors_storage=eigenvectors_storage,
                 symmetrize_Dq=symmetrize_Dq,
                 symprec=symprec,
-            )
-
-        if track_bands:
-            if k_points.ndim == 1 or (k_points.ndim == 2 and len(k_points) == 1):
-                raise ValueError("Band tracking requires multiple k-points, but only one was provided.")
-
-            gamma_indices = np.where(np.all(np.isclose(k_points, [0, 0, 0], atol=1e-5), axis=1))[0]
-            if len(gamma_indices) == 0:
-                raise ValueError("k_points must include the Gamma point [0, 0, 0] when track_bands=True.")
-            
-            band_indices = mbe_automation.dynamics.harmonic.bands.track_from_gamma(
-                phonopy_object=ph,
-                q_points=k_points,
-                degenerate_freqs_tol_cm1=degenerate_freqs_tol_cm1,
-                delta_q=delta_q,
-                symmetrize_Dq=symmetrize_Dq,
-                symprec=symprec,
-            )
-            
-            freqs, evecs = mbe_automation.dynamics.harmonic.bands.reorder(
-                band_indices=band_indices,
-                frequencies=freqs,
-                eigenvectors=evecs,
-                eigenvectors_storage=eigenvectors_storage,
+                frac_coords_frame=frac_coords_frame,
             )
 
         if freq_units == "cm-1":
