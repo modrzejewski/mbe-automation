@@ -273,6 +273,8 @@ def test_dhmt_bcc_boundary_points_degeneracies():
 def test_dynamical_matrix_symmetry_and_covariance_hcp_cu(ph_hcp_cu):
     """Verify dynamical matrix space-group covariance and little-group invariance.
 
+    Adapted from the sonar program written by Paul Niklas Ruth.
+
     For HCP Cu with EMT potential, evaluates at commensurate wavevectors with
     complex Bloch phases away from Gamma:
       1. Little-group symmetrization identity: P_{G_q}[D(q)] == D(q)
