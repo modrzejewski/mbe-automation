@@ -166,7 +166,7 @@ Second order force constants and associated physical quantities used to compute 
 
 #### Methods
 *   **`read` / `save`**: Load from or save to a dataset file.
-*   **`frequencies_and_eigenvectors`**: Calculates phonon frequencies and eigenvectors at specific k-points (provided as list or numpy array, defaults to Gamma point). Supports band tracking via `track_bands=True` and dynamical matrix symmetrization via `symmetrize_Dq=True`.
+*   **`frequencies_and_eigenvectors`**: Calculates phonon frequencies and eigenvectors at specific k-points (provided as list or numpy array, defaults to Gamma point). Supports coordinate frame selection via `frac_coords_frame="conventional"` or `"primitive"` and dynamical matrix symmetrization via `symmetrize_Dq=True`.
 *   **`k_point_grid`**: Generates a k-point mesh for the system.
 *   **`to_phonopy`**: Converts the object to a Phonopy object.
 *   **`thermal_displacements`**: Computes thermal displacement properties (ADPs).
