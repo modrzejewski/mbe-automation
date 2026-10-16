@@ -8,12 +8,6 @@ import phonopy
 import pymatgen.core
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from ase.calculators.calculator import Calculator as ASECalculator
-try:
-    from mace.calculators import MACECalculator
-    mace_available = True
-except ImportError:
-    MACECalculator = None
-    mace_available = False
 
 try:
     from mbe_automation.dynamics.harmonic.bands import track_from_gamma, reorder
@@ -507,7 +501,7 @@ def _absolute_amplitude_eq_2(
 
 def _to_cif(
         U_cart: npt.NDArray[np.float64],
-        lattice_vectors=npt.NDArray[np.float64] # lattice vectors stored in columns
+        lattice_vectors: npt.NDArray[np.float64], # lattice vectors stored in columns
 ):
     """
     Convert the mean square displacement matrix U(k) to the CIF format.

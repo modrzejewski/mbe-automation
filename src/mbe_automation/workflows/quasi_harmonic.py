@@ -18,7 +18,7 @@ import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.structure.clusters
 
-from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
+from mbe_automation.calculators.uma import FAIRChemCalculator, _UMA_AVAILABLE
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, thermal_displacements
 from mbe_automation.storage.verification import verify_adps_roundtrip
 
@@ -452,9 +452,11 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     )
     unit_cell = config.crystal.copy()
 
-    if _MACE_AVAILABLE:
-        if isinstance(config.calculator, MACECalculator):
-            mbe_automation.common.display.mace_summary(config.calculator)
+    if _UMA_AVAILABLE:
+        if isinstance(config.calculator, FAIRChemCalculator):
+            mbe_automation.common.display.uma_summary(
+                calculator=config.calculator,
+            )
 
     mbe_automation.storage.save_structure(
         structure=mbe_automation.storage.from_ase_atoms(config.crystal),
