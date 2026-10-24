@@ -45,53 +45,6 @@ class MoleculeRef:
 
 
 @dataclass(kw_only=True)
-class CumulativeEntropy:
-    """
-    Configuration for evaluating the cumulative vibrational entropy function T*S(nu)
-    on an equidistant frequency grid during quasi-harmonic or harmonic workflows.
-    """
-    k_point_mesh: npt.NDArray[np.integer] | Literal["gamma"] | float | None = None
-    frequency_step_cm1: float = 1.0
-    center_at_gamma: bool = False
-    use_mesh_symmetry: bool = True
-    symmetrize_Dq: bool = True
-    symprec: float = 1.0E-5
-    save_csv: bool = True
-    save_plot: bool = True
-    freq_max_cm1: float | None = None
-
-    def __post_init__(self):
-        if self.frequency_step_cm1 <= 0.0:
-            raise ValueError(
-                f"CumulativeEntropy.frequency_step_cm1 must be positive, "
-                f"got {self.frequency_step_cm1}."
-            )
-        if isinstance(self.k_point_mesh, (list, np.ndarray)):
-            mesh = np.asarray(self.k_point_mesh, dtype=np.int64)
-            if mesh.shape != (3,) or np.any(mesh <= 0):
-                raise ValueError(
-                    f"CumulativeEntropy.k_point_mesh array must have shape (3,) "
-                    f"with positive integers, got {self.k_point_mesh}."
-                )
-            self.k_point_mesh = mesh
-        elif self.k_point_mesh is not None and not (
-            isinstance(self.k_point_mesh, (float, int, np.floating, np.integer))
-            or self.k_point_mesh == "gamma"
-        ):
-            raise TypeError(
-                f"CumulativeEntropy.k_point_mesh must be a float, array of 3 ints, "
-                f"\"gamma\", or None, got {type(self.k_point_mesh).__name__}."
-            )
-        if isinstance(self.k_point_mesh, (int, np.integer)) and not isinstance(self.k_point_mesh, bool):
-            self.k_point_mesh = float(self.k_point_mesh)
-        if self.freq_max_cm1 is not None and self.freq_max_cm1 <= 0.0:
-            raise ValueError(
-                f"CumulativeEntropy.freq_max_cm1 must be positive, "
-                f"got {self.freq_max_cm1}."
-            )
-
-
-@dataclass(kw_only=True)
 class FreeEnergy:
     """
     Default parameters for free energy calculations
@@ -395,7 +348,6 @@ class FreeEnergy:
     save_csv: bool = True
     save_adps: bool = False
     adps_k_point_mesh: npt.NDArray[np.integer] | Literal["gamma"] | float = 50.0
-    cumulative_entropy: CumulativeEntropy | None = None
 
     def __post_init__(self):
         import mbe_automation.dynamics.harmonic.eos

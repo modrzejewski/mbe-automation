@@ -7,7 +7,7 @@ platforms = ["linux-64"]
 [dependencies]
 python = ">=3.11"
 
-# --- Distilled from nomore-ase ---
+# --- Distilled from nomore-ase (Base & Mace Env) ---
 numpy = "==2.3.3"
 spglib = "==2.6.0"
 gcc = ">=15.2.0,<15.3"
@@ -19,7 +19,7 @@ mypy = "*"
 pytest = "*"
 
 # --- Distilled from mbe-automation (Mapped to Conda) ---
-pytorch = ">=2.8.0"
+pytorch = "==2.9.1"
 scipy = "==1.16.2"
 pandas = "*"
 ase = ">=3.26.0"
@@ -47,7 +47,8 @@ mbe-automation = { path = ".", editable = true }
 nomore-ase = { path = "src/nomore_ase", editable = true }
 pyscf = ">=2.12.0"
 pyscf-dispersion = "*"
-fairchem-core = ">=2.19.0"
+mace-torch = { path = "src/mace" }
+graph-longrange = { path = "src/graph_electrostatics" }
 irmsd = "==0.1.1"
 
 # --- Feature: GPU CUDA 12 ---

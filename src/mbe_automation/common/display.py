@@ -11,11 +11,11 @@ from pathlib import Path
 import numpy as np
 
 try:
-    from fairchem.core import FAIRChemCalculator
-    _UMA_AVAILABLE = True
+    from mace.calculators import MACECalculator
+    _MACE_AVAILABLE = True
 except ImportError:
-    FAIRChemCalculator = None  # type: ignore[assignment,misc]
-    _UMA_AVAILABLE = False
+    MACECalculator = None
+    _MACE_AVAILABLE = False
 
 class Progress:
     """Wrap an iterable to print progress updates.
@@ -254,57 +254,30 @@ def dotted_separator(n: int):
     print(separator)
 
 
-def uma_summary(
-    calculator: FAIRChemCalculator,
-) -> None:
+def mace_summary(calculator: MACECalculator) -> None:
     """
-    Print essential UMA model information.
-
+    Print essential MACE model information.
+    
     Args:
-        calculator: FAIRChemCalculator or UMA instance.
+        calculator: MACECalculator instance
     """
-    predictor = getattr(calculator, "predictor", None)
-    model = getattr(predictor, "model", None)
-    if model is not None:
-        total_params = sum(p.numel() for p in model.parameters())
-        dtype = (
-            str(next(model.parameters()).dtype)
-            if total_params > 0
-            else "unknown"
-        )
-        device = (
-            str(next(model.parameters()).device)
-            if total_params > 0
-            else str(getattr(calculator, "device", "unknown"))
-        )
-    else:
-        total_params = 0
-        dtype = "unknown"
-        device = str(getattr(calculator, "device", "unknown"))
-
-    model_path = getattr(calculator, "model_path", None)
-    if model_path is None and predictor is not None:
-        model_path = getattr(predictor, "_inference_model_path", None)
-
-    model_name = getattr(calculator, "model_name", None)
-    if model_name is None:
-        if model_path is not None:
-            model_name = Path(model_path).stem
-        else:
-            model_name = "N/A"
-
-    task_name = getattr(calculator, "task_name", "N/A")
+    
+    model = calculator.models[0]
+    total_params = sum(p.numel() for p in model.parameters())
+    dtype = str(next(model.parameters()).dtype) if total_params > 0 else 'unknown'
+    r_max = getattr(model, 'r_max', 'N/A')
+    num_interactions = getattr(model, 'num_interactions', 'N/A')
+    device = str(next(model.parameters()).device)
 
     framed([
         "Machine-learning interatomic potential",
-        "UMA",
+        "MACE"
     ])
-    print(f"model_name            {model_name}")
-    if model_path is not None:
-        print(f"model_path            {shorten_path(model_path)}")
-    print(f"task_name             {task_name}")
-    if total_params > 0:
-        print(f"total parameters      {total_params:,}")
+    print(f"r_max                 {r_max} Å")
+    print(f"num_interactions      {num_interactions}")
+    if r_max != "N/A" and num_interactions != "N/A":
+        print(f"receptive field       {r_max*num_interactions:.1f} Å")
+    print(f"total parameters      {total_params:,}")
     print(f"data type             {dtype}")
     print(f"device                {device}")
 

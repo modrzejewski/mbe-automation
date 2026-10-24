@@ -401,8 +401,6 @@ def phonons(
     for i, s in enumerate(supercells, 1):
         forces = forces_in_displaced_supercell(s, calculator)
         force_set.append(forces)
-        if cuda_available:
-            torch.cuda.empty_cache()
         progress = i * 100 // n_supercells
         if progress >= next_print:
             now = time.time()

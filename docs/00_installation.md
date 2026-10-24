@@ -1,8 +1,8 @@
 # Setup & Installation
 
 - [Quick Start: Most Frequent Scenarios](#quick-start-most-frequent-scenarios)
-  - [Scenario A: Install with UMA and PySCF on GPU](#scenario-a-install-with-uma-and-pyscf-on-gpu)
-  - [Scenario B: Install with Pixi](#scenario-b-install-with-pixi)
+  - [Scenario A: Install with MACE and PySCF on GPU](#scenario-a-install-with-mace-and-pyscf-on-gpu)
+  - [Scenario B: Install with UMA on GPU](#scenario-b-install-with-uma-on-gpu)
 - [Supported Backends](#supported-backends)
 
 ## Quick Start: Most Frequent Scenarios
@@ -13,7 +13,7 @@
 module load CUDA/12.8
 ```
 
-### Scenario A: Install with UMA and PySCF on GPU
+### Scenario A: Install with MACE and PySCF on GPU
 
 This is the recommended installation for full functionality on GPU-accelerated systems.
 
@@ -23,19 +23,24 @@ python3 -m venv ~/.virtualenvs/mbe_env
 source ~/.virtualenvs/mbe_env/bin/activate
 git clone https://github.com/modrzejewski/mbe-automation.git
 cd mbe-automation
-pip install --no-cache-dir -e ".[uma,gpu-cuda12]"
+pip install --no-cache-dir -e ".[mace,gpu-cuda12]"
 ```
 *(Note: If you are on a CUDA 11 system, replace `gpu-cuda12` with `gpu-cuda11`)*
 
 > **Note on Editable Mode**
 > The -e flag installs the package in editable mode, making source code changes immediately available. If dependencies in pyproject.toml change, re-run the installation command with the appropriate extras to update them.
 
-### Scenario B: Install with Pixi
+### Scenario B: Install with UMA on GPU
 
-To install the reproducible environment managed by Pixi (with `fairchem-core` and CUDA 12 dependencies):
+If you prefer using UMA instead of MACE. Note that as of April 12th, 2026, MACE and UMA cannot be installed in the same environment due to dependency conflicts.
 
 ```bash
-pixi install -e cuda12
+mkdir -p ~/.virtualenvs
+python3 -m venv ~/.virtualenvs/mbe_env
+source ~/.virtualenvs/mbe_env/bin/activate
+git clone https://github.com/modrzejewski/mbe-automation.git
+cd mbe-automation
+pip install --no-cache-dir -e ".[uma]"
 ```
 
 ## Supported Backends
@@ -44,6 +49,7 @@ The `mbe-automation` package supports several calculation methods. While some de
 
 | Method | Required Software/Library |
 | :--- | :--- |
+| MACE | `mace-torch` (Python package) |
 | UMA | `fairchem-core` (Python package) |
 | DFT† | `gpu4pyscf`, `pyscf` (Python packages) |
 | HF† | `gpu4pyscf`, `pyscf` (Python packages) |

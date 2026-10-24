@@ -8,7 +8,6 @@
 - [Adjustable parameters](#adjustable-parameters)
 - [Computational Bottlenecks](#computational-bottlenecks)
 - [Atomic Displacement Parameters (ADPs)](#atomic-displacement-parameters-adps)
-- [Cumulative Vibrational Entropy](#cumulative-vibrational-entropy)
 - [How to read the results](#how-to-read-the-results)
 - [Complete Input Files](#complete-input-files)
 
@@ -20,7 +19,7 @@ Setup involves importing necessary modules and defining the system's structures 
 
 ```python
 import numpy as np
-from mbe_automation.calculators import UMA
+from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
@@ -31,7 +30,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"  # or .xyz, POSCAR, etc.
 molecule_file = "path/to/your/molecule.xyz"
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+mace_calc = MACE(model_path="path/to/your/mace.model")
 ```
 
 ## Phonon calculation
@@ -49,7 +48,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 200.0, 300.0]),
-    calculator=uma_calc,
+    calculator=mace_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -88,7 +87,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file("polymorph_Zprime2.xyz"),
     molecule=Structure.from_file("molecule.xyz"),  # ONE reference
     temperatures_K=np.array([5.0, 200.0, 300.0]),
-    calculator=uma_calc,
+    calculator=mace_calc,
 )
 ```
 
@@ -122,7 +121,7 @@ properties_config = FreeEnergy(
         ),
     ],
     temperatures_K=np.array([5.0, 200.0, 300.0]),
-    calculator=uma_calc,
+    calculator=mace_calc,
 )
 ```
 
@@ -172,7 +171,7 @@ For the explicit forcing modes (`"linear"`, `"inverse_volume"`, `"rigid_shift"`)
 
 ```python
 import numpy as np
-from mbe_automation.calculators import UMA
+from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
@@ -184,7 +183,7 @@ from mbe_automation.configs.quasi_harmonic import EEC, FreeEnergy
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+mace_calc = MACE(model_path="path/to/your/mace.model")
 
 relaxation_config = Minimum(
     cell_relaxation="constant_volume",
@@ -195,7 +194,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
-    calculator=uma_calc,
+    calculator=mace_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -233,7 +232,7 @@ When high-level reference EOS parameters are available (e.g. from DFT or coupled
 
 ```python
 import numpy as np
-from mbe_automation.calculators import UMA
+from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
@@ -243,7 +242,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+mace_calc = MACE(model_path="path/to/your/mace.model")
 
 relaxation_config = Minimum(
     cell_relaxation="constant_volume",
@@ -260,7 +259,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
-    calculator=uma_calc,
+    calculator=mace_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -341,12 +340,12 @@ To enable ADP calculation, set `save_adps=True` in `FreeEnergy`. The Brillouin z
 ```python
 import numpy as np
 from mbe_automation import Structure
-from mbe_automation.calculators import UMA
+from mbe_automation.calculators import MACE
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
 from mbe_automation.configs.structure import Minimum
 import mbe_automation
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+mace_calc = MACE(model_path="path/to/your/model.model")
 
 relaxation_config = Minimum(
     cell_relaxation="only_atoms",
@@ -356,7 +355,7 @@ relaxation_config = Minimum(
 config = FreeEnergy(
     crystal=Structure.from_file("crystal.cif"),
     temperatures_K=np.array([100.0]),
-    calculator=uma_calc,
+    calculator=mace_calc,
     thermal_expansion=False,
     relaxation=relaxation_config,
     save_adps=True,
@@ -364,92 +363,6 @@ config = FreeEnergy(
 )
 
 mbe_automation.run(config)
-```
-
-## Cumulative Vibrational Entropy
-
-The cumulative vibrational entropy $T \cdot S(\nu)$ (in $\text{kJ}\cdot\text{mol}^{-1}\cdot\text{unit cell}^{-1}$) can be evaluated on an equidistant frequency grid (in $\text{cm}^{-1}$) either automatically during the `FreeEnergy` workflow or as a standalone postprocessing step from an existing HDF5 dataset.
-
-### Usage with `FreeEnergy`
-
-Configure a `CumulativeEntropy` object (similar to `Minimum`) and pass it to `FreeEnergy`. The Brillouin zone sampling (`k_point_mesh`) accepts either a Fourier interpolation supercell radius (`float`, in Å) or an explicit Monkhorst–Pack mesh (`np.array([N1, N2, N3])`).
-
-```python
-import numpy as np
-import mbe_automation
-from mbe_automation import Structure
-from mbe_automation.calculators import UMA
-from mbe_automation.configs.quasi_harmonic import FreeEnergy, CumulativeEntropy
-from mbe_automation.configs.structure import Minimum
-
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
-
-relaxation_config = Minimum(
-    cell_relaxation="only_atoms",
-    max_force_on_atom_eV_A=1.0E-4,
-)
-
-cumulative_entropy_config = CumulativeEntropy(
-    k_point_mesh=np.array([8, 8, 8]),  # or float (e.g. 150.0) for Fourier interpolation radius
-    frequency_step_cm1=1.0,
-    center_at_gamma=True,
-    use_mesh_symmetry=True,
-    symmetrize_Dq=True,
-    save_csv=True,
-    save_plot=True,
-)
-
-config = FreeEnergy(
-    crystal=Structure.from_file("crystal.cif"),
-    temperatures_K=np.array([300.0]),
-    calculator=uma_calc,
-    thermal_expansion=False,
-    relaxation=relaxation_config,
-    cumulative_entropy=cumulative_entropy_config,
-    dataset="qha.hdf5",
-)
-
-mbe_automation.run(config)
-```
-
-When enabled, the workflow stores the two-column table (`frequency (cm⁻¹)`, `TS (kJ∕mol∕unit cell)`) in the HDF5 dataset under `quasi_harmonic/phonons/cumulative_entropy/...` and exports the `.csv` and `.png` plot to `phonons/<crystal_label>/` in the working directory.
-
-### Standalone Usage from an HDF5 Dataset
-
-Because full `ForceConstants` are stored in the HDF5 file, $T \cdot S(\nu)$ can be computed at any temperature and reciprocal-space mesh without re-running electronic structure or MLIP calculations:
-
-```python
-import numpy as np
-from mbe_automation import CumulativeVibrationalEntropy, ForceConstants
-
-# Option 1: Directly from the HDF5 dataset (auto-detects the ForceConstants key)
-cum_entropy = CumulativeVibrationalEntropy.from_dataset(
-    dataset="qha.hdf5",
-    temperature_K=300.0,
-    k_point_mesh=150.0,                # or np.array([8, 8, 8])
-    frequency_step_cm1=1.0,
-    center_at_gamma=False,
-    use_mesh_symmetry=True,
-    symmetrize_Dq=True,
-    save_csv_path="cumulative_entropy_300K.csv",
-    save_plot_path="cumulative_entropy_300K.png",
-)
-
-# Option 2: From a ForceConstants instance
-fc = ForceConstants.read(
-    dataset="qha.hdf5",
-    key="quasi_harmonic/phonons/force_constants/crystal[opt:atoms]",
-)
-cum_entropy = fc.cumulative_entropy(
-    temperature_K=300.0,
-    k_point_mesh=np.array([10, 10, 10]),
-    frequency_step_cm1=1.0,
-    center_at_gamma=True,
-    use_mesh_symmetry=True,
-    symmetrize_Dq=True,
-    save_csv_path="cumulative_entropy_300K.csv",
-    save_plot_path="cumulative_entropy_300K.png",
-)
 ```
 
 ## How to read the results
@@ -545,7 +458,7 @@ mbe_automation.dynamics.harmonic.display.band_structure(
 
 ```python
 import numpy as np
-from mbe_automation.calculators import UMA
+from mbe_automation.calculators import MACE
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
@@ -555,7 +468,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+mace_calc = MACE(model_path="path/to/your/model.model")
 
 # Create custom relaxation settings (optional)
 relaxation_config = Minimum(
@@ -567,7 +480,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
-    calculator=uma_calc,
+    calculator=mace_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -588,7 +501,7 @@ mbe_automation.run(properties_config)
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="UMA"
+#SBATCH --job-name="MACE"
 #SBATCH -A pl0415-02
 #SBATCH --partition=tesla
 #SBATCH --nodes 1
