@@ -30,7 +30,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"  # or .xyz, POSCAR, etc.
 molecule_file = "path/to/your/molecule.xyz"
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 ```
 
 ## Phonon calculation
@@ -183,7 +183,7 @@ from mbe_automation.configs.quasi_harmonic import EEC, FreeEnergy
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 
 relaxation_config = Minimum(
     cell_relaxation="constant_volume",
@@ -242,7 +242,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 
 relaxation_config = Minimum(
     cell_relaxation="constant_volume",
@@ -345,7 +345,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 from mbe_automation.configs.structure import Minimum
 import mbe_automation
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 
 relaxation_config = Minimum(
     cell_relaxation="only_atoms",
@@ -468,7 +468,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 
 # Create custom relaxation settings (optional)
 relaxation_config = Minimum(

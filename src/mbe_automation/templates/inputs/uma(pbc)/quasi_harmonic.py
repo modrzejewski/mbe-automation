@@ -14,6 +14,8 @@ work_dir = os.path.abspath(os.path.dirname(__file__))
 # Meta's Universal Model for Atoms (UMA)
 # Select your specific task:
 # oc20: catalysis
+# oc22: oxide catalysis
+# oc25: solid-liquid catalysis
 # omat: inorganic materials
 # omol: molecules
 # odac: MOFs
@@ -22,6 +24,7 @@ work_dir = os.path.abspath(os.path.dirname(__file__))
 uma_calc = mbe_automation.calculators.UMA(
     model_path="{mlip_parameters}",
     task_name="omc",
+    inference_settings="nitro",
 )
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(

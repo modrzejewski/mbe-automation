@@ -464,16 +464,19 @@ The `mbe_automation.calculators` module provides interfaces to computational bac
 
 ### UMA
 
-🔗 [`mbe_automation.calculators.UMA`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/uma.py#L31)
+🔗 [`mbe_automation.calculators.UMA`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/uma.py#L84)
 
-Wraps the Universal Machine learning potential for Atomistic simulations (UMA) via `fairchem-core` with 64-bit precision (`torch.float64`), local checkpoint loading, and Ray actor serialization.
+Wraps the Universal Machine learning potential for Atomistic simulations (UMA) via `fairchem-core` with the UMA Nitro inference interface (`inference_settings="nitro"`), local checkpoint loading, and Ray actor serialization.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `model_path` | `str \| Path \| None` | `None` | Path to a local UMA `.pt` checkpoint file (e.g., `"uma-m-1p1.pt"`). |
-| `model_name` | `str` | `"uma-m-1p1"` | Pretrained UMA model identifier (used when `model_path` is `None`). |
+| `model_path` | `str \| Path \| None` | `None` | Path to a local UMA `.pt` checkpoint file (e.g., `"uma-s-1p2p1.pt"`, `"uma-s-1p2p1-ft-d4rev.pt"`, `"uma-s-1p2p1-ft-r2scan.pt"`, `"uma-s-1p2.pt"`, `"uma-m-1p1.pt"`). |
+| `model_name` | `str` | `"uma-s-1p2p1"` | Pretrained UMA model identifier (used when `model_path` is `None`). |
 | `device` | `str \| None` | `None` | Execution device (`"cuda"` or `"cpu"`). Auto-detected if `None`. |
-| `task_name` | `str` | `"omc"` | Prediction head (`"omc"` for molecular crystals, `"omol"` for molecules, `"omat"` for inorganic materials, `"odac"` for MOFs, `"oc20"` for catalysis). |
+| `task_name` | `str \| None` | `"omc"` | Prediction head (`"omc"` for molecular crystals, `"omol"` for molecules, `"omat"` for inorganic materials, `"odac"` for MOFs, `"oc20"` / `"oc22"` / `"oc25"` for catalysis). Automatically selects the sole task for single-task fine-tuned checkpoints. |
+| `inference_settings` | `str \| InferenceSettings` | `"nitro"` | Inference preset (`"nitro"`, `"default"`, `"high-precision"`, `"multigpu"`, `"batch"`, `"traineval"`, `"float64"`) or custom `InferenceSettings` object. |
+| `overrides` | `dict \| None` | `None` | Optional dictionary of configuration overrides passed to `load_predict_unit`. |
+| `workers` | `int` | `1` | Number of parallel predictor workers (`1` for single-GPU UMA Nitro). |
 
 ### PySCF (DFT & HF)
 

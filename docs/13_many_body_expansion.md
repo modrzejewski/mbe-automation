@@ -31,7 +31,7 @@ import mbe_automation.configs
 crystal_file = "ammonia.xyz"  # or .cif, POSCAR, etc.
 
 uma_calc = UMA(
-    model_path="~/models/uma/uma-m-1p1.pt", 
+    model_path="~/models/uma/uma-s-1p2p1.pt", 
     task_name="omol"
 )
 
@@ -130,7 +130,7 @@ from mbe_automation import (
 )
 
 crystal = Structure.from_file("ammonia.xyz")
-calculator = UMA(model_path="~/models/uma/uma-m-1p1.pt", task_name="omol")
+calculator = UMA(model_path="~/models/uma/uma-s-1p2p1.pt", task_name="omol")
 
 cluster_filter = UniqueClustersFilter(
     cluster_types=["monomers", "dimers", "trimers"],
@@ -321,7 +321,7 @@ from mbe_automation import (
 crystal_file = "ammonia.xyz"  # or POSCAR, CIF, etc.
 
 uma_calc = UMA(
-    model_path="~/models/uma/uma-m-1p1.pt", 
+    model_path="~/models/uma/uma-s-1p2p1.pt", 
     task_name="omol",
 )
 
@@ -364,7 +364,7 @@ import mbe_automation.configs
 crystal_file = "ammonia.xyz"  # or POSCAR, CIF, etc.
 
 uma_calc = UMA(
-    model_path="~/models/uma/uma-m-1p1.pt", 
+    model_path="~/models/uma/uma-s-1p2p1.pt", 
     task_name="omol",
 )
 

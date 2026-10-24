@@ -47,7 +47,7 @@ mbe-automation = { path = ".", editable = true }
 nomore-ase = { path = "src/nomore_ase", editable = true }
 pyscf = ">=2.12.0"
 pyscf-dispersion = "*"
-fairchem-core = ">=2.19.0"
+fairchem-core = ">=2.24.0"
 irmsd = "==0.1.1"
 
 # --- Feature: GPU CUDA 12 ---

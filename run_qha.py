@@ -13,12 +13,15 @@ from mbe_automation.configs.structure import Minimum
 crystal_file = "crystal.cif"
 
 # Initialize the UMA interatomic potential calculator (all parameters at default values;
-# set model_path="uma-m-1p1.pt" to load weights from a local checkpoint file)
+# set model_path="uma-s-1p2p1.pt" to load weights from a local checkpoint file)
 calculator = UMA(
     model_path=None,
-    model_name="uma-m-1p1",
+    model_name="uma-s-1p2p1",
     device=None,
     task_name="omc",
+    inference_settings="nitro",
+    overrides=None,
+    workers=1,
 )
 
 # Load the input crystal structure with all default symmetry settings

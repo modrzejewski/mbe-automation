@@ -36,7 +36,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 from mbe_automation import Structure
 
 crystal_file = "path/to/your/crystal.cif"  # or .xyz, POSCAR, etc.
-mlip_parameter_file = "path/to/your/uma-m-1p1.pt"
+mlip_parameter_file = "path/to/your/uma-s-1p2p1.pt"
 temperature_K = 298.15
 dataset = "training_set.hdf5"
 
@@ -180,7 +180,7 @@ from mbe_automation.calculators import UMA
 # Note we assume here that you will be adding feature vectors.
 # The `feature_vectors_type` is not available for other calculators
 uma_calc = UMA(
-    model_path="path/to/your/uma-m-1p1.pt",
+    model_path="path/to/your/uma-s-1p2p1.pt",
     task_name="omol",
 )
 
@@ -233,7 +233,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 from mbe_automation import Structure
 
 crystal_file = "path/to/your/crystal.cif"
-mlip_parameter_file = "path/to/your/uma-m-1p1.pt"
+mlip_parameter_file = "path/to/your/uma-s-1p2p1.pt"
 temperature_K = 298.15
 dataset = "training_set.hdf5"
 

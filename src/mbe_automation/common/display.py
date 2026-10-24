@@ -265,22 +265,57 @@ def uma_summary(
     """
     predictor = getattr(calculator, "predictor", None)
     model = getattr(predictor, "model", None)
+    inference_settings = getattr(predictor, "inference_settings", None)
+
     if model is not None:
         total_params = sum(p.numel() for p in model.parameters())
-        dtype = (
-            str(next(model.parameters()).dtype)
-            if total_params > 0
-            else "unknown"
-        )
-        device = (
-            str(next(model.parameters()).device)
-            if total_params > 0
-            else str(getattr(calculator, "device", "unknown"))
-        )
+        inner_model = getattr(model, "module", model)
+        unmerged_experts = getattr(inner_model, "_experts", None)
+        if isinstance(unmerged_experts, dict) and unmerged_experts:
+            total_params += sum(t.numel() for t in unmerged_experts.values())
     else:
         total_params = 0
+
+    if (
+        inference_settings is not None
+        and getattr(inference_settings, "base_precision_dtype", None) is not None
+    ):
+        dtype = str(inference_settings.base_precision_dtype)
+    elif model is not None and total_params > 0:
+        try:
+            dtype = str(next(model.parameters()).dtype)
+        except StopIteration:
+            dtype = "unknown"
+    else:
         dtype = "unknown"
-        device = str(getattr(calculator, "device", "unknown"))
+
+    device = str(
+        getattr(predictor, "device", None)
+        or getattr(calculator, "device", None)
+        or (
+            next(model.parameters()).device
+            if model is not None and total_params > 0
+            else "unknown"
+        )
+    )
+
+    inference_mode = None
+    if inference_settings is not None:
+        try:
+            from fairchem.core.units.mlip_unit.api.inference import (
+                describe_inference_settings,
+            )
+            described = describe_inference_settings(inference_settings)
+            if not described.startswith("InferenceSettings("):
+                inference_mode = described
+        except Exception:
+            pass
+        if inference_mode is None and getattr(inference_settings, "nitro", False):
+            inference_mode = "nitro"
+    if inference_mode is None:
+        calc_setting = getattr(calculator, "inference_settings", None)
+        if isinstance(calc_setting, str):
+            inference_mode = calc_setting
 
     model_path = getattr(calculator, "model_path", None)
     if model_path is None and predictor is not None:
@@ -303,6 +338,8 @@ def uma_summary(
     if model_path is not None:
         print(f"model_path            {shorten_path(model_path)}")
     print(f"task_name             {task_name}")
+    if inference_mode is not None:
+        print(f"inference_settings    {inference_mode}")
     if total_params > 0:
         print(f"total parameters      {total_params:,}")
     print(f"data type             {dtype}")

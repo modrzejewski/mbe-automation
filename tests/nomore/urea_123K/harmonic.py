@@ -8,7 +8,11 @@ from mbe_automation import Structure
 
 xyz_solid = "urea_123K_xray.cif"
 
-uma_calc = UMA(model_path="./uma-m-1p1.pt", task_name="omc")
+uma_calc = UMA(
+    model_path="./uma-s-1p2p1.pt",
+    task_name="omc",
+    inference_settings="nitro",
+)
 
 # Create custom relaxation settings (optional)
 relaxation_config = Minimum(

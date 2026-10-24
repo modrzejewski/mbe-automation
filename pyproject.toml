@@ -8,7 +8,7 @@ version = "0.4.2"
 requires-python = ">=3.11"
 dependencies = [
   "torch>=2.8.0",
-  "fairchem-core>=2.19.0",
+  "fairchem-core>=2.24.0",
   "numpy==2.3.3",
   "scipy==1.16.2",
   "networkx",
@@ -40,7 +40,7 @@ dependencies = [
 [project.optional-dependencies]
 
 uma = [
-  "fairchem-core>=2.19.0",
+  "fairchem-core>=2.24.0",
 ]
 # For CUDA 11.X environments
 gpu-cuda11 = [

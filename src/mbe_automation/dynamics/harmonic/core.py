@@ -398,10 +398,16 @@ def phonons(
     next_print = 10
 
     print("Computing force dataset...")
+    predictor = getattr(calculator, "predictor", None)
+    inf_settings = getattr(predictor, "inference_settings", None)
+    clear_cache_each_step = (
+        cuda_available
+        and getattr(inf_settings, "base_precision_dtype", None) == torch.float64
+    )
     for i, s in enumerate(supercells, 1):
         forces = forces_in_displaced_supercell(s, calculator)
         force_set.append(forces)
-        if cuda_available:
+        if clear_cache_each_step:
             torch.cuda.empty_cache()
         progress = i * 100 // n_supercells
         if progress >= next_print:

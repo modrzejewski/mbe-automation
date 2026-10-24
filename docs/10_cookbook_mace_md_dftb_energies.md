@@ -64,7 +64,7 @@ crystal = Structure.from_file("urea_x23_geometry.xyz")
 molecule = crystal.extract_all_molecules()[0]
 
 calculator = UMA(
-   model_path="~/models/uma/uma-m-1p1.pt",
+   model_path="~/models/uma/uma-s-1p2p1.pt",
    task_name="omc",
 )
 
@@ -162,7 +162,7 @@ from mbe_automation.calculators import UMA
 dataset = "md_structures.hdf5"
 
 uma_calc = UMA(
-    model_path="~/models/uma/uma-m-1p1.pt",
+    model_path="~/models/uma/uma-s-1p2p1.pt",
     task_name="omol",
 )
 

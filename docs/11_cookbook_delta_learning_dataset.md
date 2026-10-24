@@ -22,7 +22,7 @@ from mbe_automation.calculators import DFT, UMA
 # Initialize Calculators
 # Baseline: Pre-trained UMA model
 calc_baseline = UMA(
-    model_path="~/models/uma/uma-m-1p1.pt",
+    model_path="~/models/uma/uma-s-1p2p1.pt",
     task_name="omol",
 )
 

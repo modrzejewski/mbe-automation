@@ -2,7 +2,7 @@
 
 ### GPU Memory Limitations for Large Supercells
 
-A primary bottleneck in calculations on molecular crystals is the GPU memory required for large supercells. For models with a large number of parameters, such as UMA (`uma-m-1p1`) in 64-bit precision, calculations on supercells with a radius of 20.0 to 25.0 Å (approximately 1500–2000 atoms) can exceed 80 GB of GPU memory. This amount approaches the maximum capacity of an NVIDIA H100 GPU.
+A primary bottleneck in calculations on molecular crystals is the GPU memory required for large supercells. For models with a large number of parameters, such as UMA (`uma-s-1p2p1` or `uma-m-1p1`), calculations on supercells with a radius of 20.0 to 25.0 Å (approximately 1500–2000 atoms) can require substantial GPU memory, approaching the capacity of an NVIDIA H100 GPU when run in 64-bit precision.
 
 The table below lists the memory specifications for several NVIDIA GPUs commonly used in scientific computing.
 

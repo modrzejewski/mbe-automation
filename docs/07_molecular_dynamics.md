@@ -22,7 +22,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"  # or .xyz, POSCAR, etc.
 molecule_file = "path/to/your/molecule.xyz"
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 ```
 
 ## NPT/NVT Propagation
@@ -121,7 +121,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 
 md_config = mbe_automation.configs.md.Enthalpy(
     molecule=Structure.from_file(molecule_file),

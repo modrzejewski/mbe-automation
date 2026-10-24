@@ -17,7 +17,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 
 cif_path = "experiment.cif"
 
-uma_calc = UMA(model_path="uma-m-1p1.pt")
+uma_calc = UMA(model_path="uma-s-1p2p1.pt")
 
 # Use "only_atoms" cell relaxation to keep the experimental cell parameters
 relaxation_config = Minimum(
