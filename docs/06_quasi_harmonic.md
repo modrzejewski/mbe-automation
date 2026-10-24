@@ -19,7 +19,7 @@ Setup involves importing necessary modules and defining the system's structures 
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation.configs
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
@@ -30,7 +30,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"  # or .xyz, POSCAR, etc.
 molecule_file = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/mace.model")
+uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
 ```
 
 ## Phonon calculation
@@ -48,7 +48,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -87,7 +87,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file("polymorph_Zprime2.xyz"),
     molecule=Structure.from_file("molecule.xyz"),  # ONE reference
     temperatures_K=np.array([5.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
 )
 ```
 
@@ -121,7 +121,7 @@ properties_config = FreeEnergy(
         ),
     ],
     temperatures_K=np.array([5.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
 )
 ```
 
@@ -171,7 +171,7 @@ For the explicit forcing modes (`"linear"`, `"inverse_volume"`, `"rigid_shift"`)
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
@@ -183,7 +183,7 @@ from mbe_automation.configs.quasi_harmonic import EEC, FreeEnergy
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/mace.model")
+uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
 
 relaxation_config = Minimum(
     cell_relaxation="constant_volume",
@@ -194,7 +194,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -232,7 +232,7 @@ When high-level reference EOS parameters are available (e.g. from DFT or coupled
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
@@ -242,7 +242,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/mace.model")
+uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
 
 relaxation_config = Minimum(
     cell_relaxation="constant_volume",
@@ -259,7 +259,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -340,12 +340,12 @@ To enable ADP calculation, set `save_adps=True` in `FreeEnergy`. The Brillouin z
 ```python
 import numpy as np
 from mbe_automation import Structure
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
 from mbe_automation.configs.structure import Minimum
 import mbe_automation
 
-mace_calc = MACE(model_path="path/to/your/model.model")
+uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
 
 relaxation_config = Minimum(
     cell_relaxation="only_atoms",
@@ -355,7 +355,7 @@ relaxation_config = Minimum(
 config = FreeEnergy(
     crystal=Structure.from_file("crystal.cif"),
     temperatures_K=np.array([100.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     thermal_expansion=False,
     relaxation=relaxation_config,
     save_adps=True,
@@ -458,7 +458,7 @@ mbe_automation.dynamics.harmonic.display.band_structure(
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
@@ -468,7 +468,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/model.model")
+uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
 
 # Create custom relaxation settings (optional)
 relaxation_config = Minimum(
@@ -480,7 +480,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -501,7 +501,7 @@ mbe_automation.run(properties_config)
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="MACE"
+#SBATCH --job-name="UMA"
 #SBATCH -A pl0415-02
 #SBATCH --partition=tesla
 #SBATCH --nodes 1

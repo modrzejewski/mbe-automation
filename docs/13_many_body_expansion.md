@@ -25,14 +25,14 @@ is evaluated as the minimum distance between any of their respective atoms.
 
 ```python
 import mbe_automation
-from mbe_automation import MACE, Structure, UniqueClustersFilter
+from mbe_automation import UMA, Structure, UniqueClustersFilter
 import mbe_automation.configs
 
 crystal_file = "ammonia.xyz"  # or .cif, POSCAR, etc.
 
-mace_calc = MACE(
-    model_path="~/models/mace/mace-mh-1.model", 
-    head="omol"
+uma_calc = UMA(
+    model_path="~/models/uma/uma-m-1p1.pt", 
+    task_name="omol"
 )
 
 cluster_filter = UniqueClustersFilter(
@@ -42,7 +42,7 @@ cluster_filter = UniqueClustersFilter(
 
 config = mbe_automation.configs.many_body_expansion.Clusters(
     crystal=Structure.from_file(crystal_file),
-    calculator=mace_calc,
+    calculator=uma_calc,
     filter=cluster_filter,
     work_dir="./mbe_output",
 )
@@ -123,14 +123,14 @@ The multi-level workflow is configured with [`MultiLevel`](01_api.md#multilevel)
 ```python
 import mbe_automation
 from mbe_automation import (
-    MACE,
+    UMA,
     Structure,
     UniqueClustersFilter,
     MultiLevel,
 )
 
 crystal = Structure.from_file("ammonia.xyz")
-calculator = MACE(model_path="~/models/mace/mace-mh-1.model", head="omol")
+calculator = UMA(model_path="~/models/uma/uma-m-1p1.pt", task_name="omol")
 
 cluster_filter = UniqueClustersFilter(
     cluster_types=["monomers", "dimers", "trimers"],
@@ -312,7 +312,7 @@ This script sets up and exports multi-level coupled-cluster calculations using [
 ```python
 import mbe_automation
 from mbe_automation import (
-    MACE,
+    UMA,
     Structure,
     UniqueClustersFilter,
     MultiLevel,
@@ -320,9 +320,9 @@ from mbe_automation import (
 
 crystal_file = "ammonia.xyz"  # or POSCAR, CIF, etc.
 
-mace_calc = MACE(
-    model_path="~/models/mace/mace-mh-1.model", 
-    head="omol",
+uma_calc = UMA(
+    model_path="~/models/uma/uma-m-1p1.pt", 
+    task_name="omol",
 )
 
 cluster_filter = UniqueClustersFilter(
@@ -332,7 +332,7 @@ cluster_filter = UniqueClustersFilter(
 
 config = MultiLevel(
     crystal=Structure.from_file(crystal_file),
-    calculator=mace_calc,
+    calculator=uma_calc,
     filter=cluster_filter,
     switchover_distances={
         "dimers": 7.0,
@@ -354,7 +354,7 @@ This script extracts clusters using [`Clusters`](01_api.md#clusters) and manuall
 ```python
 import mbe_automation
 from mbe_automation import (
-    MACE,
+    UMA,
     Structure,
     UniqueClustersFilter,
     ScheduledTasks,
@@ -363,9 +363,9 @@ import mbe_automation.configs
 
 crystal_file = "ammonia.xyz"  # or POSCAR, CIF, etc.
 
-mace_calc = MACE(
-    model_path="~/models/mace/mace-mh-1.model", 
-    head="omol",
+uma_calc = UMA(
+    model_path="~/models/uma/uma-m-1p1.pt", 
+    task_name="omol",
 )
 
 cluster_filter = UniqueClustersFilter(
@@ -375,7 +375,7 @@ cluster_filter = UniqueClustersFilter(
 
 config = mbe_automation.configs.many_body_expansion.Clusters(
     crystal=Structure.from_file(crystal_file),
-    calculator=mace_calc,
+    calculator=uma_calc,
     filter=cluster_filter,
     work_dir="./mbe_output",
 )

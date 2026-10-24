@@ -1,10 +1,10 @@
-# Cookbook: Training Set from MACE MD + r2SCAN Energies & Forces
+# Cookbook: Training Set from UMA MD + r2SCAN Energies & Forces
 
 This cookbook outlines a multi-step workflow for generating a machine learning training set. The procedure consists of generating candidate structures via molecular dynamics (MD) with a baseline model, extracting finite molecular clusters, identifying diverse configurations via feature-based subsampling, and labeling them with a reference calculator (r2SCAN-D4).
 
 ## Workflow Overview
 
-1. [**MD Propagation**](#step-1-molecular-dynamics-sampling): Generate a dense set of periodic configurations and an isolated molecule trajectory using a fast baseline model (MACE). Feature vectors are computed automatically.
+1. [**MD Propagation**](#step-1-molecular-dynamics-sampling): Generate a dense set of periodic configurations and an isolated molecule trajectory using a fast baseline model (UMA). Feature vectors are computed automatically.
 
 2. [**Molecule Subsampling & Labeling**](#step-2-molecule-subsampling-and-labeling): Select diverse isolated molecule configurations and compute reference energies/forces.
 
@@ -14,7 +14,7 @@ This cookbook outlines a multi-step workflow for generating a machine learning t
 
 5. [**Dataset Export**](#step-5-dataset-splitting-and-export): Split the labeled samples into training/validation/test sets and export to XYZ files.
 
-6. [**Model Training**](#step-6-model-training): Train a new MACE model using the combined data.
+6. [**Model Training**](#step-6-model-training): Train a new MLIP model using the combined data.
 
 ## Input Data
 
@@ -53,7 +53,7 @@ Run a molecular dynamics simulation to generate structures of a molecular crysta
 **Input:** `step_1.py`
 
 ```python
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 import numpy as np
 
 import mbe_automation
@@ -63,9 +63,9 @@ from mbe_automation import Structure
 crystal = Structure.from_file("urea_x23_geometry.xyz")
 molecule = crystal.extract_all_molecules()[0]
 
-calculator = MACE(
-   model_path="~/models/mace/mace-mh-1.model",
-   head="omol",
+calculator = UMA(
+   model_path="~/models/uma/uma-m-1p1.pt",
+   task_name="omc",
 )
 
 dataset = "md_structures.hdf5"
@@ -157,13 +157,13 @@ import mbe_automation
 import numpy as np
 from mbe_automation import Structure, DatasetKeys
 from mbe_automation import FiniteSubsystemFilter
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 dataset = "md_structures.hdf5"
 
-mace_calc = MACE(
-    model_path="~/models/mace/mace-mh-1.model",
-    head="omol",
+uma_calc = UMA(
+    model_path="~/models/uma/uma-m-1p1.pt",
+    task_name="omol",
 )
 
 for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_frames"):
@@ -190,7 +190,7 @@ for key in DatasetKeys(dataset).trajectories().periodic().starts_with("all_md_fr
     
     for cluster in clusters:
         cluster.run(
-            calculator=mace_calc,
+            calculator=uma_calc,
             energies=False,
             forces=False,
             feature_vectors_type="averaged_environments"
@@ -318,7 +318,7 @@ print("All calculations completed")
 
 ## Step 6: Model Training
 
-Train the MACE model using all generated data files.
+Train an MLIP model using all generated data files (example configuration below).
 
 **Configuration File:** `train.yaml`
 
@@ -354,11 +354,11 @@ seed: 3
 restart_latest: True
 ```
 
-**Bash Script:** `train_mace.sh`
+**Bash Script:** `train_model.sh`
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="MACE_Train"
+#SBATCH --job-name="MLIP_Train"
 #SBATCH -A pl0415-02
 #SBATCH --partition=tesla --constraint=h100
 #SBATCH --nodes=1
@@ -371,7 +371,7 @@ restart_latest: True
 module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
 source ~/.virtualenvs/compute-env/bin/activate
 
-python -m mace.cli.run_train --config train.yaml > "train.log" 2>&1
+# Run your MLIP training command on train.xyz / validate.xyz / test.xyz
 ```
 
 ## Computational Resources
@@ -384,7 +384,7 @@ Use this script to run the GPU-intensive steps.
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="MACE_MD_Gen"
+#SBATCH --job-name="UMA_MD_Gen"
 #SBATCH -A pl0415-02
 #SBATCH --partition=tesla --constraint=h100
 #SBATCH --nodes=1

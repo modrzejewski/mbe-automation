@@ -8,7 +8,7 @@ To perform this analysis, you first need to generate a properties dataset using 
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation
 from mbe_automation import Structure
@@ -17,7 +17,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 
 cif_path = "experiment.cif"
 
-mace_calc = MACE(model_path="mace.model")
+uma_calc = UMA(model_path="uma-m-1p1.pt")
 
 # Use "only_atoms" cell relaxation to keep the experimental cell parameters
 relaxation_config = Minimum(
@@ -32,7 +32,7 @@ properties_config = FreeEnergy(
         transform="no_transformation"
     ),
     temperatures_K=np.array([300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     supercell_radius=24.0,
     thermal_expansion=False,
     relaxation=relaxation_config,

@@ -14,7 +14,7 @@ Setup involves importing necessary modules and defining the system's structures 
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation.configs
 from mbe_automation import Structure
@@ -22,7 +22,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"  # or .xyz, POSCAR, etc.
 molecule_file = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/mace.model")
+uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
 ```
 
 ## NPT/NVT Propagation
@@ -33,7 +33,7 @@ The MD workflow is configured using the `Enthalpy` and `ClassicalMD` classes fro
 md_config = mbe_automation.configs.md.Enthalpy(
     molecule=Structure.from_file(molecule_file),
     crystal=Structure.from_file(crystal_file),
-    calculator=mace_calc,
+    calculator=uma_calc,
     temperatures_K=np.array([298.15]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
 
@@ -113,7 +113,7 @@ properties.hdf5
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation.configs
 from mbe_automation import Structure
@@ -121,12 +121,12 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/model.model")
+uma_calc = UMA(model_path="path/to/your/uma-m-1p1.pt")
 
 md_config = mbe_automation.configs.md.Enthalpy(
     molecule=Structure.from_file(molecule_file),
     crystal=Structure.from_file(crystal_file),
-    calculator=mace_calc,
+    calculator=uma_calc,
     temperatures_K=np.array([298.15]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
 
@@ -156,7 +156,7 @@ mbe_automation.run(md_config)
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="MACE"
+#SBATCH --job-name="UMA"
 #SBATCH -A pl0415-02
 #SBATCH --partition=tesla
 #SBATCH --nodes 1

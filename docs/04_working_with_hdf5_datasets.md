@@ -148,7 +148,7 @@ for key in DatasetKeys(dataset).molecular_crystals():
 
 ### 4. Selecting Data for Training
 
-This example selects finite clusters that have feature vectors, subsamples them to reduce the dataset size, and exports the result to a MACE-compatible training file.
+This example selects finite clusters that have feature vectors, subsamples them to reduce the dataset size, and exports the result to an extended XYZ training file.
 
 ```python
 from mbe_automation import DatasetKeys, FiniteSubsystem, Dataset
@@ -167,7 +167,7 @@ for key in DatasetKeys(dataset_file).finite_subsystems().with_feature_vectors():
     # clusters and PBC structures too.
     training_dataset.append(subsampled_subsystem)
 
-# Export the aggregated dataset to MACE XYZ format
+# Export the aggregated dataset to extended XYZ format
 # level_of_theory is a string which characterizes the electronic
 # structure approximation and basis set employed to generate
 # the ground truth data. Available as calculator.level_of_theory

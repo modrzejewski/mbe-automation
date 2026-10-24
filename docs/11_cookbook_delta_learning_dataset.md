@@ -1,6 +1,6 @@
 # Cookbook: Delta Learning Dataset Creation
 
-This document describes the creation of a dataset for **Delta Learning** using the MACE framework. Delta learning trains a model on the difference between a high-level target method (e.g., DFT or CCSD(T)) and a lower-level baseline method (e.g., a semi-empirical method or a simpler ML potential).
+This document describes the creation of a dataset for **Delta Learning** using a baseline UMA potential. Delta learning trains a model on the difference between a high-level target method (e.g., DFT or CCSD(T)) and a lower-level baseline method (e.g., a semi-empirical method or a pre-trained ML potential such as UMA).
 
 ## Table of Contents
 
@@ -9,22 +9,21 @@ This document describes the creation of a dataset for **Delta Learning** using t
 3. [Dataset Generation](#dataset-generation)
 4. [Atomic Reference](#atomic-reference)
 5. [Export](#export)
-6. [Model Training](#model-training)
 
 ## Setup
 
-The following script initializes the necessary calculators. A pre-trained MACE model serves as the baseline, and a DFT method (r2SCAN-D4/def2-SVP) serves as the target.
+The following script initializes the necessary calculators. A pre-trained UMA model serves as the baseline, and a DFT method (r2SCAN-D4/def2-SVP) serves as the target.
 
 ```python
 import mbe_automation
 from mbe_automation import Structure, Trajectory, FiniteSubsystem, Dataset, DatasetKeys
-from mbe_automation.calculators import DFT, MACE
+from mbe_automation.calculators import DFT, UMA
 
 # Initialize Calculators
-# Baseline: Pre-trained MACE model
-calc_baseline = MACE(
-    model_path="~/models/mace/mace-mh-1.model",
-    head="omol",
+# Baseline: Pre-trained UMA model
+calc_baseline = UMA(
+    model_path="~/models/uma/uma-m-1p1.pt",
+    task_name="omol",
 )
 
 # Target: DFT (r2SCAN-D4/def2-SVP)
@@ -56,7 +55,7 @@ for key in DatasetKeys(input_dataset).trajectories().finite():
     # Select a diverse subset of frames (e.g., 20 frames using farthest point sampling)
     subset = traj.subsample(20)
 
-    # Calculate Baseline (MACE) and Target (DFT) properties
+    # Calculate Baseline (UMA) and Target (DFT) properties
     # The results are stored in the structure's 'ground_truth' attribute
     subset.run_model(calc_baseline)
     subset.run_model(calc_target)
@@ -136,7 +135,7 @@ atomic_energies = atomic_energies_baseline + atomic_energies_target
 
 ## Export
 
-The final step exports the datasets to MACE-compatible XYZ files. The levels of theory for delta learning are defined, and the combined atomic reference energies are passed to the training set export.
+The final step exports the datasets to extended XYZ files. The levels of theory for delta learning are defined, and the combined atomic reference energies are passed to the training set export.
 
 ```python
 delta_learning = {
@@ -159,103 +158,4 @@ test_set.to_mace_dataset(
 )
 
 print("Export completed.")
-```
-
-## Model Training
-
-The following Bash script trains a Delta Learning MACE model using the generated files.
-
-> **Attention:** The `DeltaMACE` calculator requires the baseline and delta models to have the same head name. Ensure the head name in `train.yaml` matches your baseline model's head. If mismatched, correct `train.yaml` and restart training from the checkpoint to update the head name.
-
-**Configuration File:** `train.yaml`
-
-```yaml
-name: "urea_r2scan_d4_delta"
-
-model: "MACE"
-num_interactions: 2
-hidden_irreps: "32x0e + 32x1o"
-correlation: 2
-r_max: 6.0
-
-heads:
-  omol:
-    train_file: "delta_learning/train.xyz"
-    valid_file: "delta_learning/validate.xyz"
-    test_file: "delta_learning/test.xyz"
-    energy_key: "REF_energy"
-    forces_key: "REF_forces"
-
-forces_weight: 1000
-energy_weight: 10
-stress_weight: 0
-batch_size: 8
-valid_batch_size: 8
-max_num_epochs: 300
-start_swa: 200
-scheduler_patience: 15
-patience: 100
-eval_interval: 1
-ema: True
-swa: True
-error_table: "PerAtomRMSE"
-plot_frequency: 10
-default_dtype: "float64"
-device: cuda
-save_cpu: True
-seed: 3
-restart_latest: True
-```
-
-**Bash Script:** `train.sh`
-
-```bash
-#!/bin/bash
-#SBATCH --job-name="MACE_Train"
-#SBATCH -A pl0415-02
-#SBATCH --partition=tesla --constraint=h100
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --gpus-per-node=1
-#SBATCH --cpus-per-task=8
-#SBATCH --time=24:00:00
-#SBATCH --mem=180gb
-
-module load python/3.11.9-gcc-11.5.0-5l7rvgy cuda/12.8.0_570.86.10
-source ~/.virtualenvs/compute-env/bin/activate
-
-python -m mace.cli.run_train --config train.yaml > "train.log" 2>&1
-```
-
-## Using the Trained Delta Model
-
-Once the delta model has been trained (e.g., producing `urea_r2scan_d4_delta.model`), you can use the `DeltaMACE` calculator to run simulations at the target level of theory. This calculator combines the baseline model with the delta model for efficient and accurate calculations.
-
-```python
-from mbe_automation import Structure
-from mbe_automation.calculators import DeltaMACE
-
-# Define paths to the baseline and the newly trained delta model
-baseline_model = "~/models/mace/mace-mh-1.model"
-delta_model = "urea_r2scan_d4_delta.model" # From the training step
-
-# Initialize the delta-learning calculator
-calc = DeltaMACE(
-    model_paths=[baseline_model, delta_model],
-    head="omol"
-)
-
-# Load a structure to test
-structure = Structure.from_file("some_test_structure.xyz")
-
-# Run calculation
-# The result will be at the target level of theory
-structure.run(calc)
-
-# Retrieve results
-energy = structure.ground_truth.energies[calc.level_of_theory]
-forces = structure.ground_truth.forces[calc.level_of_theory]
-
-print(f"Delta-learning Energy: {energy} eV/atom")
-print(f"Final Level of Theory: {calc.level_of_theory}")
 ```

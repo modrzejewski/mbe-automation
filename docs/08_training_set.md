@@ -25,7 +25,7 @@ Setup involves importing necessary modules and defining the parameters for the w
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation
 from mbe_automation.configs.md import ClassicalMD
@@ -36,11 +36,11 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 from mbe_automation import Structure
 
 crystal_file = "path/to/your/crystal.cif"  # or .xyz, POSCAR, etc.
-mlip_parameter_file = "path/to/your/mace.model"
+mlip_parameter_file = "path/to/your/uma-m-1p1.pt"
 temperature_K = 298.15
 dataset = "training_set.hdf5"
 
-mace_calc = MACE(model_path=mlip_parameter_file)
+uma_calc = UMA(model_path=mlip_parameter_file)
 ```
 
 ## Step 1: MD Sampling
@@ -50,7 +50,7 @@ The first stage generates configurations by running a short molecular dynamics s
 ```python
 md_sampling_config = MDSampling(
     crystal=Structure.from_file(crystal_file),
-    calculator=mace_calc,
+    calculator=uma_calc,
     temperatures_K=np.array([temperature_K]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
     finite_subsystem_filter=FiniteSubsystemFilter(
@@ -77,7 +77,7 @@ A quasi-harmonic calculation is performed to obtain the force constants required
 ```python
 free_energy_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
-    calculator=mace_calc,
+    calculator=uma_calc,
     thermal_expansion=False,
     supercell_radius=20.0,
     dataset=dataset,
@@ -92,7 +92,7 @@ The final stage generates configurations by sampling from the phonon modes of th
 
 ```python
 phonon_sampling_config = PhononSampling(
-    calculator=mace_calc,
+    calculator=uma_calc,
     temperature_K=temperature_K,
     finite_subsystem_filter=FiniteSubsystemFilter(
         selection_rule="closest_to_central_molecule",
@@ -173,15 +173,15 @@ To update a dataset, first load the structure, run the calculator, and then simp
 
 ```python
 from mbe_automation import Trajectory
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 # Initialize the calculator that will be used to update the structures
 #
 # Note we assume here that you will be adding feature vectors.
 # The `feature_vectors_type` is not available for other calculators
-mace_calc = MACE(
-    model_path="path/to/your/mace.model",
-    head="omol",
+uma_calc = UMA(
+    model_path="path/to/your/uma-m-1p1.pt",
+    task_name="omol",
 )
 
 # Load structure
@@ -195,7 +195,7 @@ traj = Trajectory.read(
 # Note that we do not want to re-calculate energies and forces,
 # so we set the corresponding keywords to `False`.
 traj.run(
-    calculator=mace_calc,
+    calculator=uma_calc,
     feature_vectors_type="averaged_environments",
     energies=False,
     forces=False
@@ -222,7 +222,7 @@ For a detailed discussion of performance considerations, see the [Computational 
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation
 from mbe_automation.configs.md import ClassicalMD
@@ -233,16 +233,16 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
 from mbe_automation import Structure
 
 crystal_file = "path/to/your/crystal.cif"
-mlip_parameter_file = "path/to/your/mace.model"
+mlip_parameter_file = "path/to/your/uma-m-1p1.pt"
 temperature_K = 298.15
 dataset = "training_set.hdf5"
 
-mace_calc = MACE(model_path=mlip_parameter_file)
+uma_calc = UMA(model_path=mlip_parameter_file)
 
 md_sampling_config = MDSampling(
     crystal=Structure.from_file(crystal_file),
-    calculator=mace_calc,
-    features_calculator=mace_calc,
+    calculator=uma_calc,
+    features_calculator=uma_calc,
     temperatures_K=np.array([temperature_K]),
     pressures_GPa=np.array([1.0E-4, 1.0]),
     finite_subsystem_filter=FiniteSubsystemFilter(
@@ -263,7 +263,7 @@ mbe_automation.run(md_sampling_config)
 
 free_energy_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
-    calculator=mace_calc,
+    calculator=uma_calc,
     thermal_expansion=False,
     supercell_radius=20.0,
     dataset=dataset,
@@ -272,8 +272,8 @@ free_energy_config = FreeEnergy(
 mbe_automation.run(free_energy_config)
 
 phonon_sampling_config = PhononSampling(
-    calculator=mace_calc,
-    features_calculator=mace_calc,
+    calculator=uma_calc,
+    features_calculator=uma_calc,
     temperature_K=temperature_K,
     finite_subsystem_filter=FiniteSubsystemFilter(
         selection_rule="closest_to_central_molecule",
@@ -299,7 +299,7 @@ mbe_automation.run(phonon_sampling_config)
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="MACE"
+#SBATCH --job-name="UMA"
 #SBATCH -A pl0415-02
 #SBATCH --partition=tesla
 #SBATCH --nodes 1

@@ -1,6 +1,6 @@
-# Cookbook: Adding Atomic Reference Energies to Existing MACE Training Data
+# Cookbook: Adding Atomic Reference Energies to Existing MLIP Training Data
 
-This cookbook demonstrates how to export a dataset of structures to a MACE-compatible training file, including the calculation and inclusion of atomic reference energies (isolated atom energies).
+This cookbook demonstrates how to export a dataset of structures to an extended XYZ training file, including the calculation and inclusion of atomic reference energies (isolated atom energies).
 
 We assume you already have a HDF5 file containing structures with ground truth data (energies and forces) at a specific level of theory (e.g., r2SCAN DFT with def2-tzvpd basis set).
 
@@ -54,7 +54,7 @@ for key in keys:
 
 ## 2. Generate atomic reference energies
 
-MACE requires the energies of isolated atoms to serve as a baseline for the total energy. We calculate these using the same level of theory as the dataset.
+MLIP training requires the energies of isolated atoms to serve as a baseline for the total energy. We calculate these using the same level of theory as the dataset.
 
 ```python
 # Calculate energies for all unique elements in the dataset
@@ -68,7 +68,7 @@ print(atomic_reference.energies[calculator.level_of_theory])
 
 ## 3. Export data
 
-Finally, we export the structures and the atomic reference energies to a single XYZ file suitable for training MACE models.
+Finally, we export the structures and the atomic reference energies to a single XYZ file suitable for training MLIP models.
 
 ```python
 # Define the output path
@@ -109,4 +109,4 @@ C 2.4 0.8 0.0 ...
 ...
 ```
 
-This file is now ready to be used as input for training a MACE model.
+This file is now ready to be used as input for training an MLIP model.
