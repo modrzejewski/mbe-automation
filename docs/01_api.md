@@ -5,7 +5,7 @@ This chapter provides a comprehensive reference for the core data classes, confi
 All core data classes and calculators can be imported directly from the top-level package or their respective modules:
 ```python
 from mbe_automation import Structure, Trajectory, ForceConstants
-from mbe_automation.calculators import UMA, DFT
+from mbe_automation.calculators import MACE, DFT
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
 ```
 
@@ -37,6 +37,8 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
     * [Clusters](#clusters)
     * [MultiLevel](#multilevel)
 * [4. Interatomic Potentials & Calculators](#4-interatomic-potentials--calculators)
+    * [MACE](#mace)
+    * [DeltaMACE](#deltamace)
     * [UMA](#uma)
     * [PySCF (DFT & HF)](#pyscf-dft--hf)
     * [DFTB+ (Semi-empirical)](#dftb-semi-empirical)
@@ -462,18 +464,38 @@ Configuration object for the multi-level many-body expansion workflow. Inherits 
 ## 4. Interatomic Potentials & Calculators
 The `mbe_automation.calculators` module provides interfaces to computational backends. These calculators inherit from the standard ASE `Calculator` interface but add **Level of Theory Tracking** (used to tag dataset data) and **Multi-GPU Parallelization** using Ray.
 
-### UMA
+### MACE
 
-🔗 [`mbe_automation.calculators.UMA`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/uma.py#L31)
+🔗 [`mbe_automation.calculators.MACE`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/mace.py#L17)
 
-Wraps the Universal Machine learning potential for Atomistic simulations (UMA) via `fairchem-core` with 64-bit precision (`torch.float64`), local checkpoint loading, and Ray actor serialization.
+Wraps the `mace-torch` calculator with automatic device selection and Ray actor serialization.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `model_path` | `str \| Path \| None` | `None` | Path to a local UMA `.pt` checkpoint file (e.g., `"uma-m-1p1.pt"`). |
-| `model_name` | `str` | `"uma-m-1p1"` | Pretrained UMA model identifier (used when `model_path` is `None`). |
-| `device` | `str \| None` | `None` | Execution device (`"cuda"` or `"cpu"`). Auto-detected if `None`. |
-| `task_name` | `str` | `"omc"` | Prediction head (`"omc"` for molecular crystals, `"omol"` for molecules, `"omat"` for inorganic materials, `"odac"` for MOFs, `"oc20"` for catalysis). |
+| `model_path` | `str` | - | Path to the MACE model file. |
+| `head` | `str` | `"Default"` | Name of the readout head (e.g., `"omol"` for `mace-mh-1.model`). |
+
+### DeltaMACE
+
+🔗 [`mbe_automation.calculators.DeltaMACE`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/mace.py#L101)
+
+Implements a delta-learning model, combining a baseline model with additive correction models.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `model_paths` | `list[str]` | - | List of MACE model paths (baseline first, then deltas). |
+| `head` | `str` | `"Default"` | Name of the readout head to use for all models. |
+
+### UMA
+
+🔗 [`mbe_automation.calculators.UMA`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/uma.py#L12)
+
+Wraps the Universal Machine learning potential for Atomistic simulations (UMA) via `fairchem`.
+
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `model_name` | `str` | `"uma-s-1p2"` | UMA model version. |
+| `task_name` | `str` | `"omc"` | Task/head for predictions. |
 
 ### PySCF (DFT & HF)
 
