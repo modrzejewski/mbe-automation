@@ -261,6 +261,8 @@ Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 | `verbose` | Verbosity of the program's output. `0` suppresses warnings. | `0` |
 | `save_plots` | If `True`, save plots of the simulation results. | `True` |
 | `save_csv` | If `True`, save CSV files of the simulation results. | `True` |
+| `incremental_csv` | If `True`, create `thermodynamics_equilibrium_volume.csv` immediately after EOS volume selection and update it after each completed temperature point in the quasi-harmonic workflow. | `False` |
+| `restart` | If `True`, restart a partially or previously completed calculation from `dataset` (or `work_dir / "dataset.hdf5"` when `dataset=None`), falling back to `.cif` files in `work_dir / "relaxation"` if needed. | `False` |
 | `save_adps` | If `True`, compute atomic displacement parameters and save them to a CIF file. | `False` |
 | `adps_k_point_mesh` | The k-points mesh used for sampling the Brillouin zone when computing atomic displacement parameters. | `50.0` |
 

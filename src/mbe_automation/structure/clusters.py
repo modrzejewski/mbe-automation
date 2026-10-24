@@ -573,7 +573,8 @@ class MolecularComposition:
             key: str,
             calculator: ASECalculator,
             config: Minimum,
-            work_dir: Path | str = Path("./")
+            work_dir: Path | str = Path("./"),
+            restart: bool = False,
     ) -> None:
         """
         Extract nonequivalent molecules from a periodic cell and save the corresponding
@@ -586,6 +587,7 @@ class MolecularComposition:
             calculator=calculator,
             config=config,
             work_dir=work_dir,
+            restart=restart,
         )
 
 
@@ -1567,7 +1569,8 @@ def _extract_relaxed_unique_molecules(
         key: str,
         calculator: ASECalculator,
         config: Minimum,
-        work_dir: Path | str = Path("./")
+        work_dir: Path | str = Path("./"),
+        restart: bool = False,
 ) -> None:
     """
     Extract nonequivalent molecules from a periodic cell and save the corresponding
@@ -1575,6 +1578,16 @@ def _extract_relaxed_unique_molecules(
     """
     unique_molecules = composition.molecules_unique
     n_unique_molecules = composition.n_molecules_unique
+
+    if restart and Path(dataset).is_file():
+        with mbe_automation.storage.file_lock.dataset_file(dataset, "r") as f:
+            all_present = all(
+                f"{key}/molecule[extracted,{i}]" in f
+                and f"{key}/molecule[extracted,{i},opt:atoms]" in f
+                for i in range(n_unique_molecules)
+            )
+        if all_present:
+            return
 
     relaxed_molecules = []
     relaxed_labels = []

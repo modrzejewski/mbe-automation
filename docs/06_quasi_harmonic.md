@@ -319,6 +319,32 @@ For more details on its configuration, see the [`DebyeModel` class documentation
 
 If the fit cannot be performed (fewer than 3 points below the threshold), the workflow prints a warning and falls back to `volume_curve="eos_minimum"` automatically — no exception is raised and the calculation continues. The `"volume_curve"` column in the output CSV records which source was actually used, reflecting any such fallback.
 
+## Restarting Calculations and Incremental CSV Output
+
+### Restarting a Calculation (`restart=True`)
+
+To resume a partially completed calculation or extend a completed calculation with additional volumes or temperatures, set `restart=True` in `FreeEnergy`:
+
+```python
+config = FreeEnergy(
+    ...
+    work_dir="./qha_run",
+    dataset="properties.hdf5",  # or None to use work_dir / "dataset.hdf5"
+    restart=True,
+    incremental_csv=True,
+)
+```
+
+When `restart=True`:
+- Completed structures and force constants are read from the HDF5 file specified by `dataset` (or `work_dir / "dataset.hdf5"` when `dataset=None`).
+- If a geometry relaxation finished before interruption (before phonon supercell calculations completed), the relaxed structure is loaded from `work_dir / "relaxation" / <system_label> / "relaxed_structure.cif"`.
+- If `volume_range` (or `thermal_pressures_GPa` when `eos_sampling="pressure"`) differs from the previous run, only the missing EOS points are calculated, the EOS fit is redone across all sampled points, and the equilibrium calculations at target temperatures (`crystal[eq:T=...,p=...]`) are recalculated from scratch.
+- If `volume_range` is unchanged and `temperatures_K` is modified or extended, all EOS points are reused from the dataset and only the temperature points not yet present in the dataset are calculated.
+
+### Incremental CSV Output (`incremental_csv=True`)
+
+Setting `incremental_csv=True` in `FreeEnergy` writes `thermodynamics_equilibrium_volume.csv` in `work_dir` as soon as the EOS calculations finish and equilibrium volumes for the temperature points are selected. After each temperature point (`crystal[eq:T=...,p=...]`) completes, `thermodynamics_equilibrium_volume.csv` is updated with the newly calculated data point, and the final table (including temperature-derivative properties such as $C_P$ and thermal expansion coefficients) is written upon completion.
+
 ## Adjustable parameters
 
 Detailed descriptions of the configuration classes can be found in the [API Reference](./01_api.md) chapter.

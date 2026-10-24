@@ -225,6 +225,7 @@ def _relaxed_single_molecule(
         gas_pressure_GPa,
         input_label,
         relaxed_label,
+        restart: bool = False,
 ):
     """
     Save the user-supplied input reference, relax it in vacuum, run
@@ -239,22 +240,67 @@ def _relaxed_single_molecule(
         input_structure = mbe_automation.storage.from_ase_atoms(ref.system)
         ase_system = ref.system
 
+    root_key_clean = root_key.strip("/")
     mbe_automation.storage.save_structure(
         structure=input_structure,
         dataset=dataset,
-        key=f"{root_key}/structures/{input_label}",
+        key=f"{root_key_clean}/structures/{input_label}",
     )
-    relaxed_molecule = mbe_automation.structure.relax.isolated_molecule(
-        molecule=ase_system.copy(),
-        calculator=calculator,
-        config=relaxation_config,
-        work_dir=geom_opt_dir / relaxed_label,
-        key=f"{root_key}/structures/{relaxed_label}",
-    )
+    relaxed_key = f"{root_key_clean}/structures/{relaxed_label}"
+    xyz_path = Path(geom_opt_dir) / relaxed_label / "relaxed_structure.xyz"
+
+    if restart and mbe_automation.dynamics.harmonic.core.has_stored_structure(
+        dataset=dataset,
+        root_key=root_key,
+        system_label=relaxed_label,
+    ):
+        mbe_automation.common.display.framed([
+            "Relaxation (restarted from dataset)",
+            relaxed_key,
+        ])
+        stored_mol = mbe_automation.storage.read_structure(
+            dataset=str(dataset),
+            key=relaxed_key,
+        )
+        relaxed_molecule = mbe_automation.storage.to_ase(stored_mol)
+        relaxed_molecule.calc = calculator
+    elif restart and xyz_path.exists():
+        mbe_automation.common.display.framed([
+            "Relaxation (restarted from file)",
+            relaxed_key,
+        ])
+        relaxed_molecule = mbe_automation.storage.from_file(read_path=xyz_path)
+        relaxed_molecule.calc = calculator
+        mbe_automation.storage.save_structure(
+            structure=mbe_automation.storage.from_ase_atoms(
+                relaxed_molecule,
+                level_of_theory=calculator.level_of_theory,
+            ),
+            dataset=dataset,
+            key=relaxed_key,
+        )
+    else:
+        relaxed_molecule = mbe_automation.structure.relax.isolated_molecule(
+            molecule=ase_system.copy(),
+            calculator=calculator,
+            config=relaxation_config,
+            work_dir=geom_opt_dir / relaxed_label,
+            key=relaxed_key,
+        )
+        mbe_automation.storage.save_structure(
+            structure=mbe_automation.storage.from_ase_atoms(
+                relaxed_molecule,
+                level_of_theory=calculator.level_of_theory,
+            ),
+            dataset=dataset,
+            key=relaxed_key,
+        )
+
     vibrations = mbe_automation.dynamics.harmonic.core.molecular_vibrations(
         molecule=relaxed_molecule,
         calculator=calculator,
         work_dir=vibrations_dir / relaxed_label,
+        restart=restart,
     )
     df_molecule = mbe_automation.dynamics.harmonic.data.molecule(
         relaxed_molecule,
@@ -277,6 +323,7 @@ def _process_gas_phase_molecules(
         root_key,
         temperatures_K,
         gas_pressure_GPa,
+        restart: bool = False,
 ):
     """
     Run _relaxed_single_molecule for each ref. Label scheme:
@@ -306,6 +353,7 @@ def _process_gas_phase_molecules(
                 "molecule[input,opt:atoms]" if single_molecule_mode
                 else f"molecule[input,{symbols[k]},opt:atoms]"
             ),
+            restart=restart,
         )
         df_molecules.append(df_molecule)
     return df_molecules
@@ -362,6 +410,74 @@ def _compute_sublimation_df(df_crystal, df_molecules, n_equivalent_primitive):
         df_molecules,
         n_equivalent_primitive,
     )
+
+
+def _assemble_quasi_harmonic_df(
+        df_crystal_eos: pd.DataFrame,
+        frames_at_T: list[pd.DataFrame],
+        effective_volume_curve: str,
+        reference_state_forcing: str,
+        df_molecules: list[pd.DataFrame] | None,
+        n_equivalent_primitive: np.ndarray | None,
+) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    """
+    Assemble the quasi-harmonic thermodynamics DataFrame from EOS,
+    gas-phase molecules, and completed equilibrium temperature points.
+    """
+    if not frames_at_T:
+        if df_molecules is not None:
+            molecule_dfs_for_concat = _tag_molecule_dfs_for_concat(df_molecules)
+            return pd.concat([
+                df_crystal_eos,
+                *molecule_dfs_for_concat,
+            ], axis=1), None
+        return df_crystal_eos.copy(), None
+
+    df_crystal_qha = pd.concat(frames_at_T)
+    df_crystal_qha["volume_curve"] = effective_volume_curve
+    df_crystal_qha["reference_state_forcing"] = reference_state_forcing
+
+    df_thermal_expansion = (
+        mbe_automation.dynamics.harmonic.crystal_thermo.fit_thermal_expansion_properties(
+            df_crystal_equilibrium=df_crystal_qha
+        )
+    )
+    if df_molecules is not None:
+        df_sublimation_qha = _compute_sublimation_df(
+            df_crystal=df_crystal_qha,
+            df_molecules=df_molecules,
+            n_equivalent_primitive=n_equivalent_primitive,
+        )
+        molecule_dfs_for_concat = _tag_molecule_dfs_for_concat(df_molecules)
+        df_crystal_qha = df_crystal_qha.reindex(df_crystal_eos.index)
+        df_thermal_expansion = df_thermal_expansion.reindex(df_crystal_eos.index)
+
+        _assert_consistent_temps(df_sublimation_qha, df_crystal_eos, "sublimation")
+        _assert_consistent_temps(df_crystal_qha, df_crystal_eos, "QHA")
+        for k, df_mol in enumerate(df_molecules):
+            _assert_consistent_temps(df_mol, df_crystal_eos, f"molecule_{k}")
+
+        df_quasi_harmonic = pd.concat([
+            df_sublimation_qha,
+            df_crystal_qha.drop(columns=["T (K)"]),
+            df_thermal_expansion.drop(columns=["T (K)"]),
+            df_crystal_eos.drop(columns=["T (K)"]),
+            *molecule_dfs_for_concat,
+        ], axis=1)
+    else:
+        df_crystal_qha = df_crystal_qha.reindex(df_crystal_eos.index)
+        df_thermal_expansion = df_thermal_expansion.reindex(df_crystal_eos.index)
+
+        _assert_consistent_temps(df_crystal_qha, df_crystal_eos, "QHA")
+
+        df_quasi_harmonic = pd.concat([
+            df_crystal_eos[["T (K)"]],
+            df_crystal_qha.drop(columns=["T (K)"]),
+            df_thermal_expansion.drop(columns=["T (K)"]),
+            df_crystal_eos.drop(columns=["T (K)"]),
+        ], axis=1)
+
+    return df_quasi_harmonic, df_crystal_qha
 
 
 def _store_cif_adps(
@@ -492,12 +608,15 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         # referenced only for cell_relaxation='full' 
         #
         optimizer._pressure_GPa = config.pressure_GPa
-    unit_cell_V0, space_group_V0 = mbe_automation.structure.relax.crystal(
+    unit_cell_V0, space_group_V0 = mbe_automation.dynamics.harmonic.core.load_or_relax_crystal(
         unit_cell=unit_cell,
         calculator=config.calculator,
         config=optimizer,
         work_dir=geom_opt_dir/relaxed_crystal_label,
-        key=f"{config.root_key}/structures/{relaxed_crystal_label}"
+        dataset=config.dataset,
+        root_key=config.root_key,
+        system_label=relaxed_crystal_label,
+        restart=config.restart,
     )
     #
     # Note: From this point forward, unit_cell_V0 is guaranteed to be
@@ -519,6 +638,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         calculator=config.calculator,
         config=config.relaxation,
         work_dir=geom_opt_dir,
+        restart=config.restart,
     )
     n_atoms_primitive, n_atoms_conventional = _centering_ratio(unit_cell_V0)
     molecule_refs, n_equivalent_primitive = _normalize_molecule_input(
@@ -557,6 +677,7 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             root_key=config.root_key,
             temperatures_K=config.temperatures_K,
             gas_pressure_GPa=config.pressure_GPa,
+            restart=config.restart,
         )
         n_formula_units = np.gcd.reduce(n_equivalent_primitive)
         mbe_automation.storage.save_attribute(
@@ -586,17 +707,12 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     # Phonon properties of the fully relaxed cell
     # (the harmonic approximation)
     #
-    phonons = mbe_automation.dynamics.harmonic.core.phonons(
-        unit_cell_V0,
-        config.calculator,
-        supercell_matrix,
-        config.supercell_displacement,
+    phonons, df_crystal = mbe_automation.dynamics.harmonic.core.load_or_compute_crystal_phonons(
+        unit_cell=unit_cell_V0,
+        calculator=config.calculator,
+        supercell_matrix=supercell_matrix,
+        supercell_displacement=config.supercell_displacement,
         interp_mesh=config.fourier_interpolation_mesh,
-        key=f"{config.root_key}/phonons/{relaxed_crystal_label}"
-    )
-    df_crystal = mbe_automation.dynamics.harmonic.data.crystal(
-        unit_cell_V0,
-        phonons,
         temperatures=config.temperatures_K,
         external_pressure_GPa=config.pressure_GPa,
         imaginary_mode_threshold=config.imaginary_mode_threshold,
@@ -605,8 +721,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         dataset=config.dataset,
         root_key=config.root_key,
         system_label=relaxed_crystal_label,
-        level_of_theory=config.calculator.level_of_theory,
         unit_cell_type="primitive",
+        restart=config.restart,
     )
 
     if config.save_adps:
@@ -657,6 +773,20 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     #
     interp_mesh = phonons.mesh.mesh_numbers # enforce the same mesh for all systems
 
+    target_eos_labels = mbe_automation.dynamics.harmonic.core.expected_eos_labels(
+        eos_sampling=config.eos_sampling,
+        volume_range=config.volume_range,
+        thermal_pressures_GPa=config.thermal_pressures_GPa,
+    )
+    eos_volumes_unchanged = (
+        config.restart
+        and mbe_automation.dynamics.harmonic.core.has_matching_eos_sampling(
+            dataset=config.dataset,
+            root_key=config.root_key,
+            target_labels=target_eos_labels,
+        )
+    )
+
     interpolated_harmonic_props = mbe_automation.dynamics.harmonic.core.equilibrium_curve(
         unit_cell_V0,
         space_group_V0,
@@ -682,7 +812,17 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         config.dataset,
         config.root_key,
         config.save_plots,
+        restart=config.restart,
     )
+
+    if config.restart and not eos_volumes_unchanged:
+        mbe_automation.dynamics.harmonic.core.clear_equilibrium_temperature_calculations(
+            dataset=config.dataset,
+            root_key=config.root_key,
+            work_dir=config.work_dir,
+        )
+    restart_temperatures = config.restart and eos_volumes_unchanged
+
     df_crystal_eos = interpolated_harmonic_props.interpolated_at_equilibrium_volume
 
     effective_volume_curve = config.volume_curve
@@ -763,6 +903,21 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
     data_frames_at_T = []
     filtered_df = df_crystal_eos[df_crystal_eos["valid_equilibrium"]]
+    csv_equilibrium_path = os.path.join(
+        config.work_dir,
+        "thermodynamics_equilibrium_volume.csv",
+    )
+
+    if config.incremental_csv:
+        df_initial_qha, _ = _assemble_quasi_harmonic_df(
+            df_crystal_eos=df_crystal_eos,
+            frames_at_T=data_frames_at_T,
+            effective_volume_curve=effective_volume_curve,
+            reference_state_forcing=config.electronic_energy_correction.reference_state_forcing,
+            df_molecules=df_molecules,
+            n_equivalent_primitive=n_equivalent_primitive,
+        )
+        df_initial_qha.to_csv(csv_equilibrium_path)
 
     for i, row in filtered_df.iterrows():
         T = row["T (K)"]
@@ -793,12 +948,15 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
                 p_effective += interpolated_harmonic_props.eec.evaluate_pressure(V)
             optimizer._pressure_GPa = p_effective
             optimizer.cell_relaxation = "full"
-            unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
+            unit_cell_T, space_group_T = mbe_automation.dynamics.harmonic.core.load_or_relax_crystal(
                 unit_cell=unit_cell_T,
                 calculator=config.calculator,
                 config=optimizer,
                 work_dir=geom_opt_dir/label_crystal,
-                key=f"{config.root_key}/structures/{label_crystal}"
+                dataset=config.dataset,
+                root_key=config.root_key,
+                system_label=label_crystal,
+                restart=restart_temperatures,
             )
         elif config.eos_sampling == "volume" or config.eos_sampling == "uniform_scaling":
             #
@@ -817,24 +975,22 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             else:
                 optimizer.cell_relaxation = "only_atoms"
                 
-            unit_cell_T, space_group_T = mbe_automation.structure.relax.crystal(
+            unit_cell_T, space_group_T = mbe_automation.dynamics.harmonic.core.load_or_relax_crystal(
                 unit_cell=unit_cell_T,
                 calculator=config.calculator,
                 config=optimizer,
                 work_dir=geom_opt_dir/label_crystal,
-                key=f"{config.root_key}/structures/{label_crystal}"
+                dataset=config.dataset,
+                root_key=config.root_key,
+                system_label=label_crystal,
+                restart=restart_temperatures,
             )
-        phonons = mbe_automation.dynamics.harmonic.core.phonons(
-            unit_cell_T,
-            config.calculator,
-            supercell_matrix,
-            config.supercell_displacement,
+        phonons, df_crystal_T = mbe_automation.dynamics.harmonic.core.load_or_compute_crystal_phonons(
+            unit_cell=unit_cell_T,
+            calculator=config.calculator,
+            supercell_matrix=supercell_matrix,
+            supercell_displacement=config.supercell_displacement,
             interp_mesh=interp_mesh,
-            key=f"{config.root_key}/phonons/force_constants/{label_crystal}"
-        )
-        df_crystal_T = mbe_automation.dynamics.harmonic.data.crystal(
-            unit_cell_T,
-            phonons,
             temperatures=np.array([T]),
             external_pressure_GPa=config.pressure_GPa,
             imaginary_mode_threshold=config.imaginary_mode_threshold, 
@@ -843,8 +999,8 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             dataset=config.dataset,
             root_key=config.root_key,
             system_label=label_crystal,
-            level_of_theory=config.calculator.level_of_theory,
             unit_cell_type="primitive",
+            restart=restart_temperatures,
         )
         
         if (config.electronic_energy_correction.is_enabled
@@ -859,6 +1015,17 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         df_crystal_T.index = [i] # map current dataframe to temperature T
         data_frames_at_T.append(df_crystal_T)
 
+        if config.incremental_csv:
+            df_partial_qha, _ = _assemble_quasi_harmonic_df(
+                df_crystal_eos=df_crystal_eos,
+                frames_at_T=data_frames_at_T,
+                effective_volume_curve=effective_volume_curve,
+                reference_state_forcing=config.electronic_energy_correction.reference_state_forcing,
+                df_molecules=df_molecules,
+                n_equivalent_primitive=n_equivalent_primitive,
+            )
+            df_partial_qha.to_csv(csv_equilibrium_path)
+
     if not data_frames_at_T:
         print("\n" + "!" * 80)
         print("HALTING WORKFLOW".center(80))
@@ -868,88 +1035,23 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
         print("!" * 80 + "\n")
         mbe_automation.common.display.timestamp_finish(datetime_start)
         return
-    #
-    # Create a single data frame for the whole temperature range
-    # by vertically stacking data frames computed for individual
-    # temeprature points
-    #
-    df_crystal_qha = pd.concat(data_frames_at_T)
-    df_crystal_qha["volume_curve"] = effective_volume_curve
-    df_crystal_qha["reference_state_forcing"] = (
-        config.electronic_energy_correction.reference_state_forcing
-    )
-    #
-    # Compute heat capacity at constant pressure (C_P_tot) and thermal expansion
-    # coefficients (alpha_V, alpha_L_a, alpha_L_b, alpha_L_c) using numerical
-    # derivatives. The derivatives will be computed only if there is a sufficient
-    # number of temperature points with equilibrium values of thermodynamic functions.
-    # The numerical algorithm chosen for dX/dT depends on the number of available
-    # temperature points.
-    #
-    df_thermal_expansion = mbe_automation.dynamics.harmonic.crystal_thermo.fit_thermal_expansion_properties(
-        df_crystal_equilibrium=df_crystal_qha
-    )
-    #
-    # Reindex onto the full temperature axis of df_crystal_eos just before the
-    # concat. The added rows are temperatures where the equilibrium-volume search
-    # failed and are left empty (NaN). Reindexing here, rather than earlier, keeps
-    # those temperatures out of fit_thermal_expansion and sublimation above.
-    #
-    if df_molecules is not None:
-        df_sublimation_qha = _compute_sublimation_df(
-            df_crystal=df_crystal_qha,
-            df_molecules=df_molecules,
-            n_equivalent_primitive=n_equivalent_primitive,
-        )
-        molecule_dfs_for_concat = _tag_molecule_dfs_for_concat(df_molecules)
-        df_crystal_qha = df_crystal_qha.reindex(df_crystal_eos.index)
-        df_thermal_expansion = df_thermal_expansion.reindex(df_crystal_eos.index)
-        
-        #
-        # Verify strict alignment of temperatures to ensure pandas axis=1
-        # concatenation operates on physically matching rows
-        #
-        _assert_consistent_temps(df_sublimation_qha, df_crystal_eos, "sublimation")
-        _assert_consistent_temps(df_crystal_qha, df_crystal_eos, "QHA")
-        for k, df_mol in enumerate(df_molecules):
-            _assert_consistent_temps(df_mol, df_crystal_eos, f"molecule_{k}")
 
-        df_quasi_harmonic = pd.concat([
-            df_sublimation_qha,
-            df_crystal_qha.drop(columns=["T (K)"]),
-            df_thermal_expansion.drop(columns=["T (K)"]),
-            df_crystal_eos.drop(columns=["T (K)"]),
-            *molecule_dfs_for_concat,
-        ], axis=1)
-
-    else:
-        df_crystal_qha = df_crystal_qha.reindex(df_crystal_eos.index)
-        df_thermal_expansion = df_thermal_expansion.reindex(df_crystal_eos.index)
-        
-        #
-        # Verify strict alignment of temperatures to ensure pandas axis=1
-        # concatenation operates on physically matching rows
-        #
-        _assert_consistent_temps(df_crystal_qha, df_crystal_eos, "QHA")
-        
-        #
-        # Source "T (K)" from the full-index df_crystal_eos so it is never NaN
-        # at the failed temperatures.
-        #
-        df_quasi_harmonic = pd.concat([
-            df_crystal_eos[["T (K)"]],
-            df_crystal_qha.drop(columns=["T (K)"]),
-            df_thermal_expansion.drop(columns=["T (K)"]),
-            df_crystal_eos.drop(columns=["T (K)"]),
-        ], axis=1)
+    df_quasi_harmonic, df_crystal_qha = _assemble_quasi_harmonic_df(
+        df_crystal_eos=df_crystal_eos,
+        frames_at_T=data_frames_at_T,
+        effective_volume_curve=effective_volume_curve,
+        reference_state_forcing=config.electronic_energy_correction.reference_state_forcing,
+        df_molecules=df_molecules,
+        n_equivalent_primitive=n_equivalent_primitive,
+    )
         
     mbe_automation.storage.save_data_frame(
         df=df_quasi_harmonic,
         dataset=config.dataset,
         key=f"{config.root_key}/thermodynamics_equilibrium_volume"
     )
-    if config.save_csv:
-        df_quasi_harmonic.to_csv(os.path.join(config.work_dir, "thermodynamics_equilibrium_volume.csv"))
+    if config.save_csv or config.incremental_csv:
+        df_quasi_harmonic.to_csv(csv_equilibrium_path)
 
     #
     # Compare the interpolated Gibbs free energy against the actual one only at

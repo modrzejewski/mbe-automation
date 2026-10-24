@@ -109,6 +109,8 @@ qha_config = FreeEnergy(
     save_csv=True,
     save_adps=False,
     adps_k_point_mesh=50.0,
+    restart=False,
+    incremental_csv=False,
 )
 
 mbe_automation.run(

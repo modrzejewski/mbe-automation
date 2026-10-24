@@ -282,7 +282,8 @@ def _assert_supercell_consistency(
 def molecular_vibrations(
         molecule,
         calculator,
-        work_dir: str | Path = "."
+        work_dir: str | Path = ".",
+        restart: bool = False,
 ):
     """
     Compute molecular vibrations of a molecule using
@@ -291,7 +292,7 @@ def molecular_vibrations(
     molecule.calc = calculator
 
     vib_dir = Path(work_dir)
-    if vib_dir.exists():
+    if vib_dir.exists() and not restart:
         shutil.rmtree(vib_dir)
     vib_dir.mkdir(parents=True, exist_ok=True)
 
@@ -447,6 +448,276 @@ def phonons(
     return phonons
 
 
+def has_stored_structure(
+        dataset: str | Path,
+        root_key: str,
+        system_label: str,
+) -> bool:
+    dataset_path = Path(dataset)
+    if not dataset_path.exists():
+        return False
+    root_key_clean = root_key.strip("/")
+    structure_key = f"{root_key_clean}/structures/{system_label}"
+    return structure_key in mbe_automation.storage.DatasetKeys(dataset_path).structures()
+
+
+def has_completed_crystal_phonons(
+        dataset: str | Path,
+        root_key: str,
+        system_label: str,
+) -> bool:
+    dataset_path = Path(dataset)
+    if not dataset_path.exists():
+        return False
+    root_key_clean = root_key.strip("/")
+    keys = mbe_automation.storage.DatasetKeys(dataset_path)
+    fc_key = f"{root_key_clean}/phonons/force_constants/{system_label}"
+    bz_key = f"{root_key_clean}/phonons/brillouin_zone_paths/{system_label}"
+    structure_key = f"{root_key_clean}/structures/{system_label}"
+    return (
+        fc_key in keys.force_constants()
+        and bz_key in keys.brillouin_zone_paths()
+        and structure_key in keys.structures()
+    )
+
+
+def load_or_relax_crystal(
+        unit_cell: ase.Atoms,
+        calculator,
+        config: Minimum,
+        work_dir: Path | str,
+        dataset: str | Path,
+        root_key: str,
+        system_label: str,
+        restart: bool = False,
+) -> tuple[ase.Atoms, int]:
+    work_dir_path = Path(work_dir)
+    root_key_clean = root_key.strip("/")
+    structure_key = f"{root_key_clean}/structures/{system_label}"
+
+    if restart:
+        if has_stored_structure(dataset, root_key, system_label):
+            mbe_automation.common.display.framed([
+                "Geometry relaxation (restarted from dataset)",
+                structure_key,
+            ])
+            stored_structure = mbe_automation.storage.read_structure(
+                dataset=str(dataset),
+                key=structure_key,
+            )
+            relaxed_cell = mbe_automation.storage.to_ase(stored_structure)
+            relaxed_cell.calc = calculator
+            space_group, _ = mbe_automation.structure.crystal.check_symmetry(
+                relaxed_cell,
+                symmetry_thresh=config.symmetry_tolerance_strict,
+            )
+            return relaxed_cell, space_group
+
+        cif_path = work_dir_path / "relaxed_structure.cif"
+        if cif_path.exists():
+            mbe_automation.common.display.framed([
+                "Geometry relaxation (restarted from CIF file)",
+                structure_key,
+            ])
+            relaxed_cell = mbe_automation.storage.from_file(
+                read_path=cif_path,
+                transform=config.transform,
+                symprec=config.symmetry_tolerance_loose,
+            )
+            relaxed_cell.calc = calculator
+            space_group, _ = mbe_automation.structure.crystal.check_symmetry(
+                relaxed_cell,
+                symmetry_thresh=config.symmetry_tolerance_strict,
+            )
+            return relaxed_cell, space_group
+
+    return mbe_automation.structure.relax.crystal(
+        unit_cell=unit_cell,
+        calculator=calculator,
+        config=config,
+        work_dir=work_dir_path,
+        key=structure_key,
+    )
+
+
+def load_or_compute_crystal_phonons(
+        unit_cell: ase.Atoms,
+        calculator,
+        supercell_matrix: npt.NDArray[np.int64],
+        supercell_displacement: float,
+        interp_mesh,
+        temperatures: npt.NDArray[np.float64],
+        external_pressure_GPa: float,
+        imaginary_mode_threshold: float,
+        space_group: int,
+        work_dir: Path | str,
+        dataset: str | Path,
+        root_key: str,
+        system_label: str,
+        unit_cell_type: Literal["primitive", "conventional"] = "primitive",
+        restart: bool = False,
+) -> tuple[phonopy.Phonopy, pd.DataFrame]:
+    root_key_clean = root_key.strip("/")
+    fc_key = f"{root_key_clean}/phonons/force_constants/{system_label}"
+    bz_key = f"{root_key_clean}/phonons/brillouin_zone_paths/{system_label}"
+    structure_key = f"{root_key_clean}/structures/{system_label}"
+
+    if restart and has_completed_crystal_phonons(dataset, root_key, system_label):
+        mbe_automation.common.display.framed([
+            "Phonons (restarted from dataset)",
+            fc_key,
+        ])
+        ph = mbe_automation.storage.to_phonopy(
+            dataset=str(dataset),
+            key=fc_key,
+        )
+        ph.run_mesh(
+            mesh=interp_mesh,
+            is_gamma_center=True,
+        )
+        stored_structure = mbe_automation.storage.read_structure(
+            dataset=str(dataset),
+            key=structure_key,
+        )
+        bz_path = mbe_automation.storage.read_brillouin_zone_path(
+            dataset=str(dataset),
+            key=bz_key,
+        )
+        if stored_structure.E_pot is not None:
+            e_pot_eV = float(np.asarray(stored_structure.E_pot).item()) * len(unit_cell)
+            e_el_kJ_mol = e_pot_eV * ase.units.eV / (ase.units.kJ / ase.units.mol)
+        else:
+            e_el_kJ_mol = None
+
+        df_crystal = mbe_automation.dynamics.harmonic.data.crystal(
+            unit_cell=unit_cell,
+            phonons=ph,
+            temperatures=temperatures,
+            external_pressure_GPa=external_pressure_GPa,
+            imaginary_mode_threshold=imaginary_mode_threshold,
+            space_group=space_group,
+            work_dir=work_dir,
+            dataset=str(dataset),
+            root_key=root_key,
+            system_label=system_label,
+            level_of_theory=calculator.level_of_theory,
+            unit_cell_type=unit_cell_type,
+            save_to_dataset=False,
+            e_el_kJ_mol=e_el_kJ_mol,
+            brillouin_zone_path=bz_path,
+        )
+        return ph, df_crystal
+
+    ph = phonons(
+        unit_cell,
+        calculator,
+        supercell_matrix,
+        supercell_displacement,
+        interp_mesh=interp_mesh,
+        key=fc_key,
+    )
+    df_crystal = mbe_automation.dynamics.harmonic.data.crystal(
+        unit_cell=unit_cell,
+        phonons=ph,
+        temperatures=temperatures,
+        external_pressure_GPa=external_pressure_GPa,
+        imaginary_mode_threshold=imaginary_mode_threshold,
+        space_group=space_group,
+        work_dir=work_dir,
+        dataset=str(dataset),
+        root_key=root_key,
+        system_label=system_label,
+        level_of_theory=calculator.level_of_theory,
+        unit_cell_type=unit_cell_type,
+        save_to_dataset=True,
+    )
+    return ph, df_crystal
+
+
+def expected_eos_labels(
+        eos_sampling: Literal[*EOS_SAMPLING_ALGOS],
+        volume_range: npt.NDArray[np.float64] | None,
+        thermal_pressures_GPa: npt.NDArray[np.float64] | None,
+) -> list[str]:
+    if eos_sampling == "pressure":
+        return [
+            f"crystal[eos:p_thermal={p:.4f}]"
+            for p in thermal_pressures_GPa
+        ]
+    return [
+        f"crystal[eos:V={v:.4f}]"
+        for v in volume_range
+    ]
+
+
+def has_matching_eos_sampling(
+        dataset: str | Path,
+        root_key: str,
+        target_labels: list[str],
+) -> bool:
+    dataset_path = Path(dataset)
+    if not dataset_path.exists():
+        return False
+
+    if not all(
+        has_completed_crystal_phonons(dataset_path, root_key, label)
+        for label in target_labels
+    ):
+        return False
+
+    root_key_clean = root_key.strip("/")
+    eos_key = f"{root_key_clean}/eos_sampled"
+    try:
+        df_eos = mbe_automation.storage.read_data_frame(
+            dataset=str(dataset_path),
+            key=eos_key,
+            columns=["system_label_crystal"],
+        )
+    except Exception:
+        return False
+
+    if "system_label_crystal" not in df_eos.columns:
+        return False
+
+    existing_labels = {
+        val.decode("utf-8") if isinstance(val, (bytes, np.bytes_)) else str(val)
+        for val in df_eos["system_label_crystal"].to_list()
+    }
+    return existing_labels == set(target_labels)
+
+
+def clear_equilibrium_temperature_calculations(
+        dataset: str | Path,
+        root_key: str,
+        work_dir: str | Path,
+) -> None:
+    dataset_path = Path(dataset)
+    root_key_clean = root_key.strip("/")
+    if dataset_path.exists():
+        keys = mbe_automation.storage.DatasetKeys(dataset_path)
+        prefixes = [
+            f"{root_key_clean}/phonons/force_constants/crystal[eq:",
+            f"{root_key_clean}/phonons/brillouin_zone_paths/crystal[eq:",
+            f"{root_key_clean}/structures/crystal[eq:",
+        ]
+        for key in list(keys):
+            if any(key.startswith(prefix) for prefix in prefixes):
+                mbe_automation.storage.delete(dataset_path, key)
+
+        thermo_key = f"{root_key_clean}/thermodynamics_equilibrium_volume"
+        try:
+            mbe_automation.storage.delete(dataset_path, thermo_key)
+        except Exception:
+            pass
+
+    for subdir_name in ("relaxation", "phonons"):
+        parent_dir = Path(work_dir) / subdir_name
+        if parent_dir.exists():
+            for child in parent_dir.iterdir():
+                if child.is_dir() and child.name.startswith("crystal[eq:"):
+                    shutil.rmtree(child)
+
+
 def _fit_debye_model(
     df: pd.DataFrame,
     debye_model: mbe_automation.dynamics.harmonic.eec.DebyeModel,
@@ -516,6 +787,7 @@ def equilibrium_curve(
         dataset: str,
         root_key: str,
         save_plots: bool,
+        restart: bool = False,
 ):
 
     geom_opt_dir = Path(work_dir) / "relaxation"
@@ -563,12 +835,15 @@ def equilibrium_curve(
             optimizer = deepcopy(relaxation)
             optimizer.cell_relaxation = "full"
             optimizer._pressure_GPa = thermal_pressures_GPa[i] + external_pressure_GPa
-            unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
+            unit_cell_V, space_group_V = load_or_relax_crystal(
                 unit_cell=unit_cell_V0,
                 calculator=calculator,
                 config=optimizer,
                 work_dir=geom_opt_dir/label,
-                key=f"{root_key}/structures/{label}"
+                dataset=dataset,
+                root_key=root_key,
+                system_label=label,
+                restart=restart,
             )
             
         elif (
@@ -590,36 +865,33 @@ def equilibrium_curve(
             else:
                 optimizer.cell_relaxation = "only_atoms"
                 
-            unit_cell_V, space_group_V = mbe_automation.structure.relax.crystal(
+            unit_cell_V, space_group_V = load_or_relax_crystal(
                 unit_cell=unit_cell_V,
                 calculator=calculator,
                 config=optimizer,
                 work_dir=geom_opt_dir/label,
-                key=f"{root_key}/structures/{label}"
+                dataset=dataset,
+                root_key=root_key,
+                system_label=label,
+                restart=restart,
             )
             
-        ph = phonons(
-            unit_cell_V,
-            calculator,
-            supercell_matrix,
-            supercell_displacement,
+        _, df_crystal_V = load_or_compute_crystal_phonons(
+            unit_cell=unit_cell_V,
+            calculator=calculator,
+            supercell_matrix=supercell_matrix,
+            supercell_displacement=supercell_displacement,
             interp_mesh=interp_mesh,
-            key=f"{root_key}/phonons/force_constants/{label}"
-        )
-        
-        df_crystal_V = mbe_automation.dynamics.harmonic.data.crystal(
-            unit_cell_V,
-            ph,
-            temperatures,
-            external_pressure_GPa,
-            imaginary_mode_threshold,
+            temperatures=temperatures,
+            external_pressure_GPa=external_pressure_GPa,
+            imaginary_mode_threshold=imaginary_mode_threshold,
             space_group=space_group_V,
             work_dir=work_dir,
             dataset=dataset,
             root_key=root_key,
             system_label=label,
-            level_of_theory=calculator.level_of_theory,
             unit_cell_type="primitive",
+            restart=restart,
         )
         df_eos_points.append(df_crystal_V)
 

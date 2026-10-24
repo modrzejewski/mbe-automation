@@ -348,6 +348,8 @@ class FreeEnergy:
     save_csv: bool = True
     save_adps: bool = False
     adps_k_point_mesh: npt.NDArray[np.integer] | Literal["gamma"] | float = 50.0
+    restart: bool = False
+    incremental_csv: bool = False
 
     def __post_init__(self):
         import mbe_automation.dynamics.harmonic.eos
