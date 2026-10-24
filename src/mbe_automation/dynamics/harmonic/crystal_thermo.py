@@ -383,3 +383,111 @@ def fit_thermal_expansion_properties(
             "α_L_b_conventional (1∕K)": properties.alpha_L_b_conv,
             "α_L_c_conventional (1∕K)": properties.alpha_L_c_conv,
     }, index=df_crystal_equilibrium.index)
+
+
+def cumulative_vibrational_entropy(
+    freqs_THz: npt.NDArray[np.float64],
+    temperature_K: float,
+    weights: npt.NDArray[np.float64] | None = None,
+    frequency_step_cm1: float = 1.0,
+    freq_max_cm1: float | None = None,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    """
+    Compute cumulative crystal vibrational entropy T*S(nu) on an equidistant frequency grid.
+
+    Args:
+        freqs_THz: Phonon frequencies in THz.
+            Shape: (n_qpoints, n_bands) when weights are provided.
+            Shape: (n_modes,) when weights=None (gamma-point calculation).
+        temperature_K: Temperature in Kelvin.
+        weights: Geometric weights of q-points.
+            Shape: (n_qpoints,).
+            If None, a single gamma-point calculation is assumed
+            and freqs_THz must be 1D (n_modes,).
+        frequency_step_cm1: Step size Delta nu in cm^-1 for the equidistant frequency grid.
+        freq_max_cm1: Optional upper frequency bound in cm^-1 for the grid.
+            If None, defaults to ceil(max(nu) / frequency_step_cm1) * frequency_step_cm1.
+
+    Returns:
+        Tuple of:
+        - grid_frequencies_cm1: Equidistant frequencies in cm^-1.
+        - cumulative_TS_kJ_mol: Cumulative T*S(nu) in kJ/mol/unit cell.
+    """
+    if frequency_step_cm1 <= 0.0:
+        raise ValueError(f"frequency_step_cm1 must be positive, got {frequency_step_cm1}.")
+
+    freqs = np.array(freqs_THz, dtype=np.float64)
+
+    if weights is None:
+        assert freqs.ndim == 1, (
+            f"When weights=None (gamma-point), freqs_THz must be 1D (N_modes,), "
+            f"got shape {freqs.shape}"
+        )
+        weights_arr = np.array([1.0], dtype=np.float64)
+        freqs = freqs.reshape(1, -1)
+    else:
+        weights_arr = np.array(weights, dtype=np.float64)
+
+    assert freqs.ndim == 2, (
+        f"freqs_THz must be 2D (n_qpoints, n_bands), got shape {freqs.shape}"
+    )
+    assert weights_arr.ndim == 1, (
+        f"weights must be 1D (n_qpoints,), got shape {weights_arr.shape}"
+    )
+    assert freqs.shape[0] == weights_arr.shape[0], (
+        f"Shape mismatch: freqs has {freqs.shape[0]} q-points "
+        f"but weights has {weights_arr.shape[0]} entries"
+    )
+
+    total_weight = np.sum(weights_arr)
+    weights_expanded = np.broadcast_to(weights_arr[:, None], freqs.shape)
+
+    units = get_physical_units()
+    THzToEv = units.THzToEv
+    THzToCm = units.THzToCm
+    kB = units.KB
+    EvTokJmol = units.EvTokJmol
+
+    hbar_omega = freqs * THzToEv
+    freqs_cm1 = freqs * THzToCm
+
+    condition = hbar_omega > 1.0E-8
+    valid_hbar_omega = hbar_omega[condition]
+    valid_freqs_cm1 = freqs_cm1[condition]
+    valid_weights = weights_expanded[condition]
+
+    if freq_max_cm1 is not None:
+        if freq_max_cm1 < 0.0:
+            raise ValueError(f"freq_max_cm1 must be non-negative, got {freq_max_cm1}.")
+        max_grid_cm1 = float(freq_max_cm1)
+    elif len(valid_freqs_cm1) > 0:
+        max_grid_cm1 = (
+            np.ceil(np.max(valid_freqs_cm1) / frequency_step_cm1) * frequency_step_cm1
+        )
+    else:
+        max_grid_cm1 = 0.0
+
+    n_steps = int(np.round(max_grid_cm1 / frequency_step_cm1)) + 1
+    grid_frequencies_cm1 = np.arange(n_steps, dtype=np.float64) * frequency_step_cm1
+    cumulative_TS_kJ_mol = np.zeros_like(grid_frequencies_cm1)
+
+    if temperature_K >= 1.0E-6 and len(valid_hbar_omega) > 0:
+        beta = 1.0 / (kB * temperature_K)
+        x = valid_hbar_omega * beta
+        bose_factor = 1.0 / np.expm1(x)
+
+        TS_modes_eV = temperature_K * kB * (x * bose_factor - stable_log1mexp(x))
+        TS_modes_weighted_kJ_mol = (
+            (TS_modes_eV * valid_weights / total_weight) * EvTokJmol
+        )
+
+        sort_order = np.argsort(valid_freqs_cm1, kind="mergesort")
+        sorted_freqs_cm1 = valid_freqs_cm1[sort_order]
+        sorted_TS_cumsum = np.cumsum(TS_modes_weighted_kJ_mol[sort_order])
+
+        indices = np.searchsorted(sorted_freqs_cm1, grid_frequencies_cm1, side="right")
+        nonzero_mask = indices > 0
+        cumulative_TS_kJ_mol[nonzero_mask] = sorted_TS_cumsum[indices[nonzero_mask] - 1]
+
+    return grid_frequencies_cm1, cumulative_TS_kJ_mol
+

@@ -17,10 +17,6 @@ if "nomore_ase.workflows.refinement" not in sys.modules:
     sys.modules["nomore_ase.workflows.refinement"] = mock_workflow_module
     mock_workflow_module.NoMoReRefinement = MagicMock()
 
-if "mace" not in sys.modules:
-    sys.modules["mace"] = MagicMock()
-    sys.modules["mace.calculators"] = MagicMock()
-
 import pytest
 import numpy as np
 from pathlib import Path

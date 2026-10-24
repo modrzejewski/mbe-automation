@@ -12,8 +12,6 @@ from . import mbe_legacy
 from .calculators import (
     HF,
     DFT,
-    MACE,
-    DeltaMACE,
     UMA,
 )
 
@@ -27,6 +25,7 @@ from .storage import (
 )
 from .api import (
     ForceConstants,
+    CumulativeVibrationalEntropy,
     Structure,
     Trajectory,
     MolecularCrystal,
@@ -48,3 +47,4 @@ from .api import (
 )
 
 read = AnySystem.read
+

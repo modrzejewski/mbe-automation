@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import mbe_automation
 from mbe_automation import (
-    MACE,
+    UMA,
     UniqueClustersFilter,
 )
 from mbe_automation.storage import from_xyz_file
@@ -22,16 +22,23 @@ from tests.reference_data.test_cases import TEST_CASES
 
 @pytest.fixture(scope="module")
 def mbe(tmp_path_factory) -> MBE:
-    test_cases_with_models = [
-        c for c in TEST_CASES
-        if c.get("general_model_path", Path()).exists()
-    ]
-    if not test_cases_with_models:
-        pytest.skip("No test cases with models available.")
+    if UMA is None:
+        pytest.skip("UMA calculator is not available.")
 
-    case = test_cases_with_models[0]
+    case = TEST_CASES[0]
     crystal = from_xyz_file(case["crystal_path"])
-    calc = MACE(model_path=str(case["general_model_path"]))
+    model_path = case.get("general_model_path")
+    try:
+        if (
+            model_path is not None
+            and Path(model_path).suffix == ".pt"
+            and Path(model_path).is_file()
+        ):
+            calc = UMA(model_path=str(model_path))
+        else:
+            calc = UMA()
+    except Exception as exc:
+        pytest.skip(f"UMA model unavailable: {exc}")
 
     unique_cluster_filter = UniqueClustersFilter(
         cluster_types=["monomers", "dimers", "trimers"],

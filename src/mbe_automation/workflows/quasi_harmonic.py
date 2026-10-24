@@ -18,7 +18,7 @@ import mbe_automation.structure.molecule
 import mbe_automation.structure.relax
 import mbe_automation.structure.clusters
 
-from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
+from mbe_automation.calculators.uma import FAIRChemCalculator, _UMA_AVAILABLE
 from mbe_automation.dynamics.harmonic.modes import PhononFilter, thermal_displacements
 from mbe_automation.storage.verification import verify_adps_roundtrip
 
@@ -421,6 +421,70 @@ def _store_cif_adps(
     )
 
 
+def _store_cumulative_entropy(
+    config: mbe_automation.configs.quasi_harmonic.FreeEnergy,
+    force_constants_key: str,
+    crystal_label: str,
+    temperatures_K: np.ndarray,
+    single_temperature_label: bool = False,
+) -> None:
+    """
+    Compute cumulative vibrational entropy T*S(nu) and store to HDF5, CSV, and plot.
+    """
+    ce_config = config.cumulative_entropy
+    if ce_config is None:
+        return
+
+    k_point_mesh = (
+        ce_config.k_point_mesh
+        if ce_config.k_point_mesh is not None
+        else config.fourier_interpolation_mesh
+    )
+    fc = mbe_automation.api.classes.ForceConstants.read(
+        dataset=str(config.dataset),
+        key=force_constants_key,
+    )
+
+    for T in temperatures_K:
+        if single_temperature_label:
+            hdf5_key = f"{config.root_key}/phonons/cumulative_entropy/{crystal_label}"
+            base_name = "cumulative_entropy"
+        else:
+            hdf5_key = f"{config.root_key}/phonons/cumulative_entropy/{crystal_label}/T={T:.2f}K"
+            base_name = f"cumulative_entropy_T={T:.2f}K"
+
+        out_dir = Path(config.work_dir) / "phonons" / crystal_label
+        csv_path = (
+            out_dir / f"{base_name}.csv"
+            if (config.save_csv and ce_config.save_csv)
+            else None
+        )
+        plot_path = (
+            out_dir / f"{base_name}.png"
+            if (config.save_plots and ce_config.save_plot)
+            else None
+        )
+
+        cum_entropy = fc.cumulative_entropy(
+            temperature_K=float(T),
+            k_point_mesh=k_point_mesh,
+            frequency_step_cm1=ce_config.frequency_step_cm1,
+            center_at_gamma=ce_config.center_at_gamma,
+            use_mesh_symmetry=ce_config.use_mesh_symmetry,
+            symmetrize_Dq=ce_config.symmetrize_Dq,
+            symprec=ce_config.symprec,
+            save_csv_path=csv_path,
+            save_plot_path=plot_path,
+            freq_max_cm1=ce_config.freq_max_cm1,
+        )
+
+        mbe_automation.storage.save_data_frame(
+            df=cum_entropy.to_dataframe(),
+            dataset=str(config.dataset),
+            key=hdf5_key,
+        )
+
+
 def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
 
     assert config.relaxation.transform == "to_symmetrized_primitive_cell", (
@@ -452,9 +516,11 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
     )
     unit_cell = config.crystal.copy()
 
-    if _MACE_AVAILABLE:
-        if isinstance(config.calculator, MACECalculator):
-            mbe_automation.common.display.mace_summary(config.calculator)
+    if _UMA_AVAILABLE:
+        if isinstance(config.calculator, FAIRChemCalculator):
+            mbe_automation.common.display.uma_summary(
+                calculator=config.calculator,
+            )
 
     mbe_automation.storage.save_structure(
         structure=mbe_automation.storage.from_ase_atoms(config.crystal),
@@ -612,6 +678,15 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             config=config,
             key=f"{config.root_key}/phonons/force_constants/{relaxed_crystal_label}",
             crystal_label=relaxed_crystal_label,
+        )
+
+    if config.cumulative_entropy is not None:
+        _store_cumulative_entropy(
+            config=config,
+            force_constants_key=f"{config.root_key}/phonons/force_constants/{relaxed_crystal_label}",
+            crystal_label=relaxed_crystal_label,
+            temperatures_K=config.temperatures_K,
+            single_temperature_label=False,
         )
     
     if df_molecules is not None:
@@ -844,6 +919,15 @@ def run(config: mbe_automation.configs.quasi_harmonic.FreeEnergy):
             level_of_theory=config.calculator.level_of_theory,
             unit_cell_type="primitive",
         )
+
+        if config.cumulative_entropy is not None:
+            _store_cumulative_entropy(
+                config=config,
+                force_constants_key=f"{config.root_key}/phonons/force_constants/{label_crystal}",
+                crystal_label=label_crystal,
+                temperatures_K=np.array([T]),
+                single_temperature_label=True,
+            )
         
         if (config.electronic_energy_correction.is_enabled
                 and not config.electronic_energy_correction.is_implicit):

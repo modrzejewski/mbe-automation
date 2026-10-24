@@ -819,3 +819,59 @@ def debye_model_summary(
     mbe_automation.common.display.dotted_separator(n)
 
 
+def cumulative_entropy(
+    frequencies_cm1: npt.NDArray[np.float64],
+    TS_kJ_mol: npt.NDArray[np.float64],
+    temperature_K: float,
+    asymptotic_TS_kJ_mol: float | None = None,
+    save_path: str | None = None,
+    freq_max_cm1: float | None = None,
+):
+    """
+    Plot cumulative vibrational entropy T*S(nu) as a function of frequency (cm^-1).
+    """
+    if asymptotic_TS_kJ_mol is None:
+        asymptotic_TS_kJ_mol = float(TS_kJ_mol[-1]) if len(TS_kJ_mol) > 0 else 0.0
+
+    fig, ax = plt.subplots()
+    ax.plot(
+        frequencies_cm1,
+        TS_kJ_mol,
+        linestyle="-",
+        linewidth=1.8,
+        label=f"T = {temperature_K:.1f} K",
+    )
+    ax.axhline(
+        asymptotic_TS_kJ_mol,
+        linestyle="--",
+        color="black",
+        linewidth=1.0,
+        alpha=0.7,
+        label=f"Total TS = {asymptotic_TS_kJ_mol:.2f} kJ∕mol",
+    )
+
+    if freq_max_cm1 is not None:
+        ax.set_xlim(0.0, freq_max_cm1)
+    elif len(frequencies_cm1) > 0:
+        ax.set_xlim(0.0, float(frequencies_cm1[-1]))
+
+    y_top = max(asymptotic_TS_kJ_mol * (11.0 / 10.0), 1.0E-3)
+    ax.set_ylim(0.0, y_top)
+
+    ax.set_xlabel("Frequency (cm⁻¹)")
+    ax.set_ylabel("Cumulative entropy TS (kJ∕mol∕unit cell)")
+    ax.grid(True, linestyle="--", alpha=0.6)
+    ax.legend(loc="lower right")
+
+    plt.tight_layout()
+
+    if save_path:
+        output_dir = os.path.dirname(str(save_path))
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        plt.savefig(str(save_path), dpi=300, bbox_inches="tight")
+        plt.close(fig)
+    else:
+        return fig
+
+
