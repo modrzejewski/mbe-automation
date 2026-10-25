@@ -1,6 +1,72 @@
 from __future__ import annotations
-from pathlib import Path
+import getpass
 import os
+from pathlib import Path
+import socket
+import sys
+import tempfile
+
+_USER_SET_TRITON_CACHE = "TRITON_CACHE_DIR" in os.environ
+_USER_SET_INDUCTOR_CACHE = "TORCHINDUCTOR_CACHE_DIR" in os.environ
+_CACHE_CONFIGURED_PID: int | None = None
+
+
+def _configure_compiler_cache_dirs() -> None:
+    """
+    Configure node-local, process-isolated cache directories for Triton and
+    TorchInductor when not already set in the environment.
+
+    Prevents race conditions ([Errno 2] No such file or directory) and stale
+    NFS file handles ([Errno 116] Stale file handle) when multiple cluster jobs
+    or workers compile kernels concurrently on a shared home filesystem.
+    """
+    global _CACHE_CONFIGURED_PID
+    current_pid = os.getpid()
+    if _CACHE_CONFIGURED_PID == current_pid:
+        return
+
+    base_tmp = Path(
+        os.environ.get("TMPDIR")
+        or os.environ.get("TMP")
+        or os.environ.get("TEMP")
+        or tempfile.gettempdir()
+    )
+    try:
+        user = getpass.getuser()
+    except Exception:
+        user = "user"
+    try:
+        host = socket.gethostname()
+    except Exception:
+        host = "localhost"
+    job_id = os.environ.get("SLURM_JOB_ID", "nojob")
+    cache_root = base_tmp / f"mbe_automation_{user}_{host}_{job_id}_{current_pid}"
+
+    if not _USER_SET_TRITON_CACHE:
+        triton_dir = cache_root / "triton_cache"
+        try:
+            triton_dir.mkdir(parents=True, exist_ok=True)
+            os.environ["TRITON_CACHE_DIR"] = str(triton_dir)
+            triton_mod = sys.modules.get("triton")
+            triton_knobs = getattr(triton_mod, "knobs", None)
+            if triton_knobs is not None and hasattr(triton_knobs, "cache"):
+                triton_knobs.cache.dir = str(triton_dir)
+        except OSError:
+            pass
+
+    if not _USER_SET_INDUCTOR_CACHE:
+        inductor_dir = cache_root / "torchinductor_cache"
+        try:
+            inductor_dir.mkdir(parents=True, exist_ok=True)
+            os.environ["TORCHINDUCTOR_CACHE_DIR"] = str(inductor_dir)
+        except OSError:
+            pass
+
+    _CACHE_CONFIGURED_PID = current_pid
+
+
+_configure_compiler_cache_dirs()
+
 import torch
 
 _original_det = torch.det
@@ -41,14 +107,35 @@ except ImportError:
 
 
 def _resolve_inference_settings(
-    inference_settings: str | InferenceSettings,
+    inference_settings: str | InferenceSettings | None = None,
+    nitro: bool = False,
 ) -> str | InferenceSettings:
+    if inference_settings is None:
+        inference_settings = "nitro" if nitro else "float64"
+
     if isinstance(inference_settings, InferenceSettings):
-        if getattr(inference_settings, "base_precision_dtype", None) == torch.float64:
+        is_float64 = (
+            getattr(inference_settings, "base_precision_dtype", None)
+            == torch.float64
+        )
+        is_nitro = bool(nitro or getattr(inference_settings, "nitro", False))
+        if is_nitro and is_float64:
+            raise ValueError(
+                "UMA 'nitro' mode requires 32-bit floating-point precision and "
+                "conflicts with 64-bit precision (float64)."
+            )
+        if is_float64:
             _enable_float64_safe_det()
+        if is_nitro or getattr(inference_settings, "compile", False):
+            _configure_compiler_cache_dirs()
         return inference_settings
 
     if isinstance(inference_settings, str):
+        if nitro and inference_settings == "float64":
+            raise ValueError(
+                "UMA 'nitro' mode requires 32-bit floating-point precision and "
+                "conflicts with 64-bit precision (float64)."
+            )
         if inference_settings == "float64":
             _enable_float64_safe_det()
             return InferenceSettings(
@@ -60,6 +147,7 @@ def _resolve_inference_settings(
                 internal_graph_gen_version=2,
                 base_precision_dtype=torch.float64,
             )
+        _configure_compiler_cache_dirs()
         if guess_inference_settings is not None:
             try:
                 return guess_inference_settings(inference_settings)
@@ -95,8 +183,10 @@ if _UMA_AVAILABLE:
         (e.g., ``uma-s-1p2p1.pt``, ``uma-s-1p2p1-ft-d4rev.pt``,
         ``uma-s-1p2p1-ft-r2scan.pt``, ``uma-s-1p2.pt``, ``uma-m-1p1.pt``) via
         ``model_path`` or by pretrained model name via ``model_name``
-        (defaulting to ``"uma-s-1p2p1"``), using the UMA Nitro inference
-        interface (``inference_settings="nitro"``) by default.
+        (defaulting to ``"uma-s-1p2p1"``). Enforces 64-bit floating-point
+        precision (``float64``) by default for tight geometry relaxations and
+        finite-displacement phonon calculations; set ``nitro=True`` to enable
+        the 32-bit UMA Nitro inference mode.
         """
 
         def __init__(
@@ -105,7 +195,8 @@ if _UMA_AVAILABLE:
             model_name: str = "uma-s-1p2p1",
             device: str | None = None,
             task_name: str | None = "omc",
-            inference_settings: str | InferenceSettings = "nitro",
+            nitro: bool = False,
+            inference_settings: str | InferenceSettings | None = None,
             overrides: dict | None = None,
             workers: int = 1,
             **kwargs,
@@ -164,11 +255,23 @@ if _UMA_AVAILABLE:
                     device = "cpu"
 
             self.device = device
-            self.inference_settings = inference_settings
+            self.nitro = bool(
+                nitro
+                or inference_settings == "nitro"
+                or getattr(inference_settings, "nitro", False)
+            )
+            self.inference_settings = (
+                inference_settings
+                if inference_settings is not None
+                else ("nitro" if self.nitro else "float64")
+            )
             self.overrides = overrides
             self.workers = workers
 
-            config = _resolve_inference_settings(inference_settings)
+            config = _resolve_inference_settings(
+                inference_settings=inference_settings,
+                nitro=nitro,
+            )
 
             if self.model_path is not None:
                 if not self.model_path.is_file():
@@ -228,6 +331,7 @@ if _UMA_AVAILABLE:
                 "model_name": self.model_name,
                 "device": self.device,
                 "task_name": self.task_name,
+                "nitro": self.nitro,
                 "inference_settings": self.inference_settings,
                 "overrides": self.overrides,
                 "workers": self.workers,

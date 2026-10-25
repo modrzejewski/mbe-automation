@@ -468,7 +468,7 @@ The `mbe_automation.calculators` module provides interfaces to computational bac
 
 🔗 [`mbe_automation.calculators.UMA`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/uma.py#L84)
 
-Wraps the Universal Machine learning potential for Atomistic simulations (UMA) via `fairchem-core` with the UMA Nitro inference interface (`inference_settings="nitro"`), local checkpoint loading, and Ray actor serialization.
+Wraps the Universal Machine learning potential for Atomistic simulations (UMA) via `fairchem-core` with 64-bit precision (`float64`) enforced by default, an optional `nitro` flag (`nitro=True`) for 32-bit UMA Nitro inference, local checkpoint loading, and Ray actor serialization.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -476,7 +476,8 @@ Wraps the Universal Machine learning potential for Atomistic simulations (UMA) v
 | `model_name` | `str` | `"uma-s-1p2p1"` | Pretrained UMA model identifier (used when `model_path` is `None`). |
 | `device` | `str \| None` | `None` | Execution device (`"cuda"` or `"cpu"`). Auto-detected if `None`. |
 | `task_name` | `str \| None` | `"omc"` | Prediction head (`"omc"` for molecular crystals, `"omol"` for molecules, `"omat"` for inorganic materials, `"odac"` for MOFs, `"oc20"` / `"oc22"` / `"oc25"` for catalysis). Automatically selects the sole task for single-task fine-tuned checkpoints. |
-| `inference_settings` | `str \| InferenceSettings` | `"nitro"` | Inference preset (`"nitro"`, `"default"`, `"high-precision"`, `"multigpu"`, `"batch"`, `"traineval"`, `"float64"`) or custom `InferenceSettings` object. |
+| `nitro` | `bool` | `False` | Enable 32-bit UMA Nitro inference (`True`) or enforce 64-bit floating-point precision (`False`, default). |
+| `inference_settings` | `str \| InferenceSettings \| None` | `None` | Optional inference preset (`"float64"`, `"nitro"`, `"default"`, `"high-precision"`, `"multigpu"`, `"batch"`, `"traineval"`) or custom `InferenceSettings` object. Defaults to `"nitro"` when `nitro=True` and `"float64"` when `nitro=False`. |
 | `overrides` | `dict \| None` | `None` | Optional dictionary of configuration overrides passed to `load_predict_unit`. |
 | `workers` | `int` | `1` | Number of parallel predictor workers (`1` for single-GPU UMA Nitro). |
 

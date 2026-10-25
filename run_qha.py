@@ -19,7 +19,8 @@ calculator = UMA(
     model_name="uma-s-1p2p1",
     device=None,
     task_name="omc",
-    inference_settings="nitro",
+    nitro=False,
+    inference_settings=None,
     overrides=None,
     workers=1,
 )
@@ -116,4 +117,3 @@ qha_config = FreeEnergy(
 mbe_automation.run(
     config=qha_config,
 )
-

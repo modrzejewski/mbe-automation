@@ -662,3 +662,58 @@ def test_qha_workflow_incremental_csv_and_restart_modes(tmp_path, monkeypatch):
         "quasi_harmonic/phonons/force_constants/crystal[eq:T=100.00,p=0.00010]",
         "quasi_harmonic/phonons/force_constants/crystal[eq:T=200.00,p=0.00010]",
     ]
+
+
+
+def test_uma_nitro_and_float64_precision_settings():
+    """Verify UMA nitro toggle, default 64-bit precision, conflict detection, and cache dir isolation."""
+    import importlib.util
+    import os
+    import torch
+
+    uma_path = SRC_PATH / "mbe_automation" / "calculators" / "uma.py"
+    spec = importlib.util.spec_from_file_location("_real_uma_test", uma_path)
+    uma_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(uma_mod)
+
+    class _MockInferenceSettings:
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+    uma_mod.InferenceSettings = _MockInferenceSettings
+    uma_mod.guess_inference_settings = lambda mode: _MockInferenceSettings(
+        tf32=(mode == "nitro"),
+        compile=(mode == "nitro"),
+        merge_mole=(mode == "nitro"),
+        nitro=(mode == "nitro"),
+        base_precision_dtype=torch.float32,
+    )
+
+    # 1. Default (nitro=False) enforces 64-bit precision
+    settings_default = uma_mod._resolve_inference_settings(
+        inference_settings=None,
+        nitro=False,
+    )
+    assert getattr(settings_default, "base_precision_dtype", None) == torch.float64
+    assert getattr(settings_default, "tf32", None) is False
+    assert getattr(settings_default, "compile", None) is False
+
+    # 2. nitro=True selects nitro mode (32-bit)
+    settings_nitro = uma_mod._resolve_inference_settings(
+        inference_settings=None,
+        nitro=True,
+    )
+    assert getattr(settings_nitro, "nitro", False) is True
+    assert getattr(settings_nitro, "base_precision_dtype", None) == torch.float32
+
+    # 3. Conflict between nitro=True and float64 raises ValueError
+    with pytest.raises(ValueError, match="conflicts with 64-bit precision"):
+        uma_mod._resolve_inference_settings(
+            inference_settings="float64",
+            nitro=True,
+        )
+
+    # 4. Compiler cache directories are isolated in local temp directory
+    assert "TRITON_CACHE_DIR" in os.environ
+    assert "TORCHINDUCTOR_CACHE_DIR" in os.environ

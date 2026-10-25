@@ -24,7 +24,7 @@ work_dir = os.path.abspath(os.path.dirname(__file__))
 uma_calc = mbe_automation.calculators.UMA(
     model_path="{mlip_parameters}",
     task_name="omc",
-    inference_settings="nitro",
+    nitro=False,
 )
 
 properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended(

@@ -11,7 +11,7 @@ xyz_solid = "urea_123K_xray.cif"
 uma_calc = UMA(
     model_path="./uma-s-1p2p1.pt",
     task_name="omc",
-    inference_settings="nitro",
+    nitro=False,
 )
 
 # Create custom relaxation settings (optional)
@@ -36,5 +36,3 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 )
 
 mbe_automation.run(properties_config)
-
-

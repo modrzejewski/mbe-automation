@@ -312,6 +312,8 @@ def uma_summary(
             pass
         if inference_mode is None and getattr(inference_settings, "nitro", False):
             inference_mode = "nitro"
+        if inference_mode is None and dtype == "torch.float64":
+            inference_mode = "float64"
     if inference_mode is None:
         calc_setting = getattr(calculator, "inference_settings", None)
         if isinstance(calc_setting, str):
@@ -329,6 +331,11 @@ def uma_summary(
             model_name = "N/A"
 
     task_name = getattr(calculator, "task_name", "N/A")
+    nitro_enabled = bool(
+        getattr(calculator, "nitro", False)
+        or getattr(inference_settings, "nitro", False)
+        or inference_mode == "nitro"
+    )
 
     framed([
         "Machine-learning interatomic potential",
@@ -338,6 +345,7 @@ def uma_summary(
     if model_path is not None:
         print(f"model_path            {shorten_path(model_path)}")
     print(f"task_name             {task_name}")
+    print(f"nitro                 {nitro_enabled}")
     if inference_mode is not None:
         print(f"inference_settings    {inference_mode}")
     if total_params > 0:
