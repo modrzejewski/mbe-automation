@@ -6,6 +6,9 @@ import socket
 import sys
 import tempfile
 
+import ase
+from ase.calculators.calculator import all_changes
+
 _USER_SET_TRITON_CACHE = "TRITON_CACHE_DIR" in os.environ
 _USER_SET_INDUCTOR_CACHE = "TORCHINDUCTOR_CACHE_DIR" in os.environ
 _CACHE_CONFIGURED_PID: int | None = None
@@ -86,6 +89,21 @@ def _enable_float64_safe_det() -> None:
         torch.det = _safe_det
 
 
+def _ensure_omol_atoms_info(
+    atoms: ase.Atoms | None,
+    task_name: str | None,
+) -> None:
+    """
+    Set default charge=0 and spin=1 in atoms.info when running the 'omol' task
+    if they are not already defined, suppressing repeated warnings from fairchem.
+    """
+    if atoms is not None and task_name == "omol":
+        if "charge" not in atoms.info or atoms.info["charge"] is None:
+            atoms.info["charge"] = 0
+        if "spin" not in atoms.info or atoms.info["spin"] is None:
+            atoms.info["spin"] = 1
+
+
 try:
     from fairchem.core import pretrained_mlip, FAIRChemCalculator
     from fairchem.core.units.mlip_unit import (
@@ -107,35 +125,21 @@ except ImportError:
 
 
 def _resolve_inference_settings(
-    inference_settings: str | InferenceSettings | None = None,
-    nitro: bool = False,
+    inference_settings: str | InferenceSettings = "float64",
 ) -> str | InferenceSettings:
-    if inference_settings is None:
-        inference_settings = "nitro" if nitro else "float64"
-
     if isinstance(inference_settings, InferenceSettings):
-        is_float64 = (
+        if (
             getattr(inference_settings, "base_precision_dtype", None)
             == torch.float64
-        )
-        is_nitro = bool(nitro or getattr(inference_settings, "nitro", False))
-        if is_nitro and is_float64:
-            raise ValueError(
-                "UMA 'nitro' mode requires 32-bit floating-point precision and "
-                "conflicts with 64-bit precision (float64)."
-            )
-        if is_float64:
+        ):
             _enable_float64_safe_det()
-        if is_nitro or getattr(inference_settings, "compile", False):
+        if getattr(inference_settings, "nitro", False) or getattr(
+            inference_settings, "compile", False
+        ):
             _configure_compiler_cache_dirs()
         return inference_settings
 
     if isinstance(inference_settings, str):
-        if nitro and inference_settings == "float64":
-            raise ValueError(
-                "UMA 'nitro' mode requires 32-bit floating-point precision and "
-                "conflicts with 64-bit precision (float64)."
-            )
         if inference_settings == "float64":
             _enable_float64_safe_det()
             return InferenceSettings(
@@ -146,6 +150,16 @@ def _resolve_inference_settings(
                 external_graph_gen=False,
                 internal_graph_gen_version=2,
                 base_precision_dtype=torch.float64,
+            )
+        if inference_settings == "float32":
+            return InferenceSettings(
+                tf32=False,
+                activation_checkpointing=True,
+                merge_mole=False,
+                compile=False,
+                external_graph_gen=False,
+                internal_graph_gen_version=2,
+                base_precision_dtype=torch.float32,
             )
         _configure_compiler_cache_dirs()
         if guess_inference_settings is not None:
@@ -184,9 +198,8 @@ if _UMA_AVAILABLE:
         ``uma-s-1p2p1-ft-r2scan.pt``, ``uma-s-1p2.pt``, ``uma-m-1p1.pt``) via
         ``model_path`` or by pretrained model name via ``model_name``
         (defaulting to ``"uma-s-1p2p1"``). Enforces 64-bit floating-point
-        precision (``float64``) by default for tight geometry relaxations and
-        finite-displacement phonon calculations; set ``nitro=True`` to enable
-        the 32-bit UMA Nitro inference mode.
+        precision (``inference_settings="float64"``) by default; supports
+        ``"float32"``, ``"nitro"``, and all ``fairchem`` inference presets.
         """
 
         def __init__(
@@ -195,8 +208,7 @@ if _UMA_AVAILABLE:
             model_name: str = "uma-s-1p2p1",
             device: str | None = None,
             task_name: str | None = "omc",
-            nitro: bool = False,
-            inference_settings: str | InferenceSettings | None = None,
+            inference_settings: str | InferenceSettings = "float64",
             overrides: dict | None = None,
             workers: int = 1,
             **kwargs,
@@ -255,23 +267,11 @@ if _UMA_AVAILABLE:
                     device = "cpu"
 
             self.device = device
-            self.nitro = bool(
-                nitro
-                or inference_settings == "nitro"
-                or getattr(inference_settings, "nitro", False)
-            )
-            self.inference_settings = (
-                inference_settings
-                if inference_settings is not None
-                else ("nitro" if self.nitro else "float64")
-            )
+            self.inference_settings = inference_settings
             self.overrides = overrides
             self.workers = workers
 
-            config = _resolve_inference_settings(
-                inference_settings=inference_settings,
-                nitro=nitro,
-            )
+            config = _resolve_inference_settings(inference_settings)
 
             if self.model_path is not None:
                 if not self.model_path.is_file():
@@ -310,12 +310,34 @@ if _UMA_AVAILABLE:
             else:
                 resolved_task_name = task_name
 
+            if "atoms" in kwargs:
+                _ensure_omol_atoms_info(kwargs["atoms"], resolved_task_name)
+
             super().__init__(
                 predictor,
                 task_name=resolved_task_name,
                 **kwargs,
             )
             self.level_of_theory = f"uma_{self.model_name}_{self.task_name}_head"
+
+        def calculate(
+            self,
+            atoms: ase.Atoms | None = None,
+            properties: list[str] | tuple[str, ...] | None = None,
+            system_changes: list[str] = all_changes,
+        ) -> None:
+            target_atoms = (
+                atoms if atoms is not None else getattr(self, "atoms", None)
+            )
+            _ensure_omol_atoms_info(target_atoms, getattr(self, "task_name", None))
+            if properties is None:
+                super().calculate(atoms=atoms, system_changes=system_changes)
+            else:
+                super().calculate(
+                    atoms=atoms,
+                    properties=properties,
+                    system_changes=system_changes,
+                )
 
         def serialize(self) -> tuple:
             """
@@ -331,7 +353,6 @@ if _UMA_AVAILABLE:
                 "model_name": self.model_name,
                 "device": self.device,
                 "task_name": self.task_name,
-                "nitro": self.nitro,
                 "inference_settings": self.inference_settings,
                 "overrides": self.overrides,
                 "workers": self.workers,

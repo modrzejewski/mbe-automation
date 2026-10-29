@@ -300,7 +300,10 @@ def uma_summary(
     )
 
     inference_mode = None
-    if inference_settings is not None:
+    calc_setting = getattr(calculator, "inference_settings", None)
+    if isinstance(calc_setting, str) and calc_setting in {"float64", "float32"}:
+        inference_mode = calc_setting
+    if inference_mode is None and inference_settings is not None:
         try:
             from fairchem.core.units.mlip_unit.api.inference import (
                 describe_inference_settings,
@@ -314,10 +317,8 @@ def uma_summary(
             inference_mode = "nitro"
         if inference_mode is None and dtype == "torch.float64":
             inference_mode = "float64"
-    if inference_mode is None:
-        calc_setting = getattr(calculator, "inference_settings", None)
-        if isinstance(calc_setting, str):
-            inference_mode = calc_setting
+    if inference_mode is None and isinstance(calc_setting, str):
+        inference_mode = calc_setting
 
     model_path = getattr(calculator, "model_path", None)
     if model_path is None and predictor is not None:
@@ -331,11 +332,6 @@ def uma_summary(
             model_name = "N/A"
 
     task_name = getattr(calculator, "task_name", "N/A")
-    nitro_enabled = bool(
-        getattr(calculator, "nitro", False)
-        or getattr(inference_settings, "nitro", False)
-        or inference_mode == "nitro"
-    )
 
     framed([
         "Machine-learning interatomic potential",
@@ -345,7 +341,6 @@ def uma_summary(
     if model_path is not None:
         print(f"model_path            {shorten_path(model_path)}")
     print(f"task_name             {task_name}")
-    print(f"nitro                 {nitro_enabled}")
     if inference_mode is not None:
         print(f"inference_settings    {inference_mode}")
     if total_params > 0:

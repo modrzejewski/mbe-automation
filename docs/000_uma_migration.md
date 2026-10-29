@@ -1,6 +1,6 @@
 # Migration from MACE to UMA and UMA Nitro (`fairchem-core>=2.24.0`)
 
-This document summarizes the dependency, calculator, and workflow changes required to replace MACE with the Universal Model for Atoms (UMA 1.2.1 / `uma-s-1p2p1`) and the optional UMA Nitro inference interface via `fairchem-core>=2.24.0`.
+This document summarizes the dependency, calculator, and workflow changes required to replace MACE with the Universal Model for Atoms (UMA 1.2.1 / `uma-s-1p2p1`) and the UMA Nitro inference interface via `fairchem-core>=2.24.0`.
 
 ---
 
@@ -25,7 +25,7 @@ This document summarizes the dependency, calculator, and workflow changes requir
 
 ---
 
-## 2. UMA Calculator & UMA Nitro Interface (`src/mbe_automation/calculators/uma.py`)
+## 2. UMA Calculator & Inference Settings (`src/mbe_automation/calculators/uma.py`)
 
 ### 2.1 Local Checkpoint Loading & Latest UMA 1.2.1 Models
 
@@ -43,42 +43,29 @@ This document summarizes the dependency, calculator, and workflow changes requir
 from mbe_automation.calculators import UMA
 
 # Load from a local UMA 1.2.1 checkpoint file (64-bit precision enforced by default;
-# set nitro=True to enable 32-bit UMA Nitro inference)
+# set inference_settings="nitro" to enable 32-bit UMA Nitro inference)
 calc = UMA(
     model_path="/path/to/uma-s-1p2p1.pt",
     task_name="omc",
-    nitro=False,
+    inference_settings="float64",
 )
 ```
 
-When `model_path` (or `UMA_MODEL_PATH` in the environment) points to a local `.pt`, `.pth`, or `.ckpt` file, `UMA` loads the predictor using `fairchem.core.units.mlip_unit.load_predict_unit`:
+For single-task fine-tuned checkpoints (`uma-s-1p2p1-ft-d4rev.pt` with `omol` or `uma-s-1p2p1-ft-r2scan.pt` with `omat`), `UMA` automatically selects the checkpoint's sole task when `task_name` is left at its default value (`"omc"`). When running `"omol"`, `UMA` also populates `atoms.info["charge"] = 0` and `atoms.info["spin"] = 1` whenever they are not defined on the input `ase.Atoms` object.
 
-```python
-predictor = load_predict_unit(
-    str(self.model_path),
-    inference_settings=config,
-    overrides=overrides,
-    device=self.device,
-    workers=workers,
-)
-```
+### 2.2 Precision & Inference Presets (`inference_settings`)
 
-For single-task fine-tuned checkpoints (`uma-s-1p2p1-ft-d4rev.pt` with `omol` or `uma-s-1p2p1-ft-r2scan.pt` with `omat`), `UMA` automatically selects the checkpoint's sole task when `task_name` is left at its default value (`"omc"`).
+`UMA` defaults to `inference_settings="float64"`, which enforces 64-bit IEEE double precision required for tight crystal geometry relaxations (`max_force_on_atom_eV_A = 1.0E-4`) and finite-displacement harmonic phonon calculations. Supported `inference_settings` presets include:
 
-### 2.2 Precision vs. UMA Nitro (`nitro` and `inference_settings`)
-
-`UMA` defaults to `nitro=False`, which enforces 64-bit IEEE double precision (`"float64"`) required for tight crystal geometry relaxations (`max_force_on_atom_eV_A = 1.0E-4`) and finite-displacement harmonic phonon calculations. Setting `nitro=True` activates the 32-bit standalone `UMANitroModel` in `fairchem-core>=2.24.0` (custom CuTeDSL / Triton / CUDA graph execution with merged MOLE experts on CUDA capability 8.x–12.x GPUs). Because `UMANitroModel` kernels operate in 32-bit precision (`torch.float32` / `tf32=True`), `nitro=True` conflicts with 64-bit precision (`"float64"`).
-
-To prevent multi-node and multi-worker Triton/TorchInductor cache race conditions on shared network home directories (`~/.triton/cache`), `calculators/uma.py` automatically isolates `TRITON_CACHE_DIR` and `TORCHINDUCTOR_CACHE_DIR` in node-local temporary storage per host, SLURM job, and process ID when not already set in the environment.
-
-Supported `inference_settings` presets include:
-
-* `"float64"` (default when `nitro=False`): 64-bit IEEE double precision (`base_precision_dtype=torch.float64`, `tf32=False`, `activation_checkpointing=True`, `merge_mole=False`, `compile=False`), including a CPU determinant fallback (`_safe_det`) for `torch.det` on `float64` CUDA tensors.
-* `"nitro"` / `"default"` (default when `nitro=True`): Runs UMA Nitro for `uma-s-1p2p1`, `uma-s-1p2p1-ft-d4rev`, and `uma-s-1p2p1-ft-r2scan` on supported NVIDIA GPUs, and automatically falls back to `"multigpu"` for other checkpoints (such as `uma-m-1p1.pt`) or devices.
+* `"float64"` (default): 64-bit IEEE double precision (`base_precision_dtype=torch.float64`, `tf32=False`, `activation_checkpointing=True`, `merge_mole=False`, `compile=False`), including a CPU determinant fallback (`_safe_det`) for `torch.det` on `float64` CUDA tensors.
+* `"float32"`: Uncompiled 32-bit IEEE single precision (`base_precision_dtype=torch.float32`, `tf32=False`, `activation_checkpointing=True`, `merge_mole=False`, `compile=False`).
+* `"nitro"` / `"default"`: Runs 32-bit UMA Nitro (`UMANitroModel` with TF32, merged MOLE weights, and compiled CUDA/Triton/CuTeDSL kernels) for `uma-s-1p2p1`, `uma-s-1p2p1-ft-d4rev`, and `uma-s-1p2p1-ft-r2scan` on supported NVIDIA GPUs, and automatically falls back to `"multigpu"` for other checkpoints or devices.
 * `"high-precision"`: Full IEEE FP32 precision (`tf32=False`) with merged MOLE weights (`merge_mole=True`) and `torch.compile=True`.
 * `"multigpu"`: Merged MOLE weights and `torch.compile=True` with TF32 matrix multiplications on CUDA.
 * `"batch"`: Unmerged and uncompiled FP32 mode with activation checkpointing (`merge_mole=False, compile=False, activation_checkpointing=True`) for heterogeneous inputs.
 
+To prevent multi-node and multi-worker Triton/TorchInductor cache race conditions on shared network home directories (`~/.triton/cache`), `calculators/uma.py` automatically isolates `TRITON_CACHE_DIR` and `TORCHINDUCTOR_CACHE_DIR` in node-local temporary storage per host, SLURM job, and process ID when not already set in the environment.
+
 ### 2.3 Ray Worker Serialization
 
-`UMA.serialize()` returns `(UMA, {"model_path": ..., "model_name": self.model_name, "device": self.device, "task_name": self.task_name, "nitro": self.nitro, "inference_settings": self.inference_settings, "overrides": self.overrides, "workers": self.workers})`, allowing multi-GPU Ray workers in [`calculators/core.py`](../src/mbe_automation/calculators/core.py) to reconstruct calculators with identical local paths and inference settings.
+`UMA.serialize()` returns `(UMA, {"model_path": ..., "model_name": self.model_name, "device": self.device, "task_name": self.task_name, "inference_settings": self.inference_settings, "overrides": self.overrides, "workers": self.workers})`, allowing multi-GPU Ray workers in [`calculators/core.py`](../src/mbe_automation/calculators/core.py) to reconstruct calculators with identical local paths and inference settings.

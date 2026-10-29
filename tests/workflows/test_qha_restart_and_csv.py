@@ -666,7 +666,7 @@ def test_qha_workflow_incremental_csv_and_restart_modes(tmp_path, monkeypatch):
 
 
 def test_uma_nitro_and_float64_precision_settings():
-    """Verify UMA nitro toggle, default 64-bit precision, conflict detection, and cache dir isolation."""
+    """Verify UMA inference_settings ('float64', 'float32', 'nitro'), omol charge/spin defaults, and cache dir isolation."""
     import importlib.util
     import os
     import torch
@@ -684,36 +684,44 @@ def test_uma_nitro_and_float64_precision_settings():
     uma_mod.InferenceSettings = _MockInferenceSettings
     uma_mod.guess_inference_settings = lambda mode: _MockInferenceSettings(
         tf32=(mode == "nitro"),
-        compile=(mode == "nitro"),
-        merge_mole=(mode == "nitro"),
+        compile=True,
+        merge_mole=True,
         nitro=(mode == "nitro"),
         base_precision_dtype=torch.float32,
     )
 
-    # 1. Default (nitro=False) enforces 64-bit precision
-    settings_default = uma_mod._resolve_inference_settings(
-        inference_settings=None,
-        nitro=False,
-    )
-    assert getattr(settings_default, "base_precision_dtype", None) == torch.float64
-    assert getattr(settings_default, "tf32", None) is False
-    assert getattr(settings_default, "compile", None) is False
+    # 1. Default ("float64") enforces 64-bit precision
+    settings_f64 = uma_mod._resolve_inference_settings("float64")
+    assert getattr(settings_f64, "base_precision_dtype", None) == torch.float64
+    assert getattr(settings_f64, "tf32", None) is False
+    assert getattr(settings_f64, "compile", None) is False
 
-    # 2. nitro=True selects nitro mode (32-bit)
-    settings_nitro = uma_mod._resolve_inference_settings(
-        inference_settings=None,
-        nitro=True,
-    )
+    # 2. "float32" enforces uncompiled 32-bit IEEE precision (tf32=False)
+    settings_f32 = uma_mod._resolve_inference_settings("float32")
+    assert getattr(settings_f32, "base_precision_dtype", None) == torch.float32
+    assert getattr(settings_f32, "tf32", None) is False
+    assert getattr(settings_f32, "compile", None) is False
+
+    # 3. "nitro" selects nitro mode (32-bit + tf32 + compile)
+    settings_nitro = uma_mod._resolve_inference_settings("nitro")
     assert getattr(settings_nitro, "nitro", False) is True
     assert getattr(settings_nitro, "base_precision_dtype", None) == torch.float32
 
-    # 3. Conflict between nitro=True and float64 raises ValueError
-    with pytest.raises(ValueError, match="conflicts with 64-bit precision"):
-        uma_mod._resolve_inference_settings(
-            inference_settings="float64",
-            nitro=True,
-        )
+    # 4. Default charge=0 and spin=1 populated in atoms.info for task_name="omol"
+    mol = ase.Atoms("H2O")
+    assert "charge" not in mol.info and "spin" not in mol.info
+    uma_mod._ensure_omol_atoms_info(mol, "omc")
+    assert "charge" not in mol.info and "spin" not in mol.info
+    uma_mod._ensure_omol_atoms_info(mol, "omol")
+    assert mol.info["charge"] == 0
+    assert mol.info["spin"] == 1
 
-    # 4. Compiler cache directories are isolated in local temp directory
+    # Preserves explicitly set charge and spin
+    radical_ion = ase.Atoms("H2O", info={"charge": 1, "spin": 2})
+    uma_mod._ensure_omol_atoms_info(radical_ion, "omol")
+    assert radical_ion.info["charge"] == 1
+    assert radical_ion.info["spin"] == 2
+
+    # 5. Compiler cache directories are isolated in local temp directory
     assert "TRITON_CACHE_DIR" in os.environ
     assert "TORCHINDUCTOR_CACHE_DIR" in os.environ

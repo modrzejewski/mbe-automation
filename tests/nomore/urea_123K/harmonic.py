@@ -11,7 +11,7 @@ xyz_solid = "urea_123K_xray.cif"
 uma_calc = UMA(
     model_path="./uma-s-1p2p1.pt",
     task_name="omc",
-    nitro=False,
+    inference_settings="float64",
 )
 
 # Create custom relaxation settings (optional)

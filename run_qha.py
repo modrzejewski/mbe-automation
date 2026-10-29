@@ -19,8 +19,7 @@ calculator = UMA(
     model_name="uma-s-1p2p1",
     device=None,
     task_name="omc",
-    nitro=False,
-    inference_settings=None,
+    inference_settings="float64",
     overrides=None,
     workers=1,
 )
