@@ -6,3 +6,4 @@ from . import structure
 from . import recommended
 from . import refinement
 from . import many_body_expansion
+from . import solvation

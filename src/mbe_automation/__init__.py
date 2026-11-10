@@ -44,6 +44,7 @@ from .api import (
     ScheduledTasks,
     Clusters,
     MultiLevel,
+    SolvationFreeEnergy,
     run,
 )
 

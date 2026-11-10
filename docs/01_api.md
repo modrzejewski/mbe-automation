@@ -36,6 +36,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
     * [PhononFilter](#phononfilter)
     * [Clusters](#clusters)
     * [MultiLevel](#multilevel)
+    * [SolvationFreeEnergy](#solvationfreeenergy)
 * [4. Interatomic Potentials & Calculators](#4-interatomic-potentials--calculators)
     * [MACE](#mace)
     * [DeltaMACE](#deltamace)
@@ -458,6 +459,37 @@ Configuration object for the multi-level many-body expansion workflow. Inherits 
 | `lno_accuracy` | Accuracy settings for LNO-CCSD(T) calculations. Supported values: `"tight"`, `"vtight"`. | `("tight", "vtight")` |
 | `save_inputs` | Whether to export quantum-chemical input files and SLURM array scripts to `work_dir/tasks`. | `True` |
 | `queue` | SLURM queue configuration name. | `None` |
+
+### SolvationFreeEnergy
+
+🔗 [`mbe_automation.configs.solvation.SolvationFreeEnergy`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/configs/solvation.py#L218)
+
+Configuration object for molecular crystal solvation and dissolution free-energy workflows coupled to softcore `MACE-OFF23-SC` replica exchange via an external `mace-md` worker environment.
+
+| Parameter | Description | Default Value |
+| --- | --- | --- |
+| `alchemical` | An instance of `AlchemicalHREMD` specifying the softcore potential checkpoint and replica-exchange schedule. | - |
+| `crystal` | Initial crystal unit cell structure. | `None` |
+| `molecule` | Initial unrelaxed gas-phase molecule structure (used when `crystal` is omitted). | `None` |
+| `relaxed_molecule` | Pre-optimized gas-phase conformer structure. | `None` |
+| `solute_smiles` | Optional SMILES string used to assign bond orders to the relaxed solute conformer. | `None` |
+| `solute_charge` | Total formal charge of the solute molecule. | `0` |
+| `calculator` | Calculator for vacuum conformer relaxation and optional sublimation evaluation. | `None` |
+| `temperature_K` | Target temperature (K). | `298.15` |
+| `pressure_GPa` | Gas-phase reference pressure (GPa). | `1.0E-4` |
+| `sublimation_free_energy_kJ_mol` | Manual override for sublimation free energy (kJ/mol/molecule). | `None` |
+| `sublimation_dataset_key` | Dataset key pointing to a stored `FreeEnergy` table. | `None` |
+| `quasi_harmonic` | Optional `FreeEnergy` configuration executed automatically prior to solvation. | `None` |
+| `relaxation_energy_kJ_mol` | Manual override for monomer conformational relaxation energy (kJ/mol/molecule). | `None` |
+| `relaxation_energy_mode` | Combination mode for relaxation energy: `"included_in_sublimation"`, `"additive_to_rigid_sublimation"`, or `"delta_correction"`. | `"included_in_sublimation"` |
+| `relaxation` | An instance of `Minimum` configuring vacuum monomer relaxation. | `Minimum(transform="no_transformation")` |
+| `solvent` | An instance of `SolventBox` configuring solvent packing and classical NPT pre-equilibration. | `SolventBox()` |
+| `environment` | An instance of `MACEMDEnvironment` configuring the external `mace-md` Conda environment and MPI launcher. | `MACEMDEnvironment()` |
+| `work_dir` | Directory where runtime files are stored. | `"./"` |
+| `dataset` | Main dataset file storing structures and thermodynamic tables. | `None` (defaults to `work_dir / "dataset.hdf5"`) |
+| `root_key` | Root path in the dataset file. | `"solvation"` |
+| `save_plots` | Save MBAR state-overlap and alchemical profile plots. | `True` |
+| `save_csv` | Export thermodynamic summary and alchemical profile tables to CSV. | `True` |
 
 ---
 
