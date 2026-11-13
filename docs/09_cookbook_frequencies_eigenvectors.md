@@ -163,6 +163,52 @@ freqs_tracked, eigenvecs_tracked = fc.frequencies_and_eigenvectors(
 # resulting freqs_tracked will have bands continuous in index j across k-points i
 ```
 
+### Step 5: Computing and Saving Mean Square Displacement (MSD) and ADP Tensors
+
+You can compute thermal Mean Square Displacement (MSD) matrices from `ForceConstants` over a specified Brillouin-zone mesh and save them directly to a `.npz` archive using `fc.save_msd(...)`.
+
+The method supports two modes:
+*   `mode="full"`: Saves the full interatomic Cartesian covariance tensor `mean_square_displacements_matrix_full` of shape `(n_temperatures, n_atoms, n_atoms, 3, 3)`.
+*   `mode="diagonal"`: Saves only the on-site Cartesian ADP tensors `mean_square_displacements_matrix_diagonal` of shape `(n_temperatures, n_atoms, 3, 3)`.
+
+```python
+import numpy as np
+from mbe_automation import ForceConstants
+from mbe_automation.dynamics.harmonic.modes import PhononFilter
+
+dataset_path = "properties.hdf5"
+key = "quasi_harmonic/phonons/force_constants/crystal[opt:atoms]"
+
+fc = ForceConstants.read(dataset=dataset_path, key=key)
+
+temperatures_K = np.array([100.0, 298.15])
+phonon_filter = PhononFilter(
+    k_point_mesh=50.0,      # float radius (Å), "gamma", or [Nx, Ny, Nz]
+    freq_min_THz=0.1,
+    freq_max_THz=None,
+)
+
+# Save full MSD tensor (n_temperatures, n_atoms, n_atoms, 3, 3)
+fc.save_msd(
+    save_path="msd_full.npz",
+    temperatures_K=temperatures_K,
+    mode="full",
+    phonon_filter=phonon_filter,
+    include_metadata=True,
+)
+
+# Save diagonal ADP tensors (n_temperatures, n_atoms, 3, 3)
+fc.save_msd(
+    save_path="adps_diagonal.npz",
+    temperatures_K=temperatures_K,
+    mode="diagonal",
+    phonon_filter=phonon_filter,
+    include_metadata=True,
+)
+```
+
+When `include_metadata=True`, the `.npz` archive also includes primitive-cell atomic metadata (`elements`, `atomic_numbers`, `positions` in Å, and `cell_vectors` in Å) alongside `temperatures_K`.
+
 ## Output Explanation
 
 *   **`freqs_THz`**: An array containing the phonon frequencies (THz).

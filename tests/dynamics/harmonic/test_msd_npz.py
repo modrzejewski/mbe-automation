@@ -59,12 +59,12 @@ def sample_force_constants() -> ForceConstants:
     )
 
 
-def test_to_npz_file_full_mode(sample_force_constants: ForceConstants, tmp_path: Path) -> None:
+def test_save_msd_full_mode(sample_force_constants: ForceConstants, tmp_path: Path) -> None:
     temperatures_K = np.array([100.0, 300.0])
     phonon_filter = PhononFilter(k_point_mesh="gamma", freq_min_THz=0.1, freq_max_THz=None)
     save_path = tmp_path / "msd_full.npz"
 
-    disp = sample_force_constants.to_npz_file(
+    disp = sample_force_constants.save_msd(
         save_path=save_path,
         temperatures_K=temperatures_K,
         mode="full",
@@ -95,7 +95,7 @@ def test_to_npz_file_full_mode(sample_force_constants: ForceConstants, tmp_path:
         assert np.allclose(data["temperatures_K"], temperatures_K)
 
 
-def test_to_npz_file_diagonal_mode_with_metadata(
+def test_save_msd_diagonal_mode_with_metadata(
     sample_force_constants: ForceConstants, tmp_path: Path
 ) -> None:
     temperatures_K = np.array([123.0, 298.15])
@@ -135,18 +135,18 @@ def test_to_npz_file_diagonal_mode_with_metadata(
         assert data["cell_vectors"].shape == (3, 3)
 
 
-def test_to_npz_file_validation_errors(
+def test_save_msd_validation_errors(
     sample_force_constants: ForceConstants, tmp_path: Path
 ) -> None:
     with pytest.raises(ValueError, match="Unknown mode"):
-        sample_force_constants.to_npz_file(
+        sample_force_constants.save_msd(
             save_path=tmp_path / "invalid.npz",
             temperatures_K=np.array([300.0]),
             mode="invalid",  # type: ignore[arg-type]
         )
 
     with pytest.raises(ValueError, match="temperatures_K must be a non-empty 1D array"):
-        sample_force_constants.to_npz_file(
+        sample_force_constants.save_msd(
             save_path=tmp_path / "invalid_temp.npz",
             temperatures_K=np.array([[300.0]]),
             mode="full",
