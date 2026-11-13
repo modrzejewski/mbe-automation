@@ -442,7 +442,7 @@ class ForceConstants(_ForceConstants):
             symprec=symprec,
         )
 
-    def to_npz_file(
+    def save_msd(
             self,
             save_path: str | Path,
             temperatures_K: npt.NDArray[np.float64],
@@ -484,8 +484,6 @@ class ForceConstants(_ForceConstants):
             symmetrize_Dq=symmetrize_Dq,
             symprec=symprec,
         )
-
-    save_thermal_displacements_npz = to_npz_file
 
     def brillouin_zone_path(
             self,
