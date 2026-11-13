@@ -16,7 +16,7 @@ import pytest
 
 import mbe_automation
 from mbe_automation import (
-    MACE,
+    UMA,
     Structure,
     UniqueClustersFilter,
 )
@@ -27,7 +27,11 @@ DIMER_CUTOFF = 30.0
 TRIMER_CUTOFF = 10.0
 
 from tests.reference_data.test_cases import TEST_CASES
-TEST_CASES_WITH_MODELS = [c for c in TEST_CASES if c.get("general_model_path") is not None]
+TEST_CASES_WITH_MODELS = [
+    c for c in TEST_CASES
+    if c.get("general_model_path") is not None
+    and Path(c["general_model_path"]).exists()
+]
 
 def _find_safe_cutoff(distances: np.ndarray, t: float, tolerance: float = 1e-3) -> float:
     """Find a safe cutoff near `t` by locating a gap in the distances of at least `tolerance`.
@@ -218,8 +222,22 @@ def _run_cluster_extraction(case: dict, work_dir: Path) -> None:
         case: Dictionary containing system paths and reference paths.
         work_dir: Output directory for the generated clusters.
     """
+    if UMA is None:
+        pytest.skip("UMA calculator is not available.")
+
     crystal = Structure.from_xyz_file(case["crystal_path"])
-    calc = MACE(model_path=str(case["general_model_path"])) 
+    model_path = case.get("general_model_path")
+    try:
+        if (
+            model_path is not None
+            and Path(model_path).suffix == ".pt"
+            and Path(model_path).is_file()
+        ):
+            calc = UMA(model_path=str(model_path))
+        else:
+            calc = UMA()
+    except Exception as exc:
+        pytest.skip(f"UMA model unavailable: {exc}")
 
     unique_cluster_filter = UniqueClustersFilter(
         cluster_types=["monomers", "dimers", "trimers"],

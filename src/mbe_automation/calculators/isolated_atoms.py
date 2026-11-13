@@ -6,9 +6,15 @@ import pyscf
 import ase
 from mbe_automation.calculators.pyscf import PySCFCalculator
 from mbe_automation.calculators.dftb import DFTBCalculator
-from mbe_automation.calculators.mace import MACE
+from mbe_automation.calculators.uma import (
+    FAIRChemCalculator,
+    UMA,
+    _UMA_AVAILABLE,
+)
 
-SUPPORTED_CALCULATORS = PySCFCalculator | MACE
+SUPPORTED_CALCULATORS = PySCFCalculator
+if _UMA_AVAILABLE:
+    SUPPORTED_CALCULATORS = SUPPORTED_CALCULATORS | UMA | FAIRChemCalculator
 
 def ground_state_spin(z: int) -> int:
     """
@@ -53,8 +59,8 @@ def ground_state_spin(z: int) -> int:
 
 
 def atomic_energies(
-        calculator: SUPPORTED_CALCULATORS,
-        z_numbers: npt.NDArray[np.integer],
+    calculator: SUPPORTED_CALCULATORS,
+    z_numbers: npt.NDArray[np.integer],
 ) -> dict[np.int64, np.float64]:
     """
     Calculate ground-state energies for all unique isolated atoms
@@ -72,7 +78,12 @@ def atomic_energies(
     """
     
     if not isinstance(calculator, SUPPORTED_CALCULATORS):
-        valid_names = [x.__name__ for x in typing.get_args(SUPPORTED_CALCULATORS)]
+        args = typing.get_args(SUPPORTED_CALCULATORS)
+        valid_names = (
+            [x.__name__ for x in args]
+            if args
+            else [SUPPORTED_CALCULATORS.__name__]
+        )
         raise TypeError(
             f"Expected one of {valid_names}, "
             f"got {type(calculator).__name__}."
@@ -82,9 +93,12 @@ def atomic_energies(
     for z in z_numbers:
         isolated_atom = ase.Atoms(
             numbers=[z],
-            pbc=False
+            pbc=False,
         )
-        isolated_atom.info["n_unpaired_electrons"] = ground_state_spin(z)
+        n_unpaired = ground_state_spin(z)
+        isolated_atom.info["n_unpaired_electrons"] = n_unpaired
+        isolated_atom.info["spin"] = n_unpaired + 1
+        isolated_atom.info["charge"] = 0
         isolated_atom.calc = calculator
         E_atomic[z] = isolated_atom.get_potential_energy()
 

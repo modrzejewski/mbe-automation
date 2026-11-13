@@ -12,8 +12,6 @@ from . import mbe_legacy
 from .calculators import (
     HF,
     DFT,
-    MACE,
-    DeltaMACE,
     UMA,
 )
 

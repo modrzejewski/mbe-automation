@@ -39,9 +39,6 @@ dependencies = [
 
 [project.optional-dependencies]
 
-mace = [
-  "mace-torch>=0.3.15",
-]
 uma = [
   "fairchem-core>=2.24.0",
 ]

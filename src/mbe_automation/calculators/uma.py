@@ -201,6 +201,7 @@ if _UMA_AVAILABLE:
         precision (``inference_settings="float64"``) by default; supports
         ``"float32"``, ``"nitro"``, and all ``fairchem`` inference presets.
         """
+
         def __init__(
             self,
             model_path: str | Path | None = None,
@@ -212,13 +213,59 @@ if _UMA_AVAILABLE:
             workers: int = 1,
             **kwargs,
         ):
+            checkpoint_path = kwargs.pop("checkpoint_path", None)
+            if model_path is None and checkpoint_path is not None:
+                model_path = checkpoint_path
+            if model_path is None:
+                env_model_path = os.environ.get("UMA_MODEL_PATH")
+                if env_model_path:
+                    model_path = env_model_path
+
+            if model_path is not None:
+                candidate = Path(model_path).expanduser()
+                if candidate.suffix == ".model":
+                    raise ValueError(
+                        f"Unsupported MACE '.model' checkpoint passed to UMA calculator: "
+                        f"{candidate}. Provide a UMA '.pt' checkpoint file or model name."
+                    )
+                is_file_like = (
+                    candidate.is_file()
+                    or candidate.suffix in {".pt", ".pth", ".ckpt"}
+                    or "/" in str(model_path)
+                    or "\\" in str(model_path)
+                )
+                if is_file_like:
+                    self.model_path: Path | None = candidate.resolve()
+                    self.model_name = candidate.stem
+                else:
+                    self.model_path = None
+                    self.model_name = str(model_path)
+            else:
+                candidate = Path(model_name).expanduser()
+                if candidate.suffix == ".model":
+                    raise ValueError(
+                        f"Unsupported MACE '.model' checkpoint passed to UMA calculator: "
+                        f"{candidate}. Provide a UMA '.pt' checkpoint file or model name."
+                    )
+                is_file_like = (
+                    candidate.is_file()
+                    or candidate.suffix in {".pt", ".pth", ".ckpt"}
+                    or "/" in str(model_name)
+                    or "\\" in str(model_name)
+                )
+                if is_file_like:
+                    self.model_path = candidate.resolve()
+                    self.model_name = candidate.stem
+                else:
+                    self.model_path = None
+                    self.model_name = model_name
+
             if device is None:
                 if torch.cuda.is_available():
                     device = "cuda"
                 else:
                     device = "cpu"
 
-            self.model_name = model_name
             self.device = device
             self.inference_settings = inference_settings
             self.overrides = overrides
@@ -292,14 +339,17 @@ if _UMA_AVAILABLE:
                     system_changes=system_changes,
                 )
 
-            super().__init__(predictor, task_name=task_name, **kwargs)
-
         def serialize(self) -> tuple:
             """
             Return the class and arguments required to reconstruct the calculator.
             Used for passing the calculator to Ray workers for parallel execution.
             """
             return UMA, {
+                "model_path": (
+                    str(self.model_path)
+                    if self.model_path is not None
+                    else None
+                ),
                 "model_name": self.model_name,
                 "device": self.device,
                 "task_name": self.task_name,
