@@ -25,7 +25,9 @@ except ImportError:
 def main(
     h5_path: str,
     traj_key: str,
-    mace_model: str,
+    uma_model: str,
+    task_name: str = "omc",
+    inference_settings: str = "nitro",
     burn_in: int = 0,
     out_npy: str | None = None,
     out_cif: str | None = None,
@@ -40,7 +42,8 @@ def main(
         model_paths=mace_model_path,
         default_dtype="float64",
         device=device,
-        head="omol",
+        task_name=task_name,
+        inference_settings=inference_settings,
     )
 
     print(f"Reading trajectory from: {h5_path} key: {traj_key}")
@@ -88,7 +91,9 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Compute MD thermal displacements (ADPs) from an mbe-automation Trajectory.")
     p.add_argument("--h5", required=True, help="Path to HDF5 file containing trajectory (e.g., urea.hdf5)")
     p.add_argument("--traj-key", required=True, help="Trajectory key inside the HDF5 file")
-    p.add_argument("--mace-model", required=True, help="Path to MACE model file")
+    p.add_argument("--uma-model", default="uma-s-1p2p1.pt", help="Path to UMA model checkpoint file or model name")
+    p.add_argument("--task-name", default="omc", help="UMA task head (default: omc)")
+    p.add_argument("--inference-settings", default="nitro", help="UMA inference settings preset (default: nitro)")
     p.add_argument("--burn-in", type=int, default=0, help="Number of initial frames to discard (default 0)")
     p.add_argument("--out-npy", default="md_adps.npy", help="Optional: save symmetrized ADPs to .npy")
     p.add_argument("--out-cif", default=None, help="Optional: save CIF with anisotropic U parameters (requires internal writer)")
@@ -98,7 +103,9 @@ if __name__ == "__main__":
     main(
         h5_path=args.h5,
         traj_key=args.traj_key,
-        mace_model=args.mace_model,
+        uma_model=args.uma_model,
+        task_name=args.task_name,
+        inference_settings=args.inference_settings,
         burn_in=args.burn_in,
         out_npy=args.out_npy,
         out_cif=args.out_cif,

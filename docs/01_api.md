@@ -92,7 +92,7 @@ Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single
 *   **`subsample`**: Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). Requires feature vectors.
 *   **`select`**: Returns a new object containing only the specified frames (by index).
 *   **`run`**: Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. Can distribute work via `chunk`.
-*   **`to_mace_dataset`**: Exports the data (structures, energies, forces) to MACE-compatible XYZ files for model training.
+*   **`to_mace_dataset`**: Exports the data (structures, energies, forces) to extended XYZ files for MLIP training.
 *   **`random_split`**: Randomly splits the frames into multiple objects (e.g., for creating training and validation sets).
 *   **`to_molecular_crystal`**: Converts a periodic structure into a `MolecularCrystal` by detecting connected molecules.
 *   **`to_ase_atoms`**: Converts a specific frame into an `ase.Atoms` object.
@@ -114,7 +114,7 @@ Time evolution of an atomistic system generated with molecular dynamics. Include
 *   **`read` / `save`**: Load from or save to a dataset file.
 *   **`subsample` / `select`**: Sample or select specific frames.
 *   **`run`**: Executes a calculator on the trajectory frames.
-*   **`to_mace_dataset`**: Exports the data to MACE-compatible XYZ files.
+*   **`to_mace_dataset`**: Exports the data to extended XYZ files for MLIP training.
 *   **`to_ase_atoms` / `to_pymatgen` / `lattice`**: Frame conversion utilities.
 *   **`display`**: Visualizes properties of the object (e.g. energy fluctuations).
 *   **`available_energies` / `available_forces`**: Lists methods (levels of theory) for which energies/forces are available.
@@ -154,7 +154,7 @@ Finite clusters of molecules extracted from a periodic structure or trajectory. 
 *   **`read` / `save`**: Load from or save to an HDF5 dataset.
 *   **`subsample` / `select`**: Sample or select specific frames.
 *   **`run`**: Executes a calculator on the finite clusters.
-*   **`to_mace_dataset`**: Exports the data to MACE-compatible XYZ files.
+*   **`to_mace_dataset`**: Exports the data to extended XYZ files for MLIP training.
 *   **`random_split`**: Randomly splits the frames into multiple objects.
 *   **`unique_elements` / `atomic_reference`**: Elemental properties and isolated atom energies.
 
@@ -185,7 +185,7 @@ A container class that holds a collection of `Structure` or `FiniteSubsystem` ob
 #### Methods
 *   **`append`**: Adds a structure or subsystem to the dataset collection.
 *   **`statistics`**: Prints statistical summaries of the dataset (e.g. mean/std of energies).
-*   **`to_mace_dataset`**: Exports data to MACE-compatible XYZ files.
+*   **`to_mace_dataset`**: Exports data to extended XYZ files for MLIP training.
 *   **`unique_elements` / `atomic_reference`**: Elemental properties and isolated atom energies.
 
 ### AtomicReference
@@ -264,6 +264,8 @@ Configuration object for Quasi-Harmonic Approximation (QHA) workflows.
 | `verbose` | Verbosity of the program's output. `0` suppresses warnings. | `0` |
 | `save_plots` | If `True`, save plots of the simulation results. | `True` |
 | `save_csv` | If `True`, save CSV files of the simulation results. | `True` |
+| `incremental_csv` | If `True`, create `thermodynamics_equilibrium_volume.csv` immediately after EOS volume selection and update it after each completed temperature point in the quasi-harmonic workflow. | `False` |
+| `restart` | If `True`, restart a partially or previously completed calculation from `dataset` (or `work_dir / "dataset.hdf5"` when `dataset=None`), falling back to `.cif` files in `work_dir / "relaxation"` if needed. | `False` |
 | `save_adps` | If `True`, compute atomic displacement parameters and save them to a CIF file. | `False` |
 | `adps_k_point_mesh` | The k-points mesh used for sampling the Brillouin zone when computing atomic displacement parameters. | `50.0` |
 

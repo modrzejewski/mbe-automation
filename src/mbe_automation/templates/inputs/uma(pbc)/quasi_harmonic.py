@@ -29,6 +29,8 @@ else:
 #
 # Select your specific task:
 # oc20: catalysis
+# oc22: oxide catalysis
+# oc25: solid-liquid catalysis
 # omat: inorganic materials
 # omol: molecules
 # odac: MOFs

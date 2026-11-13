@@ -19,7 +19,7 @@ Setup involves importing necessary modules and defining the system's structures 
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation.configs
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
@@ -30,7 +30,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"  # or .xyz, POSCAR, etc.
 molecule_file = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/mace.model")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 ```
 
 ## Phonon calculation
@@ -48,7 +48,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -87,7 +87,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file("polymorph_Zprime2.xyz"),
     molecule=Structure.from_file("molecule.xyz"),  # ONE reference
     temperatures_K=np.array([5.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
 )
 ```
 
@@ -121,7 +121,7 @@ properties_config = FreeEnergy(
         ),
     ],
     temperatures_K=np.array([5.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
 )
 ```
 
@@ -171,7 +171,7 @@ For the explicit forcing modes (`"linear"`, `"inverse_volume"`, `"rigid_shift"`)
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
@@ -183,7 +183,7 @@ from mbe_automation.configs.quasi_harmonic import EEC, FreeEnergy
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/mace.model")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 
 relaxation_config = Minimum(
     cell_relaxation="constant_volume",
@@ -194,7 +194,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -232,7 +232,7 @@ When high-level reference EOS parameters are available (e.g. from DFT or coupled
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
@@ -242,7 +242,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/mace.model")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 
 relaxation_config = Minimum(
     cell_relaxation="constant_volume",
@@ -259,7 +259,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -319,6 +319,32 @@ For more details on its configuration, see the [`DebyeModel` class documentation
 
 If the fit cannot be performed (fewer than 3 points below the threshold), the workflow prints a warning and falls back to `volume_curve="eos_minimum"` automatically — no exception is raised and the calculation continues. The `"volume_curve"` column in the output CSV records which source was actually used, reflecting any such fallback.
 
+## Restarting Calculations and Incremental CSV Output
+
+### Restarting a Calculation (`restart=True`)
+
+To resume a partially completed calculation or extend a completed calculation with additional volumes or temperatures, set `restart=True` in `FreeEnergy`:
+
+```python
+config = FreeEnergy(
+    ...
+    work_dir="./qha_run",
+    dataset="properties.hdf5",  # or None to use work_dir / "dataset.hdf5"
+    restart=True,
+    incremental_csv=True,
+)
+```
+
+When `restart=True`:
+- Completed structures and force constants are read from the HDF5 file specified by `dataset` (or `work_dir / "dataset.hdf5"` when `dataset=None`).
+- If a geometry relaxation finished before interruption (before phonon supercell calculations completed), the relaxed structure is loaded from `work_dir / "relaxation" / <system_label> / "relaxed_structure.cif"`.
+- If `volume_range` (or `thermal_pressures_GPa` when `eos_sampling="pressure"`) differs from the previous run, only the missing EOS points are calculated, the EOS fit is redone across all sampled points, and the equilibrium calculations at target temperatures (`crystal[eq:T=...,p=...]`) are recalculated from scratch.
+- If `volume_range` is unchanged and `temperatures_K` is modified or extended, all EOS points are reused from the dataset and only the temperature points not yet present in the dataset are calculated.
+
+### Incremental CSV Output (`incremental_csv=True`)
+
+Setting `incremental_csv=True` in `FreeEnergy` writes `thermodynamics_equilibrium_volume.csv` in `work_dir` as soon as the EOS calculations finish and equilibrium volumes for the temperature points are selected. After each temperature point (`crystal[eq:T=...,p=...]`) completes, `thermodynamics_equilibrium_volume.csv` is updated with the newly calculated data point, and the final table (including temperature-derivative properties such as $C_P$ and thermal expansion coefficients) is written upon completion.
+
 ## Adjustable parameters
 
 Detailed descriptions of the configuration classes can be found in the [API Reference](./01_api.md) chapter.
@@ -340,12 +366,12 @@ To enable ADP calculation, set `save_adps=True` in `FreeEnergy`. The Brillouin z
 ```python
 import numpy as np
 from mbe_automation import Structure
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 from mbe_automation.configs.quasi_harmonic import FreeEnergy
 from mbe_automation.configs.structure import Minimum
 import mbe_automation
 
-mace_calc = MACE(model_path="path/to/your/model.model")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 
 relaxation_config = Minimum(
     cell_relaxation="only_atoms",
@@ -355,7 +381,7 @@ relaxation_config = Minimum(
 config = FreeEnergy(
     crystal=Structure.from_file("crystal.cif"),
     temperatures_K=np.array([100.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     thermal_expansion=False,
     relaxation=relaxation_config,
     save_adps=True,
@@ -458,7 +484,7 @@ mbe_automation.dynamics.harmonic.display.band_structure(
 
 ```python
 import numpy as np
-from mbe_automation.calculators import MACE
+from mbe_automation.calculators import UMA
 
 import mbe_automation.configs
 from mbe_automation.configs.structure import Minimum
@@ -468,7 +494,7 @@ from mbe_automation import Structure
 crystal_file = "path/to/your/crystal.cif"
 molecule_file = "path/to/your/molecule.xyz"
 
-mace_calc = MACE(model_path="path/to/your/model.model")
+uma_calc = UMA(model_path="path/to/your/uma-s-1p2p1.pt")
 
 # Create custom relaxation settings (optional)
 relaxation_config = Minimum(
@@ -480,7 +506,7 @@ properties_config = FreeEnergy(
     crystal=Structure.from_file(crystal_file),
     molecule=Structure.from_file(molecule_file),
     temperatures_K=np.array([5.0, 123.0, 200.0, 300.0]),
-    calculator=mace_calc,
+    calculator=uma_calc,
     supercell_radius=25.0,
     relaxation=relaxation_config,
     volume_range=np.array([0.98, 1.00, 1.02, 1.04, 1.06, 1.08, 1.10]),
@@ -501,7 +527,7 @@ mbe_automation.run(properties_config)
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name="MACE"
+#SBATCH --job-name="UMA"
 #SBATCH -A pl0415-02
 #SBATCH --partition=tesla
 #SBATCH --nodes 1

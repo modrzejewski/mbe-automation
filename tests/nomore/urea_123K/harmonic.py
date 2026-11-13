@@ -8,8 +8,11 @@ from mbe_automation import Structure
 
 xyz_solid = "urea_123K_xray.cif"
 
-#mace_calc = MACE(model_path="~/models/mace/mace-mh-1.model", head="omol")
-mace_calc = MACE(model_path="./MACE_model_swa.model")
+uma_calc = UMA(
+    model_path="./uma-s-1p2p1.pt",
+    task_name="omc",
+    inference_settings="float64",
+)
 
 # Create custom relaxation settings (optional)
 relaxation_config = Minimum(
@@ -35,5 +38,3 @@ properties_config = mbe_automation.configs.quasi_harmonic.FreeEnergy.recommended
 )
 
 mbe_automation.run(properties_config)
-
-

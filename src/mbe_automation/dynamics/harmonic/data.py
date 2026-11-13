@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 import os
 import time
@@ -58,14 +59,18 @@ def detect_imaginary_modes(
 
     print("Searching for imaginary ω's anywhere in the FBZ...", flush=True)
     
-    n_bands = len(phonons.band_structure.frequencies[0][0])
+    if isinstance(phonons, mbe_automation.storage.BrillouinZonePath):
+        segment_frequencies = phonons.frequencies
+    else:
+        segment_frequencies = phonons.band_structure.frequencies
+    n_bands = len(segment_frequencies[0][0])
     min_freqs_FBZ = np.full(
         shape=n_bands,
         fill_value=np.finfo(np.float64).max,
         dtype=np.float64
     )    
-    for segment_idx in range(len(phonons.band_structure.frequencies)): # loop over segments of a full path
-        freqs = phonons.band_structure.frequencies[segment_idx]
+    for segment_idx in range(len(segment_frequencies)): # loop over segments of a full path
+        freqs = segment_frequencies[segment_idx]
         min_freqs = np.min(freqs, axis=0) # minimum over all k-points belonging to the current segment
         min_freqs_FBZ = np.minimum(min_freqs_FBZ, min_freqs) # minimum over the entire FBZ path
         
@@ -227,6 +232,9 @@ def crystal(
         system_label,
         level_of_theory,
         unit_cell_type: Literal["primitive", "conventional", "unknown"] = "unknown",
+        save_to_dataset: bool = True,
+        e_el_kJ_mol: float | None = None,
+        brillouin_zone_path: mbe_automation.storage.BrillouinZonePath | None = None,
 ):
     """
     Physical properties derived from the harmonic model
@@ -266,7 +274,12 @@ def crystal(
     ZPE_crystal = phonons.thermal_properties.zero_point_energy # kJ/mol/unit cell
 
     E_vib_crystal = F_vib_crystal + temperatures * S_vib_crystal / 1000 # kJ/mol/unit cell
-    E_el_crystal = unit_cell.get_potential_energy() * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
+    if e_el_kJ_mol is not None:
+        E_el_crystal = e_el_kJ_mol
+    else:
+        e_pot_eV = unit_cell.get_potential_energy()
+        structure.E_pot = np.array([e_pot_eV / structure.n_atoms], dtype=np.float64)
+        E_el_crystal = e_pot_eV * ase.units.eV/(ase.units.kJ/ase.units.mol) # kJ/mol/unit cell
     F_tot_crystal = E_el_crystal + F_vib_crystal # kJ/mol/unit cell
 
     lattice = structure.lattice()
@@ -296,35 +309,41 @@ def crystal(
     G_tot_crystal = F_tot_crystal + pV_crystal # kJ/mol/unit cell
     H_tot_crystal = E_el_crystal + E_vib_crystal + pV_crystal # kJ/mol/unit cell
 
-    generate_fbz_path(phonons)
+    if brillouin_zone_path is not None:
+        fbz_source = brillouin_zone_path
+    else:
+        generate_fbz_path(phonons)
+        fbz_source = phonons
     fbz_analysis = detect_imaginary_modes(
-        phonons,
+        fbz_source,
         imaginary_mode_threshold
     )
-    
-    t0 = time.time()
-    print(f"Saving phonon data to HDF5...", end="", flush=True)
-    mbe_automation.storage.save_force_constants(
-        dataset=dataset,
-        key=f"{root_key}/phonons/force_constants/{system_label}",
-        phonons=phonons
-    )
-    mbe_automation.storage.save_brillouin_zone_path(
-        phonons=phonons,
-        dataset=dataset,
-        key=f"{root_key}/phonons/brillouin_zone_paths/{system_label}",
-    )
-    mbe_automation.dynamics.harmonic.display.band_structure(
-        dataset=dataset,
-        key=f"{root_key}/phonons/brillouin_zone_paths/{system_label}",
-        save_path=os.path.join(work_dir, "phonons", system_label, "brillouin_zone_path.png"),
-        freq_max_THz=10.0 # THz
-    )
-    structure.save(
-        dataset=dataset,
-        key=f"{root_key}/structures/{system_label}"
-    )
-    print(f" done (Δt={time.time() - t0:.1f} s)", flush=True)
+
+    if save_to_dataset:
+        t0 = time.time()
+        print(f"Saving phonon data to HDF5...", end="", flush=True)
+        mbe_automation.storage.save_force_constants(
+            dataset=dataset,
+            key=f"{root_key}/phonons/force_constants/{system_label}",
+            phonons=phonons
+        )
+        mbe_automation.storage.save_brillouin_zone_path(
+            phonons=phonons,
+            dataset=dataset,
+            key=f"{root_key}/phonons/brillouin_zone_paths/{system_label}",
+        )
+        mbe_automation.dynamics.harmonic.display.band_structure(
+            dataset=dataset,
+            key=f"{root_key}/phonons/brillouin_zone_paths/{system_label}",
+            save_path=os.path.join(work_dir, "phonons", system_label, "brillouin_zone_path.png"),
+            freq_max_THz=10.0 # THz
+        )
+        structure.save(
+            dataset=dataset,
+            key=f"{root_key}/structures/{system_label}",
+            update_mode="replace",
+        )
+        print(f" done (Δt={time.time() - t0:.1f} s)", flush=True)
     interp_mesh = phonons.mesh.mesh_numbers
     
     df = pd.DataFrame({
