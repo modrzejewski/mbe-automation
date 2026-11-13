@@ -12,6 +12,7 @@ import mbe_automation.inputs.rpa
 import mbe_automation.inputs.orca
 import mbe_automation.inputs.mrcc
 import mbe_automation.inputs.pyscf
+import mbe_automation.inputs.mace
 import mbe_automation.inputs.uma
 import mbe_automation.inputs.dftb
 
@@ -98,6 +99,17 @@ def prepare_inputs(ProjectDirectory, mlip_parameters, UnitCellFile, SystemTypes,
                                              InputTemplates["HF(PBC)"],
                                              QueueScriptTemplates["HF(PBC)"],
                                              SymmetrizeUnitCell)
+        if "MACE" in MethodsPBC:
+            mbe_automation.inputs.mace.Make(directory_structure.INP_DIRS,
+                                            directory_structure.XYZ_DIRS,
+                                            directory_structure.CSV_DIRS["MACE(PBC)"],
+                                            directory_structure.PLOT_DIRS["MACE(PBC)"],
+                                            directory_structure.ML_DIRS["MACE(PBC)"],
+                                            InputTemplates["MACE(PBC)"],
+                                            QueueScriptTemplates["MACE(PBC)"],
+                                            SymmetrizeUnitCell,
+                                            mlip_parameters["MACE"]
+                                            )
         if "UMA" in MethodsPBC:
             mbe_automation.inputs.uma.Make(directory_structure.INP_DIRS,
                                            directory_structure.XYZ_DIRS,

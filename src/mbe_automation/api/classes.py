@@ -442,6 +442,49 @@ class ForceConstants(_ForceConstants):
             symprec=symprec,
         )
 
+    def save_msd(
+            self,
+            save_path: str | Path,
+            temperatures_K: npt.NDArray[np.float64],
+            mode: Literal["full", "diagonal"] = "full",
+            phonon_filter: PhononFilter | None = None,
+            include_metadata: bool = False,
+            symmetrize_Dq: bool = True,
+            symprec: float = 1e-5,
+    ) -> ThermalDisplacements:
+        """
+        Compute thermal mean square displacement (MSD) matrices and save them to a `.npz` file.
+
+        Args:
+            save_path: Path to the output `.npz` file.
+            temperatures_K: 1D array of temperatures (in Kelvin).
+            mode: Storage mode:
+                - "full": Saves `mean_square_displacements_matrix_full` with shape
+                  `(n_temperatures, n_atoms_primitive, n_atoms_primitive, 3, 3)`.
+                - "diagonal": Saves `mean_square_displacements_matrix_diagonal` (ADPs)
+                  with shape `(n_temperatures, n_atoms_primitive, 3, 3)`.
+            phonon_filter: Optional filter for phonons and k-point sampling mesh.
+                If None, defaults to `k_point_mesh=50.0` and `freq_max_THz=None`.
+            include_metadata: If True, includes primitive-cell atomic metadata in the
+                `.npz` archive (`elements`, `atomic_numbers`, `positions`, `cell_vectors`).
+            symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+                using crystal symmetry operations.
+            symprec: Symmetry tolerance. Defaults to 1e-5.
+
+        Returns:
+            The computed `ThermalDisplacements` object.
+        """
+        return mbe_automation.dynamics.harmonic.modes.save_thermal_displacements_npz(
+            force_constants=self,
+            save_path=save_path,
+            temperatures_K=temperatures_K,
+            mode=mode,
+            phonon_filter=phonon_filter,
+            include_metadata=include_metadata,
+            symmetrize_Dq=symmetrize_Dq,
+            symprec=symprec,
+        )
+
     def brillouin_zone_path(
             self,
             n_points: int = 20,

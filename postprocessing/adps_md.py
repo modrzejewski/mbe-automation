@@ -4,18 +4,22 @@ from pathlib import Path
 import numpy as np
 
 # Fix for potential MKL/OpenMP conflicts
-os.environ["MKL_THREADING_LAYER"] = "GNU"
+os.environ['MKL_THREADING_LAYER'] = 'GNU'
 
-# CRITICAL: Import mbe_automation (which loads dftb/pyscf) BEFORE torch
+# CRITICAL: Import mbe_automation (which loads dftb/pyscf) BEFORE torch/mace
 # to prevent segmentation faults caused by library initialization order.
-from mbe_automation import Trajectory, UMA
+from mbe_automation import Trajectory
 from mbe_automation.dynamics.md.modes import calculate_adp_covariance_matrix, MFDThermalDisplacements
 
 import torch  # Now safe to import torch
+from mace.calculators import MACECalculator
 try:
     from mbe_automation.storage.xyz_formats import _to_cif_with_adps
 except ImportError:
     _to_cif_with_adps = None
+
+# Restore original load (optional, but good practice if we want normal behavior later)
+# torch.load = _original_torch_load
 
 
 def main(
@@ -30,12 +34,13 @@ def main(
     device: str | None = None,
 ):
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    uma_model_path = os.path.expanduser(uma_model)
+    mace_model_path = os.path.expanduser(mace_model)
 
     print(f"Using device: {device}")
-    print(f"Loading model: {uma_model_path}")
-    calc = UMA(
-        model_path=uma_model_path,
+    print(f"Loading model: {mace_model_path}")
+    calc = MACECalculator(
+        model_paths=mace_model_path,
+        default_dtype="float64",
         device=device,
         task_name=task_name,
         inference_settings=inference_settings,
@@ -77,14 +82,8 @@ def main(
         elif md_td.structure is None:
             print("No reference structure available in MFDThermalDisplacements.structure; cannot write CIF with ADPs.")
         else:
-            lattice_vectors = md_td.structure.lattice.matrix.T
-            n_diag = np.diag([np.linalg.norm(vrec) for vrec in np.linalg.inv(lattice_vectors)])
-            an_inv = np.linalg.inv(lattice_vectors @ n_diag)
-            adps_cif = np.array([
-                an_inv @ u @ an_inv.T
-                for u in md_td.mean_square_displacements_matrix_diagonal
-            ])
-            _to_cif_with_adps(out_cif, md_td.structure, adps_cif)
+            # _to_cif_with_adps expects a pymatgen Structure and adps array
+            _to_cif_with_adps(out_cif, md_td.structure, md_td.mean_square_displacements_matrix_diagonal)
             print(f"Saved CIF with anisotropic U parameters to: {out_cif}")
 
 
@@ -98,7 +97,7 @@ if __name__ == "__main__":
     p.add_argument("--burn-in", type=int, default=0, help="Number of initial frames to discard (default 0)")
     p.add_argument("--out-npy", default="md_adps.npy", help="Optional: save symmetrized ADPs to .npy")
     p.add_argument("--out-cif", default=None, help="Optional: save CIF with anisotropic U parameters (requires internal writer)")
-    p.add_argument("--device", default=None, help="Device string for UMA calculator (e.g. cpu or cuda). If omitted, auto-detect.")
+    p.add_argument("--device", default=None, help="Device string for MACECalculator (e.g. cpu or cuda). If omitted, auto-detect.")
     args = p.parse_args()
 
     main(

@@ -16,11 +16,8 @@ from mbe_automation.storage.core import (
     CALCULATION_STATUS_FAILED,
     CALCULATION_STATUS_SCF_NOT_CONVERGED,
 )
-from mbe_automation.calculators.uma import (
-    FAIRChemCalculator,
-    UMA,
-    _UMA_AVAILABLE,
-)
+from mbe_automation.calculators.mace import MACE, DeltaMACE, _MACE_AVAILABLE
+from mbe_automation.calculators.uma import UMA, _UMA_AVAILABLE
 from mbe_automation.calculators.pyscf import PySCFCalculator, SCFNotConverged
 from mbe_automation.calculators.dftb import DFTBCalculator
 import mbe_automation.common.display
@@ -28,15 +25,15 @@ import mbe_automation.common.resources
 from mbe_automation.configs.execution import Resources
 
 CALCULATORS = PySCFCalculator | DFTBCalculator
+if _MACE_AVAILABLE:
+    CALCULATORS = CALCULATORS | MACE | DeltaMACE
 if _UMA_AVAILABLE:
-    CALCULATORS = CALCULATORS | UMA | FAIRChemCalculator
+    CALCULATORS = CALCULATORS | UMA
 
 
-def _is_uma(
-    calc: object,
-) -> bool:
-    """Perform a safe isinstance check when UMA may be None (fairchem package not installed)."""
-    return UMA is not None and isinstance(calc, UMA)
+def _is_mace(calc: object) -> bool:
+    """Perform a safe isinstance check when MACE may be None (mace package not installed)."""
+    return MACE is not None and isinstance(calc, (MACE, DeltaMACE))
 
 
 def _split_work(structure: Structure, n_workers: int):
@@ -75,7 +72,7 @@ def _split_work(structure: Structure, n_workers: int):
 
 
 def _sequential_loop(
-    calculator: CALCULATORS,
+    calculator: MACE | PySCFCalculator | DFTBCalculator,
     positions: npt.NDArray[np.float64],
     cell_vectors: npt.NDArray[np.float64] | None,
     atomic_numbers: npt.NDArray[np.float64],
@@ -110,7 +107,8 @@ def _sequential_loop(
         forces = None
 
     if compute_feature_vectors:
-        n_features = getattr(calculator, "n_invariant_features", 0)
+        assert _is_mace(calculator)
+        n_features = calculator.n_invariant_features
         if average_over_atoms:
             feature_vectors = np.zeros((n_frames, n_features))
         else:
@@ -357,11 +355,7 @@ def run_model(
     if resources is None:
         resources = Resources.auto_detect()
 
-    compute_feature_vectors = (
-        compute_feature_vectors
-        and hasattr(calculator, "n_invariant_features")
-        and hasattr(calculator, "get_descriptors")
-    )
+    compute_feature_vectors = compute_feature_vectors and _is_mace(calculator)
 
     n_workers = min(resources.n_gpus, structure.n_frames)
     n_gpus_per_worker = 1
@@ -369,17 +363,16 @@ def run_model(
     use_ray = (
         RAY_AVAILABLE and
         n_workers > 1 and
-        (isinstance(calculator, PySCFCalculator) or _is_uma(calculator))
+        (isinstance(calculator, PySCFCalculator) or _is_mace(calculator))
     )
 
     if use_ray:
         n_cpus_per_worker = max(1, resources.n_cpu_cores // n_workers)
 
     if not silent:
-        level_of_theory = getattr(calculator, "level_of_theory", "uma")
         mbe_automation.common.resources.print_computational_resources()
         mbe_automation.common.display.framed(
-            [f"Running {level_of_theory} on {structure.n_frames} fixed frames"]
+            [f"Running {calculator.level_of_theory} on {structure.n_frames} fixed frames"]
         )
         print(f"{'compute_energies':<30}{compute_energies}")
         print(f"{'compute_forces':<30}{compute_forces}")

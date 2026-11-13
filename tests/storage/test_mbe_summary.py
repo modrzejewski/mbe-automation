@@ -12,7 +12,7 @@ import pytest
 
 import mbe_automation
 from mbe_automation import (
-    UMA,
+    MACE,
     UniqueClustersFilter,
 )
 from mbe_automation.api import MBE as APIMBE
@@ -283,23 +283,15 @@ def test_mbe_summary_methods(tmp_path: Path):
 
 
 def test_mbe_workflow(tmp_path: Path):
-    if UMA is None:
-        pytest.skip("UMA calculator is not available.")
+    test_cases_with_models = [
+        c for c in TEST_CASES if c.get("general_model_path") is not None
+    ]
+    if not test_cases_with_models:
+        pytest.skip("No test cases with models available.")
 
-    case = TEST_CASES[0]
+    case = test_cases_with_models[0]
     crystal = from_xyz_file(case["crystal_path"])
-    model_path = case.get("general_model_path")
-    try:
-        if (
-            model_path is not None
-            and Path(model_path).suffix == ".pt"
-            and Path(model_path).is_file()
-        ):
-            calc = UMA(model_path=str(model_path))
-        else:
-            calc = UMA()
-    except Exception as exc:
-        pytest.skip(f"UMA model unavailable: {exc}")
+    calc = MACE(model_path=str(case["general_model_path"]))
 
     unique_cluster_filter = UniqueClustersFilter(
         cluster_types=["monomers", "dimers"],

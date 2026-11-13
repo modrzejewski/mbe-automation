@@ -12,7 +12,7 @@ import mbe_automation.dynamics
 import mbe_automation.structure
 import mbe_automation.calculators
 
-from mbe_automation.calculators.uma import FAIRChemCalculator, _UMA_AVAILABLE
+from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
 
 
 def phonon_sampling(
@@ -28,11 +28,9 @@ def phonon_sampling(
 
     mbe_automation.common.display.framed(["Training set", "Normal-mode coordinate sampling"])
         
-    if _UMA_AVAILABLE:
-        if isinstance(config.calculator, FAIRChemCalculator):
-            mbe_automation.common.display.uma_summary(
-                calculator=config.calculator,
-            )
+    if _MACE_AVAILABLE:
+        if isinstance(config.calculator, MACECalculator):
+            mbe_automation.common.display.mace_summary(config.calculator)
 
     traj_pbc = mbe_automation.dynamics.harmonic.modes.trajectory(
         dataset=config.force_constants_dataset,
@@ -65,7 +63,7 @@ def phonon_sampling(
     
     all_structures = [molecular_crystal.supercell] + [s.cluster_of_molecules for s in finite_subsystems]
     for s in all_structures:
-        E_pot, forces, _, _ = mbe_automation.calculators.run_model(
+        E_pot, forces, _ = mbe_automation.calculators.run_model(
             structure=s,
             calculator=config.calculator,
             compute_feature_vectors=False,
@@ -78,7 +76,7 @@ def phonon_sampling(
                 config.features_calculator is not None and
                 config.feature_vectors_type != "none"
         ):
-            _, _, feature_vectors, _ = mbe_automation.calculators.run_model(
+            _, _, feature_vectors = mbe_automation.calculators.run_model(
                 structure=s,
                 calculator=config.features_calculator,
                 compute_feature_vectors=True,
@@ -153,7 +151,7 @@ def _crystal_at_pT(
             config.features_calculator is not None and
             config.feature_vectors_type != "none"
     ):
-        _, _, feature_vectors, _ = mbe_automation.calculators.run_model(
+        _, _, feature_vectors = mbe_automation.calculators.run_model(
             structure=pbc_md_frames,
             calculator=config.features_calculator,
             compute_feature_vectors=True,
@@ -196,7 +194,7 @@ def _finite_system_at_pT(
     for s in finite_subsystems:
         key = f"{config.root_key}/finite_subsystems/n={s.n_molecules}/{system_label}"
 
-        E_pot, forces, _, _ = mbe_automation.calculators.run_model(
+        E_pot, forces, _ = mbe_automation.calculators.run_model(
             structure=s.cluster_of_molecules,
             calculator=config.calculator,
             compute_feature_vectors=False,
@@ -210,7 +208,7 @@ def _finite_system_at_pT(
                 config.features_calculator is not None and
                 config.feature_vectors_type != "none"
         ):
-            _, _, feature_vectors, _ = mbe_automation.calculators.run_model(
+            _, _, feature_vectors = mbe_automation.calculators.run_model(
                 structure=s.cluster_of_molecules,
                 calculator=config.features_calculator,
                 compute_feature_vectors=True,
@@ -242,11 +240,9 @@ def md_sampling(
 
     mbe_automation.common.display.framed(["Training set", "MD sampling"])
         
-    if _UMA_AVAILABLE:
-        if isinstance(config.calculator, FAIRChemCalculator):
-            mbe_automation.common.display.uma_summary(
-                calculator=config.calculator,
-            )
+    if _MACE_AVAILABLE:
+        if isinstance(config.calculator, MACECalculator):
+            mbe_automation.common.display.mace_summary(config.calculator)
     
     if config.md_crystal.supercell_matrix is None:
         supercell_matrix = mbe_automation.structure.crystal.supercell_matrix(

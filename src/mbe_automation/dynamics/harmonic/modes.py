@@ -8,6 +8,12 @@ import phonopy
 import pymatgen.core
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from ase.calculators.calculator import Calculator as ASECalculator
+try:
+    from mace.calculators import MACECalculator
+    mace_available = True
+except ImportError:
+    MACECalculator = None
+    mace_available = False
 
 try:
     from mbe_automation.dynamics.harmonic.bands import track_from_gamma, reorder
@@ -501,7 +507,7 @@ def _absolute_amplitude_eq_2(
 
 def _to_cif(
         U_cart: npt.NDArray[np.float64],
-        lattice_vectors: npt.NDArray[np.float64], # lattice vectors stored in columns
+        lattice_vectors=npt.NDArray[np.float64] # lattice vectors stored in columns
 ):
     """
     Convert the mean square displacement matrix U(k) to the CIF format.
@@ -968,6 +974,89 @@ def thermal_displacements(
     )
     
     print("Thermal displacements completed", flush=True)
+    return disp
+
+
+def save_thermal_displacements_npz(
+        force_constants: ForceConstants,
+        save_path: str | Path,
+        temperatures_K: npt.NDArray[np.float64],
+        mode: Literal["full", "diagonal"] = "full",
+        phonon_filter: PhononFilter | None = None,
+        include_metadata: bool = False,
+        symmetrize_Dq: bool = True,
+        symprec: float = 1e-5,
+) -> ThermalDisplacements:
+    """
+    Compute thermal mean square displacement (MSD) matrices from ForceConstants
+    and save them to a NumPy `.npz` archive.
+
+    Args:
+        force_constants: The harmonic force constants model.
+        save_path: Path to the output `.npz` file.
+        temperatures_K: 1D array of temperatures (in Kelvin).
+        mode: Storage mode:
+            - "full": Saves `mean_square_displacements_matrix_full` with shape
+              `(n_temperatures, n_atoms_primitive, n_atoms_primitive, 3, 3)`.
+            - "diagonal": Saves `mean_square_displacements_matrix_diagonal` (ADPs)
+              with shape `(n_temperatures, n_atoms_primitive, 3, 3)`.
+        phonon_filter: A PhononFilter object defining the subset of phonons and
+            the k-point sampling mesh. If None, defaults to `k_point_mesh=50.0`
+            and `freq_max_THz=None`.
+        include_metadata: If True, includes primitive-cell atomic metadata in the
+            `.npz` archive (`elements`, `atomic_numbers`, `positions`, `cell_vectors`).
+        symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
+            using crystal symmetry operations.
+        symprec: Symmetry tolerance. Defaults to 1e-5.
+
+    Returns:
+        The computed `ThermalDisplacements` object.
+    """
+    if mode not in ("full", "diagonal"):
+        raise ValueError(f"Unknown mode '{mode}'. Expected 'full' or 'diagonal'.")
+
+    temperatures_K = np.asarray(temperatures_K, dtype=np.float64)
+    if temperatures_K.ndim != 1 or len(temperatures_K) == 0:
+        raise ValueError("temperatures_K must be a non-empty 1D array of temperatures.")
+
+    if phonon_filter is None:
+        phonon_filter = PhononFilter(
+            freq_max_THz=None,
+            k_point_mesh=50.0,
+        )
+
+    disp = thermal_displacements(
+        force_constants=force_constants,
+        temperatures_K=temperatures_K,
+        phonon_filter=phonon_filter,
+        cell_type="primitive",
+        symmetrize_Dq=symmetrize_Dq,
+        symprec=symprec,
+    )
+
+    data_dict: dict[str, npt.NDArray] = {
+        "temperatures_K": temperatures_K,
+    }
+    if mode == "full":
+        data_dict["mean_square_displacements_matrix_full"] = (
+            disp.mean_square_displacements_matrix_full
+        )
+    else:
+        data_dict["mean_square_displacements_matrix_diagonal"] = (
+            disp.mean_square_displacements_matrix_diagonal
+        )
+
+    if include_metadata:
+        ph = mbe_automation.storage.to_phonopy(force_constants=force_constants)
+        data_dict["elements"] = np.asarray(ph.primitive.symbols, dtype=str)
+        data_dict["atomic_numbers"] = np.asarray(ph.primitive.numbers, dtype=np.int64)
+        data_dict["positions"] = np.asarray(ph.primitive.positions, dtype=np.float64)
+        data_dict["cell_vectors"] = np.asarray(ph.primitive.cell, dtype=np.float64)
+
+    save_path = Path(save_path).expanduser()
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(save_path, **data_dict)
+
     return disp
 
 
