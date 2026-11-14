@@ -7,6 +7,23 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 import mbe_automation.dynamics.harmonic.modes
 from mbe_automation.structure.crystal import SYMMETRY_TOLERANCE_STRICT
+from .xyz_formats import _space_group_items
+
+def _space_group_header_mismatch(small_structure: gemmi.SmallStructure) -> str:
+    """
+    Empty if the header names exactly the tabulated setting of the operator loop,
+    or nothing if there is none. Otherwise a description of the difference.
+    """
+    declared = {
+        "_space_group_name_H-M_alt": small_structure.spacegroup_hm,
+        "_space_group_IT_number": small_structure.spacegroup_number,
+        "_space_group_name_Hall": small_structure.spacegroup_hall,
+    }
+    declared = {tag: value for tag, value in declared.items() if value}
+    expected = _space_group_items(small_structure.symops)
+    if declared == expected:
+        return ""
+    return f"space-group header {declared} does not match the operator loop, which implies {expected}"
 
 def verify_adps_roundtrip(
     cif_path: str,
@@ -38,6 +55,11 @@ def verify_adps_roundtrip(
         small_structure = gemmi.make_small_structure_from_block(block)
     except Exception as e:
         print(f"CIF roundtrip failed: could not read CIF - {e}")
+        return False
+
+    mismatch = _space_group_header_mismatch(small_structure)
+    if mismatch:
+        print(f"CIF roundtrip failed: {mismatch}")
         return False
 
     # 2. Extract Representative Atom Data and ADPs
