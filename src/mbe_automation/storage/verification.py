@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 import gemmi
 import numpy as np
 import numpy.typing as npt
@@ -26,7 +27,7 @@ def _space_group_header_mismatch(small_structure: gemmi.SmallStructure) -> str:
     return f"space-group header {declared} does not match the operator loop, which implies {expected}"
 
 def verify_adps_roundtrip(
-    cif_path: str,
+    cif_path: str | Path,
     original_structure: pymatgen.core.Structure,
     thermal_displacements: mbe_automation.dynamics.harmonic.modes.ThermalDisplacements,
     temperature_idx: int = 0,
@@ -50,7 +51,7 @@ def verify_adps_roundtrip(
     """
     # 1. Load CIF Data via gemmi
     try:
-        doc = gemmi.cif.read_file(cif_path)
+        doc = gemmi.cif.read_file(str(cif_path))
         block = doc.sole_block()
         small_structure = gemmi.make_small_structure_from_block(block)
     except Exception as e:
