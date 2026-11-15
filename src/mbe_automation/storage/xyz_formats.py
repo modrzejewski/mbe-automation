@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
+from collections.abc import Sequence
 from typing import Any, Literal
 from typing import TYPE_CHECKING
 import pymatgen
@@ -117,7 +118,29 @@ def _read_cif(
             )
         return _read_cif_pymatgen(filepath)
     else:
-        raise ValueError("Invalid backend requested in _read_cif.")        
+        raise ValueError("Invalid backend requested in _read_cif.")
+
+def _space_group_items(ops: Sequence[str]) -> dict[str, str | int]:
+    """
+    CIF items naming the tabulated space-group setting with exactly these operators.
+
+    Empty if no tabulated setting has them: a centred lattice written in its
+    primitive cell, or an origin away from the tabulated one. The operator loop
+    alone then defines the symmetry. CIF readers such as CCTBX reject a file
+    whose symbols or IT number stand for another setting than its operator loop.
+    """
+    try:
+        group = gemmi.GroupOps([gemmi.Op(op) for op in ops])
+    except RuntimeError:  # a translation that is not a multiple of 1/24
+        return {}
+    space_group = gemmi.find_spacegroup_by_ops(group)
+    if space_group is None:
+        return {}
+    return {
+        "_space_group_name_H-M_alt": space_group.xhm(),  # with the origin choice, e.g. "P 42/n:1"
+        "_space_group_IT_number": space_group.number,
+        "_space_group_name_Hall": space_group.hall,
+    }
 
 def _to_cif_with_adps(
         save_path: str | Path,
@@ -142,32 +165,20 @@ def _to_cif_with_adps(
     blocks["_chemical_formula_sum"] = no_oxi_comp.formula
     if symprec is not None:
         spg_analyzer = pymatgen.symmetry.analyzer.SpacegroupAnalyzer(struct, symprec)
+        ops = [op.as_xyz_str() for op in spg_analyzer.get_symmetry_operations()]
         blocks["_space_group_crystal_system"] = spg_analyzer.get_crystal_system()
-        blocks["_space_group_name_H-M_alt"] = spg_analyzer.get_space_group_symbol()
-        blocks["_space_group_IT_number"] = spg_analyzer.get_space_group_number()
-        blocks["_space_group_name_Hall"] = spg_analyzer.get_hall()
     else:
-        blocks["_space_group_name_H-M_alt"] = "P 1"
-        blocks["_space_group_IT_number"] = 1
-        
+        ops = ["x, y, z"]
+    blocks.update(_space_group_items(ops))
+
     for cell_attr in ("a", "b", "c"):
         blocks[f"_cell_length_{cell_attr}"] = format_str.format(getattr(lattice, cell_attr))
     for cell_attr in ("alpha", "beta", "gamma"):
         blocks[f"_cell_angle_{cell_attr}"] = format_str.format(getattr(lattice, cell_attr))
     blocks["_cell_volume"] = format_str.format(lattice.volume)
 
-    if symprec is None:
-        blocks["_symmetry_equiv_pos_site_id"] = ["1"]
-        blocks["_symmetry_equiv_pos_as_xyz"] = ["x, y, z"]
-    else:
-        symm_ops: list[pymatgen.core.operations.SymmOp] = []
-        for op in spg_analyzer.get_symmetry_operations():
-            v = op.translation_vector
-            symm_ops.append(pymatgen.core.operations.SymmOp.from_rotation_and_translation(op.rotation_matrix, v))
-            
-        ops = [op.as_xyz_str() for op in symm_ops]
-        blocks["_symmetry_equiv_pos_site_id"] = [f"{i}" for i in range(1, len(ops) + 1)]
-        blocks["_symmetry_equiv_pos_as_xyz"] = ops
+    blocks["_symmetry_equiv_pos_site_id"] = [f"{i}" for i in range(1, len(ops) + 1)]
+    blocks["_symmetry_equiv_pos_as_xyz"] = ops
 
     loops: list[list[str]] = [
         ["_symmetry_equiv_pos_site_id", "_symmetry_equiv_pos_as_xyz"],

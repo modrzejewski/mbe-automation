@@ -171,6 +171,7 @@ Second order force constants and associated physical quantities used to compute 
 *   **`to_phonopy`**: Converts the object to a Phonopy object.
 *   **`thermal_displacements`**: Computes thermal displacement properties (ADPs).
 *   **`to_cif_file`**: Saves the primitive cell to a CIF file (can include ADPs).
+*   **`save_msd`**: Computes thermal mean square displacement (MSD) matrices across a 1D array of temperatures and saves them to a `.npz` archive in `"full"` (full interatomic covariance tensor) or `"diagonal"` (on-site Cartesian ADP tensors) mode, with optional primitive-cell atomic metadata.
 *   **`gruneisen_parameters`**: Computes Gruneisen parameters at a given k-point.
 *   **`refine`**: Refines phonon frequencies against experimental ADPs using the NoMoRe library.
 *   **`thermodynamics`**: Computes thermodynamic properties (vib energy, entropy, etc.) at given temperatures.
