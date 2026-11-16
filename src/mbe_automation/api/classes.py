@@ -450,7 +450,7 @@ class ForceConstants(_ForceConstants):
             phonon_filter: PhononFilter | None = None,
             include_metadata: bool = False,
             symmetrize_Dq: bool = True,
-            symprec: float = 1e-5,
+            symprec: float = SYMMETRY_TOLERANCE_STRICT,
     ) -> ThermalDisplacements:
         """
         Compute thermal mean square displacement (MSD) matrices and save them to a `.npz` file.
@@ -469,7 +469,7 @@ class ForceConstants(_ForceConstants):
                 `.npz` archive (`elements`, `atomic_numbers`, `positions`, `cell_vectors`).
             symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
                 using crystal symmetry operations.
-            symprec: Symmetry tolerance. Defaults to 1e-5.
+            symprec: Symmetry tolerance. Defaults to SYMMETRY_TOLERANCE_STRICT.
 
         Returns:
             The computed `ThermalDisplacements` object.

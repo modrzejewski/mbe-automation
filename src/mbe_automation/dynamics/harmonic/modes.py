@@ -50,7 +50,7 @@ class PhononFilter:
             phonon branch across the Brillouin zone. If specified,
             freq_min_THz and freq_max_THz are ignored.
     freq_min_THz: The minimum phonon frequency (in THz) to be included
-            in the calculations. Defaults to 0.0.
+            in the calculations. Must be positive. Defaults to 0.1.
     freq_max_THz: The maximum phonon frequency (in THz) to be included.
             If None, all frequencies above `freq_min_THz` are included.
             Defaults to None.
@@ -82,7 +82,8 @@ class ThermalDisplacements:
             Eq 4a in ref 2.
         mean_square_displacements_matrix_full: rank (n_temperatures, n_atoms, n_atoms, 3, 3).
             Full variance-covariance matrix of atomic displacements (Å²).
-            Eq 6 in ref 1.
+            Eq 6 in ref 1. Block (k, k') refers to the pair of atoms
+            at their positions in the primitive cell of the phonopy object.
         instantaneous_displacements: rank (n_temperatures, n_time_points, n_atoms, 3)
             or None. Instantaneous atomic displacements (Å). Eq 2 in ref 1.
     """
@@ -529,14 +530,14 @@ def _thermal_displacements(
         temperatures_K: npt.NDArray[np.float64], # temperature points in K, rank (n_temperatures, )
         time_points_fs: npt.NDArray[np.float64] = np.array([0.0]), # time points in fs, rank (n_time_points, )
         selected_modes: npt.NDArray[np.integer] | None = None,
-        freq_min_THz: float = 0.0,
+        freq_min_THz: float = 0.1,
         freq_max_THz: float | None = None,
         cell_type: Literal["primitive", "supercell"] = "primitive",
         amplitude_scan: Literal[*AMPLITUDE_SCAN_MODES] = "time_propagation",
         n_random_samples: int = 1, # ignored unless amplitude_scan=="random" or amplitude_scan=="equidistant"
         rng: np.random.Generator | None = None,
         symmetrize_Dq: bool = True,
-        symprec: float = 1e-5,
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
 ) -> ThermalDisplacements:
     """
     Compute thermal displacement vectors of atoms
@@ -565,8 +566,10 @@ def _thermal_displacements(
        Acta Cryst. A 56, 403 (2000); doi: 10.1107/S0108767300005626
 
     """
-    if not freq_min_THz >= 0.0:
-        raise ValueError("freq_min_THz must be nonnegative")
+    assert freq_min_THz > 0.0, (
+        "freq_min_THz must be positive. Allowing near-zero frequency modes "
+        "causes large numerical errors in the computed ADPs."
+    )
     if len(qpoints) == 0:
         raise ValueError("qpoints array cannot be empty")
     if np.any(temperatures_K <= 0):
@@ -635,6 +638,7 @@ def _thermal_displacements(
         (n_temperatures, n_atoms_primitive*3, n_atoms_primitive*3),
         dtype=np.complex128
     )
+    scaled_positions_primitive = phonopy_object.primitive.scaled_positions
 
     for q in qpoints:
         all_freqs_THz, eigenvecs = at_k_point(
@@ -672,14 +676,28 @@ def _thermal_displacements(
             )
         Ajk_ejk_primitive = Ajk_primitive * ejk_primitive[np.newaxis, :, :]
         #
+        # Position-dependent part of the phase factor
+        # Exp(i * q * r(k)) for atoms of the primitive cell.
+        # The eigenvectors of phonopy's dynamical matrix
+        # do not include this factor.
+        #
+        exp_iqr_primitive = np.repeat(
+            np.exp(2j * np.pi * np.dot(scaled_positions_primitive, q)),
+            3
+        ) # rank (n_atoms_primitive*3, )
+        Ajk_ejk_exp_iqr_primitive = (
+            Ajk_ejk_primitive * exp_iqr_primitive[np.newaxis, np.newaxis, :]
+        )
+        #
         # U(k,k') defined in eq 6 of ref 1,
+        # including Exp(i * q * (r(k) - r(k'))),
         # except the 1/N normalization factor is added
         # at a later stage
         #
         U_q = np.einsum(
             "Tjk,Tjl->Tkl",
-            Ajk_ejk_primitive,
-            Ajk_ejk_primitive.conj()
+            Ajk_ejk_exp_iqr_primitive,
+            Ajk_ejk_exp_iqr_primitive.conj()
         )
         mean_sq_disp += U_q
 
@@ -738,11 +756,7 @@ def _thermal_displacements(
 
         if cell_type == "primitive":
             ejk, Ajk = ejk_primitive, Ajk_primitive
-            scaled_positions = phonopy_object.primitive.scaled_positions
-            exp_iqr = np.repeat(
-                np.exp(2j * np.pi * np.dot(scaled_positions, q)),
-                3
-            ) # rank (n_atoms_primitive*3, )                
+            exp_iqr = exp_iqr_primitive                
 
         Ajk_ejk = Ajk * ejk # rank (n_temperatures, n_freqs, n_atoms * 3)
         #
@@ -873,7 +887,7 @@ def thermal_displacements(
         n_random_samples: int = 1, # ignored unless random_scan=="random" or random_scan=="equidistant"
         rng: np.random.Generator | None = None,
         symmetrize_Dq: bool = True,
-        symprec: float = 1e-5,
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
 ) -> ThermalDisplacements:
     """
     Compute thermal displacement properties of atoms in a crystal lattice.
@@ -979,7 +993,7 @@ def save_thermal_displacements_npz(
         phonon_filter: PhononFilter | None = None,
         include_metadata: bool = False,
         symmetrize_Dq: bool = True,
-        symprec: float = 1e-5,
+        symprec: float = SYMMETRY_TOLERANCE_STRICT,
 ) -> ThermalDisplacements:
     """
     Compute thermal mean square displacement (MSD) matrices from ForceConstants
@@ -1001,7 +1015,7 @@ def save_thermal_displacements_npz(
             `.npz` archive (`elements`, `atomic_numbers`, `positions`, `cell_vectors`).
         symmetrize_Dq: Whether to symmetrize the dynamical matrix at each q-point
             using crystal symmetry operations.
-        symprec: Symmetry tolerance. Defaults to 1e-5.
+        symprec: Symmetry tolerance. Defaults to SYMMETRY_TOLERANCE_STRICT.
 
     Returns:
         The computed `ThermalDisplacements` object.

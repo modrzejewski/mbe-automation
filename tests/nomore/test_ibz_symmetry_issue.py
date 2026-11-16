@@ -159,7 +159,7 @@ def compute_mbe_adps(force_constants, mesh_size, temperature_K):
         temperatures_K=np.array([temperature_K], dtype=np.float64),
         phonon_filter=modes.PhononFilter(
             k_point_mesh=mesh,
-            freq_min_THz=0.0, 
+            freq_min_THz=0.1,
             freq_max_THz=None
         ),
         cell_type="primitive"

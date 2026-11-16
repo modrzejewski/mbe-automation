@@ -12,15 +12,18 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from mbe_automation import Structure
 from mbe_automation.structure.molecule import match
-from mbe_automation.storage.verification import verify_adps_roundtrip
+from mbe_automation.storage.verification import _space_group_header_mismatch, verify_adps_roundtrip
+from mbe_automation.storage.xyz_formats import _space_group_items
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from tests.reference_data.test_cases import TEST_CASES
+from tests.reference_data.test_cases import TEST_CASES, X23_DIR
 
 TOLERANCE_CELL = 1.0E-5
 TOLERANCE_POSITIONS = 1.0E-5
 EXPERIMENTAL_ADPS_DIR = PROJECT_ROOT / "tests" / "reference_data" / "experimental_adps"
 EXPERIMENTAL_CIF_PATHS = sorted(EXPERIMENTAL_ADPS_DIR.glob("*.cif"))
+ALPHA_GLYCINE = EXPERIMENTAL_ADPS_DIR / "alpha-gly_90K_neutron.cif"
+HEXAMETHYLENETETRAMINE = X23_DIR / "22_hexamethylenetetramine" / "solid.xyz"
 
 
 def _unit_cell_rmsd(structure1: Structure, structure2: Structure) -> float:
@@ -193,4 +196,37 @@ def test_round_trip_cif_with_adps(cif_path: Path) -> None:
             symprec=1.0E-5,
         )
         assert passed
+
+
+@pytest.mark.parametrize(
+    "structure_path, transform, expected_hm, expected_number",
+    [
+        (ALPHA_GLYCINE, "no_transformation", "P 1 21/n 1", 14),  # alternative setting of a P lattice
+        (HEXAMETHYLENETETRAMINE, "to_symmetrized_conventional_cell", "I -4 3 m", 217),  # centred lattice, conventional cell
+        (HEXAMETHYLENETETRAMINE, "to_symmetrized_primitive_cell", "", 0),  # centred lattice, primitive cell: operators only
+    ],
+)
+def test_cif_space_group_header_follows_operators(
+        structure_path: Path,
+        transform: str,
+        expected_hm: str,
+        expected_number: int,
+) -> None:
+    crystal = Structure.from_file(structure_path, transform=transform)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        out_cif = Path(tmp_dir) / "out.cif"
+        crystal.to_file(save_path=out_cif, symprec=1.0E-5)
+        small_structure = gemmi.make_small_structure_from_block(
+            gemmi.cif.read_file(str(out_cif)).sole_block()
+        )
+
+    assert _space_group_header_mismatch(small_structure) == ""
+    assert small_structure.spacegroup_hm == expected_hm
+    assert small_structure.spacegroup_number == expected_number
+    assert len(small_structure.get_all_unit_cell_sites()) == len(crystal.atomic_numbers)
+
+
+def test_cif_space_group_header_empty_for_untabulated_origin() -> None:
+    assert _space_group_items(["x, y, z", "-x+795/809, -y, z"]) == {}
+
 
