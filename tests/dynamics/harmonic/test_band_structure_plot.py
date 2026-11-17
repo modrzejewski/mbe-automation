@@ -1,7 +1,9 @@
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.colors
+import matplotlib.lines
 import matplotlib.pyplot as plt
+import matplotlib.text
 import numpy as np
 import pytest
 
@@ -75,12 +77,20 @@ def close_figures():
 
 def _dots(fig) -> list:
     return [
-        line for ax in fig.axes for line in ax.get_lines() if line.get_marker() == "o"
+        artist for artist in fig.artists
+        if isinstance(artist, matplotlib.lines.Line2D) and artist.get_marker() == "o"
+    ]
+
+
+def _annotations(fig) -> list:
+    return [
+        artist for artist in fig.artists
+        if isinstance(artist, matplotlib.text.Annotation)
     ]
 
 
 def _labels(fig) -> list[str]:
-    return [text.get_text() for ax in fig.axes for text in ax.texts]
+    return [annotation.get_text() for annotation in _annotations(fig)]
 
 
 def _count_color(fig, color: str) -> int:
@@ -144,6 +154,80 @@ def test_wavenumber_units():
     assert len(labels) == 1
     assert "−16.68 cm⁻¹" in labels[0]
     assert len(_dots(fig)) == 2
+    assert fig.axes[0].get_ylabel() == "Frequency (cm⁻¹)"
+
+
+def test_break_labels_merged():
+    fig = mbe_automation.dynamics.harmonic.display.band_structure(fbz_path=_band_path())
+    left = [text.get_text() for text in fig.axes[0].get_xticklabels()]
+    right = [text.get_text() for text in fig.axes[1].get_xticklabels()]
+    assert left == ["$\\Gamma$", "X", "M|Y"]
+    assert right == ["", "$\\Gamma$"]
+
+
+def test_dot_at_panel_edge_is_whole():
+    """
+    A dip at the end of a panel is drawn whole, over the touching
+    panel on its right.
+    """
+    t = np.linspace(0.0, 1.0, N_POINTS)
+    kpoints, frequencies, distances = [], [], []
+    for k, (band, q_start, q_end) in enumerate([
+            (0.6 * np.sin(np.pi * t) - 0.5 * t**6, [0.0, 0.0, 0.0], [0.5, 0.0, 0.0]),
+            (0.6 * np.sin(np.pi * t), [0.0, 0.5, 0.0], [0.0, 0.0, 0.0]),
+    ]):
+        q, w, d = _segment(
+            lowest_band=band,
+            q_start=q_start,
+            q_end=q_end,
+            distance_start=float(k),
+        )
+        kpoints.append(q)
+        frequencies.append(w)
+        distances.append(d)
+    fbz_path = mbe_automation.storage.core.BrillouinZonePath(
+        kpoints=kpoints,
+        frequencies=frequencies,
+        path_connections=np.array([False, False]),
+        labels=np.array(["$\\Gamma$", "X", "Y", "$\\Gamma$"]),
+        distances=distances,
+    )
+    fig = mbe_automation.dynamics.harmonic.display.band_structure(fbz_path=fbz_path)
+    fig.set_dpi(300)
+    fig.canvas.draw()
+    image = np.asarray(fig.canvas.buffer_rgba())
+    (dot,) = _dots(fig)
+    x, y = dot.get_transform().transform((dot.get_xdata()[0], dot.get_ydata()[0]))
+    row = image.shape[0] - int(round(y))
+    red = matplotlib.colors.to_rgb(mbe_automation.dynamics.harmonic.display._IMAGINARY_COLOR)
+    for dx in (-5, 5):
+        pixel = image[row, int(round(x)) + dx, :3] / 255.0
+        assert np.allclose(pixel, red, atol=0.1)
+
+
+def test_dip_label_below_curves():
+    """
+    The label lies below the most imaginary dip, where no band passes,
+    and inside the axes.
+    """
+    fig = mbe_automation.dynamics.harmonic.display.band_structure(fbz_path=_band_path())
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    (label,) = _annotations(fig)
+    box = label.get_window_extent(renderer)
+    dot_y = label.xycoords.transform(label.xy)[1]
+    assert label.get_va() == "top"
+    assert box.y1 < dot_y
+    assert box.y0 > fig.axes[0].get_window_extent(renderer).y0
+
+
+def test_dip_label_beside_dot_without_room():
+    fig = mbe_automation.dynamics.harmonic.display.band_structure(
+        fbz_path=_band_path(),
+        freq_min_THz=-0.55,
+    )
+    (label,) = _annotations(fig)
+    assert label.get_va() == "center"
 
 
 def test_format_q():

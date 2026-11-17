@@ -1,6 +1,8 @@
 from __future__ import annotations
 import matplotlib.axes
+import matplotlib.lines
 import matplotlib.patheffects
+import matplotlib.text
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
@@ -47,6 +49,11 @@ _BAND_STRUCTURE_STYLE = {
     "xtick.major.pad": 5,
     "ytick.major.pad": 4,
 }
+#
+# Vertical room (points) below the most imaginary dip for its
+# two-line label, the offset from the dot and the white outline.
+#
+_DIP_LABEL_ROOM_PT = 24.0
 
 def animate_pymatviz(
         mode: mbe_automation.storage.Structure,
@@ -174,6 +181,40 @@ def _format_q(
     return "q=(" + ",".join(components) + ")"
 
 
+def _axes_height_pt(
+        ax: matplotlib.axes.Axes,
+) -> float:
+    """
+    Height of the axes in points.
+    """
+    return ax.get_position().height * ax.figure.get_figheight() * 72.0
+
+
+def _panel_labels(
+        labels: npt.NDArray[np.str_],
+        continuous_segments: list[tuple[int, int]],
+) -> list[list[str]]:
+    """
+    Tick labels of each panel. The two labels at a break between
+    panels are merged into one label, e.g. Z|R₂, at the end of the
+    left panel. The first tick of the right panel gets no label.
+    """
+    panel_labels = []
+    label_count = 0
+    for start_idx, end_idx in continuous_segments:
+        num_labels = end_idx - start_idx + 2
+        panel_labels.append(
+            [str(x) for x in labels[label_count : label_count + num_labels]]
+        )
+        label_count += num_labels
+
+    for left, right in zip(panel_labels, panel_labels[1:]):
+        if left[-1] != right[0]:
+            left[-1] = f"{left[-1]}|{right[0]}"
+        right[0] = ""
+    return panel_labels
+
+
 def _imaginary_dips(
         distances: list[npt.NDArray[np.float64]],
         frequencies: list[npt.NDArray[np.float64]],
@@ -221,6 +262,14 @@ def _mark_imaginary_dips(
     """
     Mark every dip of the lowest band below threshold with a dot. Label the
     most imaginary dip with its frequency and q-point.
+
+    The label hangs below the level of the most imaginary dip if there is
+    room. No band passes below that level, so the label covers no curve.
+    Otherwise the label is placed beside the dot.
+
+    The panels touch. Dots and the label are figure artists, drawn over
+    all panels and not clipped, so that a dot at the edge of a panel or
+    a label that extends into a neighbouring panel is drawn whole.
     """
     dips = []
     for ax, (first_segment, last_segment) in zip(axes, continuous_segments):
@@ -234,16 +283,19 @@ def _mark_imaginary_dips(
         ):
             if frequency < nu_min:
                 continue
-            ax.plot(
-                distance,
-                frequency,
-                marker="o",
-                markersize=5.5,
-                markerfacecolor=_IMAGINARY_COLOR,
-                markeredgecolor="white",
-                markeredgewidth=1.4,
-                linestyle="none",
-                zorder=5,
+            ax.figure.add_artist(
+                matplotlib.lines.Line2D(
+                    [distance],
+                    [frequency],
+                    transform=ax.transData,
+                    marker="o",
+                    markersize=5.5,
+                    markerfacecolor=_IMAGINARY_COLOR,
+                    markeredgecolor="white",
+                    markeredgewidth=1.4,
+                    linestyle="none",
+                    zorder=5,
+                )
             )
             dips.append((ax, distance, frequency, q))
 
@@ -252,28 +304,38 @@ def _mark_imaginary_dips(
 
     ax, distance, frequency, q = min(dips, key=lambda dip: dip[2])
     x_min, x_max = ax.get_xlim()
+    y_min, y_max = ax.get_ylim()
     label_on_right = (distance - x_min) / (x_max - x_min) < 0.8
+    room_below_pt = (frequency - y_min) / (y_max - y_min) * _axes_height_pt(ax)
+    label_below = room_below_pt >= _DIP_LABEL_ROOM_PT
+    if label_below:
+        xytext = (6 if label_on_right else -6, -3)
+    else:
+        xytext = (9 if label_on_right else -9, -1)
     label = (
         f"{_format_signed(value=frequency, n_decimals=2)} {unit_label}\n"
         f"{_format_q(q=q)}"
     )
-    ax.annotate(
-        label,
-        xy=(distance, frequency),
-        xytext=(9 if label_on_right else -9, -1),
-        textcoords="offset points",
-        ha="left" if label_on_right else "right",
-        va="center",
-        fontsize=7,
-        color=_TEXT_COLOR,
-        linespacing=1.2,
-        zorder=6,
-        path_effects=[
-            matplotlib.patheffects.withStroke(
-                linewidth=2.5,
-                foreground=(1.0, 1.0, 1.0, 0.85),
-            )
-        ],
+    ax.figure.add_artist(
+        matplotlib.text.Annotation(
+            label,
+            xy=(distance, frequency),
+            xycoords=ax.transData,
+            xytext=xytext,
+            textcoords="offset points",
+            ha="left" if label_on_right else "right",
+            va="top" if label_below else "center",
+            fontsize=7,
+            color=_TEXT_COLOR,
+            linespacing=1.2,
+            zorder=6,
+            path_effects=[
+                matplotlib.patheffects.withStroke(
+                    linewidth=2.5,
+                    foreground=(1.0, 1.0, 1.0, 0.85),
+                )
+            ],
+        )
     )
 
 
@@ -347,10 +409,6 @@ def _band_structure(
     else:
         max_freq = np.max(all_freqs)
         nu_max = max_freq + 0.05 * (max_freq - min_freq)
-    if freq_min_THz is not None:
-        nu_min = freq_min_THz * scaling_factor
-    else:
-        nu_min = min_freq - 0.05 * (nu_max - min_freq)
     #
     # The last element of path_connections is False by definition
     # of BrillouinZonePath. Manually constructed paths may violate this.
@@ -374,12 +432,27 @@ def _band_structure(
             sharey=True,
             squeeze=False,
             figsize=(7.0, 3.2),
-            gridspec_kw={"width_ratios": width_ratios, "wspace": 0.04},
+            gridspec_kw={"width_ratios": width_ratios, "wspace": 0.0},
         )
         axes = list(axes[0])
 
-        label_count = 0
-        for ax, (start_idx, end_idx) in zip(axes, continuous_segments):
+        if freq_min_THz is not None:
+            nu_min = freq_min_THz * scaling_factor
+        else:
+            padding = 0.05 * (nu_max - min_freq)
+            if min_freq < threshold:
+                #
+                # Room below the most imaginary dip for its label
+                #
+                room = _DIP_LABEL_ROOM_PT / _axes_height_pt(axes[0])
+                padding = max(padding, room / (1.0 - room) * (nu_max - min_freq))
+            nu_min = min_freq - padding
+
+        panel_labels = _panel_labels(
+            labels=labels,
+            continuous_segments=continuous_segments,
+        )
+        for i, (ax, (start_idx, end_idx)) in enumerate(zip(axes, continuous_segments)):
             for k in range(start_idx, end_idx + 1):
                 for j in reversed(range(n_bands)):
                     if np.min(frequencies[k][:, j]) > nu_max:
@@ -397,12 +470,9 @@ def _band_structure(
 
             tick_pos = [distances[k][0] for k in range(start_idx, end_idx + 1)]
             tick_pos.append(distances[end_idx][-1])
-            num_labels = len(tick_pos)
-            tick_labels = labels[label_count : label_count + num_labels]
-            label_count += num_labels
 
             ax.set_xticks(tick_pos)
-            ax.set_xticklabels(tick_labels)
+            ax.set_xticklabels(panel_labels[i])
             ax.set_xlim(tick_pos[0], tick_pos[-1])
             _style_band_axis(
                 ax=ax,
@@ -411,7 +481,7 @@ def _band_structure(
             )
 
         axes[0].set_ylim(nu_min, nu_max)
-        axes[0].set_ylabel(f"ω ({unit_label})")
+        axes[0].set_ylabel(f"Frequency ({unit_label})")
         _mark_imaginary_dips(
             axes=axes,
             continuous_segments=continuous_segments,
@@ -464,10 +534,11 @@ def band_structure(
     The three lowest bands are drawn in one accent colour and all other bands
     in grey. Frequencies are sorted at each q-point and not tracked by band
     character, so the three lowest bands are the acoustic modes only near Γ.
-    The region of imaginary frequencies (ω < 0) is tinted. Every dip of the
-    lowest band below imaginary_mode_thresh_THz is marked with a dot; the most
-    imaginary one is labelled with its frequency and q-point in reduced
-    coordinates.
+    The region of imaginary frequencies, plotted as negative values, is
+    tinted. Every dip of the lowest band below imaginary_mode_thresh_THz is
+    marked with a dot; the most imaginary one is labelled with its frequency
+    and q-point in reduced coordinates. Panels at path breaks touch and share
+    one merged label, e.g. Z|R₂.
 
     Args:
         fbz_path: Band structure. If None, read from dataset and key.
@@ -475,7 +546,8 @@ def band_structure(
         key: Key of the band structure in the dataset.
         save_path: Path of the image file. If None, return the figure.
         freq_min_THz: Lower frequency limit (THz). Default: lowest frequency
-            minus 5% of the plotted range.
+            minus 5% of the plotted range, or more to fit the label of the
+            most imaginary dip below it.
         freq_max_THz: Upper frequency limit (THz). Default: highest frequency
             plus 5% of the frequency range.
         freq_units: Units of the frequency axis, "THz" or "cm-1".

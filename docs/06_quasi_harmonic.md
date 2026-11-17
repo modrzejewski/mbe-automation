@@ -439,7 +439,7 @@ print(df_fixed.head())
 
 ### Plotting Phonon Band Structure
 
-The phonon band structure for any calculated structure can be plotted using the `band_structure` function. The three lowest bands are highlighted and the optical bands are grey. Imaginary frequencies (ω < 0) lie in a tinted region; dips of the lowest band below `imaginary_mode_thresh_THz` are marked, and the most imaginary one is labelled with its q-point in reduced coordinates. The workflow saves this plot up to 10 THz; use `freq_min_THz` and `freq_max_THz` for another range.
+The phonon band structure for any calculated structure can be plotted using the `band_structure` function. The three lowest bands are highlighted and the optical bands are grey. Imaginary frequencies, plotted as negative values, lie in a tinted region; dips of the lowest band below `imaginary_mode_thresh_THz` are marked, and the most imaginary one is labelled with its q-point in reduced coordinates. The workflow saves this plot up to 10 THz; use `freq_min_THz` and `freq_max_THz` for another range.
 
 ```python
 import mbe_automation
