@@ -318,7 +318,8 @@ def crystal(
         dataset=dataset,
         key=f"{root_key}/phonons/brillouin_zone_paths/{system_label}",
         save_path=os.path.join(work_dir, "phonons", system_label, "brillouin_zone_path.png"),
-        freq_max_THz=10.0 # THz
+        freq_max_THz=10.0,
+        imaginary_mode_thresh_THz=imaginary_mode_threshold,
     )
     structure.save(
         dataset=dataset,

@@ -186,27 +186,39 @@ class BrillouinZonePath(_BrillouinZonePath):
     def plot(
             self,
             save_path: str | Path | None = None,
+            freq_min_THz: float | None = None,
             freq_max_THz: float | None = None,
-            color_map: str = "plasma",
-            freq_units: Literal["THz", "cm-1"] = "THz"
+            freq_units: Literal["THz", "cm-1"] = "THz",
+            imaginary_mode_thresh_THz: float = -0.1,
+            title: str | None = None,
     ):
         """
         Plot the band structure.
-        
+
+        The three lowest bands are highlighted, optical bands are grey, the
+        imaginary region is tinted, and dips of the lowest band below
+        imaginary_mode_thresh_THz are marked; the most imaginary one is
+        labelled with its q-point.
+
         Args:
             save_path: Path to save the plot. If None, returns the figure.
-            freq_max_THz: Maximum frequency limit for the plot in THz.
-            color_map: Matplotlib colormap name.
+            freq_min_THz: Lower frequency limit (THz).
+            freq_max_THz: Upper frequency limit (THz).
             freq_units: Units for frequency axis, "THz" or "cm-1".
+            imaginary_mode_thresh_THz: Frequency (THz) below which a dip of
+                the lowest band is marked.
+            title: Title above the plot.
         """
         if save_path is not None:
             save_path = Path(save_path).expanduser()
         return mbe_automation.dynamics.harmonic.display.band_structure(
             fbz_path=self,
             save_path=save_path,
+            freq_min_THz=freq_min_THz,
             freq_max_THz=freq_max_THz,
-            color_map=color_map,
-            freq_units=freq_units
+            freq_units=freq_units,
+            imaginary_mode_thresh_THz=imaginary_mode_thresh_THz,
+            title=title,
         )
 
 class _TrainingStructure:
