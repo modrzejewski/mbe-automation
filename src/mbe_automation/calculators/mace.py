@@ -1,19 +1,16 @@
 import torch
 from pathlib import Path
-from e3nn import o3
 from ase.calculators.calculator import Calculator, all_changes
 import numpy as np
 
-try:
-    from mace.calculators import MACECalculator
-    _MACE_AVAILABLE = True
-except ImportError:
-    MACECalculator = None  # type: ignore[assignment,misc]
-    _MACE_AVAILABLE = False
+from mbe_automation.common.dependencies import MACE_AVAILABLE, requires_mace
 
 DEFAULT_HEAD = "Default"
 
-if _MACE_AVAILABLE:
+if MACE_AVAILABLE:
+    from e3nn import o3
+    from mace.calculators import MACECalculator
+
     class MACE(MACECalculator):
         """
         Modified ASE MACE calculator:
@@ -174,5 +171,34 @@ if _MACE_AVAILABLE:
             }
 
 else:
-    MACE = None      # type: ignore[assignment,misc]
-    DeltaMACE = None  # type: ignore[assignment,misc]
+    MACECalculator = None  # type: ignore[assignment,misc]
+
+    class MACE(Calculator):  # type: ignore[no-redef]
+        @requires_mace
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class DeltaMACE(Calculator):  # type: ignore[no-redef]
+        @requires_mace
+        def __init__(self, *args, **kwargs):
+            pass
+
+
+def is_mace_calculator(calculator: object) -> bool:
+    """Return True when MACE is available and calculator is MACE or DeltaMACE."""
+    return MACE_AVAILABLE and isinstance(calculator, (MACE, DeltaMACE))
+
+
+@requires_mace("MACE feature vectors (descriptors)")
+def validate_feature_vectors_calculator(calculator: object | None) -> None:
+    """Validate that MACE is available and calculator supports MACE descriptors."""
+    if calculator is None:
+        raise ValueError(
+            "A features_calculator must be provided when "
+            "feature_vectors_type is not \"none\"."
+        )
+    if not isinstance(calculator, (MACE, DeltaMACE)):
+        raise TypeError(
+            f"Feature vector calculation requires a MACE or DeltaMACE calculator, "
+            f"got {type(calculator).__name__}."
+        )

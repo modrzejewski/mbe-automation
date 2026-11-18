@@ -11,7 +11,7 @@ import mbe_automation.dynamics.harmonic.refinement_v3
 import mbe_automation.dynamics.harmonic.crystal_thermo
 import mbe_automation.storage
 
-from mbe_automation.calculators.mace import MACECalculator, _MACE_AVAILABLE
+from mbe_automation.calculators.mace import MACECalculator, MACE_AVAILABLE
 
 
 def run(
@@ -58,9 +58,8 @@ def run(
     print(f"{'best_strategy_criterion':<25} {config.best_strategy_criterion}")
     print(f"{'work_dir':<25} {config.work_dir}")
 
-    if _MACE_AVAILABLE:
-        if isinstance(config.calculator, MACECalculator):
-            mbe_automation.common.display.mace_summary(config.calculator)
+    if MACE_AVAILABLE and isinstance(config.calculator, MACECalculator):
+        mbe_automation.common.display.mace_summary(config.calculator)
 
     config.work_dir.mkdir(parents=True, exist_ok=True)
 

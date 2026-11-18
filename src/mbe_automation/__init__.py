@@ -14,6 +14,8 @@ from .calculators import (
     DFT,
     MACE,
     DeltaMACE,
+    MACE_AVAILABLE,
+    requires_mace,
     UMA,
 )
 

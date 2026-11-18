@@ -1676,6 +1676,9 @@ def _run_model(
     if feature_vectors_type not in FEATURE_VECTOR_TYPES:
         raise ValueError("Invalid type of feature vectors")
 
+    if feature_vectors_type != "none":
+        mbe_automation.calculators.validate_feature_vectors_calculator(calculator)
+
     if selected_frames is not None:
         if (
                 len(selected_frames) > 0 and

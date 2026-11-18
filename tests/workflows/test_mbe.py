@@ -17,6 +17,7 @@ import pytest
 import mbe_automation
 from mbe_automation import (
     MACE,
+    MACE_AVAILABLE,
     Structure,
     UniqueClustersFilter,
 )
@@ -238,6 +239,7 @@ def _run_cluster_extraction(case: dict, work_dir: Path) -> None:
     mbe_automation.run(config)
     _verify_symmetry_weights(case, work_dir)
 
+@pytest.mark.skipif(not MACE_AVAILABLE, reason="mace-torch is not installed")
 @pytest.mark.parametrize("case", TEST_CASES_WITH_MODELS, ids=[c["name"] for c in TEST_CASES_WITH_MODELS])
 def test_extract_unique_clusters(case: dict, tmp_path: Path):
     """Test full unique cluster extraction pipeline against golden references."""

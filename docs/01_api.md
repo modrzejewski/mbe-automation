@@ -467,9 +467,9 @@ The `mbe_automation.calculators` module provides interfaces to computational bac
 
 ### MACE
 
-🔗 [`mbe_automation.calculators.MACE`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/mace.py#L17)
+🔗 [`mbe_automation.calculators.MACE`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/mace.py)
 
-Wraps the `mace-torch` calculator with automatic device selection and Ray actor serialization.
+Wraps the optional `mace-torch` calculator (`pip install "mbe-automation[mace]"`) with automatic device selection and Ray actor serialization. Package-level boolean `mbe_automation.MACE_AVAILABLE` indicates whether `mace-torch` is installed in the current environment; instantiating `MACE` or `DeltaMACE`, or requesting MACE descriptors (`feature_vectors_type != "none"`) when `MACE_AVAILABLE` is `False`, raises an `ImportError`.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |

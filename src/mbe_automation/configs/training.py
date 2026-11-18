@@ -148,10 +148,9 @@ class PhononSampling:
         self.force_constants_dataset = Path(self.force_constants_dataset).expanduser()
         self.dataset  = Path(self.dataset).expanduser()
         self.work_dir = Path(self.work_dir).expanduser()
-        if self.feature_vectors_type != "none" and self.features_calculator is None:
-            raise ValueError(
-                "A features_calculator must be provided when "
-                "feature_vectors_type is not 'none'."
+        if self.feature_vectors_type != "none" or self.features_calculator is not None:
+            mbe_automation.calculators.validate_feature_vectors_calculator(
+                self.features_calculator
             )
             
 
@@ -232,8 +231,7 @@ class MDSampling:
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
         self.pressures_GPa = np.atleast_1d(self.pressures_GPa)
         
-        if self.feature_vectors_type != "none" and self.features_calculator is None:
-            raise ValueError(
-                "A features_calculator must be provided when "
-                "feature_vectors_type is not 'none'."
+        if self.feature_vectors_type != "none" or self.features_calculator is not None:
+            mbe_automation.calculators.validate_feature_vectors_calculator(
+                self.features_calculator
             )

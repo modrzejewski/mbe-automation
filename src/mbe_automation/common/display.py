@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sys
 import itertools
 import datetime
@@ -7,15 +8,14 @@ import getpass
 import time
 import math
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-try:
+from mbe_automation.common.dependencies import requires_mace
+
+if TYPE_CHECKING:
     from mace.calculators import MACECalculator
-    _MACE_AVAILABLE = True
-except ImportError:
-    MACECalculator = None
-    _MACE_AVAILABLE = False
 
 class Progress:
     """Wrap an iterable to print progress updates.
@@ -254,6 +254,7 @@ def dotted_separator(n: int):
     print(separator)
 
 
+@requires_mace
 def mace_summary(calculator: MACECalculator) -> None:
     """
     Print essential MACE model information.
