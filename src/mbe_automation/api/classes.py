@@ -178,9 +178,12 @@ class MBE(_MBE):
 @dataclass(kw_only=True)
 class BrillouinZonePath(_BrillouinZonePath):
     @classmethod
-    def read(cls, dataset: str, key: str) -> BrillouinZonePath:
+    def read(cls, dataset: str | Path, key: str) -> BrillouinZonePath:
         return cls(**vars(
-            mbe_automation.storage.read_brillouin_zone_path(dataset, key)
+            mbe_automation.storage.read_brillouin_zone_path(
+                Path(dataset).expanduser(),
+                key,
+            )
         ))
 
     def plot(
@@ -193,24 +196,16 @@ class BrillouinZonePath(_BrillouinZonePath):
             title: str | None = None,
     ):
         """
-        Plot the band structure.
-
-        The three lowest bands are highlighted, optical bands are grey, the
-        imaginary region is tinted, and dips of the lowest band below
-        imaginary_mode_thresh_THz are marked; the most imaginary one is
-        labelled with its q-point.
+        Plot phonon dispersion along this Brillouin zone path.
 
         Args:
-            save_path: Path to save the plot. If None, returns the figure.
+            save_path: Output image path. If None, return the figure.
             freq_min_THz: Lower frequency limit (THz).
             freq_max_THz: Upper frequency limit (THz).
-            freq_units: Units for frequency axis, "THz" or "cm-1".
-            imaginary_mode_thresh_THz: Frequency (THz) below which a dip of
-                the lowest band is marked.
+            freq_units: Frequency axis units, "THz" or "cm-1".
+            imaginary_mode_thresh_THz: Threshold (THz) for marking imaginary dips.
             title: Title above the plot.
         """
-        if save_path is not None:
-            save_path = Path(save_path).expanduser()
         return mbe_automation.dynamics.harmonic.display.band_structure(
             fbz_path=self,
             save_path=save_path,

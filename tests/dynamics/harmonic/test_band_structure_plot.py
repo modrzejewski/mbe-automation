@@ -5,6 +5,7 @@ import matplotlib.lines
 import matplotlib.pyplot as plt
 import matplotlib.text
 import numpy as np
+import numpy.typing as npt
 import pytest
 
 import mbe_automation.dynamics.harmonic.display
@@ -17,11 +18,11 @@ OPTICAL_COLOR = mbe_automation.dynamics.harmonic.display._OPTICAL_COLOR
 
 
 def _segment(
-        lowest_band: np.ndarray,
+        lowest_band: npt.NDArray[np.float64],
         q_start: list[float],
         q_end: list[float],
         distance_start: float,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     t = np.linspace(0.0, 1.0, N_POINTS)
     kpoints = np.outer(1.0 - t, q_start) + np.outer(t, q_end)
     frequencies = np.column_stack(
@@ -245,3 +246,131 @@ def test_save_path(tmp_path):
     )
     assert result is None
     assert save_path.is_file()
+
+
+def test_dip_label_below_curves_rounding_boundary():
+    """Round-off at the vertical-room threshold still places the label below."""
+    fig = mbe_automation.dynamics.harmonic.display.band_structure(
+        fbz_path=_band_path(),
+        freq_max_THz=2.7537688442211055,
+    )
+    (label,) = _annotations(fig)
+    assert label.get_va() == "top"
+
+
+def test_dips_outside_frequency_limits_omitted():
+    """Dips outside [freq_min_THz, freq_max_THz] are not marked."""
+    fig = mbe_automation.dynamics.harmonic.display.band_structure(
+        fbz_path=_band_path(),
+        freq_min_THz=-0.8,
+        freq_max_THz=-0.3,
+    )
+    assert len(_dots(fig)) == 1
+    labels = _labels(fig)
+    assert len(labels) == 1
+    assert "−0.50 THz" in labels[0]
+
+
+def test_label_side_uses_full_panel_strip():
+    """Horizontal label side uses position across all panels, not one panel."""
+    t = np.linspace(0.0, 1.0, N_POINTS)
+    q0, w0, _ = _segment(
+        lowest_band=0.4 * np.sin(np.pi * t) - 0.5 * t**6,
+        q_start=[0.0, 0.0, 0.0],
+        q_end=[0.1, 0.0, 0.0],
+        distance_start=0.0,
+    )
+    q1, w1, _ = _segment(
+        lowest_band=0.6 * np.sin(np.pi * t),
+        q_start=[0.0, 0.5, 0.0],
+        q_end=[0.0, 0.0, 0.0],
+        distance_start=0.2,
+    )
+    narrow_left = mbe_automation.storage.core.BrillouinZonePath(
+        kpoints=[q0, q1],
+        frequencies=[w0, w1],
+        path_connections=np.array([False, False]),
+        labels=np.array(["$\\Gamma$", "Z", "$\\mathrm{R_2}$", "$\\Gamma$"]),
+        distances=[0.2 * t, 0.2 + 2.0 * t],
+    )
+    fig_left = mbe_automation.dynamics.harmonic.display.band_structure(fbz_path=narrow_left)
+    (label_left,) = _annotations(fig_left)
+    assert label_left.get_ha() == "left"
+
+    q_wide, w_wide, _ = _segment(
+        lowest_band=0.6 * np.sin(np.pi * t),
+        q_start=[0.0, 0.0, 0.0],
+        q_end=[0.5, 0.0, 0.0],
+        distance_start=0.0,
+    )
+    q_tail, w_tail, _ = _segment(
+        lowest_band=0.4 * np.sin(np.pi * t) - 0.8 * np.exp(-((t - 0.5) / 0.1)**2),
+        q_start=[0.0, 0.5, 0.0],
+        q_end=[0.0, 0.0, 0.0],
+        distance_start=2.0,
+    )
+    narrow_right = mbe_automation.storage.core.BrillouinZonePath(
+        kpoints=[q_wide, q_tail],
+        frequencies=[w_wide, w_tail],
+        path_connections=np.array([False, False]),
+        labels=np.array(["$\\Gamma$", "X", "T", "R"]),
+        distances=[2.0 * t, 2.0 + 0.2 * t],
+    )
+    fig_right = mbe_automation.dynamics.harmonic.display.band_structure(fbz_path=narrow_right)
+    (label_right,) = _annotations(fig_right)
+    assert label_right.get_ha() == "right"
+
+
+def test_invalid_frequency_limits_raise():
+    fbz_path = _band_path(shift_THz=1.0)
+    with pytest.raises(ValueError, match="freq_min_THz"):
+        mbe_automation.dynamics.harmonic.display.band_structure(
+            fbz_path=fbz_path,
+            freq_min_THz=2.0,
+            freq_max_THz=1.0,
+        )
+    with pytest.raises(ValueError, match="freq_max_THz"):
+        mbe_automation.dynamics.harmonic.display.band_structure(
+            fbz_path=fbz_path,
+            freq_max_THz=0.0,
+        )
+    with pytest.raises(ValueError, match="freq_min_THz"):
+        mbe_automation.dynamics.harmonic.display.band_structure(
+            fbz_path=fbz_path,
+            freq_min_THz=100.0,
+        )
+
+
+def test_api_plot_and_dataset_roundtrip(tmp_path):
+    from phonopy import Phonopy
+    from phonopy.structure.atoms import PhonopyAtoms
+    import mbe_automation
+    import mbe_automation.dynamics.harmonic.data
+
+    atoms = PhonopyAtoms(
+        symbols=["C"],
+        cell=np.eye(3) * 3.5,
+        scaled_positions=[[0.0, 0.0, 0.0]],
+    )
+    phonons = Phonopy(atoms, np.eye(3))
+    phonons.force_constants = np.eye(3).reshape(1, 1, 3, 3)
+    mbe_automation.dynamics.harmonic.data.generate_fbz_path(phonons, n_points=5)
+
+    dataset_path = tmp_path / "phonons.hdf5"
+    key = "phonons/bz_path"
+    mbe_automation.storage.save_brillouin_zone_path(
+        phonons=phonons,
+        dataset=dataset_path,
+        key=key,
+    )
+
+    fig = mbe_automation.dynamics.harmonic.display.band_structure(
+        dataset=dataset_path,
+        key=key,
+    )
+    assert fig is not None
+
+    plot_path = tmp_path / "api_band.png"
+    bz_path = mbe_automation.BrillouinZonePath.read(dataset=dataset_path, key=key)
+    assert bz_path.plot(save_path=plot_path) is None
+    assert plot_path.is_file()

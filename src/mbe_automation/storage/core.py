@@ -671,7 +671,7 @@ def read_data_frame(
 
 def save_brillouin_zone_path(
         phonons: Phonopy,
-        dataset: str,
+        dataset: str | Path,
         key: str,
 ):
 
@@ -714,7 +714,7 @@ def save_brillouin_zone_path(
 
 
 def read_brillouin_zone_path(
-        dataset: str,
+        dataset: str | Path,
         key: str
 ) -> BrillouinZonePath:
 
