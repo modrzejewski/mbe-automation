@@ -1,14 +1,12 @@
 import torch
+from ase.calculators.calculator import Calculator
 
-try:
+from mbe_automation.common.dependencies import UMA_AVAILABLE, requires_uma
+
+if UMA_AVAILABLE:
     from fairchem.core import pretrained_mlip, FAIRChemCalculator
     from fairchem.core.units.mlip_unit import InferenceSettings
-    _UMA_AVAILABLE = True
-except ImportError:
-    FAIRChemCalculator = object  # type: ignore[assignment,misc]
-    _UMA_AVAILABLE = False
 
-if _UMA_AVAILABLE:
     class UMA(FAIRChemCalculator):
         """
         ASE Calculator wrapper for the Universal Machine learning potential for
@@ -65,4 +63,14 @@ if _UMA_AVAILABLE:
                 "task_name": self.task_name,
             }
 else:
-    UMA = None  # type: ignore[assignment,misc]
+    FAIRChemCalculator = None  # type: ignore[assignment,misc]
+
+    class UMA(Calculator):  # type: ignore[no-redef]
+        @requires_uma
+        def __init__(self, *args, **kwargs):
+            pass
+
+
+def is_uma_calculator(calculator: object) -> bool:
+    """Return True when UMA is available and calculator is UMA."""
+    return UMA_AVAILABLE and isinstance(calculator, UMA)

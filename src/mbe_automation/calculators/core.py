@@ -23,7 +23,11 @@ from mbe_automation.calculators.mace import (
     is_mace_calculator,
     validate_feature_vectors_calculator,
 )
-from mbe_automation.calculators.uma import UMA, _UMA_AVAILABLE
+from mbe_automation.calculators.uma import (
+    UMA,
+    UMA_AVAILABLE,
+    is_uma_calculator,
+)
 from mbe_automation.calculators.pyscf import PySCFCalculator, SCFNotConverged
 from mbe_automation.calculators.dftb import DFTBCalculator
 import mbe_automation.common.display
@@ -33,7 +37,7 @@ from mbe_automation.configs.execution import Resources
 CALCULATORS = PySCFCalculator | DFTBCalculator
 if MACE_AVAILABLE:
     CALCULATORS = CALCULATORS | MACE | DeltaMACE
-if _UMA_AVAILABLE:
+if UMA_AVAILABLE:
     CALCULATORS = CALCULATORS | UMA
 
 
@@ -365,7 +369,11 @@ def run_model(
     use_ray = (
         RAY_AVAILABLE and
         n_workers > 1 and
-        (isinstance(calculator, PySCFCalculator) or is_mace_calculator(calculator))
+        (
+            isinstance(calculator, PySCFCalculator) or
+            is_mace_calculator(calculator) or
+            is_uma_calculator(calculator)
+        )
     )
 
     if use_ray:

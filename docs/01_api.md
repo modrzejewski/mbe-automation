@@ -489,9 +489,9 @@ Implements a delta-learning model, combining a baseline model with additive corr
 
 ### UMA
 
-🔗 [`mbe_automation.calculators.UMA`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/uma.py#L12)
+🔗 [`mbe_automation.calculators.UMA`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/uma.py)
 
-Wraps the Universal Machine learning potential for Atomistic simulations (UMA) via `fairchem`.
+Wraps the optional Universal Machine learning potential for Atomistic simulations (UMA) via `fairchem-core` (`pip install "mbe-automation[uma]"`). Package-level boolean `mbe_automation.UMA_AVAILABLE` indicates whether `fairchem-core` is installed in the current environment; instantiating `UMA` when `UMA_AVAILABLE` is `False` raises an `ImportError`.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |

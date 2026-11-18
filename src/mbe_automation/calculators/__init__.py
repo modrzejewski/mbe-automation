@@ -12,7 +12,12 @@ from .mace import (
     is_mace_calculator,
     validate_feature_vectors_calculator,
 )
-from .uma import UMA, _UMA_AVAILABLE
+from .uma import (
+    UMA,
+    UMA_AVAILABLE,
+    requires_uma,
+    is_uma_calculator,
+)
 from .core import run_model
 from .core import CALCULATORS
 from .isolated_atoms import atomic_energies

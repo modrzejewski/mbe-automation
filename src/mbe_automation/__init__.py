@@ -17,6 +17,8 @@ from .calculators import (
     MACE_AVAILABLE,
     requires_mace,
     UMA,
+    UMA_AVAILABLE,
+    requires_uma,
 )
 
 from .storage.core import (
