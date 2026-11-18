@@ -439,16 +439,17 @@ print(df_fixed.head())
 
 ### Plotting Phonon Band Structure
 
-The phonon band structure for any calculated structure can be plotted using the `band_structure` function.
+The phonon band structure for any calculated structure can be plotted using the `band_structure` function. The three lowest bands are highlighted and the optical bands are grey. Imaginary frequencies, plotted as negative values, lie in a tinted region; dips of the lowest band below `imaginary_mode_thresh_THz` are marked, and the most imaginary one is labelled with its q-point in reduced coordinates. The workflow saves this plot up to 10 THz; use `freq_min_THz` and `freq_max_THz` for another range.
 
 ```python
 import mbe_automation
 
-# Plot the phonon band structure for the equilibrium structure at 300 K
+# Plot the low-frequency phonon band structure for the equilibrium structure at 300 K
 mbe_automation.dynamics.harmonic.display.band_structure(
     dataset="qha.hdf5",
     key="quasi_harmonic/phonons/brillouin_zone_paths/crystal[eq:T=300.00,p=0.00010]",
-    save_path="band_structure_300K.png"
+    save_path="band_structure_300K.png",
+    freq_max_THz=3.0,
 )
 ```
 

@@ -178,35 +178,42 @@ class MBE(_MBE):
 @dataclass(kw_only=True)
 class BrillouinZonePath(_BrillouinZonePath):
     @classmethod
-    def read(cls, dataset: str, key: str) -> BrillouinZonePath:
+    def read(cls, dataset: str | Path, key: str) -> BrillouinZonePath:
         return cls(**vars(
-            mbe_automation.storage.read_brillouin_zone_path(dataset, key)
+            mbe_automation.storage.read_brillouin_zone_path(
+                Path(dataset).expanduser(),
+                key,
+            )
         ))
 
     def plot(
             self,
             save_path: str | Path | None = None,
+            freq_min_THz: float | None = None,
             freq_max_THz: float | None = None,
-            color_map: str = "plasma",
-            freq_units: Literal["THz", "cm-1"] = "THz"
+            freq_units: Literal["THz", "cm-1"] = "THz",
+            imaginary_mode_thresh_THz: float = -0.1,
+            title: str | None = None,
     ):
         """
-        Plot the band structure.
-        
+        Plot phonon dispersion along this Brillouin zone path.
+
         Args:
-            save_path: Path to save the plot. If None, returns the figure.
-            freq_max_THz: Maximum frequency limit for the plot in THz.
-            color_map: Matplotlib colormap name.
-            freq_units: Units for frequency axis, "THz" or "cm-1".
+            save_path: Output image path. If None, return the figure.
+            freq_min_THz: Lower frequency limit (THz).
+            freq_max_THz: Upper frequency limit (THz).
+            freq_units: Frequency axis units, "THz" or "cm-1".
+            imaginary_mode_thresh_THz: Threshold (THz) for marking imaginary dips.
+            title: Title above the plot.
         """
-        if save_path is not None:
-            save_path = Path(save_path).expanduser()
         return mbe_automation.dynamics.harmonic.display.band_structure(
             fbz_path=self,
             save_path=save_path,
+            freq_min_THz=freq_min_THz,
             freq_max_THz=freq_max_THz,
-            color_map=color_map,
-            freq_units=freq_units
+            freq_units=freq_units,
+            imaginary_mode_thresh_THz=imaginary_mode_thresh_THz,
+            title=title,
         )
 
 class _TrainingStructure:

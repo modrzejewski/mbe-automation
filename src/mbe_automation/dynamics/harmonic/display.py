@@ -1,4 +1,8 @@
 from __future__ import annotations
+import matplotlib.axes
+import matplotlib.lines
+import matplotlib.patheffects
+import matplotlib.text
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
@@ -6,6 +10,7 @@ import numpy.typing as npt
 import pandas as pd
 import os
 import os.path
+from pathlib import Path
 from typing import Literal, TYPE_CHECKING
 import phonopy.physical_units
 import nglview
@@ -17,6 +22,39 @@ import mbe_automation.common.display
 
 if TYPE_CHECKING:
     from mbe_automation.dynamics.harmonic.eec import DebyeModel
+
+#
+# Band structure style: the three lowest bands in one accent colour,
+# all other bands in one grey, imaginary region tinted.
+#
+_N_ACOUSTIC_BANDS = 3
+_ACOUSTIC_COLOR = "#2a78d6"
+_OPTICAL_COLOR = "#a3a9b4"
+_IMAGINARY_COLOR = "#d03b3b"
+_IMAGINARY_FILL = (208/255, 59/255, 59/255, 0.07)
+_GRID_COLOR = "#dde1e8"
+_ZERO_LINE_COLOR = "#b4bac4"
+_LABEL_COLOR = "#474d59"
+_TICK_COLOR = "#737a88"
+_TEXT_COLOR = "#15181d"
+_BAND_STRUCTURE_STYLE = {
+    "font.size": 9,
+    "axes.labelsize": 10,
+    "axes.labelcolor": _LABEL_COLOR,
+    "xtick.color": _LABEL_COLOR,
+    "ytick.color": _TICK_COLOR,
+    "xtick.labelsize": 9.5,
+    "ytick.labelsize": 8.5,
+    "xtick.major.size": 0,
+    "ytick.major.size": 0,
+    "xtick.major.pad": 5,
+    "ytick.major.pad": 4,
+}
+#
+# Vertical room (points) below the most imaginary dip for its
+# two-line label, the offset from the dot and the white outline.
+#
+_DIP_LABEL_ROOM_PT = 24.0
 
 def animate_pymatviz(
         mode: mbe_automation.storage.Structure,
@@ -104,119 +142,403 @@ def potential_energy_curve(
         return fig
 
     
+def _format_signed(
+        value: float,
+        n_decimals: int,
+) -> str:
+    """
+    Format a number with the minus sign U+2212.
+    """
+    text = f"{abs(value):.{n_decimals}f}"
+    if value < 0 and float(text) != 0.0:
+        return f"−{text}"
+    return text
+
+
+def _format_q(
+        q: npt.NDArray[np.float64],
+) -> str:
+    """
+    Format a q-point in reduced coordinates as q=(qx,qy,qz).
+
+    A component within 1e-3 of a fraction p/n with n <= 12 is written as that
+    fraction. Other components are written with two decimals.
+    """
+    components = []
+    for x in q:
+        for n in range(1, 13):
+            p = round(x * n)
+            if abs(x - p / n) < 1.0E-3:
+                if p == 0:
+                    components.append("0")
+                elif n == 1:
+                    components.append(_format_signed(value=p, n_decimals=0))
+                else:
+                    sign = "−" if p < 0 else ""
+                    components.append(f"{sign}{abs(p)}/{n}")
+                break
+        else:
+            components.append(_format_signed(value=x, n_decimals=2))
+    return "q=(" + ",".join(components) + ")"
+
+
+def _axes_height_pt(
+        ax: matplotlib.axes.Axes,
+) -> float:
+    """
+    Height of the axes in points.
+    """
+    return ax.get_position().height * ax.figure.get_figheight() * 72.0
+
+
+def _panel_labels(
+        labels: npt.NDArray[np.str_],
+        continuous_segments: list[tuple[int, int]],
+) -> list[list[str]]:
+    """
+    Tick labels of each panel. The two labels at a break between
+    panels are merged into one label, e.g. Z|R₂, at the end of the
+    left panel. The first tick of the right panel gets no label.
+    """
+    panel_labels = []
+    label_count = 0
+    for start_idx, end_idx in continuous_segments:
+        num_labels = end_idx - start_idx + 2
+        panel_labels.append(
+            [str(x) for x in labels[label_count : label_count + num_labels]]
+        )
+        label_count += num_labels
+
+    for left, right in zip(panel_labels, panel_labels[1:]):
+        if left[-1] != right[0]:
+            left[-1] = f"{left[-1]}|{right[0]}"
+        right[0] = ""
+    return panel_labels
+
+
+def _imaginary_dips(
+        distances: list[npt.NDArray[np.float64]],
+        frequencies: list[npt.NDArray[np.float64]],
+        kpoints: list[npt.NDArray[np.float64]],
+        first_segment: int,
+        last_segment: int,
+        threshold: float,
+) -> list[tuple[float, float, npt.NDArray[np.float64]]]:
+    """
+    Find the dips of the lowest band below a threshold.
+
+    A dip is a contiguous run of k-points, over the connected segments
+    first_segment...last_segment, where the lowest band lies below threshold.
+
+    Returns:
+        Distance, frequency and q-point at the minimum of each dip.
+        Frequencies are in the units of threshold.
+    """
+    segments = range(first_segment, last_segment + 1)
+    path_distances = np.concatenate([distances[k] for k in segments])
+    lowest_band = np.concatenate([frequencies[k][:, 0] for k in segments])
+    qpoints = np.concatenate([kpoints[k] for k in segments])
+
+    below = np.concatenate(([False], lowest_band < threshold, [False]))
+    starts = np.flatnonzero(~below[:-1] & below[1:])
+    ends = np.flatnonzero(below[:-1] & ~below[1:])
+
+    dips = []
+    for start, end in zip(starts, ends):
+        i = start + int(np.argmin(lowest_band[start:end]))
+        dips.append((float(path_distances[i]), float(lowest_band[i]), qpoints[i]))
+    return dips
+
+
+def _mark_imaginary_dips(
+        axes: list[matplotlib.axes.Axes],
+        continuous_segments: list[tuple[int, int]],
+        distances: list[npt.NDArray[np.float64]],
+        frequencies: list[npt.NDArray[np.float64]],
+        kpoints: list[npt.NDArray[np.float64]],
+        threshold: float,
+        unit_label: str,
+):
+    """
+    Mark visible dips of the lowest band below threshold, and label the most
+    imaginary one with its frequency and q-point.
+
+    Markers and the label are figure artists so they render whole across panel
+    boundaries. The label hangs below the dip when vertical room permits, and
+    sits beside it otherwise.
+    """
+    y_min, y_max = axes[0].get_ylim()
+    dips = []
+    for ax, (first_segment, last_segment) in zip(axes, continuous_segments):
+        for distance, frequency, q in _imaginary_dips(
+                distances=distances,
+                frequencies=frequencies,
+                kpoints=kpoints,
+                first_segment=first_segment,
+                last_segment=last_segment,
+                threshold=threshold,
+        ):
+            if not (y_min <= frequency <= y_max):
+                continue
+            ax.figure.add_artist(
+                matplotlib.lines.Line2D(
+                    [distance],
+                    [frequency],
+                    transform=ax.transData,
+                    marker="o",
+                    markersize=5.5,
+                    markerfacecolor=_IMAGINARY_COLOR,
+                    markeredgecolor="white",
+                    markeredgewidth=1.4,
+                    linestyle="none",
+                    zorder=5,
+                )
+            )
+            dips.append((ax, distance, frequency, q))
+
+    if len(dips) == 0:
+        return
+
+    ax, distance, frequency, q = min(dips, key=lambda dip: dip[2])
+    x_min, x_max = ax.get_xlim()
+    ax_pos = ax.get_position()
+    strip_x0 = axes[0].get_position().x0
+    strip_x1 = axes[-1].get_position().x1
+    dip_x = ax_pos.x0 + (distance - x_min) / (x_max - x_min) * ax_pos.width
+    label_on_right = (dip_x - strip_x0) / (strip_x1 - strip_x0) < 0.8
+
+    room_below_pt = (frequency - y_min) / (y_max - y_min) * _axes_height_pt(ax)
+    label_below = room_below_pt >= _DIP_LABEL_ROOM_PT - 1.0E-6
+    if label_below:
+        xytext = (6 if label_on_right else -6, -3)
+    else:
+        xytext = (9 if label_on_right else -9, -1)
+    label = (
+        f"{_format_signed(value=frequency, n_decimals=2)} {unit_label}\n"
+        f"{_format_q(q=q)}"
+    )
+    ax.figure.add_artist(
+        matplotlib.text.Annotation(
+            label,
+            xy=(distance, frequency),
+            xycoords=ax.transData,
+            xytext=xytext,
+            textcoords="offset points",
+            ha="left" if label_on_right else "right",
+            va="top" if label_below else "center",
+            fontsize=7,
+            color=_TEXT_COLOR,
+            linespacing=1.2,
+            zorder=6,
+            path_effects=[
+                matplotlib.patheffects.withStroke(
+                    linewidth=2.5,
+                    foreground=(1.0, 1.0, 1.0, 0.85),
+                )
+            ],
+        )
+    )
+
+
+def _style_band_axis(
+        ax: matplotlib.axes.Axes,
+        tick_positions: list[float],
+        nu_min: float,
+):
+    """
+    Grid, zero line, high-symmetry lines and imaginary region of one panel.
+    """
+    if nu_min < 0.0:
+        ax.axhspan(
+            nu_min,
+            0.0,
+            color=_IMAGINARY_FILL,
+            linewidth=0,
+            zorder=0,
+        )
+    ax.axhline(
+        0.0,
+        color=_ZERO_LINE_COLOR,
+        linewidth=0.9,
+        zorder=1,
+    )
+    for position in tick_positions:
+        ax.axvline(
+            position,
+            color=_GRID_COLOR,
+            linewidth=0.8,
+            zorder=1,
+        )
+    ax.yaxis.grid(
+        True,
+        color=_GRID_COLOR,
+        linewidth=0.6,
+    )
+    ax.set_axisbelow(True)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+
 def _band_structure(
         fbz_path: mbe_automation.storage.core.BrillouinZonePath,
-        save_path: str | None = None,
+        save_path: str | Path | None = None,
+        freq_min_THz: float | None = None,
         freq_max_THz: float | None = None,
-        color_map: str = "plasma",
-        freq_units: Literal["THz", "cm-1"] = "THz"
+        freq_units: Literal["THz", "cm-1"] = "THz",
+        imaginary_mode_thresh_THz: float = -0.1,
+        title: str | None = None,
 ):
-    frequencies = fbz_path.frequencies
+    if (
+        freq_min_THz is not None
+        and freq_max_THz is not None
+        and freq_min_THz >= freq_max_THz
+    ):
+        raise ValueError(
+            f"freq_min_THz ({freq_min_THz}) must be less than "
+            f"freq_max_THz ({freq_max_THz})."
+        )
+
     distances = fbz_path.distances
     path_connections = fbz_path.path_connections
     labels = fbz_path.labels
-
-    nu_max = freq_max_THz
-    n_bands = frequencies[0].shape[1]
-
-    if freq_max_THz is not None:
-        all_freqs_thz = np.concatenate(frequencies)
-        max_freq_per_band = np.max(all_freqs_thz, axis=0)
-        n_bands_for_norm = np.sum(max_freq_per_band <= freq_max_THz)
-        vmax_norm = max(n_bands_for_norm - 1, 0)
-    else:
-        vmax_norm = n_bands - 1
-
-    cmap = plt.get_cmap(color_map)
-    norm = mcolors.Normalize(vmin=0, vmax=vmax_norm)
-    colors = [cmap(norm(i)) for i in range(n_bands)]
+    n_segments = len(distances)
+    n_bands = fbz_path.frequencies[0].shape[1]
+    n_acoustic_bands = min(_N_ACOUSTIC_BANDS, n_bands)
 
     scaling_factor = 1.0
     unit_label = "THz"
     if freq_units == "cm-1":
         scaling_factor = phonopy.physical_units.get_physical_units().THzToCm
         unit_label = "cm⁻¹"
+    frequencies = [f * scaling_factor for f in fbz_path.frequencies]
+    threshold = imaginary_mode_thresh_THz * scaling_factor
 
-    frequencies = [f * scaling_factor for f in frequencies]
-    if nu_max is not None:
-        nu_max *= scaling_factor
-
-    breaks = np.where(~np.array(path_connections))[0]
-    break_indices = [-1] + list(breaks)
-    width_ratios = [
-        distances[end][-1] - (distances[start][-1] if start >= 0 else 0)
-        for start, end in zip(break_indices, break_indices[1:])
-    ]
-
-    # By definition of BrillouinZonePath (following Seekpath/Phonopy conventions),
-    # the last element of path_connections should be False, so breaks should not be empty.
-    # However, we handle the case where it might be True (e.g. manually constructed paths)
-    # to prevent crashes.
-    if len(breaks) == 0:
-        fig, axes = plt.subplots(
-            1, 1, sharey=True,
-        )
-        axes = [axes]
+    all_freqs = np.concatenate(frequencies)
+    min_freq = float(np.min(all_freqs))
+    max_freq = float(np.max(all_freqs))
+    if freq_max_THz is not None:
+        nu_max = freq_max_THz * scaling_factor
+        if freq_min_THz is None and nu_max <= min_freq:
+            raise ValueError(
+                f"freq_max_THz ({freq_max_THz}) must exceed the lowest phonon "
+                f"frequency ({min_freq / scaling_factor:.4g} THz) when "
+                f"freq_min_THz is not set."
+            )
     else:
-        fig, axes = plt.subplots(
-            1, len(breaks), sharey=True,
-            gridspec_kw={'width_ratios': width_ratios, 'wspace': 0.05}
+        lower_bound = (
+            freq_min_THz * scaling_factor if freq_min_THz is not None else min_freq
         )
-        if len(breaks) == 1:
-             axes = [axes]
-
-    label_count = 0
+        if freq_min_THz is not None and lower_bound >= max_freq:
+            raise ValueError(
+                f"freq_min_THz ({freq_min_THz}) must be below the highest phonon "
+                f"frequency ({max_freq / scaling_factor:.4g} THz) when "
+                f"freq_max_THz is not set."
+            )
+        freq_span = max_freq - lower_bound
+        if freq_span == 0.0:
+            freq_span = 1.0 * scaling_factor
+        nu_max = max_freq + 0.05 * freq_span
+    #
+    # The last element of path_connections is False by definition
+    # of BrillouinZonePath. Manually constructed paths may violate this.
+    #
+    breaks = list(np.flatnonzero(~np.array(path_connections)))
+    if len(breaks) == 0 or breaks[-1] != n_segments - 1:
+        breaks.append(n_segments - 1)
+    break_indices = [-1] + breaks
     continuous_segments = [
         (start + 1, end) for start, end in zip(break_indices, break_indices[1:])
     ]
-    
-    for ax, (start_idx, end_idx) in zip(axes, continuous_segments):
-        for k in range(start_idx, end_idx + 1):
-            for j in range(n_bands):
-                ax.plot(distances[k], frequencies[k][:, j], color=colors[j], lw=1.5)
+    width_ratios = [
+        distances[end][-1] - distances[start][0]
+        for start, end in continuous_segments
+    ]
 
-        tick_pos = [distances[k][0] for k in range(start_idx, end_idx + 1)]
-        tick_pos.append(distances[end_idx][-1])
-        
-        num_labels = len(tick_pos)
-        tick_labels = labels[label_count : label_count + num_labels]
-        label_count += num_labels
+    with plt.rc_context(_BAND_STRUCTURE_STYLE):
+        fig, axes = plt.subplots(
+            1,
+            len(continuous_segments),
+            sharey=True,
+            squeeze=False,
+            figsize=(7.0, 3.2),
+            gridspec_kw={"width_ratios": width_ratios, "wspace": 0.0},
+        )
+        axes = list(axes[0])
 
-        ax.set_xticks(tick_pos)
-        ax.set_xticklabels(tick_labels)
-        ax.set_xlim(tick_pos[0], tick_pos[-1])
-        ax.axhline(0, linestyle='--', color='black', lw=1.0, alpha=0.5)
-        for pos in tick_pos:
-            ax.axvline(pos, color='black', linestyle=':', lw=0.5)
+        if freq_min_THz is not None:
+            nu_min = freq_min_THz * scaling_factor
+        else:
+            padding = 0.05 * (nu_max - min_freq)
+            if min_freq < threshold:
+                #
+                # Room below the most imaginary dip for its label
+                #
+                room = _DIP_LABEL_ROOM_PT / _axes_height_pt(axes[0])
+                padding = max(padding, room / (1.0 - room) * (nu_max - min_freq))
+            nu_min = min_freq - padding
 
-        if ax != axes[0]:
-            ax.tick_params(left=False)
+        panel_labels = _panel_labels(
+            labels=labels,
+            continuous_segments=continuous_segments,
+        )
+        for i, (ax, (start_idx, end_idx)) in enumerate(zip(axes, continuous_segments)):
+            for k in range(start_idx, end_idx + 1):
+                for j in reversed(range(n_bands)):
+                    if np.min(frequencies[k][:, j]) > nu_max:
+                        continue
+                    acoustic = j < n_acoustic_bands
+                    ax.plot(
+                        distances[k],
+                        frequencies[k][:, j],
+                        color=_ACOUSTIC_COLOR if acoustic else _OPTICAL_COLOR,
+                        linewidth=1.6 if acoustic else 0.9,
+                        zorder=3 if acoustic else 2,
+                        solid_capstyle="round",
+                        solid_joinstyle="round",
+                    )
 
-    all_freqs = np.concatenate(frequencies)
-    min_freq = np.min(all_freqs)
-    
-    if nu_max is None:
-        max_freq = np.max(all_freqs)
-        nu_max = max_freq + 0.05 * (max_freq - min_freq)
+            tick_pos = [distances[k][0] for k in range(start_idx, end_idx + 1)]
+            tick_pos.append(distances[end_idx][-1])
 
-    padding = 0.05 * (nu_max - min_freq)
-    nu_min = min_freq - padding
-    axes[0].set_ylim(nu_min, nu_max)
-        
-    fig.supylabel(f"Frequency ({unit_label})", fontsize=12)
-    fig.subplots_adjust(
-        left=0.08,
-        right=0.98,
-        bottom=0.1,
-        top=0.95,
-        wspace=0.15  # Add horizontal space between panels
-    )
+            ax.set_xticks(tick_pos)
+            ax.set_xticklabels(panel_labels[i])
+            ax.set_xlim(tick_pos[0], tick_pos[-1])
+            _style_band_axis(
+                ax=ax,
+                tick_positions=tick_pos,
+                nu_min=nu_min,
+            )
 
-    if save_path:
-        output_dir = os.path.dirname(save_path)
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        axes[0].set_ylim(nu_min, nu_max)
+        axes[0].set_ylabel(f"Frequency ({unit_label})")
+        _mark_imaginary_dips(
+            axes=axes,
+            continuous_segments=continuous_segments,
+            distances=distances,
+            frequencies=frequencies,
+            kpoints=fbz_path.kpoints,
+            threshold=threshold,
+            unit_label=unit_label,
+        )
+        if title is not None:
+            fig.suptitle(
+                title,
+                x=axes[0].get_position().x0,
+                ha="left",
+                fontsize=10.5,
+                fontweight="semibold",
+                color=_TEXT_COLOR,
+            )
+
+    if save_path is not None:
+        resolved_path = Path(save_path).expanduser()
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(
+            resolved_path,
+            dpi=300,
+            bbox_inches="tight",
+            facecolor="white",
+        )
         plt.close(fig)
     else:
         return fig
@@ -224,24 +546,53 @@ def _band_structure(
 
 def band_structure(
         fbz_path: mbe_automation.storage.core.BrillouinZonePath | None = None,
-        dataset: str | None = None,
+        dataset: str | Path | None = None,
         key: str | None = None,
-        save_path: str | None = None,
+        save_path: str | Path | None = None,
+        freq_min_THz: float | None = None,
         freq_max_THz: float | None = None,
-        color_map: str = "plasma",
-        freq_units: Literal["THz", "cm-1"] = "THz"
+        freq_units: Literal["THz", "cm-1"] = "THz",
+        imaginary_mode_thresh_THz: float = -0.1,
+        title: str | None = None,
 ):
+    """
+    Plot phonon dispersion along a Brillouin zone path.
+
+    Highlights the three lowest bands (acoustic only near Γ since bands are
+    sorted by frequency, not tracked), tints the negative imaginary region,
+    merges break labels (e.g. Z|R₂), and marks dips of the lowest band below
+    imaginary_mode_thresh_THz (labelling the deepest with frequency and q).
+
+    Args:
+        fbz_path: Band structure. If None, read from dataset and key.
+        dataset: HDF5 dataset path.
+        key: Dataset key of the band structure.
+        save_path: Output image path. If None, return the figure.
+        freq_min_THz: Lower frequency limit (THz).
+        freq_max_THz: Upper frequency limit (THz).
+        freq_units: Frequency axis units, "THz" or "cm-1".
+        imaginary_mode_thresh_THz: Threshold (THz) for marking imaginary dips.
+        title: Title above the plot.
+
+    Returns:
+        The figure if save_path is None, otherwise None.
+    """
     if fbz_path is None:
         if dataset is None or key is None:
             raise ValueError("Either 'fbz_path' or both 'dataset' and 'key' must be provided.")
-        fbz_path = mbe_automation.storage.read_brillouin_zone_path(dataset, key)
+        fbz_path = mbe_automation.storage.read_brillouin_zone_path(
+            Path(dataset).expanduser(),
+            key,
+        )
 
     return _band_structure(
-        fbz_path,
+        fbz_path=fbz_path,
         save_path=save_path,
+        freq_min_THz=freq_min_THz,
         freq_max_THz=freq_max_THz,
-        color_map=color_map,
-        freq_units=freq_units
+        freq_units=freq_units,
+        imaginary_mode_thresh_THz=imaginary_mode_thresh_THz,
+        title=title,
     )
 
 
