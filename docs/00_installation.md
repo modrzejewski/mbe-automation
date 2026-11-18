@@ -25,7 +25,6 @@ git clone https://github.com/modrzejewski/mbe-automation.git
 cd mbe-automation
 pip install --no-cache-dir -e ".[mace,gpu-cuda12]"
 ```
-*(Note: If you are on a CUDA 11 system, replace `gpu-cuda12` with `gpu-cuda11`)*
 
 > **Note on Editable Mode**
 > The -e flag installs the package in editable mode, making source code changes immediately available. If dependencies in pyproject.toml change, re-run the installation command with the appropriate extras to update them.
