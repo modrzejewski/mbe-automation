@@ -7,11 +7,15 @@ import subprocess
 import sys
 import textwrap
 
+import ase
+import ase.build
+import numpy as np
 import pytest
 
 import mbe_automation
 from mbe_automation import (
     DFT,
+    MACE,
     MACE_AVAILABLE,
     UMA_AVAILABLE,
     Structure,
@@ -19,6 +23,10 @@ from mbe_automation import (
     requires_uma,
 )
 import mbe_automation.common.dependencies as dependencies
+from mbe_automation.configs.md import ClassicalMD
+from mbe_automation.configs.training import MDSampling, PhononSampling
+import mbe_automation.dynamics.md.core
+from tests.reference_data.test_cases import MACE_MODELS_DIR
 
 
 def test_requires_mace_preserves_metadata_and_behaves_per_flag(monkeypatch):
@@ -96,8 +104,6 @@ def test_feature_vectors_reject_non_mace_calculator_when_mace_available():
     if not MACE_AVAILABLE:
         pytest.skip("mace-torch is not installed")
 
-    import numpy as np
-
     dft_calc = DFT(model_name="pbe-d3", basis="def2-svp")
     h2 = Structure(
         positions=np.array([[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]]]),
@@ -110,6 +116,119 @@ def test_feature_vectors_reject_non_mace_calculator_when_mace_available():
 
     with pytest.raises(TypeError, match="MACE or DeltaMACE"):
         h2.run(calculator=dft_calc, feature_vectors_type="averaged_environments")
+
+
+def test_sampling_configs_disable_feature_vectors_without_features_calculator(
+    capsys: pytest.CaptureFixture[str],
+):
+    dft_calc = DFT(model_name="pbe-d3", basis="def2-svp")
+    crystal = ase.Atoms(
+        "H2",
+        positions=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]],
+        cell=[5.0, 5.0, 5.0],
+        pbc=True,
+    )
+    assert not mbe_automation.calculators.is_features_calculator(calculator=None)
+    assert not mbe_automation.calculators.is_features_calculator(calculator=dft_calc)
+
+    for features_calculator in [None, dft_calc]:
+        md_sampling = MDSampling(
+            crystal=crystal,
+            calculator=dft_calc,
+            features_calculator=features_calculator,
+        )
+        assert md_sampling.feature_vectors_type == "none"
+        assert (
+            "Changed feature_vectors_type from \"averaged_environments\" to \"none\""
+            in capsys.readouterr().out
+        )
+
+        phonon_sampling = PhononSampling(
+            calculator=dft_calc,
+            features_calculator=features_calculator,
+            feature_vectors_type="atomic",
+        )
+        assert phonon_sampling.feature_vectors_type == "none"
+        assert (
+            "Changed feature_vectors_type from \"atomic\" to \"none\""
+            in capsys.readouterr().out
+        )
+
+    MDSampling(
+        crystal=crystal,
+        calculator=dft_calc,
+        feature_vectors_type="none",
+    )
+    assert "feature_vectors_type" not in capsys.readouterr().out
+
+
+@pytest.fixture(scope="module")
+def mace_calc() -> MACE:
+    if not MACE_AVAILABLE:
+        pytest.skip("mace-torch is not installed")
+    model_path = MACE_MODELS_DIR / "GENERAL" / "MACE_model_swa.model"
+    if not model_path.exists():
+        pytest.skip("MACE model not available.")
+    return MACE(model_path=model_path)
+
+
+def test_sampling_configs_keep_feature_vectors_with_features_calculator(
+    mace_calc: MACE,
+    capsys: pytest.CaptureFixture[str],
+):
+    crystal = ase.Atoms(
+        "H2",
+        positions=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]],
+        cell=[5.0, 5.0, 5.0],
+        pbc=True,
+    )
+    assert mbe_automation.calculators.is_features_calculator(calculator=mace_calc)
+
+    md_sampling = MDSampling(
+        crystal=crystal,
+        calculator=mace_calc,
+        features_calculator=mace_calc,
+    )
+    assert md_sampling.feature_vectors_type == "averaged_environments"
+
+    phonon_sampling = PhononSampling(
+        calculator=mace_calc,
+        features_calculator=mace_calc,
+        feature_vectors_type="atomic",
+    )
+    assert phonon_sampling.feature_vectors_type == "atomic"
+    assert "feature_vectors_type" not in capsys.readouterr().out
+
+
+def test_md_with_mace_saves_feature_vectors(
+    mace_calc: MACE,
+    tmp_path: Path,
+):
+    dataset = tmp_path / "md.hdf5"
+    mbe_automation.dynamics.md.core.run(
+        system=ase.build.molecule("H2O"),
+        supercell_matrix=None,
+        calculator=mace_calc,
+        target_temperature_K=100.0,
+        target_pressure_GPa=None,
+        md=ClassicalMD(
+            ensemble="NVT",
+            nvt_algo="csvr",
+            time_total_fs=6.0,
+            time_step_fs=1.0,
+            time_equilibration_fs=1.0,
+            sampling_interval_fs=2.0,
+        ),
+        dataset=dataset,
+        key="md/traj",
+    )
+
+    traj = mbe_automation.read(dataset, "md/traj")
+    assert traj.feature_vectors_type == "averaged_environments"
+    assert traj.feature_vectors.shape == (
+        traj.n_frames,
+        mace_calc.n_invariant_features,
+    )
 
 
 def test_package_behavior_when_mlips_missing(tmp_path: Path):
@@ -164,14 +283,19 @@ def test_package_behavior_when_mlips_missing(tmp_path: Path):
         assert mbe_automation.calculators.UMA_AVAILABLE is False
 
         # 1. Stub calculators raise ImportError with installation hint
-        with pytest.raises(ImportError, match=r"`MACE` requires the optional `mace-torch`"):
+        #    and the original import error as the cause
+        with pytest.raises(ImportError, match=r"`MACE` requires the optional `mace-torch`") as exc_info:
             MACE("dummy.model")
+        assert isinstance(exc_info.value.__cause__, ImportError)
+        assert "Import failed with" in str(exc_info.value)
 
         with pytest.raises(ImportError, match=r"`DeltaMACE` requires the optional `mace-torch`"):
             DeltaMACE(["a.model", "b.model"])
 
-        with pytest.raises(ImportError, match=r"`UMA` requires the optional `fairchem-core`"):
+        with pytest.raises(ImportError, match=r"`UMA` requires the optional `fairchem-core`") as exc_info:
             UMA()
+        assert isinstance(exc_info.value.__cause__, ImportError)
+        assert "Import failed with" in str(exc_info.value)
 
         # 2. ML dataset and display helpers raise ImportError
         with pytest.raises(ImportError, match=r"`get_vacuum_energies` requires the optional `mace-torch`"):
@@ -196,25 +320,27 @@ def test_package_behavior_when_mlips_missing(tmp_path: Path):
         with pytest.raises(ImportError, match=r"`MACE feature vectors \\(descriptors\\)` requires"):
             h2.run(calculator=dft_calc, feature_vectors_type="averaged_environments")
 
-        # 4. Sampling configs reject descriptor modes when MACE is unavailable, but allow "none"
+        # 4. Sampling configs set feature_vectors_type to "none" when no
+        #    features calculator is available
         crystal_atoms = ase.Atoms(
             "H2",
             positions=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]],
             cell=[5.0, 5.0, 5.0],
             pbc=True,
         )
-        with pytest.raises(ImportError, match=r"`MACE feature vectors \\(descriptors\\)` requires"):
-            MDSampling(crystal=crystal_atoms, calculator=dft_calc)
+        for features_calculator in [None, dft_calc]:
+            md_sampling = MDSampling(
+                crystal=crystal_atoms,
+                calculator=dft_calc,
+                features_calculator=features_calculator,
+            )
+            assert md_sampling.feature_vectors_type == "none"
 
-        with pytest.raises(ImportError, match=r"`MACE feature vectors \\(descriptors\\)` requires"):
-            PhononSampling(calculator=dft_calc)
-
-        cfg_no_desc = MDSampling(
-            crystal=crystal_atoms,
-            calculator=dft_calc,
-            feature_vectors_type="none",
-        )
-        assert cfg_no_desc.feature_vectors_type == "none"
+            phonon_sampling = PhononSampling(
+                calculator=dft_calc,
+                features_calculator=features_calculator,
+            )
+            assert phonon_sampling.feature_vectors_type == "none"
 
         # 5. atomic_energies validation reports PySCFCalculator cleanly (no NoneType in valid list) and rejects None
         with pytest.raises(TypeError, match=r"PySCFCalculator") as exc_info:

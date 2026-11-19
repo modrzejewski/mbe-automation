@@ -370,7 +370,7 @@ Configuration for generating distorted structures via Molecular Dynamics samplin
 | `crystal` | Initial crystal structure for finite cluster extraction. | - |
 | `calculator` | MLIP calculator. | - |
 | `features_calculator` | Calculator to compute feature vectors. | `None` |
-| `feature_vectors_type` | Type of feature vectors to save: `"none"`, `"atomic_environments"`, or `"averaged_environments"`. | `"averaged_environments"` |
+| `feature_vectors_type` | Type of feature vectors to save: `"none"`, `"atomic_environments"`, or `"averaged_environments"`. Set automatically to `"none"` if `features_calculator` cannot compute feature vectors. | `"averaged_environments"` |
 | `md_crystal` | An instance of `ClassicalMD` configuring MD parameters. | - |
 | `temperatures_K` / `pressures_GPa` | Target temperatures and pressures. | `298.15` / `1.0E-4` |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter`. | `FiniteSubsystemFilter()` |
@@ -397,7 +397,7 @@ Configuration for generating distorted structures by sampling along normal mode 
 | `amplitude_scan` | Sampling method: `"random"`, `"equidistant"`, or `"time_propagation"`. | `"random"` |
 | `time_step_fs` | Time step for `"time_propagation"`. | `100.0` |
 | `n_frames` | Number of frames per phonon mode. | `20` |
-| `feature_vectors_type` | Type of feature vectors to save. | `"averaged_environments"` |
+| `feature_vectors_type` | Type of feature vectors to save. Set automatically to `"none"` if `features_calculator` cannot compute feature vectors. | `"averaged_environments"` |
 
 ### FiniteSubsystemFilter
 
@@ -469,7 +469,7 @@ The `mbe_automation.calculators` module provides interfaces to computational bac
 
 🔗 [`mbe_automation.calculators.MACE`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/mace.py)
 
-Wraps the optional `mace-torch` calculator (`pip install "mbe-automation[mace]"`) with automatic device selection and Ray actor serialization. Package-level boolean `mbe_automation.MACE_AVAILABLE` indicates whether `mace-torch` is installed in the current environment; instantiating `MACE` or `DeltaMACE`, or requesting MACE descriptors (`feature_vectors_type != "none"`) when `MACE_AVAILABLE` is `False`, raises an `ImportError`.
+Wraps the optional `mace-torch` calculator (`pip install "mbe-automation[mace]"`) with automatic device selection and Ray actor serialization. Package-level boolean `mbe_automation.MACE_AVAILABLE` indicates whether `mace-torch` is installed in the current environment; instantiating `MACE` or `DeltaMACE`, or calling `run` with `feature_vectors_type != "none"` when `MACE_AVAILABLE` is `False`, raises an `ImportError`.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |

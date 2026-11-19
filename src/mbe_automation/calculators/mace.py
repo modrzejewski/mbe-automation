@@ -190,13 +190,16 @@ def is_mace_calculator(calculator: object) -> bool:
 
 
 @requires_mace("MACE feature vectors (descriptors)")
-def validate_feature_vectors_calculator(calculator: object | None) -> None:
-    """Validate that MACE is available and calculator supports MACE descriptors."""
-    if calculator is None:
-        raise ValueError(
-            "A features_calculator must be provided when "
-            "feature_vectors_type is not \"none\"."
-        )
+def validate_feature_vectors_calculator(
+    calculator: object,
+) -> None:
+    """
+    Validate the calculator requested for MACE feature vectors.
+
+    Raises:
+        ImportError: If MACE is not available.
+        TypeError: If calculator is not MACE or DeltaMACE.
+    """
     if not isinstance(calculator, (MACE, DeltaMACE)):
         raise TypeError(
             f"Feature vector calculation requires a MACE or DeltaMACE calculator, "

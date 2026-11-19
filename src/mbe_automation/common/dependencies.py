@@ -5,24 +5,30 @@ from typing import ParamSpec, TypeVar, overload
 P = ParamSpec("P")
 R = TypeVar("R")
 
+MACE_IMPORT_ERROR: ImportError | None = None
+UMA_IMPORT_ERROR: ImportError | None = None
+
 try:
     import e3nn  # noqa: F401
     import mace.calculators  # noqa: F401
     MACE_AVAILABLE = True
-except ImportError:
+except ImportError as error:
     MACE_AVAILABLE = False
+    MACE_IMPORT_ERROR = error
 
 try:
     from fairchem.core import FAIRChemCalculator, pretrained_mlip  # noqa: F401
     from fairchem.core.units.mlip_unit import InferenceSettings  # noqa: F401
     UMA_AVAILABLE = True
-except ImportError:
+except ImportError as error:
     UMA_AVAILABLE = False
+    UMA_IMPORT_ERROR = error
 
 
 def _wrap_with_requirement(
     func_or_feature: Callable[P, R] | str,
     flag_name: str,
+    error_name: str,
     package_name: str,
     extra_name: str,
 ) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
@@ -35,10 +41,14 @@ def _wrap_with_requirement(
         @functools.wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             if not globals()[flag_name]:
-                raise ImportError(
+                cause = globals()[error_name]
+                message = (
                     f"`{label}` requires the optional `{package_name}` package. "
                     f"Install it with `pip install \"mbe-automation[{extra_name}]\"`."
                 )
+                if cause is not None:
+                    message += f" Import failed with: {cause}"
+                raise ImportError(message) from cause
             return func(*args, **kwargs)
 
         return wrapper
@@ -67,6 +77,7 @@ def requires_mace(
     return _wrap_with_requirement(
         func_or_feature,
         flag_name="MACE_AVAILABLE",
+        error_name="MACE_IMPORT_ERROR",
         package_name="mace-torch",
         extra_name="mace",
     )
@@ -91,6 +102,7 @@ def requires_uma(
     return _wrap_with_requirement(
         func_or_feature,
         flag_name="UMA_AVAILABLE",
+        error_name="UMA_IMPORT_ERROR",
         package_name="fairchem-core",
         extra_name="uma",
     )

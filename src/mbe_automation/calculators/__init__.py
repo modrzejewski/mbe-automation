@@ -20,6 +20,7 @@ from .uma import (
 )
 from .core import run_model
 from .core import CALCULATORS
+from .core import is_features_calculator
 from .isolated_atoms import atomic_energies
 from . import pyscf
 from . import electronic

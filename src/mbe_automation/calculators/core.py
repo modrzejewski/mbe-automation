@@ -41,6 +41,13 @@ if UMA_AVAILABLE:
     CALCULATORS = CALCULATORS | UMA
 
 
+def is_features_calculator(
+    calculator: object,
+) -> bool:
+    """Return True if calculator can compute feature vectors."""
+    return is_mace_calculator(calculator=calculator)
+
+
 def _split_work(structure: Structure, n_workers: int):
     assert structure.atomic_numbers.ndim == structure.masses.ndim
     assert structure.n_frames > 1
@@ -112,7 +119,7 @@ def _sequential_loop(
         forces = None
 
     if compute_feature_vectors:
-        assert is_mace_calculator(calculator)
+        assert is_features_calculator(calculator=calculator)
         n_features = calculator.n_invariant_features
         if average_over_atoms:
             feature_vectors = np.zeros((n_frames, n_features))
@@ -361,7 +368,7 @@ def run_model(
         resources = Resources.auto_detect()
 
     if compute_feature_vectors:
-        validate_feature_vectors_calculator(calculator)
+        validate_feature_vectors_calculator(calculator=calculator)
 
     n_workers = min(resources.n_gpus, structure.n_frames)
     n_gpus_per_worker = 1
