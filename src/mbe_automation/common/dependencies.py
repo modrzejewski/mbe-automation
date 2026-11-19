@@ -18,7 +18,13 @@ except ImportError as error:
 
 try:
     from fairchem.core import FAIRChemCalculator, pretrained_mlip  # noqa: F401
-    from fairchem.core.units.mlip_unit import InferenceSettings  # noqa: F401
+    from fairchem.core.units.mlip_unit import (  # noqa: F401
+        InferenceSettings,
+        load_predict_unit,
+    )
+    from fairchem.core.units.mlip_unit.api.inference import (  # noqa: F401
+        guess_inference_settings,
+    )
     UMA_AVAILABLE = True
 except ImportError as error:
     UMA_AVAILABLE = False
