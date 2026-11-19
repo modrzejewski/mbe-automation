@@ -45,8 +45,9 @@ class PhononSampling:
                                    # Feature vectors are required for subsampling
                                    # based on the distances in the feature space.
                                    #
-                                   # This setting is ignored unless
-                                   # features_calculator is present.
+                                   # Set automatically to "none" unless
+                                   # features_calculator can compute
+                                   # feature vectors.
                                    #
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "averaged_environments"
                                    #
@@ -148,11 +149,19 @@ class PhononSampling:
         self.force_constants_dataset = Path(self.force_constants_dataset).expanduser()
         self.dataset  = Path(self.dataset).expanduser()
         self.work_dir = Path(self.work_dir).expanduser()
-        if self.feature_vectors_type != "none" and self.features_calculator is None:
-            raise ValueError(
-                "A features_calculator must be provided when "
-                "feature_vectors_type is not 'none'."
+        if (
+                self.feature_vectors_type != "none" and
+                not mbe_automation.calculators.is_features_calculator(
+                    calculator=self.features_calculator,
+                )
+        ):
+            print(
+                f"INFO: Changed feature_vectors_type from "
+                f"\"{self.feature_vectors_type}\" to \"none\". "
+                f"No features_calculator able to compute feature vectors "
+                f"was provided."
             )
+            self.feature_vectors_type = "none"
             
 
 @dataclass(kw_only=True)
@@ -174,8 +183,9 @@ class MDSampling:
                                    # Feature vectors are required for subsampling
                                    # based on the distances in the feature space.
                                    #
-                                   # This setting is ignored unless
-                                   # features_calculator is present.
+                                   # Set automatically to "none" unless
+                                   # features_calculator can compute
+                                   # feature vectors.
                                    #
     feature_vectors_type: Literal[*FEATURE_VECTOR_TYPES] = "averaged_environments"
                                    #
@@ -232,8 +242,16 @@ class MDSampling:
         self.temperatures_K = np.atleast_1d(self.temperatures_K)
         self.pressures_GPa = np.atleast_1d(self.pressures_GPa)
         
-        if self.feature_vectors_type != "none" and self.features_calculator is None:
-            raise ValueError(
-                "A features_calculator must be provided when "
-                "feature_vectors_type is not 'none'."
+        if (
+                self.feature_vectors_type != "none" and
+                not mbe_automation.calculators.is_features_calculator(
+                    calculator=self.features_calculator,
+                )
+        ):
+            print(
+                f"INFO: Changed feature_vectors_type from "
+                f"\"{self.feature_vectors_type}\" to \"none\". "
+                f"No features_calculator able to compute feature vectors "
+                f"was provided."
             )
+            self.feature_vectors_type = "none"

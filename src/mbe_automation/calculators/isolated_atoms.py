@@ -6,9 +6,9 @@ import pyscf
 import ase
 from mbe_automation.calculators.pyscf import PySCFCalculator
 from mbe_automation.calculators.dftb import DFTBCalculator
-from mbe_automation.calculators.mace import MACE
+from mbe_automation.calculators.mace import MACE, MACE_AVAILABLE
 
-SUPPORTED_CALCULATORS = PySCFCalculator | MACE
+SUPPORTED_CALCULATORS = PySCFCalculator | MACE if MACE_AVAILABLE else PySCFCalculator
 
 def ground_state_spin(z: int) -> int:
     """
@@ -72,7 +72,8 @@ def atomic_energies(
     """
     
     if not isinstance(calculator, SUPPORTED_CALCULATORS):
-        valid_names = [x.__name__ for x in typing.get_args(SUPPORTED_CALCULATORS)]
+        valid_types = typing.get_args(SUPPORTED_CALCULATORS) or (SUPPORTED_CALCULATORS,)
+        valid_names = [x.__name__ for x in valid_types]
         raise TypeError(
             f"Expected one of {valid_names}, "
             f"got {type(calculator).__name__}."

@@ -18,7 +18,7 @@ from  mbe_automation.configs.md import ClassicalMD
 import mbe_automation.storage
 import mbe_automation.structure.molecule
 import mbe_automation.dynamics.md.csvr
-from mbe_automation.calculators.mace import MACE
+from mbe_automation.calculators.mace import is_mace_calculator
 import typing
 if typing.TYPE_CHECKING:
     from mbe_automation.calculators import CALCULATORS
@@ -308,7 +308,7 @@ def run(
     print("Time propagation...", flush=True)
     dyn.run(steps=n_total_steps)
 
-    if isinstance(calculator, MACE):
+    if is_mace_calculator(calculator):
         #
         # Automatically compute feature vectors if the calculator
         # is MACE. This simplifies the workflow because in most
@@ -317,7 +317,7 @@ def run(
         # negligible because the computed feature vectors
         # are averaged over atoms.
         #
-        _, _, feature_vectors = mbe_automation.calculators.run_model(
+        _, _, feature_vectors, _ = mbe_automation.calculators.run_model(
             structure=traj,
             calculator=calculator,
             compute_energies=False,

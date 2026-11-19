@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import mbe_automation
 from mbe_automation import (
     MACE,
+    MACE_AVAILABLE,
     UniqueClustersFilter,
 )
 from mbe_automation.storage import from_xyz_file
@@ -22,6 +23,8 @@ from tests.reference_data.test_cases import TEST_CASES
 
 @pytest.fixture(scope="module")
 def mbe(tmp_path_factory) -> MBE:
+    if not MACE_AVAILABLE:
+        pytest.skip("mace-torch is not installed.")
     test_cases_with_models = [
         c for c in TEST_CASES
         if c.get("general_model_path", Path()).exists()

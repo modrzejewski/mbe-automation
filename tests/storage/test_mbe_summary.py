@@ -13,6 +13,7 @@ import pytest
 import mbe_automation
 from mbe_automation import (
     MACE,
+    MACE_AVAILABLE,
     UniqueClustersFilter,
 )
 from mbe_automation.api import MBE as APIMBE
@@ -282,6 +283,7 @@ def test_mbe_summary_methods(tmp_path: Path):
     assert (xyz_dir / "dimers[AA]").exists()
 
 
+@pytest.mark.skipif(not MACE_AVAILABLE, reason="mace-torch is not installed")
 def test_mbe_workflow(tmp_path: Path):
     test_cases_with_models = [
         c for c in TEST_CASES if c.get("general_model_path") is not None
