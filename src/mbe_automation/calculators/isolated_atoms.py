@@ -7,8 +7,13 @@ import ase
 from mbe_automation.calculators.pyscf import PySCFCalculator
 from mbe_automation.calculators.dftb import DFTBCalculator
 from mbe_automation.calculators.mace import MACE, MACE_AVAILABLE
+from mbe_automation.calculators.uma import UMA, UMA_AVAILABLE
 
-SUPPORTED_CALCULATORS = PySCFCalculator | MACE if MACE_AVAILABLE else PySCFCalculator
+SUPPORTED_CALCULATORS = PySCFCalculator
+if MACE_AVAILABLE:
+    SUPPORTED_CALCULATORS = SUPPORTED_CALCULATORS | MACE
+if UMA_AVAILABLE:
+    SUPPORTED_CALCULATORS = SUPPORTED_CALCULATORS | UMA
 
 def ground_state_spin(z: int) -> int:
     """

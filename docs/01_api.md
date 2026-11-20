@@ -495,8 +495,14 @@ Wraps the optional Universal Machine learning potential for Atomistic simulation
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `model_name` | `str` | `"uma-s-1p2"` | UMA model version. |
-| `task_name` | `str` | `"omc"` | Task/head for predictions. |
+| `model_name` | `str` | `"uma-s-1p2p1"` | Name of a pretrained UMA model. |
+| `task_name` | `str` \| `None` | `"omc"` | Task/head for predictions. A single-task checkpoint without the `"omc"` task uses its only task. |
+| `model_path` | `str` \| `Path` \| `None` | `None` | Local checkpoint file. Takes precedence over `model_name`. |
+| `inference_settings` | `str` \| `InferenceSettings` | `"float64"` | `"float64"` or `"float32"`: model without compilation at the given precision. Other values: a `fairchem-core` preset such as `"nitro"`, or an `InferenceSettings` object. |
+
+For the `omol` task, the charge and the number of unpaired electrons are read from `atoms.info["charge"]` and `atoms.info["n_unpaired_electrons"]`. A missing key means a neutral singlet.
+
+Presets which compile kernels store them in cache directories owned by the current process, inside the temporary directory. Set `TRITON_CACHE_DIR` and `TORCHINDUCTOR_CACHE_DIR` to use other locations.
 
 ### PySCF (DFT & HF)
 
