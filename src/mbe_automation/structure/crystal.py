@@ -431,7 +431,20 @@ def supercell_matrix(
 
     assert np.allclose(optimal_matrix, np.round(optimal_matrix)), "Supercell matrix contains non-integer values"
     optimal_matrix = np.round(optimal_matrix).astype(np.int64)
-        
+
+    if np.linalg.det(optimal_matrix) < 0:
+        #
+        # A negative determinant means that the supercell lattice
+        # vectors form a left-handed system. Phonopy crashes
+        # for such supercells. Multiplying the matrix by -1
+        # (inversion of all supercell lattice vectors) yields
+        # an equivalent right-handed supercell with the same
+        # shape, volume, and point-image distance.
+        #
+        optimal_matrix = -optimal_matrix
+
+    assert np.linalg.det(optimal_matrix) > 0, "Supercell matrix must have a positive determinant"
+
     supercell = structure.make_supercell(optimal_matrix)
 
     mbe_automation.common.display.framed([
