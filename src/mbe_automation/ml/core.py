@@ -26,8 +26,10 @@ SUBSAMPLING_ALGOS = [
 # Options (2) or (3) enable subsampling of frames
 # based on the distances in the feature space.
 #
-# Limitation: options (2) and (3) work only with
-# MACE models.
+# Options (2) and (3) require a calculator with a registered
+# featurizer (mbe_automation.calculators.features), currently
+# MACE, DeltaMACE, and UMA. Feature vectors are comparable only
+# if their feature_vectors_source identifiers are equal.
 #
 FEATURE_VECTOR_TYPES = [
     "none",

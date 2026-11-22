@@ -207,6 +207,14 @@ class Structure:
     feature_vectors: npt.NDArray[np.floating] | None = None
     feature_vectors_type: str = "none"
     level_of_theory: str | None = None
+    #
+    # Identifier of the feature space, e.g.,
+    # "uma_uma-s-1p2p1_omc_head/node_embedding_l0_last".
+    # Feature vectors are comparable only if their sources
+    # are equal. "unknown" marks feature vectors read from
+    # files written before the source was stored.
+    #
+    feature_vectors_source: str | None = None
 
     def __post_init__(self):
         assert self.n_atoms > 0, "Structure must contain at least one atom."
@@ -233,6 +241,7 @@ class Structure:
             ),
             feature_vectors_type=self.feature_vectors_type,
             level_of_theory=self.level_of_theory,
+            feature_vectors_source=self.feature_vectors_source,
         )
 
     def save(
@@ -1082,6 +1091,26 @@ def read_eos_metadata(
         debye_model=debye_model
     )
 
+def _write_feature_vectors_source(
+        group: h5py.Group,
+        feature_vectors_type: str,
+        feature_vectors_source: str | None,
+) -> None:
+    if feature_vectors_type != "none" and feature_vectors_source is not None:
+        group.attrs["feature_vectors_source"] = feature_vectors_source
+    elif "feature_vectors_source" in group.attrs:
+        del group.attrs["feature_vectors_source"]
+
+
+def _read_feature_vectors_source(
+        group: h5py.Group,
+        feature_vectors_type: str,
+) -> str | None:
+    if feature_vectors_type == "none":
+        return None
+    return group.attrs.get("feature_vectors_source", "unknown")
+
+
 def _save_structure(
         dataset: str | Path,
         key: str,
@@ -1096,6 +1125,7 @@ def _save_structure(
         ground_truth: GroundTruth | None=None,
         level_of_theory: str | None = None,
         update_mode: Literal["update_properties", "replace"] = "update_properties",
+        feature_vectors_source: str | None = None,
 ):
     """
     Internal function to save structure components.
@@ -1182,6 +1212,9 @@ def _save_structure(
             group.attrs["n_atoms"] = n_atoms
             group.attrs["periodic"] = is_periodic
             group.attrs["feature_vectors_type"] = feature_vectors_type
+            _write_feature_vectors_source(
+                group, feature_vectors_type, feature_vectors_source
+            )
             if level_of_theory is not None:
                 group.attrs["level_of_theory"] = level_of_theory
 
@@ -1198,6 +1231,9 @@ def _save_structure(
                         data=feature_vectors
                     )
                     group.attrs["feature_vectors_type"] = feature_vectors_type
+                    _write_feature_vectors_source(
+                        group, feature_vectors_type, feature_vectors_source
+                    )
 
         if ground_truth is not None:
             _save_ground_truth(f, f"{key}/ground_truth", ground_truth, update_mode=update_mode)
@@ -1221,6 +1257,7 @@ def save_structure(
     ground_truth: GroundTruth | None = None,
     level_of_theory: str | None = None,
     update_mode: Literal["update_properties", "replace"] = "update_properties",
+    feature_vectors_source: str | None = None,
 ) -> None: ...
 
 def save_structure(*, dataset: str | Path, key: str, **kwargs):
@@ -1257,6 +1294,7 @@ def save_structure(*, dataset: str | Path, key: str, **kwargs):
             ground_truth=structure.ground_truth,
             level_of_theory=structure.level_of_theory,
             update_mode=kwargs.get("update_mode", "update_properties"),
+            feature_vectors_source=structure.feature_vectors_source,
         )
     elif "positions" in kwargs:
         # --- Signature 2: Called with individual arrays ---
@@ -1274,6 +1312,7 @@ def save_structure(*, dataset: str | Path, key: str, **kwargs):
             feature_vectors_type=kwargs.get("feature_vectors_type", "none"),
             level_of_theory=kwargs.get("level_of_theory"),
             update_mode=kwargs.get("update_mode", "update_properties"),
+            feature_vectors_source=kwargs.get("feature_vectors_source"),
         )
     else:
         raise ValueError(
@@ -1303,6 +1342,9 @@ def read_structure(dataset, key):
             feature_vectors=(
                 group["feature_vectors"][...]
                 if feature_vectors_type != "none" else None
+            ),
+            feature_vectors_source=_read_feature_vectors_source(
+                group, feature_vectors_type
             ),
             E_pot=(
                 group["E_pot (eV∕atom)"][...]
@@ -1367,6 +1409,9 @@ def save_trajectory(
             group.attrs["n_atoms"] = traj.n_atoms
             group.attrs["periodic"] = traj.periodic
             group.attrs["feature_vectors_type"] = traj.feature_vectors_type
+            _write_feature_vectors_source(
+                group, traj.feature_vectors_type, traj.feature_vectors_source
+            )
             group.attrs["target_temperature (K)"] = traj.target_temperature
             group.attrs["time_equilibration (fs)"] = traj.time_equilibration
             group.attrs["n_removed_trans_dof"] = traj.n_removed_trans_dof
@@ -1455,6 +1500,9 @@ def save_trajectory(
                         data=traj.feature_vectors
                     )
                     group.attrs["feature_vectors_type"] = traj.feature_vectors_type
+                    _write_feature_vectors_source(
+                        group, traj.feature_vectors_type, traj.feature_vectors_source
+                    )
 
         if traj.ground_truth is not None:
             _save_ground_truth(f, f"{key}/ground_truth", traj.ground_truth, update_mode=update_mode)
@@ -1491,6 +1539,9 @@ def read_trajectory(dataset: str, key: str) -> Trajectory:
             feature_vectors=(
                 group["feature_vectors"][...]
                 if feature_vectors_type != "none" else None
+            ),
+            feature_vectors_source=_read_feature_vectors_source(
+                group, feature_vectors_type
             ),
             target_temperature=group.attrs["target_temperature (K)"],
             target_pressure=(group.attrs["target_pressure (GPa)"] if ensemble=="NPT" else None),
@@ -1880,6 +1931,11 @@ def _save_only(
                 )
 
             group.attrs["feature_vectors_type"] = structure.feature_vectors_type
+            _write_feature_vectors_source(
+                group,
+                structure.feature_vectors_type,
+                structure.feature_vectors_source,
+            )
 
         if "ground_truth" in quantities:
 

@@ -4,6 +4,7 @@ from ase.calculators.calculator import Calculator, all_changes
 import numpy as np
 
 from mbe_automation.common.dependencies import MACE_AVAILABLE, requires_mace
+from mbe_automation.calculators.features import Featurizer, make_featurizer
 
 DEFAULT_HEAD = "Default"
 
@@ -170,6 +171,36 @@ if MACE_AVAILABLE:
                 "head": self.head,
             }
 
+    class MACEInvariants(Featurizer):
+        """
+        Invariant (l=0) features of all interaction layers of a MACE
+        model, concatenated for every atom.
+        """
+        @property
+        def n_features(self) -> int:
+            return self.calculator.n_invariant_features
+
+        @property
+        def source(self) -> str:
+            return f"{self.calculator.level_of_theory}/invariants_all_layers"
+
+        def compute(self, atoms):
+            return self.calculator.get_descriptors(
+                atoms, invariants_only=True, num_layers=-1
+            ).reshape(len(atoms), -1)
+
+    @make_featurizer.register(MACE)
+    def _make_mace_featurizer(calculator: MACE, **options) -> MACEInvariants:
+        return MACEInvariants(calculator, **options)
+
+    @make_featurizer.register(DeltaMACE)
+    def _make_delta_mace_featurizer(calculator: DeltaMACE, **options) -> MACEInvariants:
+        #
+        # Feature vectors of a delta-learning model are those
+        # of its baseline model.
+        #
+        return make_featurizer(calculator.baseline, **options)
+
 else:
     MACECalculator = None  # type: ignore[assignment,misc]
 
@@ -187,21 +218,3 @@ else:
 def is_mace_calculator(calculator: object) -> bool:
     """Return True when MACE is available and calculator is MACE or DeltaMACE."""
     return MACE_AVAILABLE and isinstance(calculator, (MACE, DeltaMACE))
-
-
-@requires_mace("MACE feature vectors (descriptors)")
-def validate_feature_vectors_calculator(
-    calculator: object,
-) -> None:
-    """
-    Validate the calculator requested for MACE feature vectors.
-
-    Raises:
-        ImportError: If MACE is not available.
-        TypeError: If calculator is not MACE or DeltaMACE.
-    """
-    if not isinstance(calculator, (MACE, DeltaMACE)):
-        raise TypeError(
-            f"Feature vector calculation requires a MACE or DeltaMACE calculator, "
-            f"got {type(calculator).__name__}."
-        )

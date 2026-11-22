@@ -100,10 +100,7 @@ def test_requires_uma_preserves_metadata_and_behaves_per_flag(monkeypatch):
         SampleUMACalculator("uma-s-1p2")
 
 
-def test_feature_vectors_reject_non_mace_calculator_when_mace_available():
-    if not MACE_AVAILABLE:
-        pytest.skip("mace-torch is not installed")
-
+def test_feature_vectors_reject_calculator_without_featurizer():
     dft_calc = DFT(model_name="pbe-d3", basis="def2-svp")
     h2 = Structure(
         positions=np.array([[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]]]),
@@ -114,7 +111,7 @@ def test_feature_vectors_reject_non_mace_calculator_when_mace_available():
         n_atoms=2,
     )
 
-    with pytest.raises(TypeError, match="MACE or DeltaMACE"):
+    with pytest.raises(TypeError, match="Feature vectors are not available"):
         h2.run(calculator=dft_calc, feature_vectors_type="averaged_environments")
 
 
@@ -229,6 +226,9 @@ def test_md_with_mace_saves_feature_vectors(
         traj.n_frames,
         mace_calc.n_invariant_features,
     )
+    assert traj.feature_vectors_source == (
+        f"{mace_calc.level_of_theory}/invariants_all_layers"
+    )
 
 
 def test_package_behavior_when_mlips_missing(tmp_path: Path):
@@ -307,7 +307,8 @@ def test_package_behavior_when_mlips_missing(tmp_path: Path):
         with pytest.raises(ImportError, match=r"`mace_summary` requires the optional `mace-torch`"):
             mbe_automation.common.display.mace_summary(None)
 
-        # 3. Descriptor calculation raises ImportError instead of silently returning None
+        # 3. Feature vector calculation raises TypeError instead of silently returning None.
+        #    No featurizer is registered when MLIP packages are missing.
         dft_calc = DFT(model_name="pbe-d3", basis="def2-svp")
         h2 = Structure(
             positions=np.array([[[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]]]),
@@ -317,7 +318,8 @@ def test_package_behavior_when_mlips_missing(tmp_path: Path):
             n_frames=1,
             n_atoms=2,
         )
-        with pytest.raises(ImportError, match=r"`MACE feature vectors \\(descriptors\\)` requires"):
+        assert not mbe_automation.calculators.supports_feature_vectors(dft_calc)
+        with pytest.raises(TypeError, match=r"Feature vectors are not available.*none installed"):
             h2.run(calculator=dft_calc, feature_vectors_type="averaged_environments")
 
         # 4. Sampling configs set feature_vectors_type to "none" when no

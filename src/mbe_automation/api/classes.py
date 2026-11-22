@@ -840,6 +840,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             overwrite: bool = False,
             selected_frames: npt.NDArray[np.int64] | None = None,
             chunk: Tuple[int, int] | None = None,
+            feature_options: dict | None = None,
     ) -> None:
         """
         Run a calculator on the structure.
@@ -855,6 +856,8 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             chunk: Tuple of (index, total_chunks) for disjoint work distribution.
                    Index is 1-based (1..total_chunks). Using this argument enables
                    parallel execution (e.g. in SLURM job arrays).
+            feature_options: Options of the featurizer of the calculator,
+                   e.g., {"layers": "all"} for UMA. None selects the defaults.
         """
         
         final_selected_frames = _resolve_chunk_indices(
@@ -872,6 +875,7 @@ class Structure(_Structure, _AtomicEnergiesCalc, _TrainingStructure):
             exec_params=exec_params,
             overwrite=overwrite,
             selected_frames=final_selected_frames,
+            feature_options=feature_options,
         )
 
     run_model = run # synonym
@@ -963,6 +967,7 @@ class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
             overwrite: bool = False,
             selected_frames: npt.NDArray[np.int64] | None = None,
             chunk: Tuple[int, int] | None = None,
+            feature_options: dict | None = None,
     ) -> None:
         """
         Run a calculator on the trajectory frames.
@@ -978,6 +983,8 @@ class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
             chunk: Tuple of (index, total_chunks) for disjoint work distribution.
                    Index is 1-based (1..total_chunks). Using this argument enables
                    parallel execution (e.g. in SLURM job arrays).
+            feature_options: Options of the featurizer of the calculator,
+                   e.g., {"layers": "all"} for UMA. None selects the defaults.
         """
 
         final_selected_frames = _resolve_chunk_indices(
@@ -995,6 +1002,7 @@ class Trajectory(_Trajectory, _TrainingStructure, _AtomicEnergiesCalc):
             exec_params=exec_params,
             overwrite=overwrite,
             selected_frames=final_selected_frames,
+            feature_options=feature_options,
         )
 
     run_model = run
@@ -1169,6 +1177,7 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             overwrite: bool = False,
             selected_frames: npt.NDArray[np.int64] | None = None,
             chunk: Tuple[int, int] | None = None,
+            feature_options: dict | None = None,
     ) -> None:
         """
         Run a calculator on the finite subsystem.
@@ -1184,6 +1193,8 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             chunk: Tuple of (index, total_chunks) for disjoint work distribution.
                    Index is 1-based (1..total_chunks). Using this argument enables
                    parallel execution (e.g. in SLURM job arrays).
+            feature_options: Options of the featurizer of the calculator,
+                   e.g., {"layers": "all"} for UMA. None selects the defaults.
         """
         
         final_selected_frames = _resolve_chunk_indices(
@@ -1192,8 +1203,9 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             selected_frames=selected_frames,
         )
         
+        structure = Structure(**vars(self.cluster_of_molecules))
         _run_model(
-            structure=Structure(**vars(self.cluster_of_molecules)),
+            structure=structure,
             calculator=calculator,
             energies=energies,
             forces=forces,
@@ -1201,7 +1213,16 @@ class FiniteSubsystem(_FiniteSubsystem, _AtomicEnergiesCalc, _TrainingStructure)
             exec_params=exec_params,
             overwrite=overwrite,
             selected_frames=final_selected_frames,
+            feature_options=feature_options,
         )
+        #
+        # _run_model assigns new objects to the attributes of the
+        # temporary Structure. Copy them back to the finite subsystem.
+        #
+        self.cluster_of_molecules.ground_truth = structure.ground_truth
+        self.cluster_of_molecules.feature_vectors = structure.feature_vectors
+        self.cluster_of_molecules.feature_vectors_type = structure.feature_vectors_type
+        self.cluster_of_molecules.feature_vectors_source = structure.feature_vectors_source
 
     run_model = run
 
@@ -1396,6 +1417,7 @@ def _select_frames(
                 if struct.feature_vectors is not None else None
             ),
             feature_vectors_type=struct.feature_vectors_type,
+            feature_vectors_source=struct.feature_vectors_source,
             ground_truth=(
                 struct.ground_truth.select_frames(indices)
                 if struct.ground_truth is not None else None
@@ -1577,6 +1599,7 @@ def _select_frames_trajectory(
                 if traj.feature_vectors is not None else None
             ),
             feature_vectors_type=traj.feature_vectors_type,
+            feature_vectors_source=traj.feature_vectors_source,
             ground_truth=(
                 traj.ground_truth.select_frames(indices)
                 if traj.ground_truth is not None else None
@@ -1646,6 +1669,7 @@ def _run_model(
         exec_params: Resources | None = None,
         overwrite: bool = False,
         selected_frames: npt.NDArray[np.int64] | None = None,
+        feature_options: dict | None = None,
 ) -> None:
     """
     Generate energies, forces, and feature vectors for a series of structure
@@ -1655,6 +1679,9 @@ def _run_model(
         selected_frames: Optional list of frame indices to process.
             If provided, calculations will be performed only for these frames.
             Must not be used with feature_vectors.
+        feature_options: Options of the featurizer of the calculator.
+            The identifier of the resulting feature space is stored
+            in structure.feature_vectors_source.
     
     (1) Energies and forces computed with this function
         are stored as ground truth. Ground truth data consists of multiple
@@ -1753,6 +1780,7 @@ def _run_model(
         compute_feature_vectors=(feature_vectors_type!="none"),
         average_over_atoms=(feature_vectors_type=="averaged_environments"),
         resources=exec_params,
+        feature_options=feature_options,
     )
     #
     # Broadcast the computed data to arrays
@@ -1791,6 +1819,11 @@ def _run_model(
         assert len(frames_to_compute) == structure.n_frames
         structure.feature_vectors = d
         structure.feature_vectors_type = feature_vectors_type
+        structure.feature_vectors_source = (
+            mbe_automation.calculators.feature_vectors_source(
+                calculator, feature_options
+            )
+        )
 
     return
 

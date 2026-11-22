@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 import numpy as np
 import numpy.typing as npt
 import ase
@@ -21,12 +22,17 @@ from mbe_automation.calculators.mace import (
     DeltaMACE,
     MACE_AVAILABLE,
     is_mace_calculator,
-    validate_feature_vectors_calculator,
 )
 from mbe_automation.calculators.uma import (
     UMA,
     UMA_AVAILABLE,
     is_uma_calculator,
+)
+from mbe_automation.calculators.features import (
+    Featurizer,
+    make_featurizer,
+    supports_feature_vectors,
+    validate_feature_vectors_calculator,
 )
 from mbe_automation.calculators.pyscf import PySCFCalculator, SCFNotConverged
 from mbe_automation.calculators.dftb import DFTBCalculator
@@ -45,7 +51,7 @@ def is_features_calculator(
     calculator: object,
 ) -> bool:
     """Return True if calculator can compute feature vectors."""
-    return is_mace_calculator(calculator=calculator)
+    return supports_feature_vectors(calculator)
 
 
 def _split_work(structure: Structure, n_workers: int):
@@ -92,7 +98,7 @@ def _sequential_loop(
     silent: bool,
     compute_energies: bool,
     compute_forces: bool,
-    compute_feature_vectors: bool,
+    featurizer: Featurizer | None,
     average_over_atoms: bool,
 ) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None, npt.NDArray]:
 
@@ -118,9 +124,8 @@ def _sequential_loop(
     else:
         forces = None
 
-    if compute_feature_vectors:
-        assert is_features_calculator(calculator=calculator)
-        n_features = calculator.n_invariant_features
+    if featurizer is not None:
+        n_features = featurizer.n_features
         if average_over_atoms:
             feature_vectors = np.zeros((n_frames, n_features))
         else:
@@ -177,10 +182,8 @@ def _sequential_loop(
             if compute_energies:
                 E_pot[i] = atoms.get_potential_energy() / n_atoms  # eV/atom
 
-            if compute_feature_vectors:
-                feature_vectors_i = calculator.get_descriptors(atoms).reshape(
-                    n_atoms, -1
-                )
+            if featurizer is not None:
+                feature_vectors_i = featurizer(atoms)
 
                 if average_over_atoms:
                     feature_vectors[i] = np.average(feature_vectors_i, axis=0)
@@ -204,7 +207,7 @@ def _parallel_loop(
     structure: Structure,
     compute_energies: bool,
     compute_forces: bool,
-    compute_feature_vectors: bool,
+    featurizer: Featurizer | None,
     average_over_atoms: bool,
     n_workers: int,
     n_gpus_per_worker: int,
@@ -222,8 +225,9 @@ def _parallel_loop(
     else:
         forces = None
 
+    compute_feature_vectors = featurizer is not None
     if compute_feature_vectors:
-        n_features = calculator.n_invariant_features
+        n_features = featurizer.n_features
         if average_over_atoms:
             feature_vectors = np.zeros((structure.n_frames, n_features))
         else:
@@ -287,6 +291,9 @@ def _parallel_loop(
                         compute_energies=compute_energies,
                         compute_forces=compute_forces,
                         compute_feature_vectors=compute_feature_vectors,
+                        feature_options=(
+                            featurizer.options if compute_feature_vectors else {}
+                        ),
                         average_over_atoms=average_over_atoms,
                     )
                 )
@@ -329,9 +336,18 @@ if RAY_AVAILABLE:
             compute_energies: bool,
             compute_forces: bool,
             compute_feature_vectors: bool,
+            feature_options: dict[str, Any],
             average_over_atoms: bool,
         ):
-
+            #
+            # The featurizer is rebuilt in the worker from the options
+            # because it holds a reference to the calculator, which
+            # is reconstructed separately in every worker.
+            #
+            featurizer = (
+                make_featurizer(self.calculator, **feature_options)
+                if compute_feature_vectors else None
+            )
             return _sequential_loop(
                 calculator=self.calculator,
                 positions=positions,
@@ -341,7 +357,7 @@ if RAY_AVAILABLE:
                 silent=self.silent,
                 compute_energies=compute_energies,
                 compute_forces=compute_forces,
-                compute_feature_vectors=compute_feature_vectors,
+                featurizer=featurizer,
                 average_over_atoms=average_over_atoms,
             )
 else:
@@ -357,11 +373,17 @@ def run_model(
     average_over_atoms: bool = False,
     silent: bool = False,
     resources: Resources | None = None,
+    feature_options: dict[str, Any] | None = None,
 ) -> tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None, npt.NDArray]:
     """
     Run a calculator of energies/forces/feature vectors for all frames of a given
     Structure. Store computed quantities in-place or return them as arrays.
     The coordinates are not modified.
+
+    Feature vectors are computed by the featurizer registered for the type
+    of the calculator. feature_options are passed to that featurizer, e.g.,
+    {"layers": "all"} for UMA. The identifier of the feature space is
+    returned by feature_vectors_source(calculator, feature_options).
 
     """
     if resources is None:
@@ -369,6 +391,9 @@ def run_model(
 
     if compute_feature_vectors:
         validate_feature_vectors_calculator(calculator=calculator)
+        featurizer = make_featurizer(calculator, **(feature_options or {}))
+    else:
+        featurizer = None
 
     n_workers = min(resources.n_gpus, structure.n_frames)
     n_gpus_per_worker = 1
@@ -394,6 +419,8 @@ def run_model(
         print(f"{'compute_energies':<30}{compute_energies}")
         print(f"{'compute_forces':<30}{compute_forces}")
         print(f"{'compute_feature_vectors':<30}{compute_feature_vectors}")
+        if featurizer is not None:
+            print(f"{'feature_vectors_source':<30}{featurizer.source}")
         print(f"{'multi-GPU parallelization':<30}{use_ray}")
         if use_ray:
             print(f"{'n_gpus':<30}{resources.n_gpus}")
@@ -408,7 +435,7 @@ def run_model(
             structure=structure,
             compute_energies=compute_energies,
             compute_forces=compute_forces,
-            compute_feature_vectors=compute_feature_vectors,
+            featurizer=featurizer,
             average_over_atoms=average_over_atoms,
             n_workers=n_workers,
             n_gpus_per_worker=n_gpus_per_worker,
@@ -425,7 +452,7 @@ def run_model(
             silent=silent,
             compute_energies=compute_energies,
             compute_forces=compute_forces,
-            compute_feature_vectors=compute_feature_vectors,
+            featurizer=featurizer,
             average_over_atoms=average_over_atoms,
         )
 
