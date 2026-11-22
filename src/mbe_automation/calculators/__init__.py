@@ -10,7 +10,6 @@ from .mace import (
     MACE_AVAILABLE,
     requires_mace,
     is_mace_calculator,
-    validate_feature_vectors_calculator,
 )
 from .uma import (
     UMA,
@@ -21,6 +20,13 @@ from .uma import (
 from .core import run_model
 from .core import CALCULATORS
 from .core import is_features_calculator
+from .features import (
+    Featurizer,
+    make_featurizer,
+    supports_feature_vectors,
+    validate_feature_vectors_calculator,
+    feature_vectors_source,
+)
 from .isolated_atoms import atomic_energies
 from . import pyscf
 from . import electronic

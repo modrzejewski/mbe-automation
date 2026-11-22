@@ -40,6 +40,7 @@ from mbe_automation.configs.quasi_harmonic import FreeEnergy
     * [MACE](#mace)
     * [DeltaMACE](#deltamace)
     * [UMA](#uma)
+    * [Feature Vectors](#feature-vectors)
     * [PySCF (DFT & HF)](#pyscf-dft--hf)
     * [DFTB+ (Semi-empirical)](#dftb-semi-empirical)
 * [5. Data Storage & Retrieval](#5-data-storage--retrieval)
@@ -91,7 +92,7 @@ Atomistic structure (positions, atomic numbers, cell vectors). Can hold a single
 *   **`to_file`**: Exports a `Structure` object to standard geometry file formats (e.g., CIF, POSCAR, XYZ, and any format supported by ASE). Takes `save_path`, optional `fmt` (inferred from extension/filename by default), and `symprec` (symmetry tolerance for space group detection in CIF exports).
 *   **`subsample`**: Selects a representative subset of frames (e.g., using Farthest Point Sampling or k-means on feature vectors). Requires feature vectors.
 *   **`select`**: Returns a new object containing only the specified frames (by index).
-*   **`run`**: Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling. Can distribute work via `chunk`.
+*   **`run`**: Executes a calculator on fixed structures. Computed energies and forces are stored in `ground_truth` (indexed by the calculator's `level_of_theory`), while feature vectors are stored directly on the structure for subsampling, together with `feature_vectors_source`, the identifier of the feature space. `feature_options` are passed to the featurizer of the calculator (see [Feature Vectors](#feature-vectors)). Can distribute work via `chunk`.
 *   **`to_mace_dataset`**: Exports the data (structures, energies, forces) to MACE-compatible XYZ files for model training.
 *   **`random_split`**: Randomly splits the frames into multiple objects (e.g., for creating training and validation sets).
 *   **`to_molecular_crystal`**: Converts a periodic structure into a `MolecularCrystal` by detecting connected molecules.
@@ -369,7 +370,7 @@ Configuration for generating distorted structures via Molecular Dynamics samplin
 | --- | --- | --- |
 | `crystal` | Initial crystal structure for finite cluster extraction. | - |
 | `calculator` | MLIP calculator. | - |
-| `features_calculator` | Calculator to compute feature vectors. | `None` |
+| `features_calculator` | Calculator to compute feature vectors: `MACE`, `DeltaMACE`, or `UMA` (see [Feature Vectors](#feature-vectors)). | `None` |
 | `feature_vectors_type` | Type of feature vectors to save: `"none"`, `"atomic_environments"`, or `"averaged_environments"`. Set automatically to `"none"` if `features_calculator` cannot compute feature vectors. | `"averaged_environments"` |
 | `md_crystal` | An instance of `ClassicalMD` configuring MD parameters. | - |
 | `temperatures_K` / `pressures_GPa` | Target temperatures and pressures. | `298.15` / `1.0E-4` |
@@ -390,7 +391,7 @@ Configuration for generating distorted structures by sampling along normal mode 
 | `force_constants_dataset` | Path to dataset file containing force constants. | `./properties.hdf5` |
 | `force_constants_key` | Key within the dataset file. | `"training/quasi_harmonic/phonons/..."` |
 | `calculator` | MLIP calculator. | - |
-| `features_calculator` | Calculator used to compute feature vectors. | `None` |
+| `features_calculator` | Calculator used to compute feature vectors: `MACE`, `DeltaMACE`, or `UMA` (see [Feature Vectors](#feature-vectors)). | `None` |
 | `temperature_K` | Temperature for phonon sampling. | `298.15` |
 | `phonon_filter` | An instance of `PhononFilter` specifying modes to sample. | `PhononFilter()` |
 | `finite_subsystem_filter` | An instance of `FiniteSubsystemFilter`. | `FiniteSubsystemFilter()` |
@@ -469,7 +470,7 @@ The `mbe_automation.calculators` module provides interfaces to computational bac
 
 🔗 [`mbe_automation.calculators.MACE`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/mace.py)
 
-Wraps the optional `mace-torch` calculator (`pip install "mbe-automation[mace]"`) with automatic device selection and Ray actor serialization. Package-level boolean `mbe_automation.MACE_AVAILABLE` indicates whether `mace-torch` is installed in the current environment; instantiating `MACE` or `DeltaMACE`, or calling `run` with `feature_vectors_type != "none"` when `MACE_AVAILABLE` is `False`, raises an `ImportError`.
+Wraps the optional `mace-torch` calculator (`pip install "mbe-automation[mace]"`) with automatic device selection and Ray actor serialization. Package-level boolean `mbe_automation.MACE_AVAILABLE` indicates whether `mace-torch` is installed in the current environment; instantiating `MACE` or `DeltaMACE` when `MACE_AVAILABLE` is `False` raises an `ImportError`.
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -503,6 +504,32 @@ Wraps the optional Universal Machine learning potential for Atomistic simulation
 For the `omol` task, the charge and the number of unpaired electrons are read from `atoms.info["charge"]` and `atoms.info["n_unpaired_electrons"]`. A missing key means a neutral singlet.
 
 Presets which compile kernels store them in cache directories owned by the current process, inside the temporary directory. Set `TRITON_CACHE_DIR` and `TORCHINDUCTOR_CACHE_DIR` to use other locations.
+
+### Feature Vectors
+
+🔗 [`mbe_automation.calculators.features`](https://github.com/modrzejewski/mbe-automation/blob/main/src/mbe_automation/calculators/features.py)
+
+Feature vectors describe atomic environments with the internal representation of an MLIP. They enable subsampling (farthest point sampling, k-means) and PCA. Each MLIP exposes its representation differently, so the extraction is done by a featurizer registered for the calculator type. `mbe_automation.calculators.supports_feature_vectors(calculator)` tells whether a featurizer exists. Calling `run` with `feature_vectors_type != "none"` and a calculator without a featurizer raises a `TypeError` which lists the supported calculators installed in the current environment.
+
+| Calculator | Featurizer | Features per atom | `feature_options` | `feature_vectors_source` |
+| --- | --- | --- | --- | --- |
+| `MACE` | `MACEInvariants` | Invariant (l=0) features of all interaction layers, concatenated | none | `<level_of_theory>/invariants_all_layers` |
+| `DeltaMACE` | featurizer of the baseline model | as `MACE` | none | source of the baseline model |
+| `UMA` | `UMANodeEmbedding` | l=0 channels of the backbone node embeddings | `layers`: `"last"` (default, `sphere_channels` features) or `"all"` (outputs of all message-passing blocks, concatenated) | `<level_of_theory>/node_embedding_l0_<layers>` |
+
+UMA embeddings depend on the task (`omc`, `omol`, ...), which is a part of `level_of_theory`. With `inference_settings` presets which merge the mixture-of-experts weights (`merge_mole=True`), all frames must have the same composition.
+
+`feature_vectors_source` is stored with the feature vectors. Feature vectors are comparable only if their sources are equal. Datasets written before the source was stored report `"unknown"`.
+
+Adding a featurizer for a new MLIP requires a `Featurizer` subclass, which implements `compute`, `n_features`, and `source`, and a registration in the calculator module:
+
+```python
+from mbe_automation.calculators.features import Featurizer, make_featurizer
+
+@make_featurizer.register(MyMLIP)
+def _(calculator, **options):
+    return MyMLIPFeaturizer(calculator, **options)
+```
 
 ### PySCF (DFT & HF)
 

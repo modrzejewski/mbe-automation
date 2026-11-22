@@ -1,3 +1,4 @@
+import functools
 import getpass
 import os
 from pathlib import Path
@@ -6,10 +7,13 @@ import sys
 import tempfile
 
 import ase
-from ase.calculators.calculator import Calculator
+from ase.calculators.calculator import Calculator, all_changes
+import numpy as np
+import numpy.typing as npt
 import torch
 
 from mbe_automation.common.dependencies import UMA_AVAILABLE, requires_uma
+from mbe_automation.calculators.features import Featurizer, make_featurizer
 
 _PRECISION_DTYPES = {
     "float64": torch.float64,
@@ -20,6 +24,7 @@ _COMPILER_CACHE_VARIABLES = {
     "TORCHINDUCTOR_CACHE_DIR": "torchinductor_cache",
 }
 _COMPILER_CACHE_ROOT_PREFIX = "mbe_automation_"
+_FEATURE_LAYERS = ("last", "all")
 
 
 def _resolve_task_name(
@@ -238,6 +243,146 @@ if UMA_AVAILABLE:
                 "model_path": self.model_path,
                 "inference_settings": self.inference_settings,
             }
+
+    def _capture_output(
+        captured: dict[int, torch.Tensor],
+        index: int,
+        module: torch.nn.Module,
+        inputs: tuple,
+        output: torch.Tensor | tuple | dict,
+    ) -> None:
+        """
+        Store the output of a module under the given index.
+
+        Activation checkpointing can run a block twice in a single
+        prediction. Both runs give identical outputs, so the later
+        one overwrites the earlier one.
+        """
+        if isinstance(output, dict):
+            output = output["node_embedding"]
+        elif isinstance(output, tuple):
+            output = output[0]
+        captured[index] = output.detach()
+
+    class UMANodeEmbedding(Featurizer):
+        """
+        Invariant (l=0) channels of the node embeddings
+        of the UMA backbone.
+
+        The node embeddings have shape (n_atoms, (lmax+1)**2, sphere_channels).
+        The l=0 component, which is invariant to rotations, is the same
+        slice which the energy head reads.
+
+        Args:
+            calculator: UMA calculator.
+            layers: "last" selects the node embedding returned by
+                the backbone (sphere_channels features). "all" concatenates
+                the outputs of all message-passing blocks
+                (n_blocks * sphere_channels features).
+
+        The embeddings are captured with forward hooks during a regular
+        prediction. This reuses the preprocessing of fairchem: graph
+        generation, task embedding, charge and spin, selection of
+        the mixture-of-linear-experts coefficients, and precision.
+        The embeddings depend on the task, which is a part of
+        level_of_theory and therefore of the source identifier.
+        """
+        def __init__(self, calculator: "UMA", layers: str = "last"):
+            if layers not in _FEATURE_LAYERS:
+                raise ValueError(
+                    f"Invalid layers: {layers!r}. Expected one of {_FEATURE_LAYERS}."
+                )
+            super().__init__(calculator)
+            self.layers = layers
+            self._n_features: int | None = None
+
+            settings = _resolve_inference_settings(calculator.inference_settings)
+            if settings.merge_mole:
+                print(
+                    "WARNING: UMA feature vectors with merge_mole=True work only "
+                    "if all frames have the same composition. Use "
+                    "inference_settings=\"float64\" for frames with "
+                    "varying composition."
+                )
+
+        def _backbone(self) -> torch.nn.Module:
+            #
+            # Resolve the backbone at every call. With merge_mole=True,
+            # fairchem replaces the model object at the first prediction.
+            #
+            model = self.calculator.predictor.model
+            model = getattr(model, "module", model)
+            return model.backbone
+
+        @property
+        def options(self) -> dict:
+            return {"layers": self.layers}
+
+        @property
+        def n_features(self) -> int:
+            if self._n_features is None:
+                backbone = self._backbone()
+                try:
+                    n_channels = int(backbone.sphere_channels)
+                    n_blocks = len(backbone.blocks)
+                except AttributeError as error:
+                    raise RuntimeError(
+                        f"Cannot determine the number of UMA feature vector "
+                        f"components: {type(backbone).__name__} does not define "
+                        f"sphere_channels or blocks in this version of fairchem."
+                    ) from error
+                n_layers = 1 if self.layers == "last" else n_blocks
+                self._n_features = n_layers * n_channels
+            return self._n_features
+
+        @property
+        def source(self) -> str:
+            return f"{self.calculator.level_of_theory}/node_embedding_l0_{self.layers}"
+
+        def compute(self, atoms: ase.Atoms) -> npt.NDArray[np.float64]:
+            backbone = self._backbone()
+            if self.layers == "last":
+                modules = [backbone]
+            else:
+                modules = list(backbone.blocks)
+
+            captured: dict[int, torch.Tensor] = {}
+            handles = [
+                module.register_forward_hook(
+                    functools.partial(_capture_output, captured, i)
+                )
+                for i, module in enumerate(modules)
+            ]
+            try:
+                self.calculator.calculate(
+                    atoms,
+                    properties=["energy"],
+                    system_changes=all_changes,
+                )
+            finally:
+                for handle in handles:
+                    handle.remove()
+
+            if len(captured) != len(modules):
+                raise RuntimeError(
+                    f"Captured {len(captured)} of {len(modules)} UMA embeddings. "
+                    f"The forward hooks did not run, which means that "
+                    f"fairchem calls the backbone modules in a way "
+                    f"this featurizer does not support."
+                )
+
+            invariants = [captured[i][:, 0, :] for i in range(len(modules))]
+            return (
+                torch.cat(invariants, dim=-1)
+                .to(torch.float64)
+                .cpu()
+                .numpy()
+            )
+
+    @make_featurizer.register(UMA)
+    def _make_uma_featurizer(calculator: UMA, **options) -> UMANodeEmbedding:
+        return UMANodeEmbedding(calculator, **options)
+
 else:
     FAIRChemCalculator = None  # type: ignore[assignment,misc]
 

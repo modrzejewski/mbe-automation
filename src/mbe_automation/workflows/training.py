@@ -85,6 +85,11 @@ def phonon_sampling(
             )
             s.feature_vectors = feature_vectors
             s.feature_vectors_type = config.feature_vectors_type
+            s.feature_vectors_source = (
+                mbe_automation.calculators.feature_vectors_source(
+                    config.features_calculator
+                )
+            )
 
     mbe_automation.storage.save_molecular_crystal(
         dataset=config.dataset,
@@ -160,6 +165,11 @@ def _crystal_at_pT(
         )
         pbc_md_frames.feature_vectors = feature_vectors
         pbc_md_frames.feature_vectors_type = config.feature_vectors_type
+        pbc_md_frames.feature_vectors_source = (
+            mbe_automation.calculators.feature_vectors_source(
+                config.features_calculator
+            )
+        )
         pbc_md_frames.save(
             dataset=config.dataset,
             key=pbc_trajectory_key,
@@ -217,6 +227,11 @@ def _finite_system_at_pT(
             )
             s.cluster_of_molecules.feature_vectors = feature_vectors
             s.cluster_of_molecules.feature_vectors_type = config.feature_vectors_type
+            s.cluster_of_molecules.feature_vectors_source = (
+                mbe_automation.calculators.feature_vectors_source(
+                    config.features_calculator
+                )
+            )
 
         mbe_automation.storage.save_finite_subsystem(
             dataset=config.dataset,

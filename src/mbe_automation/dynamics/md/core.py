@@ -18,7 +18,10 @@ from  mbe_automation.configs.md import ClassicalMD
 import mbe_automation.storage
 import mbe_automation.structure.molecule
 import mbe_automation.dynamics.md.csvr
-from mbe_automation.calculators.mace import is_mace_calculator
+from mbe_automation.calculators.features import (
+    supports_feature_vectors,
+    feature_vectors_source,
+)
 import typing
 if typing.TYPE_CHECKING:
     from mbe_automation.calculators import CALCULATORS
@@ -308,11 +311,11 @@ def run(
     print("Time propagation...", flush=True)
     dyn.run(steps=n_total_steps)
 
-    if is_mace_calculator(calculator):
+    if supports_feature_vectors(calculator):
         #
         # Automatically compute feature vectors if the calculator
-        # is MACE. This simplifies the workflow because in most
-        # cases structure generation with MACE is followed by
+        # is an MLIP. This simplifies the workflow because in most
+        # cases structure generation with an MLIP is followed by
         # subsampling in the chemical space. The storage cost is
         # negligible because the computed feature vectors
         # are averaged over atoms.
@@ -329,6 +332,7 @@ def run(
         if feature_vectors is not None:
             traj.feature_vectors = feature_vectors
             traj.feature_vectors_type = "averaged_environments"
+            traj.feature_vectors_source = feature_vectors_source(calculator)
 
     mbe_automation.storage.save_trajectory(
         dataset=dataset,
